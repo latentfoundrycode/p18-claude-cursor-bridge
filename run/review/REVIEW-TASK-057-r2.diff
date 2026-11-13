@@ -1,0 +1,1729 @@
+diff --git a/.github/workflows/tests.yml b/.github/workflows/tests.yml
+index 1a5a0dd..3b92224 100644
+--- a/.github/workflows/tests.yml
++++ b/.github/workflows/tests.yml
+@@ -17,6 +17,7 @@ jobs:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+         with:
+           persist-credentials: false
++          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
+       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+         with:
+           python-version: "3.12"
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 50a225e..e662991 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.11.12a",
+-  "generated": "2026-11-12 13:37",
++  "generated": "2026-11-13 22:47",
+   "files": {
+     "agents/cursor-configurator.md": "a8aad7838a9bc5b4f00e13fd3749919158cbe37ec7acfa9a40960600398784bc",
+     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
+@@ -93,7 +93,7 @@
+     "cursor-bridge/records-check.py": "6c5ec6e7aef58c634096bc0bf8ed94415e62d16c6a173be166d1f22d445dcd69",
+     "cursor-bridge/records-migrate.py": "cbe6acb95d7d64e7ad8086754bed108511458e2de32c387433928e1f6e8470b4",
+     "cursor-bridge/refactor-check.py": "4950674a1de1bccf2ac95a4bcec6ab5cc767f1c0a171c01cf164891d1c7d7c36",
+-    "cursor-bridge/review-guard.py": "952a60b36ba26a7b68d75a7b808f85c7f5e1030f3b66e824f8101226a66d98e0",
++    "cursor-bridge/review-guard.py": "027b1b5da11971410068a79e6fc1da3b52e975faffe3dd0cc674c936ca7305b1",
+     "cursor-bridge/roster-check.py": "dea99884ac6d57a5f661f272a90e1920c38f8e110d5a261dc7f7bc67e0a01d7c",
+     "cursor-bridge/run-hidden.py": "bcae418e3cca9d7f1be7bf421ce44b879b343613301df4590d9cc45d00f5be5c",
+     "cursor-bridge/scope-check.py": "0c9377dbd74236d256a4cbee74b082d0c4a2cd03ab20b2ad6e15a5a40d32b9d5",
+@@ -104,7 +104,7 @@
+     "cursor-bridge/shell-guard.py": "6abdc15bd149afdf1561997512b75253a154f58ddb05355577b4ebbcec36c67b",
+     "cursor-bridge/stage-diff.py": "167685045331b10e550679eb28fd51e7d829603310bde841bafb3a1cdd9a1ecc",
+     "cursor-bridge/sync-check.py": "41d4e74931b150bba23a67a1a024b640f95673a490b3a6522af3f9d6ff43e0de",
+-    "cursor-bridge/trace-check.py": "f3c246b9134ddc535f4f856cd8ced1a237d2005b53fd8499a42615493797a022",
++    "cursor-bridge/trace-check.py": "447a21dce395cf738057bd39d7415f70f2467c0712f0fc25915fe35003801263",
+     "cursor-bridge/vercel-interface.snapshot.md": "7f8cb0092a1b8df1d13320519faa421579261a052b7375c13f1565047364bafa",
+     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
+     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
+diff --git a/bridge/cursor-bridge/review-guard.py b/bridge/cursor-bridge/review-guard.py
+index 5d3e699..7078345 100644
+--- a/bridge/cursor-bridge/review-guard.py
++++ b/bridge/cursor-bridge/review-guard.py
+@@ -1216,7 +1216,8 @@ RECORD_TYPES = (".md", ".json", ".txt", ".csv", ".png", ".jpg", ".jpeg", ".gif",
+ FULL_GATE_RECORDS = (("docs/run_parameters.md", "the run parameters decide the ceilings and who merges"),
+                      ("docs/build_plan", "the plan decides what is built and in what order"),
+                      ("docs/roster", "the roster decides which model builds and which reviews"),
+-                     ("docs/diagrams/", "the diagrams, their index and the deviations decide what the diagram check allows"))   # compared in lower case
++                     ("docs/diagrams/", "the diagrams, their index and the deviations decide what the diagram check allows"),
++                     ("docs/trace_moves.md", "the trace moves record decides what the trace check excuses"))   # compared in lower case
+ TOOL_FILES = ("package.json", "package-lock.json", "tsconfig.json", "jsconfig.json", "composer.json", "deno.json", "lerna.json", "nx.json",
+               "turbo.json", "vercel.json", "firebase.json")   # a tool's own configuration, which it runs or builds from, whatever folder holds it; with them every `requirements*.txt`, which an installer reads
+ KEPT_RECORDS = ("docs/project_status.md", "docs/inventory.md", "docs/requirements.md", "project.json")   # the guards test that the status file exists; the checks read the others
+diff --git a/bridge/cursor-bridge/trace-check.py b/bridge/cursor-bridge/trace-check.py
+index a1926ad..5d6ff65 100644
+--- a/bridge/cursor-bridge/trace-check.py
++++ b/bridge/cursor-bridge/trace-check.py
+@@ -27,8 +27,29 @@ that cannot be read, a symbolic link, junction, or other reparse point met on a
+ reads, a home not readable as UTF-8, or a usage error. Then ERROR lines and RESULT: not checked
+ are printed, with no traceback.
+ The check needs the baseline commit's object history.
++
++  python trace-check.py --moves [--base <rev>] [--repo DIR]
++
++Compares the committed state of every `.md` file under `bridge/` but
++`bridge/cursor-bridge/CHANGELOG.md` between the merge-base of HEAD with the revision given
++(`origin/main` by default) and HEAD. The first output line names that base commit id.
++A passage of a changed instruction file at the base that stands in no instruction file at HEAD
++fails, naming the file and its first words and printing the entry line that would excuse it,
++unless an entry the range adds to `docs/TRACE_MOVES.md` excuses it by hash and first words.
++An added entry that excuses no dropped passage fails, naming its hash.
++
++Move-mode output lines, then counts and RESULT:
++  FAIL            a dropped passage or an unmatched entry line
++  <n> file(s) compared, <n> passage(s) compared, <n> excused
++
++Exit 0 with RESULT: OK when no FAIL line was printed. Exit 1 with RESULT: <n> problem(s)
++when at least one FAIL was printed.
++Exit 2 when the check cannot run or on a usage error (`--base` with no `--moves`, `--moves`
++with `--map`, a `--base` value beginning with `-`, or a base revision that cannot be read).
++Then ERROR lines and RESULT: not checked are printed, with no traceback.
+ """
+ import argparse
++import hashlib
+ import os
+ import re
+ import stat
+@@ -39,7 +60,10 @@ GIT_TIMEOUT = 120
+ SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+ BASELINE_REL = "bridge/cursor-bridge/workflow/trace-baseline.txt"
+ EXCEPTIONS_REL = "bridge/cursor-bridge/workflow/trace-exceptions.md"
++CHANGELOG_REL = "bridge/cursor-bridge/CHANGELOG.md"
++MOVES_REL = "docs/TRACE_MOVES.md"
+ CORE_REL = "bridge/commands/supervisor.md"
++MOVE_ENTRY_RE = re.compile(r"^- ([0-9a-f]{64}) (.+)$")
+ WORKFLOW_PREFIX = "bridge/cursor-bridge/workflow/"
+ ENTRY_RE = re.compile(
+     r"^- (reword|new) ([A-Z][A-Z0-9]*-[0-9]+) (\S+\.md) (.+)$"
+@@ -528,6 +552,256 @@ def check_citations(rel, units, all_headings, findings_cite):
+                     findings_cite.append((rel, deepest_heading(unit["chain"]), q))
+ 
+ 
++def is_instruction_md(rel):
++    rel = slash(rel)
++    if not rel.endswith(".md"):
++        return False
++    if not rel.startswith("bridge/"):
++        return False
++    return rel != CHANGELOG_REL
++
++
++def passage_hash(normal):
++    return hashlib.sha256(normal.encode("utf-8")).hexdigest()
++
++
++def passage_first_words(normal):
++    return escape_field(" ".join(normal.split()[:8]))
++
++
++def move_entry_line(normal):
++    return "- %s %s" % (passage_hash(normal), passage_first_words(normal))
++
++
++def git_file_at(root, rev, rel):
++    proc, err = git_run(root, ["show", "%s:%s" % (rev, rel)])
++    if proc is None:
++        return None, err
++    if proc.returncode != 0:
++        return None, None
++    try:
++        return decode_git_bytes(proc.stdout), None
++    except UnicodeDecodeError:
++        return None, "cannot be read as UTF-8"
++
++
++def git_head_rev(root):
++    proc, err = git_run(root, ["rev-parse", "HEAD"])
++    if proc is None:
++        return None, err
++    if proc.returncode != 0:
++        return None, "HEAD cannot be read"
++    sha = decode_git_bytes(proc.stdout).strip()
++    if not SHA_RE.match(sha):
++        return None, "HEAD is not a commit"
++    return sha, None
++
++
++def git_merge_base(root, head, rev_spec):
++    if rev_spec.startswith("-"):
++        return None, "a revision must not begin with -"
++    proc, err = git_run(root, ["rev-parse", "--verify", "--end-of-options", rev_spec])
++    if proc is None:
++        return None, err
++    if proc.returncode != 0:
++        reason = decode_git_bytes(proc.stderr + proc.stdout).strip() or "cannot be resolved"
++        return None, reason
++    rev = decode_git_bytes(proc.stdout).strip()
++    proc, err = git_run(root, ["merge-base", head, "--end-of-options", rev])
++    if proc is None:
++        return None, err
++    if proc.returncode != 0:
++        reason = decode_git_bytes(proc.stderr + proc.stdout).strip() or "no merge-base with HEAD"
++        return None, reason
++    base = decode_git_bytes(proc.stdout).strip()
++    if not SHA_RE.match(base):
++        return None, "merge-base is not a commit"
++    return base, None
++
++
++def parse_move_entries(text):
++    entries = []
++    for line in file_lines(text or ""):
++        m = MOVE_ENTRY_RE.match(line)
++        if m:
++            entries.append({
++                "hash": m.group(1),
++                "words": m.group(2),
++                "line": line,
++            })
++    return entries
++
++
++def instruction_paths_in_rev(root, rev):
++    proc, err = git_run(root, ["ls-tree", "-r", "--name-only", "-z", rev, "--", "bridge/"])
++    if proc is None:
++        return None, err
++    if proc.returncode != 0:
++        return None, "command failed"
++    paths = []
++    for part in proc.stdout.split(b"\0"):
++        if not part:
++            continue
++        try:
++            rel = decode_git_bytes(part)
++        except UnicodeDecodeError:
++            return None, "cannot be read as UTF-8"
++        if is_instruction_md(rel):
++            paths.append(slash(rel))
++    paths.sort()
++    return paths, None
++
++
++def changed_instruction_paths(root, base, head):
++    proc, err = git_run(root, ["diff", "--name-only", "--no-renames", "-z", base, head, "--", "bridge/"])
++    if proc is None:
++        return None, err
++    if proc.returncode != 0:
++        return None, "command failed"
++    paths = []
++    for part in proc.stdout.split(b"\0"):
++        if not part:
++            continue
++        try:
++            rel = decode_git_bytes(part)
++        except UnicodeDecodeError:
++            return None, "cannot be read as UTF-8"
++        if is_instruction_md(rel):
++            paths.append(slash(rel))
++    paths.sort()
++    return paths, None
++
++
++def head_passage_norms(root, head):
++    norms = set()
++    paths, err = instruction_paths_in_rev(root, head)
++    if paths is None:
++        return None, None, err
++    for rel in paths:
++        text, read_err = git_file_at(root, head, rel)
++        if read_err:
++            return None, rel, read_err
++        if text is None:
++            continue
++        units, _heads = parse_units(text)
++        for u in units:
++            norms.add(u["normal"])
++    return norms, None, None
++
++
++def added_move_entries(root, base, head):
++    base_text, read_err = git_file_at(root, base, MOVES_REL)
++    if read_err:
++        return None, read_err
++    head_text, read_err = git_file_at(root, head, MOVES_REL)
++    if read_err:
++        return None, read_err
++    base_lines = {e["line"] for e in parse_move_entries(base_text or "")}
++    added = [e for e in parse_move_entries(head_text or "") if e["line"] not in base_lines]
++    return added, None
++
++
++def run_moves(root, base_rev):
++    proc, err = git_run(root, ["rev-parse", "--is-inside-work-tree"])
++    if proc is None:
++        print("ERROR: git rev-parse: %s" % escape_field(err))
++        print("RESULT: not checked")
++        return 2
++    if proc.returncode != 0 or proc.stdout.decode("ascii", "replace").strip() != "true":
++        print("ERROR: %s: not a git work tree" % escape_field(slash(root)))
++        print("RESULT: not checked")
++        return 2
++
++    head, err = git_head_rev(root)
++    if head is None:
++        print("ERROR: git rev-parse: %s" % escape_field(err))
++        print("RESULT: not checked")
++        return 2
++
++    base, err = git_merge_base(root, head, base_rev)
++    if base is None:
++        print("ERROR: %s: %s" % (escape_field(base_rev), escape_field(err)))
++        print("RESULT: not checked")
++        return 2
++
++    print(base)
++
++    head_norms, err_rel, err = head_passage_norms(root, head)
++    if head_norms is None:
++        if err_rel is not None:
++            print("ERROR: %s: %s" % (escape_field(err_rel), escape_field(err)))
++        else:
++            print("ERROR: git: %s" % escape_field(err))
++        print("RESULT: not checked")
++        return 2
++
++    changed_paths, err = changed_instruction_paths(root, base, head)
++    if changed_paths is None:
++        print("ERROR: git diff: %s" % escape_field(err))
++        print("RESULT: not checked")
++        return 2
++
++    dropped = []
++    passages_compared = 0
++    files_compared = 0
++    for rel in changed_paths:
++        text, read_err = git_file_at(root, base, rel)
++        if read_err:
++            print("ERROR: %s: %s" % (escape_field(rel), escape_field(read_err)))
++            print("RESULT: not checked")
++            return 2
++        if text is None:
++            continue
++        files_compared += 1
++        units, _heads = parse_units(text)
++        passages_compared += len(units)
++        for u in units:
++            nf = u["normal"]
++            if nf not in head_norms:
++                dropped.append((rel, nf))
++
++    read_entries, err = added_move_entries(root, base, head)
++    if read_entries is None:
++        print("ERROR: %s: %s" % (escape_field(MOVES_REL), escape_field(err)))
++        print("RESULT: not checked")
++        return 2
++
++    matched_drop = set()
++    fail_count = 0
++    excused = 0
++
++    for entry in read_entries:
++        key = (entry["hash"], entry["words"])
++        paired = False
++        for index, (rel, nf) in enumerate(dropped):
++            if index in matched_drop:
++                continue
++            if (passage_hash(nf), passage_first_words(nf)) == key:
++                matched_drop.add(index)
++                excused += 1
++                paired = True
++                break
++        if not paired:
++            print("FAIL %s" % entry["hash"])
++            fail_count += 1
++
++    for index, (rel, nf) in enumerate(dropped):
++        if index in matched_drop:
++            continue
++        print("FAIL %s: %s" % (escape_field(slash(rel)), passage_first_words(nf)))
++        print(move_entry_line(nf))
++        fail_count += 1
++
++    print("%d file(s) compared" % files_compared)
++    print("%d passage(s) compared" % passages_compared)
++    print("%d excused" % excused)
++    if fail_count:
++        print("RESULT: %d problem(s)" % fail_count)
++        return 1
++    print("RESULT: OK")
++    return 0
++
++
+ def load_baseline_file(root, sha, rel, errors):
+     proc, err = git_run(root, ["show", "%s:%s" % (sha, rel)])
+     if proc is None:
+@@ -562,17 +836,39 @@ def build_parser():
+     )
+     parser.add_argument("--repo", default=None, metavar="DIR")
+     parser.add_argument("--map", action="store_true")
++    parser.add_argument(
++        "--moves",
++        action="store_true",
++        help="compare instruction passages between the merge-base of HEAD with a revision and HEAD",
++    )
++    parser.add_argument(
++        "--base",
++        default=None,
++        metavar="REV",
++        help="revision whose merge-base with HEAD is the range base (default origin/main)",
++    )
+     return parser
+ 
+ 
+ def main(argv=None):
+-    args = build_parser().parse_args(argv)
++    parser = build_parser()
++    args = parser.parse_args(argv)
+     if args.repo is not None:
+         root = os.path.abspath(args.repo)
+     else:
+         here = os.path.abspath(__file__)
+         root = os.path.dirname(os.path.dirname(os.path.dirname(here)))
+ 
++    if args.moves and args.map:
++        parser.error("--moves cannot be used with --map")
++    if args.base is not None and not args.moves:
++        parser.error("--base requires --moves")
++    if args.moves:
++        base_rev = args.base if args.base is not None else "origin/main"
++        if base_rev.startswith("-"):
++            parser.error("%s: a revision must not begin with -" % base_rev)
++        return run_moves(root, base_rev)
++
+     errors = []
+ 
+     proc, err = git_run(root, ["rev-parse", "--is-inside-work-tree"])
+diff --git a/docs/BUILDER_NOTES.md b/docs/BUILDER_NOTES.md
+index 5bb602c..6f771b8 100644
+--- a/docs/BUILDER_NOTES.md
++++ b/docs/BUILDER_NOTES.md
+@@ -39,3 +39,5 @@
+ 2026-10-31 BUG-038-r1: `tests/test_bug038.py` test 3 uses `text[:text.index('"""', 3)]`, which on `completion-check.py` (shebang then opening `"""` on line 2) slices only the shebang line, so `STAND-IN` is never in `doc` and the test fails before and after the docstring fix; keyword checks pass with `ast.get_docstring`-style extraction.
+ 
+ 2026-11-11 TASK-051: `test_fix001_no_test_starts_a_program_around_the_default` fails on supervisor `tests/test_records_migrate.py` lines 76 and 81 (`creationflags=NO_WINDOW`); Scope forbids editing above the builder marker, so the supervisor should spell `getattr(subprocess, "CREATE_NO_WINDOW", 0)` there. Closed 2026-11-11 (stage H2's review): the file no longer holds those lines.
++
++2026-11-13 TASK-057-r2: `test_r077_the_help_names_the_move_mode_and_its_base` asserts the substring `SUPPRESS` is absent from the whole of `docs/cli-reference.json`, but `tools/dump-cli.py` on Python 3.12 records every argparse `-h` default as the string `==SUPPRESS==` (17 occurrences after `--moves`/`--base` help is fixed); the test's first assertion and the trace-check section of the reference already match S1, while the second assertion cannot pass without a dump-cli change (out of scope for r2).
+diff --git a/docs/CLI_REFERENCE.md b/docs/CLI_REFERENCE.md
+index 3624c38..ed569a7 100644
+--- a/docs/CLI_REFERENCE.md
++++ b/docs/CLI_REFERENCE.md
+@@ -1187,6 +1187,26 @@ that cannot be read, a symbolic link, junction, or other reparse point met on a
+ reads, a home not readable as UTF-8, or a usage error. Then ERROR lines and RESULT: not checked
+ are printed, with no traceback.
+ The check needs the baseline commit's object history.
++
++  python trace-check.py --moves [--base <rev>] [--repo DIR]
++
++Compares the committed state of every `.md` file under `bridge/` but
++`bridge/cursor-bridge/CHANGELOG.md` between the merge-base of HEAD with the revision given
++(`origin/main` by default) and HEAD. The first output line names that base commit id.
++A passage of a changed instruction file at the base that stands in no instruction file at HEAD
++fails, naming the file and its first words and printing the entry line that would excuse it,
++unless an entry the range adds to `docs/TRACE_MOVES.md` excuses it by hash and first words.
++An added entry that excuses no dropped passage fails, naming its hash.
++
++Move-mode output lines, then counts and RESULT:
++  FAIL            a dropped passage or an unmatched entry line
++  <n> file(s) compared, <n> passage(s) compared, <n> excused
++
++Exit 0 with RESULT: OK when no FAIL line was printed. Exit 1 with RESULT: <n> problem(s)
++when at least one FAIL was printed.
++Exit 2 when the check cannot run or on a usage error (`--base` with no `--moves`, `--moves`
++with `--map`, a `--base` value beginning with `-`, or a base revision that cannot be read).
++Then ERROR lines and RESULT: not checked are printed, with no traceback.
+ ```
+ 
+ ### Options
+@@ -1194,6 +1214,8 @@ The check needs the baseline commit's object history.
+ - `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
+ - `--repo`; default: null; required: false
+ - `--map`; default: false; required: false
++- `--moves`; default: false; required: false; compare instruction passages between the merge-base of HEAD with a revision and HEAD
++- `--base`; default: null; required: false; revision whose merge-base with HEAD is the range base (default origin/main)
+ 
+ ## wake-timer.py
+ 
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 58a5f63..497b7d6 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -2023,3 +2023,15 @@ The facts the design rests on are recorded in docs/DESIGN.md, Change: the progra
+ - **Deviation from the plan's words, recorded in the row:** the plan names R-042's P2 entry at `supervisor.md :: Standing rules`; release S moved the membership sentence with rule 6's detail to step 7, so the entry names `decide.md :: 7. Decide (accept the increment) (#154)`, the heading that now states it.
+ - **Measured.** The nine changed test files stripped "223 passed in 151.58s"; mutants "killed=8 survived=0" (two of R-066's clause, R-067's, two of R-069's, the three D-003 states', each red on its own test); `completion-check.py --mode plan` OK, "76 built, 2 deferred, 26 planned"; `inventory-check.py` OK; `plan-check.py` OK.
+ - **Leads (none of the five):** R-071's "with the reason" stands only in the CHANGELOG's S6 entry for 2026.11.12a, in no rule text a heading could name; a text lead, for the next edit of `Known-Pitfalls.md`. The holders outside this Scope (tests/test_account_keys.py, tests/test_install_check.py, tests/test_session_start_module.py, tests/test_release_t_merge.py, tests/test_release_b_ci_floor.py, tests/test_dependency_scan.py) are named in the rows' Evidence without the rows' IDs written into them, for each file's next edit.
++
++### TASK-057: the trace check's move mode (2026-11-13, PR #160)
++- **What.** A builder increment (composer-2.5), two rounds. The supervisor's part first: docs/TRACE_MOVES.md (its entry form under `## Entries`), tests/test_program_trace_moves.py (17 tests, then 6 more), the full-gate test in tests/test_release_s_records_gate.py, and CI's tests job fetching the full history on pull requests (`fetch-depth` `'0'` there, `'1'` elsewhere: GitHub's `&& 0 || 1` yields 1, since 0 is falsy). The builder's round 1 added `--moves` and `--base` to trace-check.py and docs/TRACE_MOVES.md to premerge-records' full-gate list; round 2 fixed Review A's four findings.
++- **The brief's launch, refused once:** `header: disagrees satisfies`. The brief's prose named R-077 twice, and the launcher reads every R-id on that line, so the prose's list disagreed with the header's one ID. Fixed in place before any run (fe22f35). A lead: the reading could take each ID once.
++- **Review A, round 1:** REJECT, two findings of behaviour against the brief: a dashed `--base` refused only after two git calls (the value never reached git, `--end-of-options` holding it as a revision); `file(s) compared` counting files never read at the base (an added file, a rename's new path). Two should-fixes: both options' help suppressed, so `-h` and the command reference hid them; an instruction file unreadable at HEAD not named. Four tests pinned them, each failing on the round-1 checkpoint 16350b9. **Round 2:** APPROVE, nothing open.
++- **The supervisor's test fault, a wrong-reason failure:** the help test asserted no `SUPPRESS` anywhere in docs/cli-reference.json, but argparse records every program's `-h` default as `==SUPPRESS==`, so it could never pass. The round-2 builder found it, noted it in BUILDER_NOTES and did not edit the test. It now asserts that no option's help is `==SUPPRESS==`; Review A, round 2, confirmed it fails on 16350b9 by its first assertion, and by its second with the reference not regenerated.
++- **Measured.** The supervisor's run of the five affected files stripped, round 2: "246 passed, 4 skipped" (the four symbolic-link skips, test_trace_check.py:483 and :548); round 1's "240 passed, 4 skipped". Mutants "killed=13 survived=0": the hash dropped from an excuse, the CHANGELOG as a destination, an unmatched entry passed, every HEAD entry read, the given revision taken for the merge-base, git's rename detection, the entry line not printed, one entry excusing two alike passages, the full-gate entry removed, and round 2's four fixes each undone. m6 (rename detection) also fails the compared-count test, a second kill. One mutant was dropped, not run: the dash refusal inside `git_merge_base`, now the second of two guards before `--end-of-options`, which no test can tell apart, and mutation-run takes no expected survivor (`expect_fail must be a non-empty list`).
++- **CI, round 1 (correctness, the workflow's pin):** both programs jobs "1 failed" (ubuntu "1 failed, 5087 passed, 56 skipped"; windows "1 failed, 5107 passed, 36 skipped"), the same test, tests/test_release_b_ci_floor.py::test_r002_workflow_is_the_pinned_one: the tests job's new `fetch-depth` was not written into the workflow's pin, which must change in the same diff. The increment's own runs held the five affected files and not the workflow's readers. Fixed (the pin carries the expression as YAML reads it); five of the six test files that name tests.yml (all but test_dump_cli.py) stripped "602 passed, 2 skipped in 87.92s"; Review B round 2. The lesson, beside TASK-056's: a change of a workflow runs its readers (tests/test_release_b_ci_floor.py, tests/test_release_t_floor.py, tests/test_dependency_scan.py, tests/test_workflow_check.py, tests/test_dump_cli.py) beside its own. Review A read the fix and approved, the six files that name tests.yml "701 passed, 2 skipped in 187.41s".
++- **Builder's Assumed items:** round 1's four: `--end-of-options` (git 2.53 here; an older git fails every base closed, exit 2), two on alike passages (settled by the supervisor's test), the empty normal form (cannot occur, by parse_units). Round 2's two: the test fault above, and a dashed `--base` without `--moves`, which meets the requires-moves usage error first, also before any git call.
++- **Outside the Workspace during round 2's run:** only Reports/Maintainer/release-S-handover and release-S-notes changed. These are the maintainer session's files; it messaged the same hour. They are not the builder's.
++- **A rule breach of the supervisor's, recorded (rule 7):** during TASK-056 a module of the bridge was imported in a `python -c` probe outside pytest. A probe runs only as a test from a file under tests/, through the launcher's test kind. It changed nothing.
++- **Leads (none of the five):** `git_file_at` takes every non-zero exit as absent, so on a damaged or partial clone a missing object would read every HEAD entry as added, or skip a changed file's passages: a false pass on a clone CI does not make; `git cat-file -e` would tell absence apart (Review A, round 1, N4). "Added" entries are a set difference, so a second identical entry line adds none and fails safe (N3). Path names that are not UTF-8 are decoded before the `.md` filter, exit 2 (N5). `--m` no longer abbreviates `--map` (N6). The help test does not require a help text (`help=None` would pass; round 2, N1). `CheckArgumentParser.error` writes the raw message to stderr, stdout escaped (round 2, N4, pre-existing).
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index 26af885..88dd977 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -41,7 +41,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | The report cycle's program follow-ups | The roster's switch resolves with a `REBUILD` line when Review B is of the family that built the change in flight, and rewrites docs/ROSTER.resolved.json only when it changes; the launcher refuses that Review B until the rebuild and reports any write beside the Workspace as `bridge-run: BOUNDARY`; the review guard keeps the snapshot's hash outside the checkout and retries GitHub's lagging head at premerge; `scope-check.py --base` and `supervisor:` subjects; `records-check.py` and `stage-diff.py`; invisible-check flags no-break and fixed-width spaces; the conformance check's new floors (a computer path in the status file, the boundary hook's NOTE, Socket's banner and key step); the Semgrep rules' operand orders; a `Paused:` line is a wait for the loop guard; the installer takes a GitHub-merged `release/*` head | bridge/cursor-bridge/roster-check.py, bridge-run.py, review-guard.py, scope-check.py, records-check.py, stage-diff.py, invisible-check.py, conformance-check.py, semgrep-bridge-rules.yml, loop-guard.py, evaluate-reports.py, bridge-install.py, settings.bridge.json; tools/compaction-baseline.py | tests/test_hotfix25a_conformance_semgrep.py; tests/test_hotfix25a_guard_scope_invisible.py; tests/test_hotfix25a_loopguard_reports.py; tests/test_hotfix25a_roster_launcher.py; tests/test_hotfix25a_stage_records_install.py | hotfix 2026.10.25a (HOTFIX-002; on main 2026-10-25) |
+ | Questions about the software asked as a conversation | A question to the owner about what the software does or how a feature behaves, at intake, in a change's intake, in the mockup iteration, before the design gate and in an escalation mid-build, is asked as numbered questions in prose answered in the owner's own words, never as options the supervisor guessed and with no recommendation before the answer; a project parameter of intake.md's closed list, the gates, the run parameters and the other decisions rule 12's bound names keep the question form | bridge/cursor-bridge/workflow/phases/intake.md, interface/mockups.md, change-cycle.md, design.md; bridge/commands/supervisor.md (the escalation passage, two reporting bullets, rule 12); bridge/skills/explain-for-decision/SKILL.md; bridge/cursor-bridge/Known-Pitfalls.md (KP-075) | tests/test_hotfix_intake.py | hotfix 2026.11.09a (HOTFIX-003; on main 2026-11-09) |
+ | The glossary's workflow terms | The closed set of release B's terms (main workflow core, phase module, extension point, product type, sub-type, trait, the conditional workflows, add/replace/set, the open list, workflow and sub-workflow names, the workflow check, the compaction-survival list), and a Phase entry listing all eight status values | bridge/cursor-bridge/Glossary.md, "Main and conditional workflows" | tests/test_glossary_terms.py | release B (TASK-009) |
+-| The traceability check | Compares every passage of the core (bridge/commands/supervisor.md) at the pinned baseline commit with its current homes, the core and every module under bridge/cursor-bridge/workflow/: a passage dropped everywhere, a passage in more homes than at baseline, undeclared new text in a module, a `~/.claude/...` reference that does not name a path inside bridge/ with no link on the way, and a cited heading that resolves nowhere are FAIL lines; `reword` and `new` entries in trace-exceptions.md excuse a reworded or new passage; `--map` prints each passage's home; a link met on any path it reads, an unreadable folder, a git failure or the baseline commit missing (a shallow clone) stop it with exit 2. Only git rev-parse, cat-file, ls-tree and show run; nothing is written | bridge/cursor-bridge/trace-check.py; bridge/cursor-bridge/workflow/trace-baseline.txt (the baseline, 0a186da); bridge/cursor-bridge/workflow/trace-exceptions.md | tests/test_trace_check.py | release B (TASK-016) |
++| The traceability check | Compares every passage of the core (bridge/commands/supervisor.md) at the pinned baseline commit with its current homes, the core and every module under bridge/cursor-bridge/workflow/: a passage dropped everywhere, a passage in more homes than at baseline, undeclared new text in a module, a `~/.claude/...` reference that does not name a path inside bridge/ with no link on the way, and a cited heading that resolves nowhere are FAIL lines; `reword` and `new` entries in trace-exceptions.md excuse a reworded or new passage; `--map` prints each passage's home; a link met on any path it reads, an unreadable folder, a git failure or the baseline commit missing (a shallow clone) stop it with exit 2. Since TASK-057 (R-077) the move mode, `--moves [--base <rev>]`, compares every `.md` file under bridge/ but the CHANGELOG at the merge-base of HEAD with the revision (`origin/main` by default, the commit named on its first line) with the same files at HEAD: each passage of a changed file at the base that stands in none of them at HEAD fails, naming its file and first words and printing the entry line that would excuse it, unless an entry the range adds to docs/TRACE_MOVES.md excuses it (one passage per entry, by its normal form's hash and first words); an added entry that excuses nothing is a finding; only files read at the base count as compared; a dashed base is a usage error before any git call; `review-guard.py premerge-records` holds docs/TRACE_MOVES.md to the full gate. Only git rev-parse, cat-file, ls-tree and show run, and in the move mode merge-base and diff; nothing is written | bridge/cursor-bridge/trace-check.py; bridge/cursor-bridge/workflow/trace-baseline.txt (the baseline, 0a186da); bridge/cursor-bridge/workflow/trace-exceptions.md; docs/TRACE_MOVES.md | tests/test_trace_check.py; tests/test_program_trace_moves.py | release B (TASK-016); the move mode, the program release (TASK-057) |
+ | The phase modules | The supervisor's procedure, one file per part of the workflow, moved from the core verbatim but for 5 reworded passages (stage B3 reworded 11 passages in all, the other 6 where they stand in the core; each is excused by a `reword` entry in trace-exceptions.md; the trace excused 14 after TASK-017's three units split at the sentence, 52 since BUG-031, 57 since BUG-033 and 77 since BUG-040 and 79 since BUG-042 and 83 since BUG-043 and 89 since HOTFIX-003, each increment's rewords pinned in tests/test_core_carve.py): intake, design, interface, planning, run-parameters, configuration, delegation-loop, change-cycle, reflection, project-end (carved out of the reflection points as a declared split); the core keeps the roles and division of labour, the founding rules, the loop's shape, escalation and reporting, project state and the standing rules, and names every module, and when a module is read outside its own phase (reflection at every reflection point, its Issues section whenever an issue is detected, project end at the last stage's close, another phase's module whole for a step a module runs by its heading: the change cycle's scaled Phases 1 to 4, the design critique's use of the delegation loop's steps 3b and 8); the modules install from the manifest with no installer change | bridge/cursor-bridge/workflow/phases/*.md; bridge/commands/supervisor.md | tests/test_core_carve.py; trace-check.py (424 passages, 0 dropped) | release B (TASK-010) |
+ | Classification at intake and traits at the design gate | Each part classified against the open list at intake, its product type and sub-type fixed there, its traits and its type's default traits proposed there and settled as a decision of their own at the design gate; the `Workflows:` line written and `workflow-check.py --status` run; a part that fits no type, two equally, two sub-types equally or an unwritten type or sub-type pauses the project before design (a run sheet to the maintainer; resumed after the release and the calibration, classified again before the gate); a new or unwritten trait's handling written into the design and flagged at the gate, where the owner may pause, kept as a `Flagged trait:` row for the promotion pass; each part's delivery kind confirmed at intake and recorded as a `Delivery kind:` row; the intake questions and answers kept in run/supervisor/intake-notes.md, never a key; intake.md and design.md open with their compaction-survival lists and declare their extension points | bridge/cursor-bridge/workflow/phases/intake.md; bridge/cursor-bridge/workflow/phases/design.md | tests/test_phase_modules_intake_design.py | release B (TASK-011) |
+ | The interface variants | The interface phase runs one variant per kind of interface a part has, each an addition: mockups for screens (today's Phase 3 procedure, activated by the trait has screens), command design for commands and contract design for a protocol other software calls (each declared with its heading and purpose, its procedure written by TASK-022: command design writes docs/design/COMMANDS.md, a section per command with its help text, output and exit codes, and never takes a secret as an option's value; contract design writes docs/design/CONTRACT.md and its machine-readable contract file, each operation naming who may call it and the mechanism that tells, what its inputs may reach, and how a refused call fails, changing and revealing nothing; an added or widened operation, like a breaking change, escalates to the owner), and a playable prototype for play (a pointer to the Game Development workflow, release E); interface.md declares them in a table and one `Variants:` line the session-start hook names after it; the owner's change requests are kept in run/supervisor/interface-notes.md, never a key; the owner approves each variant's artifact, the phase passing when all are approved, and the owner's word is asked even when no part runs a variant; the plan builds against what the phase approved (planning.md, "What the interface phase hands to the plan": every approved contract gets the increment whose tests enforce it; the increment that first builds an approved command carries the command reference's generator and its currency check, and each later one that adds or changes a command "the reference regenerated and committed", whatever the part's traits, the plan critic's lens asking both, BUG-021 and BUG-022); interface.md and planning.md open with their compaction-survival lists and declare their extension points | bridge/cursor-bridge/workflow/phases/interface.md; .../interface/*.md; .../planning.md | tests/test_phase_modules_interface_planning.py; tests/test_interface_text.py; tests/test_traits_existing.py (test_r017_) | release B (TASK-012; the two procedures TASK-022; the command reference BUG-021, BUG-022) |
+@@ -134,6 +134,7 @@ No paid API key is needed to build the bridge itself; the roster uses the owner'
+ | Stage B2's least-confident item 2 is tested on shapes of the other projects' status files, built in the test, never copies of the files (FIX-002, tests/test_b2_least_confident.py): each shape keeps what the judges read (line endings, field names in their order, headed sections, size, non-ASCII text), read from the real files on 2026-10-19 as counts and names only; the content is invented | the real files hold those projects' records and this computer's paths, and this repository is public (rule 54) | 2026-10-19, supervisor (FIX-002) | a judge reads something of a status file the shapes do not keep, or a project's status file changes shape (stage B4's classifications commit their own fixtures) |
+ | The traceability check traces every passage of the core (424 at the baseline), not only the standing rules and the conditional passages R-029 names | tracing them all costs nothing more and leaves no passage to be classed by hand; a passage that leaves the core without a home takes a `reword` entry the design review sees | 2026-10-20, supervisor (TASK-016) | a split increment needs a passage deleted outright |
+ | The traceability check has no CI step: it runs in the supervisor's checkout at step 4 of every split increment (TASK-010 on) and over the finished split at TASK-025 | CI's tests job checks out with depth 1, so the baseline commit is absent there and the check ends in exit 2 by design, never a pass; fetching the history is a CI change for the increment that wants it | 2026-10-20, supervisor (TASK-016 brief) | a split increment merges without the check having run, or CI fetches full history |
++| The trace check's move mode runs in CI: the tests job fetches the full history on pull requests (depth 1 elsewhere), and tests/test_program_trace_moves.py runs `--moves` on this repository with the pull request's base branch, never skipping on a pull request; the pinned mode keeps the row above | the trigger the row above names, CI fetching the full history, met for R-077, which wants every pull request read | 2026-11-13, supervisor (TASK-057) | the full fetch costs a pull request's CI more than its run allows |
+ | TASK-016's accepted assumptions: a list continuation inside a block quote and a heading's closing `#` characters are not modelled (the core has neither); git's paths are decoded as UTF-8 (every workflow path is ASCII), a non-UTF-8 one shown through a latin-1 decode in an error that fails closed; a 120-second limit on each git command (the largest is the core's `git show`); the walk-start link test is shadowed by the baseline file's, whose path runs through the same folder (mutation (ab)) | each rests on today's files or fails closed; the commit messages of 7d9974b, 6af5b54 and be7c9b0 hold the dispositions | 2026-10-20, supervisor (TASK-016) | a module adds a block quote or a closing-hash heading, a non-ASCII path enters workflow/, a git command nears its limit, or a file read by name moves out of workflow/ |
+ | The core's size after the carve and the gate's fixes: 856 lines and 95,005 characters (before: 2,342 lines and 223,501 characters), and at stage B3's close, after TASK-014's rewording of rule 34 and BUG-018's of the `project` exception's sentence: 857 lines and 95,665 characters; the largest module, delegation-loop.md, 621 lines and 56,457 characters, inside R-032's bound of 1,500 lines and 60,000 characters; after TASK-013's split, delegation-loop.md 573 lines and 54,965 characters and its sub-file delegation-loop/refactoring-pass.md (step 9) 82 lines and 6,515 characters; at stage B3's close, after BUG-018's two survival-list bullets, delegation-loop.md 574 lines and 55,464 characters (92.4% of the bound); after TASK-017's moves into the trait files, 536 lines and 53,330 characters (88.9%); after TASK-030, which added the loop's text for windowless runs, the slot and the mutation run and moved step 7 verbatim into the sub-file delegation-loop/decide.md, 430 lines and 53,025 characters (88.4%), decide.md 117 lines and 13,071 characters; after TASK-035, which records R-003's ruling in the core and adds the template's `Deferred increments:` field, the core 864 lines and 97,047 characters, read in parts to its last line (FB-036); after TASK-034, which adds the review ceiling's text, the core 873 lines and 98,103 characters, delegation-loop.md 452 lines and 56,531 characters (94.2% of the bound), decide.md 139 lines and 17,368 characters; at stage B5's close, after BUG-031 and BUG-033, the core 874 lines and 98,327 characters, delegation-loop.md 452 lines and 57,217 characters (95.4% of the bound), decide.md 141 lines and 17,998 characters; after TASK-038, which moved step 8 verbatim into the sub-file delegation-loop/merge.md and reworded it there, delegation-loop.md 357 lines and 41,737 characters (69.6% of the bound), merge.md 106 lines and 19,702 characters, the core 876 lines and 100,701 characters (100,689 at the increment's first records commit, before round 1's fix of rule 43); after TASK-039, which added release T's convergence, threat-model and report rules, the core 875 lines and 101,063 characters, delegation-loop.md 358 lines and 43,466 characters (72.4% of the bound), decide.md 139 lines and 19,485 characters, merge.md 96 lines and 20,414 characters, measured on the merged tree (fa74dca; the figures first written, 100,940, 43,088, 19,175 and 20,094, were the accept commit's, before Review A's fixes: Review B's round-1 Should fix on PR #120); TASK-040 changes none of the four, reflection.md 130 lines and 21,731 characters, measured on the merged tree (6306b40; 21,106 was 4ecfdd5's, before Review A's fixes: Review B's round-1 Should fix on PR #121); after BUG-040, which adds one sentence to merge.md and a clause each to decide.md, reflection.md, rules 6 and 43: merge.md 96 lines and 20,823 characters, decide.md 139 lines and 19,615 characters, reflection.md 130 lines and 21,926 characters, the core 875 lines and 101,174 characters, delegation-loop.md unchanged | TASK-010's Done when asks for the measurement; TASK-013's split it foresaw (unsplit, the enriched module would be about 60,500 characters, past the bound) | 2026-10-20, supervisor (TASK-010; TASK-013) | a module nears the bound (delegation-loop.md at 72.4% of its characters since TASK-039; past 95% a further addition moves another step into a sub-file first) |
+ | The session-start hook's threat model is a partial, mismatched or hand-edited install, not a hostile checker or module: workflow-check.py and, since TASK-047, the shared module bridge_env.py run in the hook's process and could write to its output directly. Inside it, nothing the checker returns reaches the output except as an exact str matching its pattern, and bridge_env is loaded from the hook's own folder only, refused where its file is a link, its output redirected during the import and its three names (`status_values`, `status_workflows`, `STATUS_WORKFLOWS_PROBLEMS`) checked before use, the hook printing one plain line naming bridge_env (`cannot be loaded` or `cannot be used`) in place of its pointers otherwise (tests/test_header_status.py); what lies outside it is docs/HARDENING.md's (Stage B3, TASK-010 with TASK-015; TASK-047) | seven review rounds converged there; every guard past the model narrows a channel an in-process program can open another way | 2026-10-20, supervisor (TASK-015, by-class line); revised 2026-11-11, supervisor (stage H1's review: the hook loads bridge_env since TASK-047) | the hook loads code other than the installed checker and the installed shared module, or a finding inside the model |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index aab60d4..38a416d 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -15,9 +15,9 @@ open_issues: ["ISS-031 open (invisible-check misses U+2028, U+2029, U+0085 and t
+ Last updated: 2026-11-13
+ Phase: changing
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable, External services
+-Change cycle: the program release (begun 2026-11-13, the owner's word in this chat; its intake's read-back confirmed by the owner 2026-11-13; its design revision and plan addendum, one subject, `program`, approved by the owner at the design gate 2026-11-13, seven decisions in the question form, the trait External services approved and the carry comparison kept a recorded lead; step: the loop, stage P1, TASK-056 merged (PR #159), TASK-057 next); before it release B2, begun 2026-11-04, complete 2026-11-11 (Claude-Cursor Bridge 2026.11.11a)
++Change cycle: the program release (begun 2026-11-13, the owner's word in this chat; its intake's read-back confirmed by the owner 2026-11-13; the field finding F7 added to it by the owner 2026-11-13; its design revision and plan addendum, one subject, `program`, approved by the owner at the design gate 2026-11-13, seven decisions in the question form, the trait External services approved and the carry comparison kept a recorded lead; step: the loop, stage P1, TASK-057 merged (PR #160), TASK-058 next); before it release B2, begun 2026-11-04, complete 2026-11-11 (Claude-Cursor Bridge 2026.11.11a)
+ Awaiting user on: nothing
+-Next: the loop's TASK-057, the trace check's move mode (R-077), a builder increment with its brief, after TASK-056 (release S in this project's records, R-066 to R-075, R-103 and R-104 built, PR #159); stage P1 is TASK-055 to TASK-058, then P2 to P4 (docs/BUILD_PLAN.md, The program release — the plan addendum; docs/DESIGN.md, Change: the program release); the replies of GitHub are captured live by the supervisor before TASK-064's brief, and each brief names the time limit and the retry limit of its calls (the trait External services); the release ends with the owner's install from a run sheet, Context7's setup a step of it. The order after it (INVENTORY, Decisions, 2026-11-13): the progress graph, W, G, E, F, then C, which waits for the TDP's code-map command, D and the trial of the code map. reAngle and the video factory calibrate when the owner resumes them (R-031, R-037), the TDP in its own session; release T's field items on the TDP (the first stripped suite at its TASK-172; the weekly workflow, rewritten from the frozen block, v7.0.1 since 2026.11.12a, at its next configuration touch) stand in HARDENING, Correction to project end. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++Next: the loop's TASK-058, the bridge's own records checked by its tests (R-101), supervisor-authored tests, after TASK-057 (the trace check's move mode, R-077 built, PR #160); then stage P1's close, where the field finding F7 (a merge-unit line naming one increment stops the launch; the maintainer's message of 2026-11-13, the owner's confirmation in this chat the same day: "I confirm F7 as part of the program release next to F1 to F6") enters the design and the plan beside F1 to F6 on Fable 5.2, the owner told when to switch; stage P1 is TASK-055 to TASK-058, then P2 to P4 (docs/BUILD_PLAN.md, The program release — the plan addendum; docs/DESIGN.md, Change: the program release); the replies of GitHub are captured live by the supervisor before TASK-064's brief, and each brief names the time limit and the retry limit of its calls (the trait External services); the release ends with the owner's install from a run sheet, Context7's setup a step of it. The order after it (INVENTORY, Decisions, 2026-11-13): the progress graph, W, G, E, F, then C, which waits for the TDP's code-map command, D and the trial of the code map. reAngle and the video factory calibrate when the owner resumes them (R-031, R-037), the TDP in its own session; release T's field items on the TDP (the first stripped suite at its TASK-172; the weekly workflow, rewritten from the frozen block, v7.0.1 since 2026.11.12a, at its next configuration touch) stand in HARDENING, Correction to project end. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
+ Deviations accepted: none; told to the owner (rule 58): stage H2's refactoring pass recorded its twelve candidates as next-release leads, nothing merged after the stamp (HARDENING, stage H2's close); TASK-054's viewer check made on GitHub only, Typora not opened (HARDENING, TASK-054); TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions); stage T2's demonstration ran after the install, where the plan says before (HARDENING, Stage T2's demonstration)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -33,7 +33,7 @@ Open issues: ISS-031 open (invisible-check misses U+2028, U+2029, U+0085 and the
+ Maintainer requests: hotfix 2026.10.25a (2026-10-25, the maintainer's message, rule 57): calibrate, carry it onto main (the owner's D5), clean the memory folder, propose the four text items at stage B5's plan revision (the owner's D4); done 2026-10-25 (HOTFIX-002); the four text items planned at that point and approved by the owner on 2026-10-27 (the plan revision maintainer-text, PR #92). Earlier: docs/archive/STATUS_HISTORY.md.
+ Bridge version: 2026.11.12a
+ Calibrated: 2026-11-12 from 2026.11.11a to 2026.11.12a (release S) — applied: the owner's install (bridge-check 149 OK); the release's changed text re-read by its diff against 2026.11.11a, change-cycle.md whole; conformance 24 OK, 1 MISSING, 6 NOTE before main was fast-forwarded to the maintainer's records, 25 OK, 0 MISSING, 5 NOTE on main 6809f28; roster native; memory notes 3 read, 0 reduced; records-migrate --check nothing to write; completion-check plan and done OK (63 built, 2 deferred); one stripped suite run: 1 failed, 5052 passed, 42 skipped (the failure is release S's test ordering, not the strip: tests/conftest.py swaps APPDATA before test_release_t_strip.py reads its launch environment; CI skips it; reported to the maintainer); the two retired status lines, state.bridge and the register's text evidence came with the maintainer's PR #154; the weekly pin is already v7.0.1; the calibration's records pull request, #155, through the short gate; pending: release S's building items (Calibration pending); not applied (gate passed): none.
+-Calibration pending: release S's building items, from the next release's first brief: a `Round cause:` line on every numbered brief, each finding's class with its path (`no path stated` recorded), the short gate for records-only pull requests, CI's run as the one whole suite; release S's field acceptance continues there (one increment with CI's run as its only whole suite, pace-report printing a round-cause line; met: this pull request's short gate, the hook's short list after the compaction of 2026-11-12); reAngle and the video factory calibrate when the owner resumes them, from 2026.10.25a through every entry (R-031, R-037, deferred - owner 2026-10-31); the TDP calibrates to 2026.11.12a in its own session at the owner's word, its records migrated then (release B2's field acceptance, open); release T's two items stay on its own Calibration pending line (calibrated to 2026.11.03a on 2026-11-04, on its branch task-172): the weekly scan, its pin now in the frozen block (2026.11.12a), at its next configuration touch, and the first stripped suite, at its TASK-172.
++Calibration pending: release S's building items, from the next release's first brief: a `Round cause:` line on every numbered brief, each finding's class with its path (`no path stated` recorded), the short gate for records-only pull requests, CI's run as the one whole suite; release S's field acceptance met, four of four (the maintainer's message of 2026-11-13; the fourth, pace-report's round-cause line, in the video factory); reAngle and the video factory calibrate when the owner resumes them, from 2026.10.25a through every entry (R-031, R-037, deferred - owner 2026-10-31); the TDP calibrates to 2026.11.12a in its own session at the owner's word, its records migrated then (release B2's field acceptance, open); release T's two items stay on its own Calibration pending line (calibrated to 2026.11.03a on 2026-11-04, on its branch task-172): the weekly scan, its pin now in the frozen block (2026.11.12a), at its next configuration touch, and the first stripped suite, at its TASK-172.
+ Conformance notes (2026-11-12, the calibration to 2026.11.12a, after its records: 25 OK, 0 MISSING, 5 NOTE, RESULT CONFORMANT): NOTE the repository is public; NOTE the boundary-check hook is configured, not engaging (ISS-010; the launcher's BOUNDARY lines are the detection); NOTE a messaging token of the desktop app is in the session's environment (the launcher withholds it from builder and reviewer runs); NOTE two private memory folders, two lines: this project's, reviewed at calibration step 2b, and the maintainer session's, left to the maintainer
+ Run parameters: see docs/RUN_PARAMETERS.md (the one record; the owner's four answers fixed by test_r001_run_parameters_owner_values)
+ 
+diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
+index 5adbf08..a25baac 100644
+--- a/docs/REQUIREMENTS.md
++++ b/docs/REQUIREMENTS.md
+@@ -98,7 +98,7 @@ Revised 2026-11-13 (the program release, the third change cycle; docs/DESIGN.md,
+ | R-074 | A builder or review run that ends at its limit (exit 124) never raises the learned limit and is never marked healthy (release S, C18). | the CHANGELOG, 2026.11.12a, C18 | built | tests/test_release_s_launcher.py (test_c18_) |
+ | R-075 | The weekly scan's frozen block and this repository's workflows pin `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` (v7.0.1), and the block's scan step may carry `--no-resolve` where the project's floor step does (release S, C24). | the CHANGELOG, 2026.11.12a, C24 | built | the block's pin and the floor job's: tests/test_release_t_floor.py::test_r052_the_configurator_writes_the_scan_from_the_frozen_block and tests/test_release_t_floor.py::test_r052_the_block_s_pins_are_the_floor_s; this repository's two workflows: tests/test_release_b_ci_floor.py::test_r002_workflow_is_the_pinned_one and tests/test_dependency_scan.py; the `--no-resolve` word where the floor step carries it, which no program writes: text: bridge/agents/cursor-configurator.md :: What you write (#154) |
+ | R-076 | The bridge's suite passes in a stripped run: `tests/conftest.py` keeps the launch environment's `APPDATA` under a name of the tests' own before it replaces it, `tests/test_release_t_strip.py` reads that value, and the same test file assumes nothing of the shell it runs in (the profile's layout, `GIT_CONFIG_COUNT`, a redirected `HOME`, a key file's secret-like name); one stripped run of the whole suite, through the launcher, is green on the fix's branch before its merge. | the owner's order of 2026-11-13 (its opening item); the maintainer's hand-over of 2026-11-12; DESIGN.md, Change: the program release, "The tests' own" | built | tests/test_release_t_strip.py (TASK-055) |
+-| R-077 | A moved or retired instruction passage is caught by a program (T-MOVE): `trace-check.py --moves [--base <rev>]` (the base always the merge-base of HEAD with the revision given, `origin/main` by default, the resolved commit named on the mode's first line) reads every `.md` file under `bridge/` but the CHANGELOG, as the place a passage leaves and the place it may go, and fails, naming file and first words and printing the entry line that would excuse it, for each passage of a changed file at the base that stands in no such file at HEAD, a reworded passage included, unless an entry of the tracked record `docs/TRACE_MOVES.md` excuses it, one passage per entry, by the hash of its normal form and its first words; the mode reads only the entries the range itself adds to that record, so an entry of an earlier pull request is never read again, and an added entry that matches no dropped passage of the range is itself a finding; a test runs the mode, CI's tests job fetching the full history on pull requests and the test passing the pull request's base branch as the base; `review-guard.py premerge-records` holds `docs/TRACE_MOVES.md` to the full gate; the pinned mode and its entries stay as built. | the pace audit of 2026-11-09, section 7; the owner's decision D6 (2026-11-08); DESIGN.md, Change: the program release, "The records' programs" | planned | — |
++| R-077 | A moved or retired instruction passage is caught by a program (T-MOVE): `trace-check.py --moves [--base <rev>]` (the base always the merge-base of HEAD with the revision given, `origin/main` by default, the resolved commit named on the mode's first line) reads every `.md` file under `bridge/` but the CHANGELOG, as the place a passage leaves and the place it may go, and fails, naming file and first words and printing the entry line that would excuse it, for each passage of a changed file at the base that stands in no such file at HEAD, a reworded passage included, unless an entry of the tracked record `docs/TRACE_MOVES.md` excuses it, one passage per entry, by the hash of its normal form and its first words; the mode reads only the entries the range itself adds to that record, so an entry of an earlier pull request is never read again, and an added entry that matches no dropped passage of the range is itself a finding; a test runs the mode, CI's tests job fetching the full history on pull requests and the test passing the pull request's base branch as the base; `review-guard.py premerge-records` holds `docs/TRACE_MOVES.md` to the full gate; the pinned mode and its entries stay as built. | the pace audit of 2026-11-09, section 7; the owner's decision D6 (2026-11-08); DESIGN.md, Change: the program release, "The records' programs" | built | tests/test_program_trace_moves.py (TASK-057; its test on this repository's own history runs in CI on every pull request); the full gate: tests/test_release_s_records_gate.py::test_r077_the_trace_moves_record_keeps_the_full_gate |
+ | R-078 | The launcher accepts the forms a project's suites need and holds each to the target rule (C6, F5, J4, J9, J12): the test and the driver kind accept the interpreter's own leading flags, exactly `-B` and the two words `-X utf8`, every reading of the command starting after them, and no other interpreter option; npm's `--prefix`, pnpm's `--dir` and `-C` and yarn's `--cwd` are read wherever they stand before a bare `--` and refused (exit 125) unless the folder lies under the launch roots by its resolved path, through no link, given once, the `=` form alike, and an environment name that moves the folder one of the three runners executes in, each found by the increment's reality check from the tool's documentation and a probe and listed in the inventory's row for the target rule, is held to the same rule in the run's environment, a value that does not resolve refused, the variable named and its value never printed, a configuration file a runner finds staying outside the rule as that row says; the exit-125 message tells a refused option of a known runner (a defect to report, never a run to start by hand) from an unknown runner; `merge_ids` is written sorted; the plan glob escapes its root; `reflection.md`'s demonstration sentence names the `-B` form. | the evaluation of 2026-11-01, C6; the field finding F5 (the owner, 2026-11-13); DESIGN.md, Change: the program release, "The launcher" | planned | — |
+ | R-079 | A review run's own launcher rows neither teach the limit nor go unseen (C8, J2): `learned_limit` ignores every row whose start lies inside a `review` row's run, read from the log; `review-guard.py verify` names, as a note and never a flag, the launcher rows written during the review's run by id and kind, the review's own row apart; the bridge's own launcher tests write their rows under a temporary folder, never into the checkout's `run/launcher/`. | the evaluation of 2026-11-01, C8; DESIGN.md, Change: the program release, "The launcher", "The review guard" | planned | — |
+ | R-080 | The strip cannot be undone by a key file, and its name test knows more names (J10, J11): a key file that names `USERPROFILE`, `HOME`, `HOMEDRIVE`, `HOMEPATH`, `APPDATA` or `LOCALAPPDATA` is refused before the run (exit 125, the name printed, the value never); the secret-like name test, one copy in `bridge_env.py` read by the launcher and by `conformance-check.py`, also matches `PAT`, `CREDS` and `AUTH` as name parts, `DATABASE_URL` and `SSH_AUTH_SOCK`, and a secret-like `CURSOR_` name is withheld from test and driver runs. | DESIGN.md, Change: the program release, "The launcher", "The scans" (the supervisor's joined defects, shown at the design gate) | planned | — |
+diff --git a/docs/TRACE_MOVES.md b/docs/TRACE_MOVES.md
+new file mode 100644
+index 0000000..103fc22
+--- /dev/null
++++ b/docs/TRACE_MOVES.md
+@@ -0,0 +1,33 @@
++# Trace moves
++
++This file records the instruction passages a pull request retires, rewords or moves out of `bridge/`. `trace-check.py --moves` reads it (R-077; docs/DESIGN.md, Change: the program release, T-MOVE).
++
++## What the mode compares
++
++The mode compares two sets of files: every `.md` file under `bridge/` except `bridge/cursor-bridge/CHANGELOG.md`, once at the base and once at HEAD. The base is the merge-base of HEAD with `origin/main`, or with the revision `--base` names.
++
++A passage fails when it stands in a file that changed and appears in none of these files at HEAD. A passage reworded at HEAD counts as dropped. An entry this pull request adds can excuse a passage.
++
++## The form of an entry
++
++An entry is one line. Paste it from the failure the mode prints; never compose it by hand:
++
++    - <the passage's hash: 64 lowercase hex digits> <its first eight words>
++
++- **Normal form.** The mode uses the pinned mode's normal form:
++  - a paragraph, list item or table has its whitespace collapsed to single spaces;
++  - a fenced block keeps its lines, each with its trailing whitespace removed.
++- **Hash.** The SHA-256 of the normal form's UTF-8 bytes.
++- **First words.** The normal form's first eight whitespace-separated words, joined by single spaces. They are written with the pinned mode's escaping: every character outside printable ASCII becomes `\xhh`, `\uhhhh` or `\Uhhhhhhhh`, so every entry is ASCII.
++- **What it excuses.** An entry excuses the one passage whose hash and first words both match it.
++
++## Which entries are read
++
++- **Only the range's.** The mode reads only the entries the range adds: the lines of this file added between the base and HEAD.
++- **Earlier entries are never re-read.** An entry an earlier pull request added is not read again. It cannot excuse a later drop, and it causes no later failure.
++- **An entry that excuses nothing is a finding.** An added entry that excuses no passage dropped in the range is reported.
++- **Other lines are ignored.** A line not of the entry's form is not read.
++
++The file stays after the merge. A change to it takes the full gate (`review-guard.py premerge-records`).
++
++## Entries
+diff --git a/docs/cli-reference.json b/docs/cli-reference.json
+index 53682bd..2e7bf3b 100644
+--- a/docs/cli-reference.json
++++ b/docs/cli-reference.json
+@@ -1239,7 +1239,7 @@
+       "subcommands": []
+     },
+     {
+-      "description": "trace-check: mechanical traceability from a pinned pre-split baseline (R-029).\n\n  python trace-check.py [--repo DIR] [--map]\n\nCompares every passage unit of bridge/commands/supervisor.md at the pinned baseline\ncommit with the working tree: the core and every *.md under bridge/cursor-bridge/workflow/\nexcept bridge/cursor-bridge/workflow/trace-exceptions.md (the only home left out). Module files under\nworkflow/phases/, workflow/types/, and workflow/traits/ are checked for undeclared new text. Exceptions are\nlisted in workflow/trace-exceptions.md. A ~/.claude/... reference must name a path inside bridge/ with no\nsymbolic link, junction, or other reparse point on the way.\n\nFinding lines, then TRACED and RESULT:\n  FAIL (dropped)  a baseline passage is missing everywhere\n  FAIL (copy)     a passage appears more often than at baseline (excused sections excluded)\n  FAIL (new)      undeclared text in a module file\n  FAIL (ref)      a ~/.claude/... reference does not resolve to a path inside bridge/ with no link on the way\n  FAIL (cite)     a cited section heading does not resolve in any current home\n  NOTE (reword)   a dropped passage excused by a reword entry\n  MAP             with --map, each baseline passage and its current home(s)\n\nExit 0 when no FAIL line was printed. Exit 1 when at least one FAIL was printed.\nExit 2 when the check cannot run: not a git work tree, git unavailable, missing or\ninvalid trace-baseline.txt, baseline commit absent (a shallow clone is the likely cause),\nmissing supervisor.md, invalid trace-exceptions.md, a folder under bridge/cursor-bridge/workflow/\nthat cannot be read, a symbolic link, junction, or other reparse point met on a path the program\nreads, a home not readable as UTF-8, or a usage error. Then ERROR lines and RESULT: not checked\nare printed, with no traceback.\nThe check needs the baseline commit's object history.\n",
++      "description": "trace-check: mechanical traceability from a pinned pre-split baseline (R-029).\n\n  python trace-check.py [--repo DIR] [--map]\n\nCompares every passage unit of bridge/commands/supervisor.md at the pinned baseline\ncommit with the working tree: the core and every *.md under bridge/cursor-bridge/workflow/\nexcept bridge/cursor-bridge/workflow/trace-exceptions.md (the only home left out). Module files under\nworkflow/phases/, workflow/types/, and workflow/traits/ are checked for undeclared new text. Exceptions are\nlisted in workflow/trace-exceptions.md. A ~/.claude/... reference must name a path inside bridge/ with no\nsymbolic link, junction, or other reparse point on the way.\n\nFinding lines, then TRACED and RESULT:\n  FAIL (dropped)  a baseline passage is missing everywhere\n  FAIL (copy)     a passage appears more often than at baseline (excused sections excluded)\n  FAIL (new)      undeclared text in a module file\n  FAIL (ref)      a ~/.claude/... reference does not resolve to a path inside bridge/ with no link on the way\n  FAIL (cite)     a cited section heading does not resolve in any current home\n  NOTE (reword)   a dropped passage excused by a reword entry\n  MAP             with --map, each baseline passage and its current home(s)\n\nExit 0 when no FAIL line was printed. Exit 1 when at least one FAIL was printed.\nExit 2 when the check cannot run: not a git work tree, git unavailable, missing or\ninvalid trace-baseline.txt, baseline commit absent (a shallow clone is the likely cause),\nmissing supervisor.md, invalid trace-exceptions.md, a folder under bridge/cursor-bridge/workflow/\nthat cannot be read, a symbolic link, junction, or other reparse point met on a path the program\nreads, a home not readable as UTF-8, or a usage error. Then ERROR lines and RESULT: not checked\nare printed, with no traceback.\nThe check needs the baseline commit's object history.\n\n  python trace-check.py --moves [--base <rev>] [--repo DIR]\n\nCompares the committed state of every `.md` file under `bridge/` but\n`bridge/cursor-bridge/CHANGELOG.md` between the merge-base of HEAD with the revision given\n(`origin/main` by default) and HEAD. The first output line names that base commit id.\nA passage of a changed instruction file at the base that stands in no instruction file at HEAD\nfails, naming the file and its first words and printing the entry line that would excuse it,\nunless an entry the range adds to `docs/TRACE_MOVES.md` excuses it by hash and first words.\nAn added entry that excuses no dropped passage fails, naming its hash.\n\nMove-mode output lines, then counts and RESULT:\n  FAIL            a dropped passage or an unmatched entry line\n  <n> file(s) compared, <n> passage(s) compared, <n> excused\n\nExit 0 with RESULT: OK when no FAIL line was printed. Exit 1 with RESULT: <n> problem(s)\nwhen at least one FAIL was printed.\nExit 2 when the check cannot run or on a usage error (`--base` with no `--moves`, `--moves`\nwith `--map`, a `--base` value beginning with `-`, or a base revision that cannot be read).\nThen ERROR lines and RESULT: not checked are printed, with no traceback.\n",
+       "name": "trace-check.py",
+       "options": [
+         {
+@@ -1278,6 +1278,30 @@
+           ],
+           "required": false,
+           "type": null
++        },
++        {
++          "choices": null,
++          "default": false,
++          "dest": "moves",
++          "help": "compare instruction passages between the merge-base of HEAD with a revision and HEAD",
++          "nargs": 0,
++          "option_strings": [
++            "--moves"
++          ],
++          "required": false,
++          "type": null
++        },
++        {
++          "choices": null,
++          "default": null,
++          "dest": "base",
++          "help": "revision whose merge-base with HEAD is the range base (default origin/main)",
++          "nargs": null,
++          "option_strings": [
++            "--base"
++          ],
++          "required": false,
++          "type": null
+         }
+       ],
+       "path": "bridge/cursor-bridge/trace-check.py",
+diff --git a/handoff/TASK-057-r1-report.md b/handoff/TASK-057-r1-report.md
+new file mode 100644
+index 0000000..4e1b0db
+--- /dev/null
++++ b/handoff/TASK-057-r1-report.md
+@@ -0,0 +1,120 @@
++# TASK-057 round 1 report
++
++## Files changed
++
++- `bridge/cursor-bridge/trace-check.py`
++- `bridge/cursor-bridge/review-guard.py`
++- `bridge/cursor-bridge/MANIFEST.json`
++- `docs/cli-reference.json`
++- `docs/CLI_REFERENCE.md`
++
++`tests/test_trace_check.py` was not changed (pinned-mode tests stayed green without edits). `docs/BUILDER_NOTES.md` was not changed.
++
++## Summary
++
++The builder added `trace-check.py --moves` with `--base`, reusing `parse_units`, normal forms, `escape_field`, `git_run`, and `decode_git_bytes` to compare instruction `.md` files between the merge-base and HEAD, excuse drops via range-added `docs/TRACE_MOVES.md` entries, and report counts; registered `docs/TRACE_MOVES.md` on `review-guard.py` `FULL_GATE_RECORDS`; and regenerated the CLI reference and manifest. All supervisor acceptance and Done-section checks passed.
++
++## Requirements
++
++1. `run_moves` in `trace-check.py` implements merge-base resolution, changed instruction files, passage comparison, entry read/match, and FAIL/RESULT output beside the unchanged pinned path in `main`.
++2. `run_moves` prints the full merge-base sha as the first line via `print(base)` after `git_merge_base`.
++3. `git_merge_base` rejects `--base` values starting with `-` before git; `rev-parse --verify --end-of-options` and failed merge-base print `ERROR:` naming the revision and exit 2.
++4. Every git invocation uses `git_run`; the mode writes no files.
++5. Dropped passages print `FAIL <file>: <words>` plus `move_entry_line`; unmatched entries print `FAIL <hash>`.
++6. `fail_count` drives `RESULT: <n> problem(s)` or `RESULT: OK` with the three count lines.
++7. Missing work tree, bad HEAD, or UTF-8 read failures print `ERROR:` and `RESULT: not checked` in `run_moves`.
++8. `build_parser` adds `--moves` and `--base`; `main` errors on illegal combinations before the pinned path runs.
++9. `FULL_GATE_RECORDS` in `review-guard.py` includes `docs/trace_moves.md` with reason holding `the trace check`.
++10. The module docstring documents move-mode usage, output, and exit codes while preserving pinned-mode text.
++11. Regenerated manifest and CLI reference; `dump-cli.py --check` exit 0; `bridge-check.py --sources` reports SOURCES MATCH; `VERSION` remains `2026.11.12a`.
++
++## Commands
++
++### 1. `python tools/dump-cli.py`
++
++```
++(no output)
++```
++
++### 2. `python tools/make-manifest.py`
++
++```
++make-manifest: version 2026.11.12a, 146 files hashed, VERSION + MANIFEST.json written
++```
++
++### 3. `python -m pytest -q tests/test_program_trace_moves.py`
++
++```
++.................                                                        [100%]
++17 passed in 21.12s
++```
++
++### 4. `python -m pytest -q tests/test_release_s_records_gate.py`
++
++```
++.....................................................................    [100%]
++69 passed in 55.26s
++```
++
++### 5. `python -m pytest -q tests/test_trace_check.py tests/test_trace_full_split.py`
++
++```
++....................................s..sss.................              [100%]
++55 passed, 4 skipped in 25.85s
++```
++
++### 6. `python -m pytest -q tests/test_dump_cli.py`
++
++```
++........................................................................ [ 72%]
++...........................                                              [100%]
++99 passed in 102.40s (0:01:42)
++```
++
++### 7. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge`
++
++```
++windowless-check: 36 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++### 8. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++```
++bridge-check: version 2026.11.12a (2026-11-13 22:21) at <Workspace>/bridge
++bridge-check: 146 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.12a
++```
++
++### 9. `python tools/dump-cli.py --check`
++
++```
++exit=0
++```
++
++### 10. `git rev-parse HEAD` and `git status --short`
++
++```
++fe22f35d6f73e1d981dccdf10c2ddc48deddb469
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/VERSION
++ M bridge/cursor-bridge/review-guard.py
++ M bridge/cursor-bridge/trace-check.py
++ M docs/CLI_REFERENCE.md
++ M docs/cli-reference.json
++```
++
++Commit for the counts above: `fe22f35d6f73e1d981dccdf10c2ddc48deddb469`. Working tree held uncommitted changes listed above (`VERSION` content unchanged at `2026.11.12a`; git shows it modified for line-ending metadata only).
++
++## Mutations
++
++M1–M4: not run in this session (supervisor mutation sweep remains for the supervisor run).
++
++## Assumed, not verified
++
++Assumed, not verified: Git on this host accepts `--end-of-options` on `rev-parse` and `merge-base` with the argument lists used · brief requires it for dashed revision text · a failed run on an older git would show in CI or local pytest.
++
++Assumed, not verified: Two identical passage units in the same changed file at the base, both absent at HEAD, produce two FAIL lines and need two matching entries · one entry excuses one passage in the pairing loop · no test covers duplicate normals in one file.
++
++Assumed, not verified: Duplicate entry lines with identical text in `docs/TRACE_MOVES.md` at HEAD are each treated as separate added entries if both are new to the base · set difference is on full line text · no test adds two identical new entry lines.
++
++Assumed, not verified: A passage unit whose normal form is empty is compared like any other unit · `parse_units` can emit empty normals · no acceptance test asserts behaviour for an empty normal.
+diff --git a/handoff/TASK-057-r2-report.md b/handoff/TASK-057-r2-report.md
+new file mode 100644
+index 0000000..de567c3
+--- /dev/null
++++ b/handoff/TASK-057-r2-report.md
+@@ -0,0 +1,126 @@
++# TASK-057 round 2 report
++
++## Files changed
++
++- `<Workspace>/bridge/cursor-bridge/trace-check.py`
++- `<Workspace>/bridge/cursor-bridge/MANIFEST.json` (regenerated by `python tools/make-manifest.py`)
++- `<Workspace>/docs/CLI_REFERENCE.md` (regenerated by `python tools/dump-cli.py`)
++- `<Workspace>/docs/cli-reference.json` (regenerated by `python tools/dump-cli.py`)
++- `<Workspace>/docs/BUILDER_NOTES.md` (one append)
++- `<Workspace>/handoff/TASK-057-r2-report.md`
++
++## Summary
++
++Round 2 repaired the four Review A findings in `trace-check.py` move mode: dashed `--base` values are refused in `main` before any git call, `file(s) compared` counts only instruction files whose base revision text was read, `--moves` and `--base` have visible one-line help in `build_parser`, and a non–UTF-8 instruction file at HEAD is reported with its repository path. The command reference and manifest were regenerated. Three of the four named reproduction tests pass; `test_r077_the_help_names_the_move_mode_and_its_base` still fails on a whole-file `SUPPRESS` substring check because `dump-cli` records argparse `-h` defaults as `==SUPPRESS==` across every command program (documented in `BUILDER_NOTES.md`).
++
++## Requirements
++
++- **B1:** In `main` (lines 868–869), `base_rev.startswith("-")` calls `parser.error` before `run_moves`, so a non-repository folder gets `ERROR: usage:` with no git call.
++- **B2:** In `run_moves` (lines 746 and 755), `files_compared` increments only when `git_file_at` returns base text, not from `len(changed_paths)` at line 795.
++- **S1:** In `build_parser` (lines 839–849), `--moves` and `--base` use ordinary help strings instead of `argparse.SUPPRESS`, so `-h` lists both options.
++- **S2:** In `head_passage_norms` (lines 675–689) the path is returned with the read error; in `run_moves` (lines 729–734) HEAD read failures print `ERROR: <path>: <reason>` like the base-side branch at lines 747–748.
++
++## Commands and output
++
++Counts below belong to commit `31ac1ebf86aee263a8b7788e0d199289abb7fe71` with uncommitted changes on the four source/doc files listed above.
++
++### 1. `python tools/dump-cli.py`
++
++```
++(no stdout)
++```
++
++### 2. `python tools/make-manifest.py`
++
++```
++make-manifest: version 2026.11.12a, 146 files hashed, VERSION + MANIFEST.json written
++```
++
++### 3. `python -m pytest -q tests/test_program_trace_moves.py`
++
++```
++....................F..                                                  [100%]
++================================== FAILURES ===================================
++_____________ test_r077_the_help_names_the_move_mode_and_its_base _____________
++
++    def test_r077_the_help_names_the_move_mode_and_its_base():
++        """Review A, round 1, Should fix 1: the two options are shown, as the command reference lists them, never hidden."""
++        p = subprocess.run([sys.executable, str(TRACE), "-h"], capture_output=True, text=True, env=env(), encoding="utf-8", errors="replace")
++        usage = p.stdout.split("\n\n", 1)[0]
++        assert p.returncode == 0 and "--moves" in usage and "--base" in usage, p.stdout
++>       assert "SUPPRESS" not in (REPO / "docs" / "cli-reference.json").read_text(encoding="utf-8")
++E       assert 'SUPPRESS' not in '{\n  "comma... }\n  ]\n}\n'
++E         
++E         'SUPPRESS' is contained here:
++E           ault": "==SUPPRESS==",
++E         ?           ++++++++
++E                     "dest": "help",
++E                     "help": "show this help message and exit",
++E                     "nargs": 0,...
++E         
++E         ...Full output truncated (1353 lines hidden), use '-vv' to show
++
++tests\test_program_trace_moves.py:434: AssertionError
++=========================== short test summary info ===========================
++FAILED tests/test_program_trace_moves.py::test_r077_the_help_names_the_move_mode_and_its_base
++1 failed, 22 passed in 27.83s
++```
++
++### 4. `python -m pytest -q tests/test_release_s_records_gate.py::test_r077_the_trace_moves_record_keeps_the_full_gate`
++
++```
++.                                                                        [100%]
++1 passed in 6.88s
++```
++
++### 5. `python -m pytest -q tests/test_trace_check.py tests/test_trace_full_split.py`
++
++```
++....................................s..sss.................              [100%]
++55 passed, 4 skipped in 26.85s
++```
++
++### 6. `python -m pytest -q tests/test_dump_cli.py`
++
++```
++........................................................................ [ 72%]
++...........................                                              [100%]
++99 passed in 101.90s (0:01:41)
++```
++
++### 7. `python tools/dump-cli.py --check`
++
++```
++EXIT:0
++```
++
++### 8. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++```
++bridge-check: version 2026.11.12a (2026-11-13 22:47) at <Workspace>/bridge
++bridge-check: 146 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.12a
++```
++
++### 9. `git diff --numstat -- bridge/cursor-bridge/VERSION`
++
++```
++(no numstat lines; git printed only a CRLF warning for the working copy)
++```
++
++### 10. `git rev-parse HEAD` and `git status --short`
++
++```
++31ac1ebf86aee263a8b7788e0d199289abb7fe71
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/trace-check.py
++ M docs/BUILDER_NOTES.md
++ M docs/CLI_REFERENCE.md
++ M docs/cli-reference.json
++?? handoff/TASK-057-r2-report.md
++```
++
++## Assumed, not verified
++
++- The acceptance test's `SUPPRESS` substring check was meant only for `--moves` and `--base` help fields in `trace-check.py`, not for argparse `-h` defaults serialized as `==SUPPRESS==` in every program · the brief requires both no `SUPPRESS` in the whole `docs/cli-reference.json` and forbids editing `tools/dump-cli.py` · narrowing or relocating the assertion (or changing dump-cli serialization) would confirm intent and turn the test green.
++- Order of `parser.error` when `--base` begins with `-` but `--moves` is absent · `main` checks `--base requires --moves` before the dash rule, which only runs inside the `if args.moves` block · a run with `--base=--output=x` and no `--moves` would confirm the supervisor's expected message.
+diff --git a/handoff/TASK-057-r2.md b/handoff/TASK-057-r2.md
+new file mode 100644
+index 0000000..05db96e
+--- /dev/null
++++ b/handoff/TASK-057-r2.md
+@@ -0,0 +1,156 @@
++---
++record: brief
++header: 1
++id: "TASK-057"
++round: 2
++satisfies: [R-077]
++scope: ["bridge/cursor-bridge/trace-check.py", "bridge/cursor-bridge/MANIFEST.json", "docs/CLI_REFERENCE.md", "docs/cli-reference.json", "docs/BUILDER_NOTES.md", "handoff/TASK-057-r2-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# TASK-057, round 2: four fixes to the trace check's move mode
++
++Round cause: Review A, round 1, REJECT (two findings of behaviour against the brief: BLOCKING 1 and 2; SHOULD FIX 1 and 2)
++
++## Objective
++Fix the following confirmed findings of Review A, round 1: repair the four named defects, nothing else. Round 1 (the brief `handoff/TASK-057.md`, its code committed at 16350b9) added `python trace-check.py --moves [--base <rev>]` to `bridge/cursor-bridge/trace-check.py`. Review A (`run/supervisor/TASK-057-review-a-r1.txt`; its line numbers are of the code as committed) found four places where the code does not do what the brief asked: (B1) a `--base` value beginning with `-` is refused only inside `git_merge_base` (line 601), after two git calls in `run_moves` (lines 705 and 715), so a folder that is no work tree answers `not a git work tree` instead of the usage error; (B2) `files_compared = len(changed_paths)` (line 790) counts a file only added in the range, and the new path of a rename, as "compared" though nothing of it was read at the base; (S1) `--moves` and `--base` are added with `help=argparse.SUPPRESS` (lines 835-836), so `-h` hides them and the command reference lists them as `==SUPPRESS==`; (S2) an instruction file not readable as UTF-8 at HEAD gives `ERROR: git: cannot be read as UTF-8` (line 731) without naming the file, because `head_passage_norms` (lines 675-689) returns the reason without the path. The reproduction tests are the supervisor's, committed in 57f9514 in `tests/test_program_trace_moves.py`, and all four fail at 16350b9: `test_r077_a_dashed_base_is_a_usage_error_before_any_git_call` (B1), `test_r077_only_a_file_read_at_the_base_is_counted_as_compared` (B2), `test_r077_the_help_names_the_move_mode_and_its_base` (S1), `test_r077_an_instruction_file_not_readable_at_head_is_named` (S2).
++
++Satisfies: R-077 - A moved or retired instruction passage is caught by a program (T-MOVE): `trace-check.py --moves [--base <rev>]` (the base always the merge-base of HEAD with the revision given, `origin/main` by default, the resolved commit named on the mode's first line) reads every `.md` file under `bridge/` but the CHANGELOG, as the place a passage leaves and the place it may go, and fails, naming file and first words and printing the entry line that would excuse it, for each passage of a changed file at the base that stands in no such file at HEAD, a reworded passage included, unless an entry of the tracked record `docs/TRACE_MOVES.md` excuses it, one passage per entry, by the hash of its normal form and its first words; the mode reads only the entries the range itself adds to that record, so an entry of an earlier pull request is never read again, and an added entry that matches no dropped passage of the range is itself a finding; a test runs the mode, CI's tests job fetching the full history on pull requests and the test passing the pull request's base branch as the base; `review-guard.py premerge-records` holds `docs/TRACE_MOVES.md` to the full gate; the pinned mode and its entries stay as built. (Full text: the register's row in `docs/REQUIREMENTS.md`; the design: the paragraph beginning `*T-MOVE.*` in `docs/DESIGN.md`.)
++
++## Scope
++Files you may create or modify:
++- bridge/cursor-bridge/trace-check.py
++- bridge/cursor-bridge/MANIFEST.json
++- docs/CLI_REFERENCE.md
++- docs/cli-reference.json
++- docs/BUILDER_NOTES.md
++- handoff/TASK-057-r2-report.md
++
++Limits on these files:
++- `bridge/cursor-bridge/trace-check.py`: only the four changes of the Requirements, in `main`, `build_parser`, `run_moves` and `head_passage_norms` (and the move-mode lines of the module docstring, only where one of the four changes makes a sentence there untrue). The pinned mode's behaviour, output lines, entries and exit codes do not change; no other move-mode behaviour changes.
++- `bridge/cursor-bridge/MANIFEST.json` changes only as regenerated by `python tools/make-manifest.py`. Never edit it by hand. `bridge/cursor-bridge/VERSION` must come out with its content unchanged (`2026.11.12a`, the newest CHANGELOG entry): `git diff --numstat -- bridge/cursor-bridge/VERSION` prints nothing.
++- `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` change only as regenerated by `python tools/dump-cli.py`. Never edit either by hand.
++- `docs/BUILDER_NOTES.md`: append only, one dated line per note (Constraints).
++
++Do not modify anything else.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration: never edit anything under `.github/`.
++- docs/ and handoff/, except the files the Scope section names. `docs/TRACE_MOVES.md` is the supervisor's record: read it, never edit it.
++- `bridge/cursor-bridge/review-guard.py`: round 1's change there is done and accepted; do not touch the file.
++- Every test file. `tests/test_program_trace_moves.py` and `tests/test_release_s_records_gate.py` are the supervisor's: read them, never edit them. No new test file.
++- `bridge/cursor-bridge/CHANGELOG.md`, `bridge/cursor-bridge/VERSION`, `bridge/cursor-bridge/workflow/`, every other program under `bridge/cursor-bridge/`, and `tools/`. Run `tools/dump-cli.py` and `tools/make-manifest.py`; change neither.
++- The review's NOTED items 1 to 9 are not this round's work; they go to the supervisor's hardening record. In particular: `git_file_at` (lines 576-585) does not change (NOTED 4, its non-zero exit read as "absent"); the reading of "added" entries as a set difference in `added_move_entries` does not change (NOTED 3); the decoding of path names before the `.md` filter in `instruction_paths_in_rev` and `changed_instruction_paths` does not change (NOTED 5); the `--m` abbreviation is left as it is (NOTED 6).
++- `--repo` and `--map` keep their current definitions in `build_parser` (no help text added to them).
++
++## Context
++**The code as committed** (`bridge/cursor-bridge/trace-check.py` at 16350b9), the places this round touches:
++- `class CheckArgumentParser(argparse.ArgumentParser)` (line 815): its `error(self, message)` prints the usage to stderr, then `ERROR: usage: <message escaped by escape_field>` and `RESULT: not checked` to stdout, and exits 2. `parser.error(...)` is the program's usage-error path.
++- `def build_parser():` (line 827) today:
++```python
++    parser.add_argument("--repo", default=None, metavar="DIR")
++    parser.add_argument("--map", action="store_true")
++    parser.add_argument("--moves", action="store_true", help=argparse.SUPPRESS)
++    parser.add_argument("--base", default=None, metavar="REV", help=argparse.SUPPRESS)
++```
++- `def main(argv=None):` (line 840) parses the arguments, computes `root` (no git call), then:
++```python
++    if args.moves and args.map:
++        parser.error("--moves cannot be used with --map")
++    if args.base is not None and not args.moves:
++        parser.error("--base requires --moves")
++    if args.moves:
++        base_rev = args.base if args.base is not None else "origin/main"
++        return run_moves(root, base_rev)
++```
++- `def run_moves(root, base_rev):` (line 704) runs `git rev-parse --is-inside-work-tree` (705), `git_head_rev` (715), then `git_merge_base` (721), which refuses a dashed revision at line 601 only then. After `head_passage_norms` it prints `ERROR: git: <reason>` (line 731). In the loop over `changed_paths` (743-756), `git_file_at(root, base, rel)` returns `(None, None)` for a path absent at the base, and the loop `continue`s at line 750; line 790 sets `files_compared = len(changed_paths)`. The base-side read error is printed as `ERROR: <rel escaped>: <reason escaped>` then `RESULT: not checked`, exit 2 (lines 745-748): that is the form S2 asks for at HEAD.
++- `def head_passage_norms(root, head):` (line 675) returns `(norms, None)` or `(None, reason)`; on a `git_file_at` read error (line 682) the path `rel` is lost.
++- `def git_file_at(root, rev, rel):` (line 576) returns `(text, None)`, `(None, None)` for a non-zero git exit, or `(None, "cannot be read as UTF-8")`. Unchanged this round.
++
++**The four reproduction tests** (`tests/test_program_trace_moves.py`, read each whole; the helper `run(repo, *args)` runs `python trace-check.py --moves --repo <repo> <args>` and returns the exit code and stdout):
++- B1: runs `--base=--output=x` against a plain folder that is no git repository; expects exit 2, `ERROR: usage:` in the output, no `not a git work tree`, and no file `x` written.
++- B2: on a branch that only adds `bridge/cursor-bridge/workflow/phases/gamma.md` expects `RESULT: OK` with `0 file(s) compared` and `0 passage(s) compared`; then, after `git mv` of `bridge/commands/beta.md` to `bridge/commands/beta-renamed.md`, `1 file(s) compared` and `1 passage(s) compared`.
++- S1: `python trace-check.py -h` exits 0 and its usage paragraph (the text before the first blank line) holds `--moves` and `--base`; `docs/cli-reference.json` does not hold `SUPPRESS`.
++- S2: a branch that commits `bridge/cursor-bridge/workflow/phases/latin.md` holding a Latin-1 byte (not UTF-8) expects exit 2, no `RESULT: OK`, and the path `bridge/cursor-bridge/workflow/phases/latin.md` in the output.
++
++**The command reference and the manifest.** `tools/dump-cli.py` builds `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` from each program's `build_parser()` and its docstring; `python tools/dump-cli.py --check` regenerates in memory and compares (exit 0 when they match). `tools/make-manifest.py`, run from the Workspace root, rewrites `bridge/cursor-bridge/MANIFEST.json` (and `VERSION` from the newest CHANGELOG entry, whose content stays `2026.11.12a`); `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` then prints `RESULT: SOURCES MATCH bridge 2026.11.12a` when the sources match it. Round 1 ran exactly these.
++
++**Security context.** ASVS level 2 (`docs/INVENTORY.md`: the bridge launches subprocesses, confines paths and gates merges; no web or SQL surface). Trust boundaries: the command line (`--base`, `--repo`) and the repository's committed content are untrusted input; on a pull request a path, a passage and every line of `docs/TRACE_MOVES.md` may be written by whoever opened it. Every repository-derived or command-line field printed goes through `escape_field`; a revision text is never read by git as an option. `.cursor/rules/secure-coding.mdc`, `.cursor/rules/workspace-boundary.mdc` and the frozen `minimal-code.mdc` are in force for you.
++
++**External services.** None. git is local; this round adds no git call, no network and no remote wait.
++
++**Development data.** `docs/INVENTORY.md`: "Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet". For you: run the program only as the Done section's commands run it (the tests' scratch repositories under `tmp_path`, and the one test that reads this Workspace's committed history read-only). Never run or touch the installed copy under the home folder.
++
++**Values.** No value in this round is the owner's (rule 52).
++
++## Diagrams
++None. The build plan names no diagram for this increment (`Diagrams: none`).
++
++## Requirements
++1. (B1) A `--base` value beginning with `-`, given with `--moves`, is a usage error raised through the parser (`parser.error`, so `ERROR: usage: ...`, `RESULT: not checked`, exit 2) in `main`, beside the other `parser.error` checks and before `run_moves` is called, so that no git call runs first and a folder that is no work tree answers with the usage error. The message names the value (it is escaped by `CheckArgumentParser.error`). The refusal inside `git_merge_base` may stay or go; the revision text must still never reach git as an option.
++2. (B2) `<n> file(s) compared` counts only the changed instruction files whose text at the base was read (those that pass the `text is None` check in the `run_moves` loop). A file only added in the range, and the new path of a rename, are not counted. `<n> passage(s) compared` keeps its meaning (the passage units of those files at the base).
++3. (S1) `--moves` and `--base` are ordinary options of `build_parser`: no `argparse.SUPPRESS`, each with a one-line help text (what the mode does; the revision whose merge-base with HEAD is the base, `origin/main` by default), so `trace-check.py -h` shows both in its usage line and options list. Then the command reference is regenerated with `python tools/dump-cli.py` (afterwards `python tools/dump-cli.py --check` exits 0 and `docs/cli-reference.json` holds no `SUPPRESS`) and the manifest with `python tools/make-manifest.py`, so that `bridge-check.py --sources` prints `RESULT: SOURCES MATCH`.
++4. (S2) An instruction file under `bridge/` that cannot be read at HEAD (not UTF-8) stops the check with an `ERROR:` line naming its repository path (forward slashes, escaped by `escape_field`) and the reason, then `RESULT: not checked`, exit 2: the same form as the base-side read already prints. `head_passage_norms` is where the path is lost today.
++
++## Acceptance criteria
++- [ ] The four reproduction tests pass: `test_r077_a_dashed_base_is_a_usage_error_before_any_git_call`, `test_r077_only_a_file_read_at_the_base_is_counted_as_compared`, `test_r077_the_help_names_the_move_mode_and_its_base`, `test_r077_an_instruction_file_not_readable_at_head_is_named` (each names R-077).
++- [ ] Every test in `tests/test_program_trace_moves.py` passes, the repository-history test included in this checkout (or skipped only for one of its own stated reasons, quoted).
++- [ ] `tests/test_release_s_records_gate.py::test_r077_the_trace_moves_record_keeps_the_full_gate` passes.
++- [ ] Every test in `tests/test_trace_check.py` and `tests/test_trace_full_split.py` passes or skips as at round 1 (the pinned mode is unchanged), and `tests/test_dump_cli.py` passes.
++- [ ] `python tools/dump-cli.py --check` exits 0.
++- [ ] `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` prints `RESULT: SOURCES MATCH bridge 2026.11.12a`; `git diff --numstat -- bridge/cursor-bridge/VERSION` prints nothing.
++- [ ] No test file changed; `bridge/cursor-bridge/review-guard.py` unchanged; no git call added; every printed repository-derived field through `escape_field` (ASVS L2).
++
++## Constraints
++- Do not add dependencies.
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it; everything you produce goes inside it.
++- No secret is needed or used. Refer to `.env` and configuration keys by name only; never reproduce a value.
++- If the brief, the rules, or the tooling got in your way (an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason), append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks.
++- This round talks to no external service and adds no remote wait.
++- Any console process your code launches on Windows is created windowless; the program's only children are git, through `git_run`, already windowless with a timeout. This round adds no child process.
++- **Run every command in the foreground and wait for it to end.** Start nothing in the background, and leave no process running when you finish. Never start a server, a watcher or a daemon.
++- **Do NOT run the full `tests/` tree** (`python -m pytest`, `python -m pytest tests`, or any command that collects all of it). Run named files only, exactly the commands the Done section lists, with no `PYTHONPATH` or other environment change. The supervisor and CI run the full suite.
++- Run no Python other than the Done section's commands: no `python -c`, no here-document, no script of your own, and never import the project's tests outside pytest.
++- Do not fix by suppressing the symptom: no retry, no broad `try/except`, no `sleep`, no special case keyed to a test's file names. Do not edit any reproduction test or any other test. Leave no stray print or debug line.
++- If you believe the real cause of a finding is different from the one named in the Objective, stop, do not change code for it, and report why in your report and your last message; the supervisor will re-diagnose.
++- If an acceptance test and this brief seem to disagree, stop and report it; do not edit the test.
++- Do not refactor code outside the four changes, even if it looks wrong (see Out of scope for the review's NOTED items).
++- Never run the product, a migration, a seed or a test against the owner's live data (Context, "Development data").
++- No value in this round is the owner's (rule 52).
++- Follow existing conventions in the file: the `ERROR:`/`RESULT:` output lines, `escape_field` on printed fields, `slash` for paths, `parser.error` for usage errors, the module docstring as the parser's description.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`. You read with `git status`, `git diff` and `git log` only. (The tests run git inside their own scratch repositories under `tmp_path`; that is not this repository.)
++- Numbers from text are parsed with the language's own parser, never by slicing a string. This round reads no number from text.
++- Every verification command is written in the Done section in full; run exactly those, from the Workspace root. No mutation run is asked of you this round; the supervisor runs its own after your run.
++- **Known failures.** At the checkpoint 16350b9 the four reproduction tests fail; this round turns them green. No other failure is known in the files the Done section runs; if another fails and this change did not cause it, report it by its test id and fix none.
++- Prefer reuse over new code: the program's own `CheckArgumentParser`, `escape_field`, `slash` and existing functions, and write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a security, observability or accessibility requirement stated above.
++- Rules in force for you: `.cursor/rules/secure-coding.mdc`, `.cursor/rules/workspace-boundary.mdc` and the frozen `minimal-code.mdc`.
++
++## Done
++Your report is the file `handoff/TASK-057-r2-report.md`, which you write as you go: what you did, what you changed, what you ran and what it printed, what you could not do, so that nothing of it is lost when your run ends early. It names no computer path: write `<Workspace>` for the repository folder, including in quoted command output.
++
++When you finish, it holds:
++- a list of every file you changed;
++- a one-paragraph summary of what you did;
++- for each requirement (1 to 4, labelled B1, B2, S1, S2), one sentence on how the change addresses the named finding, naming the function and line;
++- every command of the list below with its output;
++- a section headed exactly `Assumed, not verified`, as the report's last section.
++
++The `Assumed, not verified` section lists every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. Examples: whether `--base` with no `--moves` and a dashed value should give the "requires --moves" error or the dash error first; how argparse renders the new help texts in the command reference. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Run these from the Workspace root, in this order, after your last edit, each in the foreground, with no `PYTHONPATH` or other environment change:
++1. `python tools/dump-cli.py`
++2. `python tools/make-manifest.py`
++3. `python -m pytest -q tests/test_program_trace_moves.py`
++4. `python -m pytest -q tests/test_release_s_records_gate.py::test_r077_the_trace_moves_record_keeps_the_full_gate`
++5. `python -m pytest -q tests/test_trace_check.py tests/test_trace_full_split.py`
++6. `python -m pytest -q tests/test_dump_cli.py`
++7. `python tools/dump-cli.py --check` (expect exit 0; quote the exit code)
++8. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` (expect `RESULT: SOURCES MATCH bridge 2026.11.12a`)
++9. `git diff --numstat -- bridge/cursor-bridge/VERSION` (expect no output)
++10. `git rev-parse HEAD` and `git status --short`
++
++Every command you ran is quoted in the report with the lines it printed, verbatim, in a fenced block. Each pytest summary line is quoted verbatim; never restate a count in prose. A claim that a check passed quotes the output line that shows it, and a number of failing or skipped cases is backed by the pytest lines naming them. A command you did not run is written `not run`, never described as run. Run this brief's test commands once more after your last edit, and write the report's results after step 10, naming the commit its counts belong to (`git rev-parse HEAD`) and whether the working tree then held uncommitted changes (`git status --short`).
++
++Your last message is the summary and the report file's path, and nothing follows it. The supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/handoff/TASK-057.md b/handoff/TASK-057.md
+new file mode 100644
+index 0000000..eae75ea
+--- /dev/null
++++ b/handoff/TASK-057.md
+@@ -0,0 +1,170 @@
++---
++record: brief
++header: 1
++id: "TASK-057"
++round: 1
++satisfies: [R-077]
++scope: ["bridge/cursor-bridge/trace-check.py", "bridge/cursor-bridge/review-guard.py", "bridge/cursor-bridge/MANIFEST.json", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "tests/test_trace_check.py", "docs/BUILDER_NOTES.md", "handoff/TASK-057-r1-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# TASK-057: The trace check's move mode (R-077)
++
++## Objective
++The bridge's instruction texts are the `.md` files under `bridge/`. Today `bridge/cursor-bridge/trace-check.py` only traces passages from one pinned pre-split baseline commit (R-029, the "pinned mode"); a passage that a later pull request drops, rewords or moves out of `bridge/` passes unseen. This increment adds a second mode to the same program, `python trace-check.py --moves [--base <rev>]`, which compares the committed state of a range (the base to HEAD) and fails for every passage of a changed instruction file at the base that stands in no instruction file at HEAD, unless an entry that the range itself adds to the tracked record `docs/TRACE_MOVES.md` excuses it. CI runs it through a test on every pull request. The increment also puts `docs/TRACE_MOVES.md` on `review-guard.py premerge-records`' full-gate list, because a program reads that record to pass a check, and regenerates the command reference and the manifest. The pinned mode, its entries and its exit codes stay exactly as built.
++
++Satisfies: R-077 - A moved or retired instruction passage is caught by a program (T-MOVE): `trace-check.py --moves [--base <rev>]` (the base always the merge-base of HEAD with the revision given, `origin/main` by default, the resolved commit named on the mode's first line) reads every `.md` file under `bridge/` but the CHANGELOG, as the place a passage leaves and the place it may go, and fails, naming file and first words and printing the entry line that would excuse it, for each passage of a changed file at the base that stands in no such file at HEAD, a reworded passage included, unless an entry of the tracked record `docs/TRACE_MOVES.md` excuses it, one passage per entry, by the hash of its normal form and its first words; the mode reads only the entries the range itself adds to that record, so an entry of an earlier pull request is never read again, and an added entry that matches no dropped passage of the range is itself a finding; a test runs the mode, CI's tests job fetching the full history on pull requests and the test passing the pull request's base branch as the base; `review-guard.py premerge-records` holds `docs/TRACE_MOVES.md` to the full gate; the pinned mode and its entries stay as built. (Full text: the register's row in `docs/REQUIREMENTS.md`; the design: the paragraph beginning `*T-MOVE.*` in `docs/DESIGN.md`.)
++
++## Scope
++Files and directories you may create or modify:
++- bridge/cursor-bridge/trace-check.py
++- bridge/cursor-bridge/review-guard.py
++- bridge/cursor-bridge/MANIFEST.json
++- docs/cli-reference.json
++- docs/CLI_REFERENCE.md
++- tests/test_trace_check.py
++- docs/BUILDER_NOTES.md
++- handoff/TASK-057-r1-report.md
++
++Limits on these files:
++- `bridge/cursor-bridge/trace-check.py`: the `--moves` mode and its `--base` option are added; the pinned mode's behaviour, output lines, entries (`trace-exceptions.md`'s `reword`/`new` form) and exit codes do not change. The module docstring is the parser's description (it feeds the command reference): extend it to document the new mode; keep every existing sentence about the pinned mode.
++- `bridge/cursor-bridge/review-guard.py`: the one change is one new entry in the `FULL_GATE_RECORDS` tuple (Requirement 9). Nothing else in the file changes.
++- `bridge/cursor-bridge/MANIFEST.json` changes only as regenerated by `python tools/make-manifest.py`. Never edit it by hand. (`bridge/cursor-bridge/VERSION` must come out unchanged: the newest CHANGELOG entry is already `2026.11.12a`, the version VERSION holds.)
++- `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` change only as regenerated by `python tools/dump-cli.py`. Never edit either by hand.
++- `tests/test_trace_check.py` (the pinned mode's tests): change it only if a pinned-mode test genuinely needs it, and then say which test and why in the report. Every existing test there stays green.
++
++Do not modify anything else.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration: `.github/workflows/tests.yml` already has the tests job's full-history fetch on pull requests (the configurator's commit 697f0cf). Never edit anything under `.github/`.
++- docs/ and handoff/, except the files the Scope section names. In particular `docs/TRACE_MOVES.md` is the supervisor's record (committed, its form stated at its head, no entry): read it, never edit it, and add no entry to it.
++- `tests/test_program_trace_moves.py` (the supervisor's acceptance tests, committed in 659a045) and `tests/test_release_s_records_gate.py` (its R-077 test is the supervisor's): read them, never edit them.
++- `bridge/cursor-bridge/CHANGELOG.md`, `bridge/cursor-bridge/VERSION`, `bridge/cursor-bridge/workflow/trace-baseline.txt`, `bridge/cursor-bridge/workflow/trace-exceptions.md`, every other program under `bridge/cursor-bridge/`, and `tools/`. Run `tools/dump-cli.py` and `tools/make-manifest.py`; change neither.
++- No new test file. The acceptance cases for the mode are all in `tests/test_program_trace_moves.py`.
++
++## Context
++**The program as built** (`bridge/cursor-bridge/trace-check.py`, 894 lines). Reuse these; do not write a second version of any of them:
++- `def parse_units(text):` returns `(units, headings_outside_fences)`; each unit is a dict with `"normal"` (its normal form), `"chain"` (the heading chain) and `"kind"` (`"para"`, `"table"` or `"fence"`). Headings are not units. The normal form of a paragraph, list item or table is `normal_form_paragraph` (lines stripped, joined, whitespace collapsed to single spaces); of a fenced block `normal_form_fence` (lines kept, each `rstrip`ped, joined by `\n`). This is "the normal form the pinned mode uses".
++- `def escape_field(value):` escapes every character outside printable ASCII as `\xhh` (below 0x20, 0x7f, and 0x80 to 0xff), `\uhhhh` or `\Uhhhhhhhh`. Every field the program prints that comes from a repository (a path, a passage's words, a revision text) goes through it.
++- `def git_run(root, args):` runs `["git", "-C", root, *args]` with `capture_output=True`, `stdin=subprocess.DEVNULL`, `timeout=GIT_TIMEOUT` (120 s) and `creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)`; returns `(proc, None)` or `(None, reason)` on a timeout or a start failure.
++- `def decode_git_bytes(data):` drops a UTF-8 byte-order mark, decodes UTF-8 (raises `UnicodeDecodeError`), and turns CRLF and CR into LF.
++- `class CheckArgumentParser(argparse.ArgumentParser)` prints `ERROR: usage: <message>` and `RESULT: not checked` and exits 2 on a usage error. `build_parser()` today adds `--repo DIR` and `--map`.
++- `main(argv=None)`: `--repo` gives the repository root (default: three folders up from the program file). Exit 2 cases print `ERROR: ...` lines then `RESULT: not checked`; exit 1 prints `RESULT: <n> problem(s)`; exit 0 prints `RESULT: OK`. The pinned mode needs `bridge/cursor-bridge/workflow/trace-baseline.txt`, `.../trace-exceptions.md` and `bridge/commands/supervisor.md`; the move mode needs none of them.
++- The `if __name__ == "__main__":` block reconfigures stdout and stderr with `errors="backslashreplace"`; keep it.
++
++**The acceptance tests** (`tests/test_program_trace_moves.py`, the supervisor's; read its module docstring and every test before you start). They build scratch git repositories under `tmp_path` (a `main` that is the base with `refs/remotes/origin/main` beside it, a branch `work` carrying the change) and run `python trace-check.py --moves --repo <scratch> [--base ...]`. What they pin, exactly:
++1. **Entry line form.** `- <sha256 hex of the passage's normal form, UTF-8> <the normal form's first eight whitespace-separated words joined by single spaces, escaped by escape_field>`. An entry is therefore always ASCII.
++2. **Excuse.** An entry excuses a passage only when both its hash and its first words equal the passage's (a reworded passage keeps its first words but changes its hash, and the entry made from the new wording excuses nothing). One passage per entry.
++3. **First output line.** The mode's first output line holds the full 40-character id of the base it used: the merge-base of HEAD with `--base`'s revision, `origin/main` by default. A revision ahead of the branch therefore never makes main's later text read as dropped.
++4. **A dropped passage.** It prints a line beginning `FAIL` naming the file (its repository path, forward slashes) and the passage's first words (escaped), and the output holds the entry line (form 1) that would excuse it.
++5. **An unmatched entry.** An added entry that excuses no dropped passage of the range prints a line beginning `FAIL` holding its hash.
++6. **Exit 1** with a `RESULT:` line other than `RESULT: OK` when anything failed.
++7. **Exit 0** with `RESULT: OK` and the counts written as `<n> file(s) compared`, `<n> passage(s) compared` and `<n> excused` otherwise (the test reads each as `\b(\d+) <label>\b`). Test `test_r077_the_entry_the_range_adds_excuses_its_passage` expects `1 file(s) compared`, `3 passage(s) compared`, `1 excused` for one changed file of three passages (a heading is no passage).
++8. **Exit 2**, with no `RESULT: OK`, for a base that cannot be read (its output naming the revision, e.g. `no-such-revision`) and for a `--base` value beginning with `-` (the test passes `--base=--output=x` and checks that no file `x` was written).
++9. **`--moves` works with `--repo DIR`** and needs none of the pinned mode's files: the scratch repositories have no `trace-baseline.txt`, no `trace-exceptions.md` and no `supervisor.md`.
++10. **The instruction files.** "Every `.md` file under `bridge/` but the CHANGELOG" means every tracked `.md` path under `bridge/` other than `bridge/cursor-bridge/CHANGELOG.md`, read from git at the base and at HEAD: committed state, never the working tree. It is both the place a passage leaves and the place it may go; a passage moved into the CHANGELOG is dropped.
++11. **A changed file** is one whose content differs between the base and HEAD, a deleted file included, and a renamed file read as a deletion and an addition (so a renamed file's passages are found at its new path and pass). This must hold whatever the user's or the repository's git configuration says about rename detection.
++12. **The entries read** are the lines of `docs/TRACE_MOVES.md` present at HEAD and added in the range (not present at the base), and only lines of the entry form; every other line is ignored. An entry an earlier pull request added (present at the base) is never read: it excuses nothing and fails nothing. A `docs/TRACE_MOVES.md` absent at the base means every entry line at HEAD is added; absent at HEAD means no entries.
++13. **The passages compared** are the passage units, by `parse_units`, of the changed files at the base. A passage "stands" at HEAD when a unit with the same normal form is in any instruction file (item 10) at HEAD, changed or not.
++14. **This repository's own history.** `test_r077_the_mode_passes_on_this_repository_s_own_history` runs the mode on this Workspace with `--base origin/<GITHUB_BASE_REF>` where that variable is set, the default base otherwise; it skips where the history is shallow or there is no `origin/main`. In this checkout `refs/remotes/origin/main` and `main` are both `d6a6a00ef79904e41ef171fe2f09e98ac3b11268`, the parent of this branch's two commits, so the range is this branch's committed changes; your own edits are uncommitted and are not read (item 10).
++
++`docs/TRACE_MOVES.md` states the same form at its head (its sections "The form of an entry" and "Which entries are read"); where it and this list differ, stop and report it.
++
++**The full gate** (`bridge/cursor-bridge/review-guard.py`, line 1216):
++```python
++FULL_GATE_RECORDS = (("docs/run_parameters.md", "the run parameters decide the ceilings and who merges"),
++                     ("docs/build_plan", "the plan decides what is built and in what order"),
++                     ("docs/roster", "the roster decides which model builds and which reviews"),
++                     ("docs/diagrams/", "the diagrams, their index and the deviations decide what the diagram check allows"))   # compared in lower case
++```
++`full_gate_reasons` compares each changed path's lower-cased form with these prefixes (`low.startswith(prefix)`) and prints `FULL GATE  <path>: <why>`. The supervisor's test `tests/test_release_s_records_gate.py::test_r077_the_trace_moves_record_keeps_the_full_gate` expects `FULL GATE  docs/TRACE_MOVES.md: ` with a reason holding the words `the trace check`, and `FULL GATE - 1 of 2 changed file(s)`.
++
++**The command reference and the manifest.** `tools/dump-cli.py` builds `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` from each program's `build_parser()` and its docstring (`trace-check.py` is in `tests/test_dump_cli.py`'s `ARGPARSE` tuple already; no change there); `python tools/dump-cli.py --check` regenerates in memory and compares. `tools/make-manifest.py`, run from the Workspace root, rewrites `bridge/cursor-bridge/MANIFEST.json` (and `VERSION`, from the newest CHANGELOG entry); `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` then reports whether the sources match it.
++
++**Security context.** ASVS level 2 (`docs/INVENTORY.md`: the bridge launches subprocesses, confines paths and gates merges; no web or SQL surface). Trust boundaries: the command line (`--base`, `--repo`) and the repository's committed content are untrusted input. On a pull request, CI runs the mode over the pull request's own text, so a path, a passage and every line of `docs/TRACE_MOVES.md` may be written by whoever opened it. `.cursor/rules/secure-coding.mdc` and `.cursor/rules/workspace-boundary.mdc` are in force for you, and the frozen `minimal-code.mdc`.
++
++**External services.** None. git is local; the increment adds no call to a service run by others and no remote wait (no `fetch`, no network). This session has no `claude` on PATH (`claude --version`: command not found); nothing in this increment calls it.
++
++**Development data.** `docs/INVENTORY.md`: "Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet". For you: run the program only as the Done section's commands run it (the tests' scratch repositories under `tmp_path`, and the one test that reads this Workspace's history read-only). Never run or touch the installed copy under the home folder.
++
++**Values.** No value in this increment is the owner's (rule 52). The eight first words, SHA-256 and the default `origin/main` are the design's (`docs/DESIGN.md`, T-MOVE) and pinned by the acceptance tests.
++
++## Diagrams
++None. The build plan names no diagram for this increment (`Diagrams: none`).
++
++## Requirements
++1. `trace-check.py --moves [--base <rev>] [--repo DIR]` implements items 1 to 13 of Context, "The acceptance tests", in the same program, reusing `parse_units` and its normal forms, `escape_field`, `git_run` and `decode_git_bytes`.
++2. The base is the merge-base of HEAD with the revision given (`origin/main` when `--base` is absent), resolved to a full commit id, and the mode's first output line names that id. No output line comes before it.
++3. A `--base` value beginning with `-` is refused with exit 2 before any git call. The revision text is never read by git as an option: pass it after `--end-of-options` or keep it from option position otherwise. A revision that does not resolve to a commit, or that has no merge-base with HEAD (a shallow history, unrelated histories), is exit 2 with an `ERROR:` line naming the revision (escaped) and the reason, and `RESULT: not checked`; never a pass.
++4. Every git call goes through `git_run` (its timeout and windowless flags); git is invoked with an argument list, never through a shell. The mode writes no file and changes no git state (no ref, no index, no config).
++5. For each dropped passage that no read entry excuses: one line beginning `FAIL` naming the file at the base (repository path, forward slashes, escaped) and the passage's first words (escaped), and the entry line of form 1 that would excuse it, printed so it can be pasted verbatim. For each read entry that excuses no dropped passage: one line beginning `FAIL` holding the entry's hash.
++6. Exit 1 with a `RESULT:` line other than `RESULT: OK` (the pinned mode's `RESULT: <n> problem(s)` form) when any `FAIL` line was printed. Exit 0 with `RESULT: OK` and the three counts otherwise: `<n> file(s) compared` (the changed instruction files whose passages at the base were read), `<n> passage(s) compared` (their passage units at the base), `<n> excused` (dropped passages an entry excused).
++7. The check cannot run (not a git work tree, git missing or timed out, HEAD unreadable, a file or a path not readable as UTF-8 at either side): exit 2 with `ERROR:` lines and `RESULT: not checked`, the pinned mode's convention, no traceback.
++8. `--base` is accepted only with `--moves`, and `--moves` does not combine with `--map`: each other combination is a usage error through `CheckArgumentParser` (exit 2). The pinned mode with its existing options (`--repo`, `--map`) behaves exactly as before.
++9. In `review-guard.py`, `docs/TRACE_MOVES.md` joins `FULL_GATE_RECORDS` as one entry: its prefix lower case (`docs/trace_moves.md`), its reason a short sentence holding the words `the trace check` in the tuple's style (for example, that the moves record decides what the trace check excuses). Nothing else in that file changes.
++10. The module docstring of `trace-check.py` documents the move mode: its usage line, what it compares, its output lines and its exit codes, beside the pinned mode's text, which stays.
++11. The command reference is regenerated (`python tools/dump-cli.py`) and `python tools/dump-cli.py --check` exits 0; the manifest is regenerated (`python tools/make-manifest.py`) and `bridge-check.py --sources` reports the sources match; `bridge/cursor-bridge/VERSION` is unchanged.
++
++## Acceptance criteria
++- [ ] Every test in `tests/test_program_trace_moves.py` passes (it names R-077), the repository-history test included in this checkout (or skipped only for one of its own stated reasons, quoted).
++- [ ] `tests/test_release_s_records_gate.py` passes, `test_r077_the_trace_moves_record_keeps_the_full_gate` included.
++- [ ] Every test in `tests/test_trace_check.py` and `tests/test_trace_full_split.py` passes: the pinned mode, its entries and its exit codes are unchanged.
++- [ ] `tests/test_dump_cli.py` passes and `python tools/dump-cli.py --check` exits 0.
++- [ ] `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` reports the sources match; `bridge/cursor-bridge/VERSION` unchanged.
++- [ ] `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge` reports no finding for `trace-check.py`.
++- [ ] R-077 is fully met for the program, with no stand-in, placeholder or "later" text.
++- [ ] No new Semgrep high findings; every git call through `git_run` with its timeout and an argument list; a `--base` beginning with `-` refused before any git call; no file written; every repository-derived field printed through `escape_field` (ASVS L2).
++- [ ] No new dependency.
++
++## Constraints
++- Do not add dependencies.
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it; everything you produce goes inside it.
++- No secret is needed or used. Refer to `.env` and configuration keys by name only; never reproduce a value.
++- If the brief, the rules, or the tooling got in your way (an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason), append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks.
++- This increment talks to no external service and adds no remote wait.
++- Any console process your code launches on Windows is created windowless; the program's only children are git, through `git_run`, already windowless. Every subprocess call gets a timeout.
++- **Run every command in the foreground and wait for it to end.** Start nothing in the background, and leave no process running when you finish. Never start a server, a watcher or a daemon.
++- **Do NOT run the full `tests/` tree** (`python -m pytest`, `python -m pytest tests`, or any command that collects all of it). Run named files only, exactly the commands the Done section lists, with no `PYTHONPATH` or other environment change. The supervisor and CI run the full suite.
++- Run no Python other than the Done section's commands: no `python -c`, no here-document, no script of your own, and never import the project's tests outside pytest.
++- An increment that starts a process: the program starts git children only, each with output captured, a timeout and no window; each ends before the program does.
++- Do not refactor code outside the scope, even if it looks wrong.
++- Never run the product, a migration, a seed or a test against the owner's live data (Context, "Development data").
++- No value in this increment is the owner's (rule 52).
++- Follow existing conventions in the files you touch: the `ERROR:`/`RESULT:` output lines, `escape_field` on printed fields, `slash` for paths, the module docstring as the parser's description.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`. You read with `git status`, `git diff` and `git log` only. (The tests run git inside their own scratch repositories under `tmp_path`; that is not this repository.)
++- Numbers from text are parsed with the language's own parser, never by slicing a string. The program reads no number from text: a hash is 64 lowercase hex characters matched as text, a commit id 40.
++- Every verification command is written in the Done section in full; run exactly those, from the Workspace root. The supervisor checks this increment's tests by mutation in its own run, with its own mutants file, after your run; the plan names its sweep: (M1) an entry taken as excusing a passage by its first words alone, without its hash; (M2) the CHANGELOG taken as a place a passage may go; (M3) an added entry that excuses nothing passed silently; (M4) an entry present at the base (outside the range) read. You may apply these by hand in-process in your own run to check the acceptance tests catch them, reverting each; if you do, list each by its label with the test that caught it. No mutation script lands in the diff.
++- **Known failures.** At the checkpoint every test of `tests/test_program_trace_moves.py` fails (`--moves` is an unknown option, exit 2), and `tests/test_release_s_records_gate.py::test_r077_the_trace_moves_record_keeps_the_full_gate` fails (the record is not on the list); this increment turns them green. No other failure is known in the files the Done section runs; if another fails and this change did not cause it, report it by its test id and fix none.
++- If an acceptance test and this brief seem to disagree, or a test seems to pin something the design does not say, stop and report it; do not edit the test.
++- Prefer reuse over new code: the program's own `parse_units`, normal forms, `escape_field`, `git_run`, `decode_git_bytes`, `slash` and `CheckArgumentParser`, and the standard library (`hashlib` for SHA-256), and write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a security, observability or accessibility requirement stated above.
++- Rules in force for you: `.cursor/rules/secure-coding.mdc`, `.cursor/rules/workspace-boundary.mdc` and the frozen `minimal-code.mdc`.
++
++## Done
++Your report is the file `handoff/TASK-057-r1-report.md`, which you write as you go: what you did, what you changed, what you ran and what it printed, what you could not do, so that nothing of it is lost when your run ends early. It names no computer path: write `<Workspace>` for the repository folder, including in quoted command output.
++
++When you finish, it holds:
++- a list of every file you changed;
++- a one-paragraph summary of what you did;
++- for each requirement (1 to 11), one sentence on how the change meets it, naming the function or line;
++- every command of the list below with its output;
++- a section headed exactly `Assumed, not verified`, as the report's last section.
++
++The `Assumed, not verified` section lists every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. Examples: the git version's support of `--end-of-options` for the commands you call; how two identical passages at the base, both dropped, are counted and excused (one failure or two; one entry or two); how a line of `docs/TRACE_MOVES.md` that appears twice at HEAD is read; what a passage whose normal form is empty does; how an instruction path not valid UTF-8 is reported. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Run these from the Workspace root, in this order, after your last edit, each in the foreground, with no `PYTHONPATH` or other environment change:
++1. `python tools/dump-cli.py`
++2. `python tools/make-manifest.py`
++3. `python -m pytest -q tests/test_program_trace_moves.py`
++4. `python -m pytest -q tests/test_release_s_records_gate.py`
++5. `python -m pytest -q tests/test_trace_check.py tests/test_trace_full_split.py`
++6. `python -m pytest -q tests/test_dump_cli.py`
++7. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge`
++8. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` (expect the sources to match)
++9. `python tools/dump-cli.py --check` (expect exit 0)
++10. `git rev-parse HEAD` and `git status --short`
++
++Every command you ran is quoted in the report with the lines it printed, verbatim, in a fenced block. Each pytest summary line is quoted verbatim; never restate a count in prose. A claim that a check passed quotes the output line that shows it, and a number of failing or skipped cases is backed by the pytest lines naming them. Each mutation is listed by this brief's own label (M1 to M4) and text, with what caught it. A command you did not run is written `not run`, never described as run. Run this brief's test commands once more after your last edit, and write the report's results after step 10, naming the commit its counts belong to (`git rev-parse HEAD`) and whether the working tree then held uncommitted changes (`git status --short`).
++
++Your last message is the summary and the report file's path, and nothing follows it. The supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/tests/test_program_trace_moves.py b/tests/test_program_trace_moves.py
+new file mode 100644
+index 0000000..5545003
+--- /dev/null
++++ b/tests/test_program_trace_moves.py
+@@ -0,0 +1,482 @@
++"""The trace check's move mode, `trace-check.py --moves [--base <rev>]` (R-077, T-MOVE).
++
++The supervisor's acceptance tests for TASK-057, written before the build. Most tests build a scratch repository:
++- its `main` is the base, with `origin/main` beside it;
++- a branch carries the change;
++- the mode runs on the branch with `--repo`.
++
++The last test runs the mode on this repository's own history.
++
++What the tests pin, as docs/TRACE_MOVES.md states it:
++- **Entry.** An entry is the line `- <sha256 of the passage's normal form> <its first eight words>`. The words are escaped as the pinned mode escapes a field.
++- **First output line.** It names the full commit id of the base the mode used: the merge-base of HEAD with `origin/main` or with `--base`.
++- **A drop.** It prints a line beginning `FAIL` that names the file and the passage's first words. It also prints the entry line that would excuse it.
++- **An added entry that excuses nothing.** It prints a line beginning `FAIL` that names the entry's hash.
++- **Exit codes.**
++  - Exit 1: a `RESULT:` line that is not `RESULT: OK`.
++  - Exit 0: `RESULT: OK` and the counts `<n> file(s) compared`, `<n> passage(s) compared` and `<n> excused`.
++  - Exit 2: a base that cannot be read, or a `--base` beginning with `-`.
++
++enforces: docs/BUILD_PLAN.md, TASK-057, Done when; docs/REQUIREMENTS.md, R-077; docs/DESIGN.md, Change: the program release, T-MOVE.
++"""
++import hashlib
++import json
++import os
++import pathlib
++import re
++import subprocess
++import sys
++
++import pytest
++
++REPO = pathlib.Path(__file__).resolve().parent.parent
++TRACE = REPO / "bridge" / "cursor-bridge" / "trace-check.py"
++
++ALPHA = "bridge/cursor-bridge/workflow/phases/alpha.md"
++BETA = "bridge/commands/beta.md"
++CHANGELOG = "bridge/cursor-bridge/CHANGELOG.md"
++MOVES = "docs/TRACE_MOVES.md"
++
++P1 = "The first passage says what the loop does before every brief is written for the builder."
++P2 = "The second passage says the review guard counts every round it opens for an increment."
++P3 = "The third passage says that nothing reaches main except through the verified gate."
++P4 = "The fourth passage is new on main after the branch was cut from it."
++PB = "The beta passage says how the owner is told about a decision that is theirs."
++P2_REWORDED = "The second passage says the review guard counts every round the launcher logs for it."
++DASH = chr(0x2014)
++PD = "The gate " + DASH + " never bypassed " + DASH + " holds every merge for the owner today."
++
++MOVES_HEAD = "# Trace moves\n\nThe form is stated in the bridge's own record.\n\n## Entries\n"
++
++
++def env():
++    return dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@x", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@x",
++                GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull)
++
++
++def git(repo, *args):
++    p = subprocess.run(["git"] + list(args), cwd=str(repo), capture_output=True, text=True, env=env())
++    assert p.returncode == 0, p.stderr
++    return p.stdout.strip()
++
++
++def put(repo, rel, text):
++    full = repo / rel
++    full.parent.mkdir(parents=True, exist_ok=True)
++    full.write_text(text, encoding="utf-8", newline="\n")
++
++
++def commit(repo, message="change"):
++    git(repo, "add", "-A")
++    git(repo, "commit", "-q", "-m", message)
++    return git(repo, "rev-parse", "HEAD")
++
++
++def escape_field(text):
++    """The pinned mode's escaping, written out here so the test does not take it from the program it tests."""
++    out = []
++    for ch in text:
++        code = ord(ch)
++        if code < 0x20 or code == 0x7f:
++            out.append("\\x%02x" % code)
++        elif code < 128:
++            out.append(ch)
++        elif code < 256:
++            out.append("\\x%02x" % code)
++        elif code <= 0xFFFF:
++            out.append("\\u%04x" % code)
++        else:
++            out.append("\\U%08x" % code)
++    return "".join(out)
++
++
++def words(passage):
++    return escape_field(" ".join(passage.split()[:8]))
++
++
++def digest(passage):
++    """A one-line paragraph's normal form is the line with its whitespace collapsed."""
++    return hashlib.sha256(" ".join(passage.split()).encode("utf-8")).hexdigest()
++
++
++def entry(passage):
++    return "- %s %s" % (digest(passage), words(passage))
++
++
++def doc(title, *passages):
++    return "# %s\n\n" % title + "".join(p + "\n\n" for p in passages)
++
++
++def add_entries(repo, *passages):
++    text = (repo / MOVES).read_text(encoding="utf-8")
++    put(repo, MOVES, text + "".join(entry(p) + "\n" for p in passages))
++
++
++@pytest.fixture
++def repo(tmp_path):
++    """`main` holds alpha (P1, P2, P3), beta (PB), the CHANGELOG and the moves record; `origin/main` beside it; branch `work`."""
++    r = tmp_path / "ws"
++    r.mkdir()
++    put(r, ALPHA, doc("Alpha", P1, P2, P3))
++    put(r, BETA, doc("Beta", PB))
++    put(r, CHANGELOG, "# Changelog\n\n## 2026.01.01a\n\nThe first release.\n")
++    put(r, MOVES, MOVES_HEAD)
++    put(r, "docs/notes.md", "# Notes\n\nNothing here.\n")
++    git(r, "init", "-q", "-b", "main")
++    commit(r, "base")
++    git(r, "update-ref", "refs/remotes/origin/main", "HEAD")
++    git(r, "checkout", "-q", "-b", "work")
++    return r
++
++
++def run(repo, *args):
++    p = subprocess.run([sys.executable, str(TRACE), "--moves", "--repo", str(repo)] + list(args), cwd=str(repo),
++                       capture_output=True, text=True, env=env(), encoding="utf-8", errors="replace")
++    return p.returncode, p.stdout
++
++
++def fail_lines(out):
++    return [l for l in out.splitlines() if l.startswith("FAIL")]
++
++
++def count(out, label):
++    m = re.search(r"\b(\d+) %s\b" % re.escape(label), out)
++    assert m, "no '<n> %s' in the output:\n%s" % (label, out)
++    return int(m.group(1))
++
++
++def assert_ok(rc, out):
++    assert rc == 0 and "RESULT: OK" in out and not fail_lines(out), out
++
++
++def assert_fails(rc, out):
++    assert rc == 1 and "RESULT: OK" not in out and re.search(r"^RESULT: ", out, re.M) and fail_lines(out), out
++
++
++# ---------------------------------------------------------------- the five cases of the supervisor's acceptance tests
++
++
++def test_r077_a_dropped_passage_fails_naming_its_file_its_first_words_and_its_entry(repo):
++    put(repo, ALPHA, doc("Alpha", P1, P3))
++    commit(repo)
++    rc, out = run(repo)
++    assert_fails(rc, out)
++    assert any(ALPHA in l and words(P2) in l for l in fail_lines(out)), out
++    assert entry(P2) in out, out                                    # the entry line, to paste
++    assert len(fail_lines(out)) == 1, out                           # P1 and P3 stand; the heading is no passage
++
++
++def test_r077_the_entry_the_range_adds_excuses_its_passage(repo):
++    put(repo, ALPHA, doc("Alpha", P1, P3))
++    add_entries(repo, P2)
++    commit(repo)
++    rc, out = run(repo)
++    assert_ok(rc, out)
++    assert count(out, "excused") == 1, out
++    assert count(out, "file(s) compared") == 1, out                 # alpha alone changed under bridge/
++    assert count(out, "passage(s) compared") == 3, out              # alpha's three passages at the base
++
++
++def test_r077_an_added_entry_that_excuses_no_dropped_passage_is_a_finding(repo):
++    put(repo, BETA, doc("Beta", PB, "A new beta passage added on the branch."))
++    add_entries(repo, P1)                                           # P1 still stands at HEAD: nothing to excuse
++    commit(repo)
++    rc, out = run(repo)
++    assert_fails(rc, out)
++    assert any(digest(P1) in l for l in fail_lines(out)), out
++
++
++def test_r077_an_entry_an_earlier_pull_request_added_is_never_read_again(repo):
++    """main merged an entry for P2 earlier (its own pull request); the branch then drops P2: the old entry excuses nothing."""
++    git(repo, "checkout", "-q", "main")
++    add_entries(repo, P2)
++    commit(repo, "an earlier pull request's entry")
++    git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
++    git(repo, "checkout", "-q", "-B", "work", "main")
++    put(repo, ALPHA, doc("Alpha", P1, P3))
++    commit(repo)
++    rc, out = run(repo)
++    assert_fails(rc, out)
++    assert any(ALPHA in l and words(P2) in l for l in fail_lines(out)), out
++
++
++def test_r077_an_earlier_entry_fails_no_later_pull_request(repo):
++    """main merged P3's drop with its entry; a later branch that drops nothing passes, the earlier entry unread."""
++    git(repo, "checkout", "-q", "main")
++    put(repo, ALPHA, doc("Alpha", P1, P2))
++    add_entries(repo, P3)
++    commit(repo, "an earlier pull request: P3 retired with its entry")
++    git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
++    git(repo, "checkout", "-q", "-B", "work", "main")
++    put(repo, BETA, doc("Beta", PB, "A new beta passage added on the branch."))
++    commit(repo)
++    rc, out = run(repo)
++    assert_ok(rc, out)
++    assert count(out, "excused") == 0, out
++
++
++def test_r077_the_default_base_is_the_merge_base_with_origin_main_named_on_the_first_line(repo):
++    """origin/main moved on after the branch was cut (P4 added): the default base is the merge-base, so P4 is no drop."""
++    cut = git(repo, "rev-parse", "HEAD")
++    git(repo, "checkout", "-q", "main")
++    put(repo, ALPHA, doc("Alpha", P1, P2, P3, P4))
++    commit(repo, "main moves on")
++    git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
++    git(repo, "checkout", "-q", "work")
++    put(repo, ALPHA, doc("Alpha", P1, P3))
++    add_entries(repo, P2)
++    commit(repo)
++    rc, out = run(repo)
++    assert_ok(rc, out)
++    assert cut in out.splitlines()[0], out
++    assert count(out, "excused") == 1, out
++
++
++# ---------------------------------------------------------------- the further cases of the Done when
++
++
++def test_r077_a_passage_moved_to_another_file_under_bridge_passes(repo):
++    put(repo, ALPHA, doc("Alpha", P1, P3))
++    put(repo, BETA, doc("Beta", PB, P2))
++    commit(repo)
++    rc, out = run(repo)
++    assert_ok(rc, out)
++    assert count(out, "excused") == 0, out
++
++
++def test_r077_a_passage_moved_into_the_changelog_fails(repo):
++    """The CHANGELOG is no place a passage may go."""
++    put(repo, ALPHA, doc("Alpha", P1, P3))
++    put(repo, CHANGELOG, "# Changelog\n\n## 2026.01.01a\n\nThe first release.\n\n" + P2 + "\n")
++    commit(repo)
++    rc, out = run(repo)
++    assert_fails(rc, out)
++    assert any(ALPHA in l and words(P2) in l for l in fail_lines(out)), out
++
++
++def test_r077_a_reworded_passage_fails_and_only_its_own_entry_excuses_it(repo):
++    """P2 reworded after its eighth word: no entry fails; an entry made from the new wording (same first words, another hash)
++    excuses nothing and is itself a finding; the entry of the old wording excuses it."""
++    assert words(P2) == words(P2_REWORDED) and digest(P2) != digest(P2_REWORDED)
++    put(repo, ALPHA, doc("Alpha", P1, P2_REWORDED, P3))
++    commit(repo)
++    rc, out = run(repo)
++    assert_fails(rc, out)
++    assert entry(P2) in out, out
++
++    add_entries(repo, P2_REWORDED)
++    commit(repo, "a wrong entry")
++    rc, out = run(repo)
++    assert_fails(rc, out)
++    assert any(ALPHA in l and words(P2) in l for l in fail_lines(out)), out
++    assert any(digest(P2_REWORDED) in l for l in fail_lines(out)), out
++
++    put(repo, MOVES, MOVES_HEAD + entry(P2) + "\n")
++    commit(repo, "the right entry")
++    rc, out = run(repo)
++    assert_ok(rc, out)
++    assert count(out, "excused") == 1, out
++
++
++def test_r077_a_passage_outside_ascii_has_an_escaped_entry_that_excuses_it(repo):
++    git(repo, "checkout", "-q", "main")
++    put(repo, BETA, doc("Beta", PB, PD))
++    commit(repo, "a passage with dashes")
++    git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
++    git(repo, "checkout", "-q", "-B", "work", "main")
++    put(repo, BETA, doc("Beta", PB))
++    commit(repo)
++    rc, out = run(repo)
++    assert_fails(rc, out)
++    assert entry(PD) in out and entry(PD).isascii(), out
++    add_entries(repo, PD)
++    commit(repo, "its entry")
++    rc, out = run(repo)
++    assert_ok(rc, out)
++
++
++def test_r077_one_entry_excuses_one_passage_even_where_two_are_alike(repo):
++    """One passage per entry (the builder's assumptions 2 and 3, round 1): a passage standing twice in a file, both dropped,
++    needs two entries; one entry leaves one failure, and two identical entry lines, both added, excuse both."""
++    git(repo, "checkout", "-q", "main")
++    put(repo, BETA, doc("Beta", PB, P4, P4))
++    commit(repo, "a passage written twice")
++    git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
++    git(repo, "checkout", "-q", "-B", "work", "main")
++    put(repo, BETA, doc("Beta", PB))
++    add_entries(repo, P4)
++    commit(repo)
++    rc, out = run(repo)
++    assert_fails(rc, out)
++    assert len([l for l in fail_lines(out) if words(P4) in l]) == 1, out
++    add_entries(repo, P4)
++    commit(repo, "the second entry")
++    rc, out = run(repo)
++    assert_ok(rc, out)
++    assert count(out, "excused") == 2, out
++
++
++def test_r077_a_deleted_file_fails_for_each_of_its_passages(repo):
++    (repo / BETA).unlink()
++    commit(repo)
++    rc, out = run(repo)
++    assert_fails(rc, out)
++    assert any(BETA in l and words(PB) in l for l in fail_lines(out)), out
++    add_entries(repo, PB)
++    commit(repo, "its entry")
++    rc, out = run(repo)
++    assert_ok(rc, out)
++
++
++def test_r077_a_renamed_file_passes(repo):
++    git(repo, "mv", ALPHA, "bridge/cursor-bridge/workflow/phases/alpha-renamed.md")
++    commit(repo)
++    rc, out = run(repo)
++    assert_ok(rc, out)
++    assert count(out, "excused") == 0, out
++
++
++def test_r077_a_renamed_file_that_drops_a_passage_fails(repo):
++    """A rename read as a deletion and an addition, whatever git's rename detection: the old path's passages are compared, so a
++    passage dropped in the same commit as the rename fails."""
++    renamed = "bridge/cursor-bridge/workflow/phases/alpha-renamed.md"
++    git(repo, "mv", ALPHA, renamed)
++    put(repo, renamed, doc("Alpha", P1, P3))
++    commit(repo)
++    git(repo, "config", "diff.renames", "true")
++    rc, out = run(repo)
++    assert_fails(rc, out)
++    assert any(ALPHA in l and words(P2) in l for l in fail_lines(out)), out
++
++
++def test_r077_a_base_two_merges_back_reads_an_earlier_drop_with_the_entry_that_merge_added(repo):
++    base = git(repo, "rev-parse", "HEAD")
++    git(repo, "checkout", "-q", "main")
++    put(repo, ALPHA, doc("Alpha", P1, P3))
++    add_entries(repo, P2)
++    commit(repo, "merge one: P2 retired with its entry")
++    put(repo, BETA, doc("Beta", PB, "A passage merge two added."))
++    commit(repo, "merge two")
++    git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
++    git(repo, "checkout", "-q", "-B", "work", "main")
++    put(repo, "docs/notes.md", "# Notes\n\nA record changed on the branch.\n")
++    commit(repo)
++    rc, out = run(repo, "--base", base)
++    assert_ok(rc, out)
++    assert base in out.splitlines()[0], out
++    assert count(out, "excused") == 1, out
++
++
++def test_r077_a_base_ahead_of_the_branch_takes_the_merge_base(repo):
++    """main, ahead of the branch, added P4 and retired P3 with its entry: with `--base main` the mode compares from the
++    merge-base, so neither main's new passage nor its entry is read."""
++    cut = git(repo, "rev-parse", "HEAD")
++    git(repo, "checkout", "-q", "main")
++    put(repo, ALPHA, doc("Alpha", P1, P2, P4))
++    add_entries(repo, P3)
++    commit(repo, "main moves on")
++    git(repo, "checkout", "-q", "work")
++    put(repo, BETA, doc("Beta", PB, "A new beta passage added on the branch."))
++    commit(repo)
++    rc, out = run(repo, "--base", "main")
++    assert_ok(rc, out)
++    assert cut in out.splitlines()[0], out
++
++
++def test_r077_a_base_that_cannot_be_read_is_exit_2_never_a_pass(repo):
++    """The mode answers on the default base first (an unknown option would also exit 2), then not on a base it cannot read."""
++    put(repo, ALPHA, doc("Alpha", P1, P3))
++    add_entries(repo, P2)
++    commit(repo)
++    assert_ok(*run(repo))
++    rc, out = run(repo, "--base", "no-such-revision")
++    assert rc == 2 and "RESULT: OK" not in out and "no-such-revision" in out, out
++
++
++def test_r077_a_base_beginning_with_a_dash_is_refused(repo):
++    put(repo, "docs/notes.md", "# Notes\n\nA record changed on the branch.\n")
++    commit(repo)
++    assert_ok(*run(repo))
++    rc, out = run(repo, "--base=--output=x")
++    assert rc == 2 and "RESULT: OK" not in out, out
++    assert not (repo / "x").exists()
++
++
++def test_r077_a_dashed_base_is_a_usage_error_before_any_git_call(tmp_path):
++    """Review A, round 1, Blocking 1: the refusal comes first, so even a folder that is no repository answers with the usage
++    error, never with what git would have said about the folder."""
++    folder = tmp_path / "not-a-repository"
++    folder.mkdir()
++    rc, out = run(folder, "--base=--output=x")
++    assert rc == 2 and "ERROR: usage:" in out and "not a git work tree" not in out, out
++    assert not (folder / "x").exists()
++
++
++def test_r077_only_a_file_read_at_the_base_is_counted_as_compared(repo):
++    """Review A, round 1, Blocking 2: `file(s) compared` counts the changed files whose passages at the base were read, so an
++    added file counts for nothing and a rename counts its old path once."""
++    put(repo, "bridge/cursor-bridge/workflow/phases/gamma.md", doc("Gamma", "A passage of a file the branch adds."))
++    commit(repo)
++    rc, out = run(repo)
++    assert_ok(rc, out)
++    assert count(out, "file(s) compared") == 0 and count(out, "passage(s) compared") == 0, out
++    git(repo, "mv", BETA, "bridge/commands/beta-renamed.md")
++    commit(repo, "a rename")
++    rc, out = run(repo)
++    assert_ok(rc, out)
++    assert count(out, "file(s) compared") == 1 and count(out, "passage(s) compared") == 1, out
++
++
++def test_r077_the_help_names_the_move_mode_and_its_base():
++    """Review A, round 1, Should fix 1: the two options are shown, as the command reference lists them, never hidden."""
++    p = subprocess.run([sys.executable, str(TRACE), "-h"], capture_output=True, text=True, env=env(), encoding="utf-8", errors="replace")
++    usage = p.stdout.split("\n\n", 1)[0]
++    assert p.returncode == 0 and "--moves" in usage and "--base" in usage, p.stdout
++    # Every program's -h option has the default ==SUPPRESS== (argparse's own); a help text so marked hides the option.
++    hidden = []
++
++    def walk(node):
++        if isinstance(node, dict):
++            if node.get("help") == "==SUPPRESS==":
++                hidden.append(node.get("option_strings"))
++            for value in node.values():
++                walk(value)
++        elif isinstance(node, list):
++            for value in node:
++                walk(value)
++
++    walk(json.loads((REPO / "docs" / "cli-reference.json").read_text(encoding="utf-8")))
++    assert hidden == []
++
++
++def test_r077_an_instruction_file_not_readable_at_head_is_named(repo):
++    """Review A, round 1, Should fix 2: a file under bridge/ that is not UTF-8 at HEAD stops the check, naming the file."""
++    bad = "bridge/cursor-bridge/workflow/phases/latin.md"
++    (repo / bad).write_bytes(b"# Latin\n\nA caf\xe9 passage.\n")
++    commit(repo)
++    rc, out = run(repo)
++    assert rc == 2 and "RESULT: OK" not in out and bad in out, out
++
++
++# ---------------------------------------------------------------- this repository's own history
++
++
++def test_r077_the_mode_passes_on_this_repository_s_own_history():
++    """On a pull request CI fetches the full history and the base is `origin/<the pull request's base branch>`; elsewhere the
++    default base. Run alone with the pull request's variables set to see CI's case (KP-074)."""
++    if not (REPO / ".git").exists():
++        pytest.skip("no repository here (mutation-run.py's copy holds none)")
++    shallow = subprocess.run(["git", "rev-parse", "--is-shallow-repository"], cwd=str(REPO), capture_output=True, text=True, env=env())
++    on_pull_request = os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
++    if shallow.stdout.strip() == "true":
++        assert not on_pull_request, "CI's tests job fetches the full history on pull requests, so this test never skips there"
++        pytest.skip("the history is shallow (a push to main checks out one commit)")
++    base_branch = os.environ.get("GITHUB_BASE_REF", "")
++    args = ["--base", "origin/" + base_branch] if base_branch else []
++    if not base_branch:
++        has_origin_main = subprocess.run(["git", "rev-parse", "--verify", "-q", "refs/remotes/origin/main"], cwd=str(REPO),
++                                         capture_output=True, text=True, env=env())
++        if has_origin_main.returncode != 0:
++            pytest.skip("no origin/main in this checkout")
++    rc, out = run(REPO, *args)
++    assert_ok(rc, out)
+diff --git a/tests/test_release_b_ci_floor.py b/tests/test_release_b_ci_floor.py
+index 6ebec4c..a3217fb 100644
+--- a/tests/test_release_b_ci_floor.py
++++ b/tests/test_release_b_ci_floor.py
+@@ -103,7 +103,8 @@ WORKFLOW_PIN = {True: {'pull_request': None, 'push': {'branches': ['main']}},
+               'tests': {'name': 'bridge programs (${{ matrix.os }})',
+                         'runs-on': '${{ matrix.os }}',
+                         'steps': [{'uses': 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+-                                   'with': {'persist-credentials': False}},
++                                   'with': {'fetch-depth': "${{ github.event_name == 'pull_request' && '0' || '1' }}",
++                                            'persist-credentials': False}},
+                                   {'uses': 'actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1',
+                                    'with': {'python-version': '3.12'}},
+                                   {'run': 'python -m pip install -r requirements.lock'},
+diff --git a/tests/test_release_s_records_gate.py b/tests/test_release_s_records_gate.py
+index a9f2197..679b657 100644
+--- a/tests/test_release_s_records_gate.py
++++ b/tests/test_release_s_records_gate.py
+@@ -130,6 +130,15 @@ def test_a_path_that_is_no_record_or_decides_a_gate_keeps_the_full_gate(repo, pa
+     assert rc == 1 and "FULL GATE  %s: " % path in out and why in out and "FULL GATE - 1 of 2 changed file(s)" in out, out
+ 
+ 
++def test_r077_the_trace_moves_record_keeps_the_full_gate(repo):
++    """R-077 (TASK-057): `docs/TRACE_MOVES.md` excuses retired passages for `trace-check.py --moves`, which CI runs, so a change
++    of it takes the whole round, as the run parameters and the plan do."""
++    change(repo, "docs/PROJECT_STATUS.md", "Phase: done\n")
++    change(repo, "docs/TRACE_MOVES.md", "# Trace moves\n\n## Entries\n- %s A passage retired here\n" % ("0" * 64))
++    rc, out = run(repo, "premerge-records")
++    assert rc == 1 and "FULL GATE  docs/TRACE_MOVES.md: " in out and "the trace check" in out and "FULL GATE - 1 of 2 changed file(s)" in out, out
++
++
+ @pytest.mark.parametrize("register,named", [
+     (REGISTER.replace("| planned | - |", "| built | tests/test_write.py |"), "R-002"),                      # a Status cell changed
+     (REGISTER.replace("| R-002 | write the file | owner | planned | - |\n", ""), "R-002"),                   # a row left
