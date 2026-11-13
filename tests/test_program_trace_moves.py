@@ -20,6 +20,7 @@ What the tests pin, as docs/TRACE_MOVES.md states it:
 enforces: docs/BUILD_PLAN.md, TASK-057, Done when; docs/REQUIREMENTS.md, R-077; docs/DESIGN.md, Change: the program release, T-MOVE.
 """
 import hashlib
+import json
 import os
 import pathlib
 import re
@@ -431,7 +432,21 @@ def test_r077_the_help_names_the_move_mode_and_its_base():
     p = subprocess.run([sys.executable, str(TRACE), "-h"], capture_output=True, text=True, env=env(), encoding="utf-8", errors="replace")
     usage = p.stdout.split("\n\n", 1)[0]
     assert p.returncode == 0 and "--moves" in usage and "--base" in usage, p.stdout
-    assert "SUPPRESS" not in (REPO / "docs" / "cli-reference.json").read_text(encoding="utf-8")
+    # Every program's -h option has the default ==SUPPRESS== (argparse's own); a help text so marked hides the option.
+    hidden = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            if node.get("help") == "==SUPPRESS==":
+                hidden.append(node.get("option_strings"))
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(json.loads((REPO / "docs" / "cli-reference.json").read_text(encoding="utf-8")))
+    assert hidden == []
 
 
 def test_r077_an_instruction_file_not_readable_at_head_is_named(repo):
