@@ -1216,7 +1216,8 @@ RECORD_TYPES = (".md", ".json", ".txt", ".csv", ".png", ".jpg", ".jpeg", ".gif",
 FULL_GATE_RECORDS = (("docs/run_parameters.md", "the run parameters decide the ceilings and who merges"),
                      ("docs/build_plan", "the plan decides what is built and in what order"),
                      ("docs/roster", "the roster decides which model builds and which reviews"),
-                     ("docs/diagrams/", "the diagrams, their index and the deviations decide what the diagram check allows"))   # compared in lower case
+                     ("docs/diagrams/", "the diagrams, their index and the deviations decide what the diagram check allows"),
+                     ("docs/trace_moves.md", "the trace moves record decides what the trace check excuses"))   # compared in lower case
 TOOL_FILES = ("package.json", "package-lock.json", "tsconfig.json", "jsconfig.json", "composer.json", "deno.json", "lerna.json", "nx.json",
               "turbo.json", "vercel.json", "firebase.json")   # a tool's own configuration, which it runs or builds from, whatever folder holds it; with them every `requirements*.txt`, which an installer reads
 KEPT_RECORDS = ("docs/project_status.md", "docs/inventory.md", "docs/requirements.md", "project.json")   # the guards test that the status file exists; the checks read the others

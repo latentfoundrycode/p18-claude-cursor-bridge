@@ -1,6 +1,6 @@
 {
   "version": "2026.11.12a",
-  "generated": "2026-11-12 13:37",
+  "generated": "2026-11-13 22:21",
   "files": {
     "agents/cursor-configurator.md": "a8aad7838a9bc5b4f00e13fd3749919158cbe37ec7acfa9a40960600398784bc",
     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
@@ -93,7 +93,7 @@
     "cursor-bridge/records-check.py": "6c5ec6e7aef58c634096bc0bf8ed94415e62d16c6a173be166d1f22d445dcd69",
     "cursor-bridge/records-migrate.py": "cbe6acb95d7d64e7ad8086754bed108511458e2de32c387433928e1f6e8470b4",
     "cursor-bridge/refactor-check.py": "4950674a1de1bccf2ac95a4bcec6ab5cc767f1c0a171c01cf164891d1c7d7c36",
-    "cursor-bridge/review-guard.py": "952a60b36ba26a7b68d75a7b808f85c7f5e1030f3b66e824f8101226a66d98e0",
+    "cursor-bridge/review-guard.py": "027b1b5da11971410068a79e6fc1da3b52e975faffe3dd0cc674c936ca7305b1",
     "cursor-bridge/roster-check.py": "dea99884ac6d57a5f661f272a90e1920c38f8e110d5a261dc7f7bc67e0a01d7c",
     "cursor-bridge/run-hidden.py": "bcae418e3cca9d7f1be7bf421ce44b879b343613301df4590d9cc45d00f5be5c",
     "cursor-bridge/scope-check.py": "0c9377dbd74236d256a4cbee74b082d0c4a2cd03ab20b2ad6e15a5a40d32b9d5",
@@ -104,7 +104,7 @@
     "cursor-bridge/shell-guard.py": "6abdc15bd149afdf1561997512b75253a154f58ddb05355577b4ebbcec36c67b",
     "cursor-bridge/stage-diff.py": "167685045331b10e550679eb28fd51e7d829603310bde841bafb3a1cdd9a1ecc",
     "cursor-bridge/sync-check.py": "41d4e74931b150bba23a67a1a024b640f95673a490b3a6522af3f9d6ff43e0de",
-    "cursor-bridge/trace-check.py": "f3c246b9134ddc535f4f856cd8ced1a237d2005b53fd8499a42615493797a022",
+    "cursor-bridge/trace-check.py": "b537f4617b5ca0a8d13ea4f9be3caa8c5d9d6c7c4d9761b09bc2afea325ec2d5",
     "cursor-bridge/vercel-interface.snapshot.md": "7f8cb0092a1b8df1d13320519faa421579261a052b7375c13f1565047364bafa",
     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",

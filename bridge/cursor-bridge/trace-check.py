@@ -27,8 +27,29 @@ that cannot be read, a symbolic link, junction, or other reparse point met on a 
 reads, a home not readable as UTF-8, or a usage error. Then ERROR lines and RESULT: not checked
 are printed, with no traceback.
 The check needs the baseline commit's object history.
+
+  python trace-check.py --moves [--base <rev>] [--repo DIR]
+
+Compares the committed state of every `.md` file under `bridge/` but
+`bridge/cursor-bridge/CHANGELOG.md` between the merge-base of HEAD with the revision given
+(`origin/main` by default) and HEAD. The first output line names that base commit id.
+A passage of a changed instruction file at the base that stands in no instruction file at HEAD
+fails, naming the file and its first words and printing the entry line that would excuse it,
+unless an entry the range adds to `docs/TRACE_MOVES.md` excuses it by hash and first words.
+An added entry that excuses no dropped passage fails, naming its hash.
+
+Move-mode output lines, then counts and RESULT:
+  FAIL            a dropped passage or an unmatched entry line
+  <n> file(s) compared, <n> passage(s) compared, <n> excused
+
+Exit 0 with RESULT: OK when no FAIL line was printed. Exit 1 with RESULT: <n> problem(s)
+when at least one FAIL was printed.
+Exit 2 when the check cannot run or on a usage error (`--base` with no `--moves`, `--moves`
+with `--map`, a `--base` value beginning with `-`, or a base revision that cannot be read).
+Then ERROR lines and RESULT: not checked are printed, with no traceback.
 """
 import argparse
+import hashlib
 import os
 import re
 import stat
@@ -39,7 +60,10 @@ GIT_TIMEOUT = 120
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 BASELINE_REL = "bridge/cursor-bridge/workflow/trace-baseline.txt"
 EXCEPTIONS_REL = "bridge/cursor-bridge/workflow/trace-exceptions.md"
+CHANGELOG_REL = "bridge/cursor-bridge/CHANGELOG.md"
+MOVES_REL = "docs/TRACE_MOVES.md"
 CORE_REL = "bridge/commands/supervisor.md"
+MOVE_ENTRY_RE = re.compile(r"^- ([0-9a-f]{64}) (.+)$")
 WORKFLOW_PREFIX = "bridge/cursor-bridge/workflow/"
 ENTRY_RE = re.compile(
     r"^- (reword|new) ([A-Z][A-Z0-9]*-[0-9]+) (\S+\.md) (.+)$"
@@ -528,6 +552,252 @@ def check_citations(rel, units, all_headings, findings_cite):
                     findings_cite.append((rel, deepest_heading(unit["chain"]), q))
 
 
+def is_instruction_md(rel):
+    rel = slash(rel)
+    if not rel.endswith(".md"):
+        return False
+    if not rel.startswith("bridge/"):
+        return False
+    return rel != CHANGELOG_REL
+
+
+def passage_hash(normal):
+    return hashlib.sha256(normal.encode("utf-8")).hexdigest()
+
+
+def passage_first_words(normal):
+    return escape_field(" ".join(normal.split()[:8]))
+
+
+def move_entry_line(normal):
+    return "- %s %s" % (passage_hash(normal), passage_first_words(normal))
+
+
+def git_file_at(root, rev, rel):
+    proc, err = git_run(root, ["show", "%s:%s" % (rev, rel)])
+    if proc is None:
+        return None, err
+    if proc.returncode != 0:
+        return None, None
+    try:
+        return decode_git_bytes(proc.stdout), None
+    except UnicodeDecodeError:
+        return None, "cannot be read as UTF-8"
+
+
+def git_head_rev(root):
+    proc, err = git_run(root, ["rev-parse", "HEAD"])
+    if proc is None:
+        return None, err
+    if proc.returncode != 0:
+        return None, "HEAD cannot be read"
+    sha = decode_git_bytes(proc.stdout).strip()
+    if not SHA_RE.match(sha):
+        return None, "HEAD is not a commit"
+    return sha, None
+
+
+def git_merge_base(root, head, rev_spec):
+    if rev_spec.startswith("-"):
+        return None, "a revision must not begin with -"
+    proc, err = git_run(root, ["rev-parse", "--verify", "--end-of-options", rev_spec])
+    if proc is None:
+        return None, err
+    if proc.returncode != 0:
+        reason = decode_git_bytes(proc.stderr + proc.stdout).strip() or "cannot be resolved"
+        return None, reason
+    rev = decode_git_bytes(proc.stdout).strip()
+    proc, err = git_run(root, ["merge-base", head, "--end-of-options", rev])
+    if proc is None:
+        return None, err
+    if proc.returncode != 0:
+        reason = decode_git_bytes(proc.stderr + proc.stdout).strip() or "no merge-base with HEAD"
+        return None, reason
+    base = decode_git_bytes(proc.stdout).strip()
+    if not SHA_RE.match(base):
+        return None, "merge-base is not a commit"
+    return base, None
+
+
+def parse_move_entries(text):
+    entries = []
+    for line in file_lines(text or ""):
+        m = MOVE_ENTRY_RE.match(line)
+        if m:
+            entries.append({
+                "hash": m.group(1),
+                "words": m.group(2),
+                "line": line,
+            })
+    return entries
+
+
+def instruction_paths_in_rev(root, rev):
+    proc, err = git_run(root, ["ls-tree", "-r", "--name-only", "-z", rev, "--", "bridge/"])
+    if proc is None:
+        return None, err
+    if proc.returncode != 0:
+        return None, "command failed"
+    paths = []
+    for part in proc.stdout.split(b"\0"):
+        if not part:
+            continue
+        try:
+            rel = decode_git_bytes(part)
+        except UnicodeDecodeError:
+            return None, "cannot be read as UTF-8"
+        if is_instruction_md(rel):
+            paths.append(slash(rel))
+    paths.sort()
+    return paths, None
+
+
+def changed_instruction_paths(root, base, head):
+    proc, err = git_run(root, ["diff", "--name-only", "--no-renames", "-z", base, head, "--", "bridge/"])
+    if proc is None:
+        return None, err
+    if proc.returncode != 0:
+        return None, "command failed"
+    paths = []
+    for part in proc.stdout.split(b"\0"):
+        if not part:
+            continue
+        try:
+            rel = decode_git_bytes(part)
+        except UnicodeDecodeError:
+            return None, "cannot be read as UTF-8"
+        if is_instruction_md(rel):
+            paths.append(slash(rel))
+    paths.sort()
+    return paths, None
+
+
+def head_passage_norms(root, head):
+    norms = set()
+    paths, err = instruction_paths_in_rev(root, head)
+    if paths is None:
+        return None, err
+    for rel in paths:
+        text, read_err = git_file_at(root, head, rel)
+        if read_err:
+            return None, read_err
+        if text is None:
+            continue
+        units, _heads = parse_units(text)
+        for u in units:
+            norms.add(u["normal"])
+    return norms, None
+
+
+def added_move_entries(root, base, head):
+    base_text, read_err = git_file_at(root, base, MOVES_REL)
+    if read_err:
+        return None, read_err
+    head_text, read_err = git_file_at(root, head, MOVES_REL)
+    if read_err:
+        return None, read_err
+    base_lines = {e["line"] for e in parse_move_entries(base_text or "")}
+    added = [e for e in parse_move_entries(head_text or "") if e["line"] not in base_lines]
+    return added, None
+
+
+def run_moves(root, base_rev):
+    proc, err = git_run(root, ["rev-parse", "--is-inside-work-tree"])
+    if proc is None:
+        print("ERROR: git rev-parse: %s" % escape_field(err))
+        print("RESULT: not checked")
+        return 2
+    if proc.returncode != 0 or proc.stdout.decode("ascii", "replace").strip() != "true":
+        print("ERROR: %s: not a git work tree" % escape_field(slash(root)))
+        print("RESULT: not checked")
+        return 2
+
+    head, err = git_head_rev(root)
+    if head is None:
+        print("ERROR: git rev-parse: %s" % escape_field(err))
+        print("RESULT: not checked")
+        return 2
+
+    base, err = git_merge_base(root, head, base_rev)
+    if base is None:
+        print("ERROR: %s: %s" % (escape_field(base_rev), escape_field(err)))
+        print("RESULT: not checked")
+        return 2
+
+    print(base)
+
+    head_norms, err = head_passage_norms(root, head)
+    if head_norms is None:
+        print("ERROR: git: %s" % escape_field(err))
+        print("RESULT: not checked")
+        return 2
+
+    changed_paths, err = changed_instruction_paths(root, base, head)
+    if changed_paths is None:
+        print("ERROR: git diff: %s" % escape_field(err))
+        print("RESULT: not checked")
+        return 2
+
+    dropped = []
+    passages_compared = 0
+    for rel in changed_paths:
+        text, read_err = git_file_at(root, base, rel)
+        if read_err:
+            print("ERROR: %s: %s" % (escape_field(rel), escape_field(read_err)))
+            print("RESULT: not checked")
+            return 2
+        if text is None:
+            continue
+        units, _heads = parse_units(text)
+        passages_compared += len(units)
+        for u in units:
+            nf = u["normal"]
+            if nf not in head_norms:
+                dropped.append((rel, nf))
+
+    read_entries, err = added_move_entries(root, base, head)
+    if read_entries is None:
+        print("ERROR: %s: %s" % (escape_field(MOVES_REL), escape_field(err)))
+        print("RESULT: not checked")
+        return 2
+
+    matched_drop = set()
+    fail_count = 0
+    excused = 0
+
+    for entry in read_entries:
+        key = (entry["hash"], entry["words"])
+        paired = False
+        for index, (rel, nf) in enumerate(dropped):
+            if index in matched_drop:
+                continue
+            if (passage_hash(nf), passage_first_words(nf)) == key:
+                matched_drop.add(index)
+                excused += 1
+                paired = True
+                break
+        if not paired:
+            print("FAIL %s" % entry["hash"])
+            fail_count += 1
+
+    for index, (rel, nf) in enumerate(dropped):
+        if index in matched_drop:
+            continue
+        print("FAIL %s: %s" % (escape_field(slash(rel)), passage_first_words(nf)))
+        print(move_entry_line(nf))
+        fail_count += 1
+
+    files_compared = len(changed_paths)
+    print("%d file(s) compared" % files_compared)
+    print("%d passage(s) compared" % passages_compared)
+    print("%d excused" % excused)
+    if fail_count:
+        print("RESULT: %d problem(s)" % fail_count)
+        return 1
+    print("RESULT: OK")
+    return 0
+
+
 def load_baseline_file(root, sha, rel, errors):
     proc, err = git_run(root, ["show", "%s:%s" % (sha, rel)])
     if proc is None:
@@ -562,16 +832,27 @@ def build_parser():
     )
     parser.add_argument("--repo", default=None, metavar="DIR")
     parser.add_argument("--map", action="store_true")
+    parser.add_argument("--moves", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--base", default=None, metavar="REV", help=argparse.SUPPRESS)
     return parser
 
 
 def main(argv=None):
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
     if args.repo is not None:
         root = os.path.abspath(args.repo)
     else:
         here = os.path.abspath(__file__)
         root = os.path.dirname(os.path.dirname(os.path.dirname(here)))
+
+    if args.moves and args.map:
+        parser.error("--moves cannot be used with --map")
+    if args.base is not None and not args.moves:
+        parser.error("--base requires --moves")
+    if args.moves:
+        base_rev = args.base if args.base is not None else "origin/main"
+        return run_moves(root, base_rev)
 
     errors = []
 
