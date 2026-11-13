@@ -7,7 +7,10 @@ The test target: a pytest or unittest run through the launcher reads the project
 folder is refused before anything starts.
 
 M1: a builder brief of round two or later carries `Round cause: <cause> - <one line>`; the launcher reads the cause into the run log
-(`cause`) for pace-report.py, logs `unstated` with a note where the line is missing or names no known cause, and never refuses for it."""
+(`cause`) for pace-report.py, logs `unstated` with a note where the line is missing or names no known cause, and never refuses for it.
+
+Register: R-074 is held by the test_c18_ tests; R-073's target rule (the command line, the environment, the key file) by the tests
+of the test target; R-072's cause in the run log and the pace report's two lines by the test_m1_ and test_m1_m2_ tests."""
 import json
 import os
 import subprocess

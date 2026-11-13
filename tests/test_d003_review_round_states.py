@@ -19,6 +19,7 @@ import time
 import pytest
 
 import test_bug039 as B
+import test_release_s_records_gate as S
 import test_task032_supervisor_guard as G
 import test_task032_supervisor_launcher as L
 
@@ -629,3 +630,62 @@ def test_d003_transition_verify_or_premerge_at_no_record_with_a_hash_copy_standi
     assert not G.rounds_file(repo, ID).exists() and mark(repo) is None
     assert not (bridge / "premerge").exists()
     G.refuse_and_nothing(repo, NAME, G.TAMPER, ID)
+
+
+# --- the short gate's path, as release S built it (TASK-056, R-067) ---------------------------------------
+
+
+def records_repo(tmp_path):
+    """main as merged beside origin/main and a branch `records` with one record changed: the status file. The helpers are
+    tests/test_release_s_records_gate.py's."""
+    r = tmp_path / "ws"
+    (r / "docs").mkdir(parents=True)
+    (r / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\n", encoding="utf-8")
+    (r / "docs" / "REQUIREMENTS.md").write_text(S.REGISTER, encoding="utf-8")
+    S.git(r, "init", "-q", "-b", "main")
+    S.git(r, "add", "-A")
+    S.git(r, "commit", "-q", "-m", "base")
+    S.git(r, "update-ref", "refs/remotes/origin/main", "HEAD")
+    S.git(r, "checkout", "-q", "-b", "records")
+    S.change(r, "docs/PROJECT_STATUS.md", "Phase: done\n")
+    return r
+
+
+def guard_files(repo):
+    folder = repo / ".git" / "bridge"
+    return sorted(os.path.relpath(os.path.join(d, f), str(folder)).replace("\\", "/") for d, _, files in os.walk(str(folder)) for f in files)
+
+
+def test_d003_state_records_branch_premerge_records_cannot_check_a_dirty_tree(tmp_path):
+    """R-067, D-003 (`records_branch`, `records_branch --> records_branch`): a branch of records alone, no rounds record, no snapshot;
+    `premerge-records` before the push on a tree not clean is CANNOT CHECK, exit 2, and writes nothing."""
+    repo = records_repo(tmp_path)
+    (repo / "docs" / "PROJECT_STATUS.md").write_text("Phase: done, edited\n", encoding="utf-8")
+    rc, out = S.run(repo, "premerge-records")
+    assert rc == 2 and "CANNOT CHECK - the tree is not clean" in out and guard_files(repo) == [], out
+
+
+def test_d003_state_short_gate_answered_before_the_push_writes_nothing(tmp_path):
+    """R-067, D-003 (`records_branch --> short_gate`): `premerge-records` before the push answers SHORT GATE, exit 0, and writes
+    nothing: no snapshot, no rounds record, no premerge record yet."""
+    repo = records_repo(tmp_path)
+    rc, out = S.run(repo, "premerge-records")
+    assert rc == 0 and "SHORT GATE - 1 changed file(s)" in out and "nothing was written" in out, out
+    assert guard_files(repo) == []
+
+
+def test_d003_state_records_premerged_writes_the_record_for_the_head(tmp_path, program, monkeypatch, capsys):
+    """R-067, D-003 (`short_gate --> records_premerged`): `premerge-records <pr>` with the pull request's head equal to the local head
+    answers OK - records only, writes `premerge/<head>` with review `records` and the files, and prints the merge command."""
+    for k in ("GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"):
+        monkeypatch.setenv(k, os.devnull)
+    repo = records_repo(tmp_path)
+    mod = program("review-guard")
+    head = S.git(repo, "rev-parse", "HEAD")
+    monkeypatch.setattr(mod, "pr_state", lambda pr, root: (S.state(repo, ["docs/PROJECT_STATUS.md"]), None))
+    rc = mod.cmd_premerge_records(str(repo), "12")
+    out = capsys.readouterr().out
+    assert rc == 0 and "OK - records only, 1 file(s)" in out and "gh pr merge 12 --squash --match-head-commit %s" % head in out, out
+    assert guard_files(repo) == ["premerge/" + head]
+    record = json.loads((repo / ".git" / "bridge" / "premerge" / head).read_text(encoding="utf-8"))
+    assert record["review"] == "records" and record["pr"] == "12" and record["files"] == ["docs/PROJECT_STATUS.md"], record

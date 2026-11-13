@@ -6,7 +6,11 @@
    cost of a compaction is bounded by the largest file the hook can name for any phase.
 
 Both are counted the plain way, `len(text.split())`, so anyone can check a number with one line. The digest's own cap (9,500
-characters, under Claude Code's 10,000 for a hook's output) stays where it is, in tests/test_session_start.py."""
+characters, under Claude Code's 10,000 for a hook's output) stays where it is, in tests/test_session_start.py.
+
+Register: R-066's two budgets are test_the_rulebook_stays_within_its_word_budget and
+test_the_file_of_any_step_stays_within_what_one_re_read_may_cost; R-069's one file of the step in hand is
+test_the_hook_asks_for_one_file_of_the_step_and_not_the_phase_s_whole_list."""
 import importlib.util
 import os
 import re

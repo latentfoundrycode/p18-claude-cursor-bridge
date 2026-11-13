@@ -2,7 +2,9 @@
 
 An unmerged increment whose `Done when:` field holds more than twelve acceptance items, or whose Scope names more than twelve
 paths, gets one `note: large increment: ...` line. It is a note and never a failure: the exit code and the RESULT line are
-those of the same plan without it. Scratch repositories."""
+those of the same plan without it. Scratch repositories.
+
+Register: R-070 is held by this file."""
 import os
 import subprocess
 import sys
