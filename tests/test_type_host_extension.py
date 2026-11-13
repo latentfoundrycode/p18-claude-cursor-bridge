@@ -240,11 +240,12 @@ def test_r025_workflow_check_passes_over_the_workflow_folder():
 
 def test_r025_the_bridge_is_classified_without_pausing():
     """BUILD_PLAN TASK-021: the committed fixture, the bridge's own `Workflows:` line as docs/PROJECT_STATUS.md writes
-    it (§6.3's classification: host extension → Claude Code extension, with installable), passes `workflow-check.py
-    --status` with no FAIL (a part whose type or sub-type is not written pauses) and no FLAG; the bridge's own status
-    file carries the same line."""
+    it (§6.3's classification: host extension → Claude Code extension, with installable; the trait External services
+    beside it since the owner approved it at the program release's design gate, 2026-11-13, docs/INVENTORY.md,
+    Decisions), passes `workflow-check.py --status` with no FAIL (a part whose type or sub-type is not written pauses)
+    and no FLAG; the bridge's own status file carries the same line."""
     path = os.path.join(FIXTURES, "bridge.status.md")
-    want = "Workflows: Host Extension Development → Claude Code Extension; traits: Installable"
+    want = "Workflows: Host Extension Development → Claude Code Extension; traits: Installable, External services"
     wf = [l for l in read(path).replace("\r\n", "\n").split("\n") if l.startswith("Workflows: ")]
     assert wf == [want], wf
     status = read(os.path.join(REPO, "docs", "PROJECT_STATUS.md")).replace("\r\n", "\n").split("\n")
