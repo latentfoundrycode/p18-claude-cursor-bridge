@@ -5,9 +5,9 @@
   "version": "2026.11.12a",
   "instruction_texts": ["bridge/"],
   "state": {
-    "phase": "done",
-    "stage": "release B2 complete 2026-11-11 (stage H2 closed, project end); release S, the maintainer's, installed and calibrated 2026-11-12; Claude-Cursor Bridge 2026.11.12a",
+    "phase": "changing",
+    "stage": "release B2 complete 2026-11-11 (stage H2 closed, project end); release S, the maintainer's, installed and calibrated 2026-11-12; the program release begun 2026-11-13 (intake); Claude-Cursor Bridge 2026.11.12a",
     "bridge": "2026.11.12a",
-    "updated": "2026-11-12"
+    "updated": "2026-11-13"
   }
 }
