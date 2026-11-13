@@ -788,3 +788,15 @@ What is criticised: the two stages change-cycle.md's item 4 appends to docs/BUIL
 **Gate**: passed 2026-11-09, the owner's three approvals asked in the question form (the text as the rule applied, mid-build escalations with no recommendation before their answer, questions before the design gate and questions that are both among it; the critique's record with its four accepted findings; the register's row R-065 at the carry); the four round files removed with `git rm` in the stamp's commit on the hotfix branch.
 
 **After the gate** (2026-11-09, the code gate's Review A, round 1, REJECT, and its round 2): KP-075's heading says "invited" where it said "licensed", since the text-consistency scan reads a line holding a licence word and a question as a licence question put to the owner; the mockups' example of a fixed-form parameter names the closed list's own items ("the platform and runtime context, such as the smallest screen width the design must fit, or the figure of a limit"); the design's table, carried to docs/DESIGN.md, is the round-2 text. Wording within the approved rule, no new row and no new place; told to the owner in the next report (rule 58).
+
+## Subject: program (the program release's design revision and its plan addendum as one subject: the program fixes the evaluations collected, the field's findings, release S's records, Context7 for the Claude side; 2026-11-13)
+
+**What is criticised:** the change cycle's design revision (change-cycle.md, item 2) with its plan addendum (item 4), one subject since the addendum's increments stand in the round-1 file: docs/DESIGN.md's section "Change: the program release", the register's rows R-066 to R-102, the inventory's five new Decisions rows, the diagram index with D-001 to D-004 as revised, and docs/BUILD_PLAN.md's section "The program release — the plan addendum" (stages P1 to P4, TASK-055 to TASK-083). The critics read `run/review/DESIGN-program-<round>.md`, built from the committed records by run/supervisor/program_design_file.py, with plan-critic's design-document and build-plan lenses and the lenses the type and the trait add. The owner's scope (INVENTORY, Decisions, 2026-11-13: the order, the field findings, the planning model, Context7) is the subject's fixed input: nothing of it is relitigated; the carry comparison is the owner's open decision at the gate and is criticised only as the design states it.
+
+**Accepted** (finding, critic, round, the reason):
+- (none yet)
+
+**Rounds** (round, kind, the commit its file was built from, critic, Blocking / Should fix / Consider, what was fixed):
+- (none yet)
+
+**Resolution:** (none yet)

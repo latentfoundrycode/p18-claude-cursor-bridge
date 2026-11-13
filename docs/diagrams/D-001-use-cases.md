@@ -2,7 +2,7 @@
 
 Level 1. Refines nothing. Drawn at release T (docs/DESIGN.md, "Change: release T", "Architecture — the retrofit's diagrams") as the retrofit of release B: the inputs are the requirements register (docs/REQUIREMENTS.md, R-001 to R-056) and the core's division of labour (bridge/commands/supervisor.md, "The roles": the owner, the supervisor, the Cursor builder, the supervisor's specialists, Review B, the maintainer, GitHub), not the code. The system is the bridge's own workflow as a supervised project; the phases are subgraphs inside the system boundary `sys_bridge`, and the actors stand outside it.
 
-Revised 2026-11-04 for release B2 (docs/DESIGN.md, "Change: release B2", "Architecture — the diagrams the change touches"): the IDs R-057 to R-064 are added to the labels of the use cases that read or write the records (the hooks and the core's order, resuming, keeping project state, the design, the plan, the run parameters, the brief, the inspection's checks, Review B's guard, the calibration with its migration, the project end, the install, the report cycle, and the change cycle that migrates this repository's own records); no actor, use case, edge or identifier is added or removed.
+Revised 2026-11-04 for release B2 (docs/DESIGN.md, "Change: release B2", "Architecture — the diagrams the change touches"): the IDs R-057 to R-064 are added to the labels of the use cases that read or write the records (the hooks and the core's order, resuming, keeping project state, the design, the plan, the run parameters, the brief, the inspection's checks, Review B's guard, the calibration with its migration, the project end, the install, the report cycle, and the change cycle that migrates this repository's own records); no actor, use case, edge or identifier is added or removed; revised again 2026-11-13 for the program release (docs/DESIGN.md, "Change: the program release (2026-11-13)"), whose IDs R-066 to R-102 are added in the same way to the labels of the use cases that realize them, with no actor, use case, edge or identifier added or removed.
 
 Each use case names the requirement IDs it serves; an edge joins an actor to a use case it takes part in. Enforced by `plan-critic`'s review (every use case traced to the register by the IDs in its node); `completion-check.py` traces the register itself, not this diagram. R-031 and R-037 are owner-deferred (2026-10-31) and drawn under the use cases they belong to.
 
@@ -19,8 +19,8 @@ flowchart LR
     subgraph sys_bridge ["Claude-Cursor Bridge: the supervised project's workflow"]
         subgraph ph_every ["In every phase"]
             uc_workflows(["Follow the core, the current phase's module and the conditional workflows that apply, in the stated order R-003, R-006, R-007, R-008, R-009, R-016, R-017, R-018, R-019, R-020, R-021, R-022, R-023, R-024, R-025, R-034, R-057, R-058, R-061"])
-            uc_resume(["Resume after a compaction or an interruption from the files the hook names R-004, R-005, R-030, R-032, R-051, R-057, R-058"])
-            uc_report(["Report to the owner leading with the decision, keep project state, write run sheets R-048, R-053, R-058, R-062"])
+            uc_resume(["Resume after a compaction or an interruption from the files the hook names R-004, R-005, R-030, R-032, R-051, R-057, R-058, R-069"])
+            uc_report(["Report to the owner leading with the decision, keep project state, write run sheets R-048, R-053, R-058, R-062, R-088, R-101"])
         end
         subgraph ph_intake_design ["Intake and design, with their gates"]
             uc_intake(["Take in a project, classify each part, pause on an unwritten type R-001, R-013, R-014, R-015, R-035"])
@@ -30,35 +30,35 @@ flowchart LR
             uc_design_gate(["Approve the design, the traits and the Level 1 diagrams at the design gate R-035, R-036"])
         end
         subgraph ph_plan_config ["Plan, run parameters and configuration"]
-            uc_plan(["Plan the build in stages and increments, pausing for planning work on the planning model R-047, R-053, R-059, R-060"])
+            uc_plan(["Plan the build in stages and increments, pausing for planning work on the planning model R-047, R-053, R-059, R-060, R-070, R-099"])
             uc_run_params(["Set the run parameters: the merge authority, the review ceiling of three R-042, R-061"])
-            uc_configure(["Configure the project: the security floor, the windowless default, the weekly scan R-002, R-039, R-052"])
+            uc_configure(["Configure the project: the security floor, the windowless default, the weekly scan R-002, R-039, R-052, R-092"])
         end
         subgraph ph_loop ["The delegation loop, one increment"]
-            uc_brief(["Package the brief and delegate it through the launcher, one heavy slot at a time R-039, R-040, R-051, R-059, R-061"])
+            uc_brief(["Package the brief and delegate it through the launcher, one heavy slot at a time R-039, R-040, R-051, R-059, R-061, R-073, R-074, R-080, R-095, R-100"])
             uc_build(["Build the increment inside its Scope and report with the Assumed, not verified list R-051"])
-            uc_inspect(["Inspect, test and scan the increment, mutation checks once per pass R-039, R-040, R-041, R-043, R-051, R-057, R-058, R-059, R-060, R-061, R-063"])
-            uc_review_a(["Decide by defect class with Review A and the auditors R-050"])
-            uc_review_b(["Review the snapshot cross-family, rounds counted against the ceiling R-042, R-046, R-050, R-059, R-061"])
-            uc_merge(["Merge through the verified gate: CI green, both reviews, no gate-integrity flag R-002, R-045"])
+            uc_inspect(["Inspect, test and scan the increment, mutation checks once per pass R-039, R-040, R-041, R-043, R-051, R-057, R-058, R-059, R-060, R-061, R-063, R-076, R-077, R-078, R-081, R-086, R-087, R-090"])
+            uc_review_a(["Decide by defect class with Review A and the auditors R-050, R-068"])
+            uc_review_b(["Review the snapshot cross-family, rounds counted against the ceiling R-042, R-046, R-050, R-059, R-061, R-079, R-084"])
+            uc_merge(["Merge through the verified gate: CI green, both reviews, no gate-integrity flag R-002, R-045, R-067, R-082, R-083, R-085"])
         end
         subgraph ph_stage_close ["Stage close and reflection"]
             uc_stage_close(["Close a stage: the refactoring pass, the stage review by both reviewers, the demonstration, the reflection items R-049"])
         end
         subgraph ph_project_end ["Project end and the release's install"]
-            uc_project_end(["Close the project: done against the register, the promotion pass, the release stamped and traced R-029, R-033, R-036, R-056, R-059, R-060, R-064"])
-            uc_install(["Install the release into the host from a run sheet and check the installed tree R-037, R-038, R-056, R-064"])
+            uc_project_end(["Close the project: done against the register, the promotion pass, the release stamped and traced R-029, R-033, R-036, R-056, R-059, R-060, R-064, R-066, R-093, R-102"])
+            uc_install(["Install the release into the host from a run sheet and check the installed tree R-037, R-038, R-056, R-064, R-094"])
         end
         subgraph ph_calibration ["Calibration"]
-            uc_calibrate(["Calibrate a running project to the installed release by phase, reopening no gate R-027, R-031, R-033, R-039, R-048, R-052, R-058, R-062, R-064"])
+            uc_calibrate(["Calibrate a running project to the installed release by phase, reopening no gate R-027, R-031, R-033, R-039, R-048, R-052, R-058, R-062, R-064, R-091"])
         end
         subgraph ph_report_cycle ["The Sunday report cycle and the workflow catalogue"]
-            uc_report_cycle(["Evaluate the week's reports and pace, accept the text follow-ups and the pitfalls R-044, R-054, R-058"])
-            uc_weekly_scan(["Scan every lockfile weekly for newly disclosed flaws R-052"])
+            uc_report_cycle(["Evaluate the week's reports and pace, accept the text follow-ups and the pitfalls R-044, R-054, R-058, R-072, R-089, R-097"])
+            uc_weekly_scan(["Scan every lockfile weekly for newly disclosed flaws R-052, R-075, R-098"])
             uc_maintain_workflows(["Add or change a product type, sub-type or trait through the open list R-011, R-028"])
         end
         subgraph ph_change ["The change cycle"]
-            uc_change_cycle(["Run a change request on a finished project, scaled to the delta R-047, R-052, R-055, R-056, R-063"])
+            uc_change_cycle(["Run a change request on a finished project, scaled to the delta R-047, R-052, R-055, R-056, R-063, R-071, R-096"])
         end
     end
 
