@@ -1187,6 +1187,26 @@ that cannot be read, a symbolic link, junction, or other reparse point met on a 
 reads, a home not readable as UTF-8, or a usage error. Then ERROR lines and RESULT: not checked
 are printed, with no traceback.
 The check needs the baseline commit's object history.
+
+  python trace-check.py --moves [--base <rev>] [--repo DIR]
+
+Compares the committed state of every `.md` file under `bridge/` but
+`bridge/cursor-bridge/CHANGELOG.md` between the merge-base of HEAD with the revision given
+(`origin/main` by default) and HEAD. The first output line names that base commit id.
+A passage of a changed instruction file at the base that stands in no instruction file at HEAD
+fails, naming the file and its first words and printing the entry line that would excuse it,
+unless an entry the range adds to `docs/TRACE_MOVES.md` excuses it by hash and first words.
+An added entry that excuses no dropped passage fails, naming its hash.
+
+Move-mode output lines, then counts and RESULT:
+  FAIL            a dropped passage or an unmatched entry line
+  <n> file(s) compared, <n> passage(s) compared, <n> excused
+
+Exit 0 with RESULT: OK when no FAIL line was printed. Exit 1 with RESULT: <n> problem(s)
+when at least one FAIL was printed.
+Exit 2 when the check cannot run or on a usage error (`--base` with no `--moves`, `--moves`
+with `--map`, a `--base` value beginning with `-`, or a base revision that cannot be read).
+Then ERROR lines and RESULT: not checked are printed, with no traceback.
 ```
 
 ### Options
@@ -1194,6 +1214,8 @@ The check needs the baseline commit's object history.
 - `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
 - `--repo`; default: null; required: false
 - `--map`; default: false; required: false
+- `--moves`; default: false; required: false; compare instruction passages between the merge-base of HEAD with a revision and HEAD
+- `--base`; default: null; required: false; revision whose merge-base with HEAD is the range base (default origin/main)
 
 ## wake-timer.py
 

@@ -130,6 +130,15 @@ def test_a_path_that_is_no_record_or_decides_a_gate_keeps_the_full_gate(repo, pa
     assert rc == 1 and "FULL GATE  %s: " % path in out and why in out and "FULL GATE - 1 of 2 changed file(s)" in out, out
 
 
+def test_r077_the_trace_moves_record_keeps_the_full_gate(repo):
+    """R-077 (TASK-057): `docs/TRACE_MOVES.md` excuses retired passages for `trace-check.py --moves`, which CI runs, so a change
+    of it takes the whole round, as the run parameters and the plan do."""
+    change(repo, "docs/PROJECT_STATUS.md", "Phase: done\n")
+    change(repo, "docs/TRACE_MOVES.md", "# Trace moves\n\n## Entries\n- %s A passage retired here\n" % ("0" * 64))
+    rc, out = run(repo, "premerge-records")
+    assert rc == 1 and "FULL GATE  docs/TRACE_MOVES.md: " in out and "the trace check" in out and "FULL GATE - 1 of 2 changed file(s)" in out, out
+
+
 @pytest.mark.parametrize("register,named", [
     (REGISTER.replace("| planned | - |", "| built | tests/test_write.py |"), "R-002"),                      # a Status cell changed
     (REGISTER.replace("| R-002 | write the file | owner | planned | - |\n", ""), "R-002"),                   # a row left
