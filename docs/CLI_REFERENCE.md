@@ -1214,8 +1214,8 @@ Then ERROR lines and RESULT: not checked are printed, with no traceback.
 - `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
 - `--repo`; default: null; required: false
 - `--map`; default: false; required: false
-- `--moves`; default: false; required: false; ==SUPPRESS==
-- `--base`; default: null; required: false; ==SUPPRESS==
+- `--moves`; default: false; required: false; compare instruction passages between the merge-base of HEAD with a revision and HEAD
+- `--base`; default: null; required: false; revision whose merge-base with HEAD is the range base (default origin/main)
 
 ## wake-timer.py
 

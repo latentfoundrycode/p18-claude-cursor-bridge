@@ -676,17 +676,17 @@ def head_passage_norms(root, head):
     norms = set()
     paths, err = instruction_paths_in_rev(root, head)
     if paths is None:
-        return None, err
+        return None, None, err
     for rel in paths:
         text, read_err = git_file_at(root, head, rel)
         if read_err:
-            return None, read_err
+            return None, rel, read_err
         if text is None:
             continue
         units, _heads = parse_units(text)
         for u in units:
             norms.add(u["normal"])
-    return norms, None
+    return norms, None, None
 
 
 def added_move_entries(root, base, head):
@@ -726,9 +726,12 @@ def run_moves(root, base_rev):
 
     print(base)
 
-    head_norms, err = head_passage_norms(root, head)
+    head_norms, err_rel, err = head_passage_norms(root, head)
     if head_norms is None:
-        print("ERROR: git: %s" % escape_field(err))
+        if err_rel is not None:
+            print("ERROR: %s: %s" % (escape_field(err_rel), escape_field(err)))
+        else:
+            print("ERROR: git: %s" % escape_field(err))
         print("RESULT: not checked")
         return 2
 
@@ -740,6 +743,7 @@ def run_moves(root, base_rev):
 
     dropped = []
     passages_compared = 0
+    files_compared = 0
     for rel in changed_paths:
         text, read_err = git_file_at(root, base, rel)
         if read_err:
@@ -748,6 +752,7 @@ def run_moves(root, base_rev):
             return 2
         if text is None:
             continue
+        files_compared += 1
         units, _heads = parse_units(text)
         passages_compared += len(units)
         for u in units:
@@ -787,7 +792,6 @@ def run_moves(root, base_rev):
         print(move_entry_line(nf))
         fail_count += 1
 
-    files_compared = len(changed_paths)
     print("%d file(s) compared" % files_compared)
     print("%d passage(s) compared" % passages_compared)
     print("%d excused" % excused)
@@ -832,8 +836,17 @@ def build_parser():
     )
     parser.add_argument("--repo", default=None, metavar="DIR")
     parser.add_argument("--map", action="store_true")
-    parser.add_argument("--moves", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--base", default=None, metavar="REV", help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--moves",
+        action="store_true",
+        help="compare instruction passages between the merge-base of HEAD with a revision and HEAD",
+    )
+    parser.add_argument(
+        "--base",
+        default=None,
+        metavar="REV",
+        help="revision whose merge-base with HEAD is the range base (default origin/main)",
+    )
     return parser
 
 
@@ -852,6 +865,8 @@ def main(argv=None):
         parser.error("--base requires --moves")
     if args.moves:
         base_rev = args.base if args.base is not None else "origin/main"
+        if base_rev.startswith("-"):
+            parser.error("%s: a revision must not begin with -" % base_rev)
         return run_moves(root, base_rev)
 
     errors = []

@@ -1283,7 +1283,7 @@
           "choices": null,
           "default": false,
           "dest": "moves",
-          "help": "==SUPPRESS==",
+          "help": "compare instruction passages between the merge-base of HEAD with a revision and HEAD",
           "nargs": 0,
           "option_strings": [
             "--moves"
@@ -1295,7 +1295,7 @@
           "choices": null,
           "default": null,
           "dest": "base",
-          "help": "==SUPPRESS==",
+          "help": "revision whose merge-base with HEAD is the range base (default origin/main)",
           "nargs": null,
           "option_strings": [
             "--base"
