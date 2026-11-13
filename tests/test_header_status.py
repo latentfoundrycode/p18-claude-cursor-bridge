@@ -73,7 +73,7 @@ P = W + "phases/"
 
 WEB = ["Has screens", "Installable", "External services", "Spends money", "Long-running process", "AI models"]
 PARTS = {
-    "bridge": [("Host Extension Development", "Claude Code Extension", ["Installable"])],
+    "bridge": [("Host Extension Development", "Claude Code Extension", ["Installable", "External services"])],
     "reangle": [("Web App Development", "Local Web App", WEB)],
     "tdp": [("Own-Computer Software Development", "Local Service Software", WEB[1:])],
     "video-factory": [("Web App Development", "Local Web App", WEB)],
@@ -201,7 +201,7 @@ FIELD_CASES = [
     ("issues-segments", "Open issues: ISS-001 fixed; ISS-015 to write (PR #3; round 1)\n", "open_issues",
      ["ISS-001 fixed", "ISS-015 to write (PR #3; round 1)"]),
     ("issues-absent", "Phase: building\n", "open_issues", []),
-    ("workflows-bridge", "Phase: building\nWorkflows: Host Extension Development %s Claude Code Extension; traits: Installable\n" % ARROW,
+    ("workflows-bridge", "Phase: building\nWorkflows: Host Extension Development %s Claude Code Extension; traits: Installable, External services\n" % ARROW,
      "workflows", as_parts(PARTS["bridge"])),
     ("workflows-unclassified", "Phase: intake\nWorkflows: not yet classified\n", "workflows", []),
     ("workflows-no-traits", "Phase: building\nWorkflows: Web App Development; traits: none\n", "workflows",
@@ -402,7 +402,7 @@ def test_r058_session_start_falls_back_on_a_malformed_header_and_names_its_line(
     assert "PROJECT STATE: Phase: building." in out, "the phase shown is the prose's: " + out
 
 
-BRIDGE_LINE = "Workflows: Host Extension Development %s Claude Code Extension; traits: Installable" % ARROW
+BRIDGE_LINE = "Workflows: Host Extension Development %s Claude Code Extension; traits: Installable, External services" % ARROW
 
 
 @pytest.mark.parametrize("key,head,prose,governs", [

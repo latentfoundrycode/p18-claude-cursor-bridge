@@ -1,13 +1,14 @@
 # D-004 context-dfd — what crosses the bridge's trust boundaries (as built)
 
-Level 2. Drawn as built (conventions §8) from the code on 2026-11-01. Realizes R-055. Enforced by review: `security-auditor` checks every edge crossing a `tb_` subgraph. A process that is a D-002 component has D-002's name behind `p_`.
+Level 2. Drawn as built (conventions §8) from the code on 2026-11-01; revised as designed on 2026-11-13 for the program release (`docs/DESIGN.md`, "Change: the program release", "Architecture — the diagrams the change touches"; the last note below), whose flows are built by its increments. Realizes R-055, R-080, R-081, R-083, R-085, R-087, R-097, R-100. Enforced by review: `security-auditor` checks every edge crossing a `tb_` subgraph. A process that is a D-002 component has D-002's name behind `p_`.
 
 Notes:
 
 - `SECRET:` marks a flow carrying a secret or credential; `UNTRUSTED:` one carrying what another vendor's agent wrote or chose. `--x` is withheld by the code; a dotted edge is reachable only by a deliberate act the bridge does not prevent (KP-032: not a sandbox; the agents run as the owner's Windows user).
-- **Stripped environment** (`bridge_env.stripped_env`; the shim applies the same test). Withheld: `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN`, `GITHUB_ENTERPRISE_TOKEN`, `GIT_ASKPASS`, `SSH_ASKPASS`, `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_0`, `GIT_CONFIG_VALUE_0`, every name `SECRET_LIKE` matches (whole-word TOKEN or SECRET, PASSWORD, PASSWD, PASSPHRASE, CREDENTIAL, API, ACCESS or PRIVATE KEY, a `_KEY` or `_KEYS` ending) but `CURSOR_*` and `GIT_CONFIG_KEY_*`. Set: `GH_CONFIG_DIR` (the empty folder), `GIT_TERMINAL_PROMPT=0`, `GIT_CONFIG_GLOBAL` (the bridge's gitconfig: includes `~/.gitconfig`, resets the helper list), `GIT_CONFIG_PARAMETERS='credential.helper='` (read after the checkout's `.git/config`), `HOME`, `USERPROFILE`, `HOMEDRIVE`, `HOMEPATH` (the agent home), `APPDATA`, `LOCALAPPDATA` (the agent home's skeleton, `AppData/Roaming` and `AppData/Local`, each where the launcher's own environment has the variable: a program the run starts that writes its key file, cache or state through either writes there and never into the owner's real folders; one link in the redirected `Roaming` folder, `Cursor`, leads to the owner's `%APPDATA%/Cursor`, where `cursor-agent` reads its login, and where that link cannot be made or leads elsewhere `APPDATA` keeps the owner's folder for the run; release S, probed on the owner's computer on 2026-11-11), `HF_HUB_CACHE`, `TORCH_HOME`, `PUPPETEER_CACHE_DIR`, `UV_CACHE_DIR`, `UV_PYTHON_INSTALL_DIR`, `PIP_CACHE_DIR`, `PYTHONUSERBASE`, `NPM_CONFIG_CACHE`, `YARN_CACHE_FOLDER`, `PLAYWRIGHT_BROWSERS_PATH`, `GOCACHE` (the owner's caches and installed packages, where present and the variable unset). Passed: the rest; a program that asks Windows itself for a known folder is not redirected. An unusable agent home refuses the run (exit 125).
+- **Stripped environment** (`bridge_env.stripped_env`; the shim applies the same test). Withheld: `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN`, `GITHUB_ENTERPRISE_TOKEN`, `GIT_ASKPASS`, `SSH_ASKPASS`, `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_0`, `GIT_CONFIG_VALUE_0`, every name `SECRET_LIKE` matches (whole-word TOKEN or SECRET, PASSWORD, PASSWD, PASSPHRASE, CREDENTIAL, API, ACCESS or PRIVATE KEY, a `_KEY` or `_KEYS` ending) but `CURSOR_*` and `GIT_CONFIG_KEY_*`. Set: `GH_CONFIG_DIR` (the empty folder), `GIT_TERMINAL_PROMPT=0`, `GIT_CONFIG_GLOBAL` (the bridge's gitconfig: includes `~/.gitconfig`, resets the helper list), `GIT_CONFIG_PARAMETERS='credential.helper='` (read after the checkout's `.git/config`), `HOME`, `USERPROFILE`, `HOMEDRIVE`, `HOMEPATH` (the agent home), `APPDATA`, `LOCALAPPDATA` (the agent home's skeleton, `AppData/Roaming` and `AppData/Local`, each where the launcher's own environment has the variable: a program the run starts that writes its key file, cache or state through either writes there and never into the owner's real folders; one link in the redirected `Roaming` folder, `Cursor`, leads to the owner's `%APPDATA%/Cursor`, where `cursor-agent` reads its login, and where that link cannot be made or leads elsewhere `APPDATA` keeps the owner's folder for the run; release S, probed on the owner's computer on 2026-11-11), `HF_HUB_CACHE`, `TORCH_HOME`, `PUPPETEER_CACHE_DIR`, `UV_CACHE_DIR`, `UV_PYTHON_INSTALL_DIR`, `PIP_CACHE_DIR`, `PYTHONUSERBASE`, `NPM_CONFIG_CACHE`, `YARN_CACHE_FOLDER`, `PLAYWRIGHT_BROWSERS_PATH`, `GOCACHE` (the owner's caches and installed packages, where present and the variable unset). Passed: the rest; a program that asks Windows itself for a known folder is not redirected. An unusable agent home refuses the run (exit 125). The program release adds (R-080, its list above written by TASK-060 with its test): a key file that names a home variable (`USERPROFILE`, `HOME`, `HOMEDRIVE`, `HOMEPATH`, `APPDATA` or `LOCALAPPDATA`) is refused before the run (exit 125, the name printed, the value never), since its value is applied after the strip; the secret-like test also matches PAT, CREDS and AUTH as name parts, DATABASE_URL and SSH_AUTH_SOCK; a secret-like CURSOR_ name is withheld from test and driver runs.
 - `bridge-run.py` strips for `cursor-agent` and with `--strip`; the loop's and the calibration's suite and driver launch commands carry `--strip` (R-052, TASK-041), the increment's own test files with them (BUG-043), the driver with `--scratch` naming its folder under the owner's profile, outside the agent home the strip names as `HOME`. A test, driver or watch run without the flag still gets the owner's environment; of the launcher's runs of builder-written code, the loop's text leaves the flag off by name for a driver whose suite needs a variable beyond `.env`, under a recorded Decision in `docs/INVENTORY.md` naming the variable. Whatever does not go through the launcher runs in a session's own environment, stated limits (`docs/INVENTORY.md`, Decisions; BUG-043), among them: a runner the launcher refuses, and a benchmark or profile; a build, a type check or a linter; a hook a commit runs; a reviewer's or auditor's own run beside its reading; a root-cause reproduction; an installer rehearsal; a live smoke and a stage demonstration's start of the product. A stripped run can still write `.git`, which a later git command of the session runs: step 4's check, not a boundary (KP-032). `--key-file` is refused with `cursor-agent` and a driver; a driver's copy carries the project's `.env`. A watch run (`gh pr checks`) runs no builder-written code and keeps the owner environment by design. `p_test_suite` stays in `tb_supervisor`: it is the owner's user running the project's own interpreter in the Workspace, launched and bounded by the supervisor, its environment stripped by the loop's `--strip` but its process no agent's.
 - The guard's records lie in the checkout's `.git`; the sha256 copy outside it finds a rewritten snapshot. Both are in the owner's profile, which the agents' user can reach.
+- **The program release** (docs/DESIGN.md, "Change: the program release", 2026-11-13; R-081, R-083, R-085, R-087, R-097, R-100). `p_evaluate_reports` (its `security` step) makes the Sunday evaluation's reads of GitHub, by GET alone, the projects' roots from `ds_projects_file`, a per-computer file outside every repository; the supervisor no longer makes them by hand. The rule's reader is one copy in `bridge_env.py`: `p_review_guard` (`ready`, `premerge-records <pr>`) and `p_bridge_run` (its wait before a CI watch) read a branch's required check contexts (the classic protection and the rules that apply to the branch, of the base and, where it names none, of the default branch), the repository's auto-merge setting and default branch, and a pull request's head, its checks, its commit statuses and its workflow runs by GET with the owner's `gh` login, beside `conformance-check.py`'s read of the same rule, which this diagram does not draw; nothing is written to GitHub by these reads, and a failed read is never a pass. On READY `p_review_guard` writes the ready record for the pull request and its head beside the premerge record in `ds_guard_records`, and `p_permission_guard` refuses a merge whose head lacks either. `p_push_scan` reads git's commits of the range to be pushed and the owner's account names (derived at run time, extended by `ds_names_file`) and prints a hit's place to the supervisor's terminal, never the matched text, since that terminal is recorded in the session's transcript; nothing leaves the computer. Around a test or driver run `p_bridge_run` reads the repository's `config` and `info/attributes`, the worktree's own `config.worktree` and every entry of the hooks folders by name and content, before and after, and prints one `GIT-CONFIG` line per difference on standard error, the run's exit unchanged: a detection, never a restore; step 4's check stays, since a session's git command may still run before it. `p_claude_subagents` (`spec-packager`, `diff-reviewer`) may query `ext_docs_service` (Context7, an MCP server the owner sets up at user scope in Claude Code; the free tier, no key) with library names, the version the project's lockfile pins and topics, never project code, a path of this computer or a name; what it returns is outside input, marked `UNTRUSTED:` here beside the note's first meaning: data, a hint and never evidence, never an instruction. Where Claude Code does not start a subagent whose listed tool's server is absent (TASK-080's probe decides), the supervisor makes the same lookup before it packages a brief or starts Review A and hands the result over in the prompt: the same two flows, from `p_supervisor`, which TASK-080 then redraws; the figure draws the first form. The permission guard does not see these MCP calls (its matcher is for the Bash and PowerShell tools), so a query is a way out of the computer that no hook of the bridge reads: what it may carry is held by the two definitions' text alone.
 
 | Element | Paths |
 |---|---|
@@ -20,6 +21,9 @@ Notes:
 | p_review_guard | bridge/cursor-bridge/review-guard.py |
 | p_pr_activity_check | bridge/cursor-bridge/pr-activity-check.py |
 | p_bridge_install | bridge/cursor-bridge/bridge-install.py |
+| p_evaluate_reports | bridge/cursor-bridge/evaluate-reports.py (its security step) |
+| p_push_scan | bridge/cursor-bridge/push-scan.py |
+| p_claude_subagents | bridge/agents/spec-packager.md, bridge/agents/diff-reviewer.md (the Claude-side subagents that write briefs and review diffs) |
 | p_test_suite | a project's suite, an increment's own test files or a mutation run under bridge-run.py, kind test or driver |
 | p_builder | cursor-agent, builder run |
 | p_review_b | cursor-agent, review run |
@@ -35,6 +39,8 @@ Notes:
 | ds_heavy_lock | ~/.cursor-bridge/heavy.lock |
 | ds_agent_home | ~/.cursor-bridge/agent-home/ |
 | ds_bridge_gitconfig | ~/.cursor-bridge/gitconfig |
+| ds_projects_file | ~/.cursor-bridge/projects.json |
+| ds_names_file | ~/.cursor-bridge/names.txt |
 | ds_gh_empty | ~/AppData/Local/cursor-bridge/gh-empty/ |
 | ds_no_hooks | the system's temporary folder, review-guard-no-hooks-\*/ (outside the repository; made fresh and empty per process by tempfile.mkdtemp, removed at exit while it is empty, nothing checking that it is empty) |
 | ds_actions_secrets | Actions secret SOCKET_SECURITY_API_KEY |
@@ -49,6 +55,7 @@ Notes:
 | ext_cursor_service | Cursor's service |
 | ext_github | GitHub account, repository, API |
 | ext_advisory | OSV, Socket, Semgrep registry |
+| ext_docs_service | Context7, the documentation service (an MCP server the owner sets up at user scope in Claude Code) |
 
 ```mermaid
 flowchart LR
@@ -63,6 +70,7 @@ ext_beside_workspace["Files beside the Workspace"]
 ext_cursor_service["Cursor's service"]
 ext_github["GitHub"]
 ext_advisory["Advisory sources"]
+ext_docs_service["Documentation service, Context7"]
 
 subgraph tb_supervisor["Supervisor's session: the owner's identity"]
 p_supervisor("Supervisor session")
@@ -75,11 +83,16 @@ p_review_guard("review-guard")
 p_pr_activity_check("pr-activity-check")
 p_bridge_install("bridge-install")
 p_test_suite("Suite or mutation run")
+p_evaluate_reports("evaluate-reports security")
+p_push_scan("push-scan")
+p_claude_subagents("spec-packager, diff-reviewer")
 ds_review_hashes[("review-hashes")]
 ds_heavy_lock[("heavy.lock")]
 ds_bridge_gitconfig[("bridge gitconfig")]
 ds_gh_empty[("gh-empty")]
 ds_no_hooks[("review-guard-no-hooks")]
+ds_projects_file[("projects.json")]
+ds_names_file[("names.txt")]
 end
 
 subgraph tb_agents["Agent processes: identity withheld"]
@@ -107,9 +120,9 @@ ext_owner -->|"instructions, decisions"| p_supervisor
 ext_claude_home -->|"commands, agents, hooks, digest"| p_supervisor
 ext_user_env -->|"SECRET: whole environment, tokens and keys included"| p_supervisor
 p_supervisor -->|"each Bash or PowerShell command"| p_permission_guard
-p_permission_guard -->|"deny: admin or API merge, force-push, worktree remove, chains, no-verify, agent around the shim, merge without premerge record"| p_supervisor
-ds_guard_records -->|"premerge record"| p_permission_guard
-p_supervisor -->|"SECRET: owner's gh and git login: push, PR, merge with --match-head-commit; the maintainer's Sunday evaluation reads workflow runs and Dependabot alerts (GET)"| ext_github
+p_permission_guard -->|"deny: admin or API merge, force-push, worktree remove, chains, no-verify, agent around the shim, merge without premerge record or, by the program release, ready record"| p_supervisor
+ds_guard_records -->|"premerge record, ready record (R-083)"| p_permission_guard
+p_supervisor -->|"SECRET: owner's gh and git login: push, PR, merge with --match-head-commit"| ext_github
 p_supervisor -->|"briefs, checkpoints, nothing during a review"| ds_checkout
 ds_run_outputs -->|"UNTRUSTED: builder note, Review B verdict"| p_supervisor
 
@@ -137,6 +150,10 @@ ds_checkout -->|"UNTRUSTED: code and tests the builder wrote; SECRET: the .env s
 ds_checkout -->|"UNTRUSTED: code and tests the builder wrote, run in the session's own environment: stated limits (BUG-043)"| p_supervisor
 p_test_suite -.->|"UNTRUSTED: a deliberate write, .git config, hooks, which a later git command of the session runs (BUG-043)"| ds_checkout
 p_bridge_run -->|"SECRET: owner's gh login, CI watch"| ext_github
+ds_checkout -->|"UNTRUSTED: .git/config, .git/config.worktree, .git/info/attributes, the hooks folders' names, read before and after a test or driver run"| p_bridge_run
+p_bridge_run -->|"GIT-CONFIG line per difference on standard error, exit unchanged: a detection, never a restore (R-081)"| p_supervisor
+p_bridge_run -->|"SECRET: owner's gh login, GET only, the rule's reader in bridge_env: the wait before a CI watch (R-085)"| ext_github
+ext_github -->|"the base branch's required check contexts, the default branch's contexts, the pushed head's checks, commit statuses and workflow runs"| p_bridge_run
 
 ds_agent_home -->|"link .cursor"| ext_cursor_home
 ext_cursor_home -->|"SECRET: Cursor account login"| p_builder & p_review_b
@@ -161,7 +178,7 @@ p_review_b -.->|"deliberate only: same user"| ds_review_hashes
 
 p_supervisor -->|"snapshot, verify, premerge nnn"| p_review_guard
 ds_checkout -->|"UNTRUSTED: HEAD, refs, stashes, .git config, hooks, ignored files"| p_review_guard
-p_review_guard -->|"snapshot, rounds, verified mark, premerge record"| ds_guard_records
+p_review_guard -->|"snapshot, rounds, verified mark, premerge record, ready record (R-083)"| ds_guard_records
 ds_guard_records -->|"UNTRUSTED: snapshot, hash-checked"| p_review_guard
 p_review_guard <-->|"sha256 copy"| ds_review_hashes
 p_review_guard -->|"restore: reset, clean, refs back, hooks off"| ds_checkout
@@ -169,10 +186,32 @@ p_review_guard -->|"empty folder"| ds_no_hooks
 ds_run_outputs -->|"UNTRUSTED: exit line of REVIEW-nnn.err"| p_review_guard
 p_review_guard -->|"OK, GATE-INTEGRITY, LEFT BEHIND, CANNOT VERIFY, hash, merge command"| p_supervisor
 ext_github -->|"SECRET: PR head, read with the owner's gh login"| p_review_guard
+p_supervisor -->|"ready, premerge-records with the PR number"| p_review_guard
+p_review_guard -->|"SECRET: owner's gh login, GET only, the rule's reader in bridge_env: ready, premerge-records (R-083)"| ext_github
+ext_github -->|"a branch's required check contexts, the default branch's contexts, allow_auto_merge, the PR's head, its checks, commit statuses and workflow runs"| p_review_guard
+p_review_guard -->|"READY, NOT READY, CANNOT CHECK; the auto-merge line"| p_supervisor
 
 p_pr_activity_check -->|"SECRET: owner's gh login, GET only"| ext_github
 ext_github -->|"PR comments, reviews, owner's events since launch"| p_pr_activity_check
 p_pr_activity_check -->|"clean, GATE-INTEGRITY, CANNOT VERIFY"| p_supervisor
+
+p_supervisor -->|"the Sunday evaluation's security step"| p_evaluate_reports
+ds_projects_file -->|"the projects' roots"| p_evaluate_reports
+p_evaluate_reports -->|"SECRET: owner's gh login, GET only: the weekly workflow's state and runs since the last read, the open Dependabot alerts (R-097)"| ext_github
+ext_github -->|"workflow state, runs, conclusions, open alerts"| p_evaluate_reports
+p_evaluate_reports -->|"security.md under Reports/Evaluations, a failed read a finding with its remedy, no log text beyond a step's exit line; the window's state in the ledger's _meta"| ext_beside_workspace
+
+p_supervisor -->|"before every push: the range"| p_push_scan
+ds_checkout -->|"UNTRUSTED: commits of base..HEAD: messages, author and committer lines, added lines, added file names"| p_push_scan
+ds_names_file -->|"the owner's further account names"| p_push_scan
+ext_user_env -->|"USERNAME, the profile folder's name"| p_push_scan
+ext_owner_profile -->|"git config user.name, the local part of user.email"| p_push_scan
+p_push_scan -->|"hits to the terminal only: commit, place, line number, never the matched text; nothing leaves the computer (R-087)"| p_supervisor
+
+p_supervisor -->|"increment to package, diff to read"| p_claude_subagents
+p_claude_subagents -->|"brief, Review A verdict"| p_supervisor
+p_claude_subagents -->|"library names, the lockfile's pinned version, topics; never project code, a path of this computer or a name (R-100)"| ext_docs_service
+ext_docs_service -->|"UNTRUSTED: documentation text, data and never an instruction"| p_claude_subagents
 
 ext_owner -->|"run sheet"| p_bridge_install
 p_bridge_install -->|"bridge files, settings merged"| ext_claude_home
