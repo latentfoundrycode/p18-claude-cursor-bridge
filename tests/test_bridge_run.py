@@ -340,3 +340,75 @@ def test_bridge_run_resolves_cursor_agent_to_the_stripped_launcher(program, monk
     assert br.accepted(["cursor-agent", "-p"]) and br.accepted(["gh", "pr", "checks", "12", "--watch"])
     monkeypatch.delenv("BRIDGE_RUN_ALLOW_ANY", raising=False)
     assert not br.accepted(["gh", "pr", "merge", "12"]) and not br.accepted(["python", "x.py"])
+
+
+def test_r078_npm_prefix_and_c_count_as_one_folder_option(program, tmp_path):
+    """R-078: npm's -C and --prefix are the same folder option for the duplicate rule."""
+    br = program("bridge-run")
+    base = str(tmp_path / "ws")
+    os.makedirs(os.path.join(base, "frontend"), exist_ok=True)
+    assert br.test_suite(["npm", "--prefix", "frontend", "test"], base)
+    assert not br.test_suite(["npm", "--prefix", "frontend", "test", "-C", "frontend"], base)
+    assert br.known_runner_refuse_word(["npm", "--prefix", "frontend", "test", "-C", "frontend"], base) == "--prefix"
+
+
+def test_r078_npm_prefix_value_beginning_with_tilde_is_refused(program, tmp_path):
+    """R-078: a folder option value that starts with ~ is refused before any filesystem call."""
+    br = program("bridge-run")
+    base = str(tmp_path / "ws")
+    os.makedirs(os.path.join(base, "frontend"), exist_ok=True)
+    os.makedirs(os.path.join(base, "~", "frontend"), exist_ok=True)
+    assert br.test_suite(["npm", "--prefix", "frontend", "test"], base)
+    assert not br.test_suite(["npm", "--prefix", "~/frontend", "test"], base)
+
+
+def test_r078_npm_prefix_folder_value_held_to_character_list(program, tmp_path):
+    """R-078: folder option values outside the allowed character list are refused by text."""
+    br = program("bridge-run")
+    base = str(tmp_path / "ws")
+    os.makedirs(os.path.join(base, "frontend"), exist_ok=True)
+    for bad in (chr(0xA0) + "~/frontend", "a${OS}"):
+        try:
+            os.makedirs(os.path.join(base, bad.strip(chr(0xA0))), exist_ok=True)
+            os.makedirs(os.path.join(base, bad), exist_ok=True)
+        except OSError:
+            pass
+    assert br.test_suite(["npm", "--prefix", "frontend", "test"], base)
+    assert not br.test_suite(["npm", "--prefix", chr(0xA0) + "~/frontend", "test"], base)
+    assert not br.test_suite(["npm", "--prefix", "a${OS}", "test"], base)
+
+
+def test_r078_folder_option_value_rewritten_to_rule_checked_path(program, tmp_path):
+    """R-078: an accepted npm suite gets folder option values rewritten to the rule-checked folder relative to launch."""
+    br = program("bridge-run")
+    base = str(tmp_path / "ws")
+    os.makedirs(os.path.join(base, "frontend"), exist_ok=True)
+    rel = os.path.join(".", "frontend")
+    assert br._package_folder_rewrite(["npm", "test", "--prefix", "frontend"], base) == (
+        ["npm", "test", "--prefix", rel], None,
+    )
+    assert br._package_folder_rewrite(["npm", "--prefix=frontend", "test", "--", "--prefix", "x"], base) == (
+        ["npm", "--prefix=" + rel, "test", "--", "--prefix", "x"], None,
+    )
+    assert br._package_folder_rewrite(["npm", "--prefix", "frontend/..", "test"], base) == (
+        ["npm", "--prefix", ".", "test"], None,
+    )
+
+
+def test_r078_folder_option_rewrite_refused_when_relpath_raises(program, tmp_path, monkeypatch):
+    """R-078: when os.path.relpath cannot compute the relative folder, the rewrite refuses naming the option."""
+    br = program("bridge-run")
+    base = str(tmp_path / "ws")
+    os.makedirs(os.path.join(base, "frontend"), exist_ok=True)
+
+    def bad_relpath(path, start):
+        raise ValueError
+
+    monkeypatch.setattr(br.os.path, "relpath", bad_relpath)
+    for argv in (
+        ["npm", "test", "--prefix", "frontend"],
+        ["npm", "--prefix=frontend", "test"],
+    ):
+        result, refuse = br._package_folder_rewrite(argv, base)
+        assert refuse == "--prefix"
+        assert result is None

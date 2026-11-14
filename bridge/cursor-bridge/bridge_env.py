@@ -912,7 +912,7 @@ def plan_increment_ids(folder):
     doc = os.path.join(folder, "docs")
     if not os.path.isdir(doc):
         return ids
-    paths = sorted(_glob.glob(os.path.join(doc, "BUILD_PLAN*.md")))
+    paths = sorted(_glob.glob(os.path.join(_glob.escape(doc), "BUILD_PLAN*.md")))
     for path in paths:
         try:
             text = read_record_text(path)

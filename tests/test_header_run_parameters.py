@@ -184,9 +184,14 @@ def test_r061_the_fallback_reads_the_nine_keys_from_the_lines():
 
 def test_r061_the_fallback_reads_this_repositorys_run_parameters():
     got = need("run_parameters_fallback")(th.read_repo("docs/RUN_PARAMETERS.md"))
-    assert got == {"stage_pause": "run", "merge_authority": "supervisor", "refactoring_pass": "on",
-                   "installer_verification": "n/a", "parallel_increments": "on", "agent_ceiling": None,
-                   "ceiling_above_twice": [], "design_rounds_above_five": [], "review_rounds_above_ceiling": []}, got
+    fixed = {"stage_pause": "run", "merge_authority": "supervisor", "refactoring_pass": "on",
+             "installer_verification": "n/a", "parallel_increments": "on", "agent_ceiling": None,
+             "ceiling_above_twice": [], "design_rounds_above_five": []}
+    assert {k: got[k] for k in fixed} == fixed, got
+    # The owner's review lifts are lines written on their words for a named increment (TASK-059's of 2026-11-14 the
+    # first): each reads with its id, a round above the ceiling, the words and the date.
+    for lift in got["review_rounds_above_ceiling"]:
+        assert set(lift) == {"id", "rounds", "words", "date"} and lift["rounds"] > 3 and lift["words"] and lift["date"], got
 
 
 def test_r061_the_fallback_of_an_empty_file_is_empty_values():

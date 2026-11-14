@@ -118,6 +118,46 @@ def test_a_test_target_outside_the_launch_folder_is_refused_before_it_runs(proje
     assert not (ws / "run" / "launcher" / "runs.jsonl").exists(), "a refused run is not logged"
 
 
+def _package_link(link, target):
+    try:
+        os.symlink(str(target), str(link), target_is_directory=True)
+    except (OSError, NotImplementedError):
+        import _winapi
+        _winapi.CreateJunction(str(target), str(link))
+
+
+def test_r078_npm_prefix_through_an_inbound_link_is_refused(tmp_path):
+    """R-078: the folder rule walks path components and refuses a junction that leads back inside."""
+    ws = tmp_path / "ws"
+    (ws / "frontend").mkdir(parents=True)
+    (ws / "run").mkdir()
+    target = ws / "frontend"
+    link = ws / "in-link"
+    try:
+        _package_link(link, target)
+    except (OSError, NotImplementedError):
+        pytest.skip("this account can make neither a symbolic link nor a junction")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    stub = bin_dir / ("npm.cmd" if sys.platform == "win32" else "npm")
+    stub.write_text("@echo STAND-IN\n" if sys.platform == "win32" else "#!/bin/sh\necho STAND-IN\n", encoding="ascii")
+    if sys.platform != "win32":
+        stub.chmod(0o755)
+    env = {k: v for k, v in os.environ.items() if not k.lower().startswith(("npm_config_", "pnpm_config_", "yarn_"))}
+    env.update(LOCALAPPDATA=str(tmp_path / "localappdata"), PATH=str(bin_dir) + os.pathsep + os.environ.get("PATH", ""))
+    env.pop("BRIDGE_RUN_ALLOW_ANY", None)
+    try:                                                    # windowless through tests/conftest.py's default
+        ok = subprocess.run([sys.executable, PROG, "--limit", "60", "--kind", "test", "--", "npm", "--prefix", "frontend", "test"],
+                            capture_output=True, text=True, cwd=str(ws), env=env, timeout=120)
+        assert ok.returncode == 0 and "STAND-IN" in ok.stdout, (ok.returncode, ok.stderr, ok.stdout)
+        p = subprocess.run([sys.executable, PROG, "--limit", "60", "--kind", "test", "--", "npm", "--prefix", "in-link", "test"],
+                           capture_output=True, text=True, cwd=str(ws), env=env, timeout=120)
+        assert p.returncode == 125 and "defect" in p.stderr and "--prefix" in p.stderr and "bridge-run: started" not in p.stderr, p.stderr
+    finally:
+        if link.exists():
+            os.rmdir(str(link)) if os.name == "nt" else os.unlink(str(link))
+
+
 def test_a_target_inside_the_launch_folder_runs_whatever_its_form(project):
     """A file, a node of it, the folder, a `-k` expression with a slash and no target at all: each runs."""
     ws, _ = project
