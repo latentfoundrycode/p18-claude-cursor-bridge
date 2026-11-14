@@ -548,7 +548,7 @@ None for the owner: the item and its place are theirs as given. The form, a refu
 
 ### Who decided (rule 51)
 
-The owner: F7 as an item of the program release beside F1 to F6 (2026-11-13, in the maintainer's chat in the question form, "Send; F7 into program release", and confirmed in this chat the same day, rule 57), and the time of its incorporation left to the supervisor ("Incorporate it at the time you deem best"). The supervisor: the incorporation at stage P1's close; both halves of the form; the rule standing in the `merge_unit` key's place in the order of the header's refusals, two or more counted as written, the side named; no reader changed and a unit of one not made valid; the increment's place in stage P2 and the clause's in TASK-082.
+The owner: F7 as an item of the program release beside F1 to F6 (2026-11-13, in the maintainer's chat in the question form, "Send; F7 into program release", and confirmed in this chat the same day, rule 57), and the time of its incorporation left to the supervisor ("Incorporate it at the time you deem best"). The supervisor: the incorporation at stage P1's close; both halves of the form; the rule standing in the `merge_unit` key's place in the order of the header's refusals, two or more counted as written, the side named; no reader changed and a unit of one not made valid; the increment's place in stage P2 and the clause's in TASK-082. The gate: the owner approved the revision on 2026-11-14, five approvals asked in the question form (the behaviour the design fixes; the register's row R-105 with R-102's sentence and R-059's clause; D-001 as revised; the critique's record, its last two fixes named as unread by a critic; the plan revision).
 
 ### Version
 
