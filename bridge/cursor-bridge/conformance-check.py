@@ -1217,10 +1217,9 @@ def main():
             m = re.match(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=", line)
             if not m:
                 continue
-            env_name = m.group(1)
-            if not SECRET_NAME.search(env_name) and not (hasattr(bridge_env, "secret_like") and bridge_env.secret_like(env_name)):
-                continue
             name = m.group(1)
+            if not SECRET_NAME.search(name) and not (hasattr(bridge_env, "secret_like") and bridge_env.secret_like(name)):
+                continue
             shown = "%s (%s)" % (name, rel) if rel != ".env" else name
             if LOCAL_SERVICE.match(name):
                 locals_.append(shown)

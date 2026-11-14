@@ -444,6 +444,8 @@ def test_the_three_floors_of_release_a1b(tmp_path):
 def test_r080_inventory_floor_uses_bridge_env_secret_like(tmp_path):
     """R-080 (J11): the inventory floor counts names bridge_env.SECRET_LIKE matches, such as GITHUB_PAT."""
     make_workspace(tmp_path)
+    env_text = (tmp_path / ".env").read_text(encoding="utf-8") + "AUTHOR_NAME=owner\n"
+    (tmp_path / ".env").write_text(env_text, encoding="utf-8")
     inv = (tmp_path / "docs" / "INVENTORY.md").read_text(encoding="utf-8")
     if "GITHUB_PAT" not in inv:
         row = "| GITHUB_PAT | API token | environment variable the owner sets | app | 2026-01-01 |\n"
@@ -451,16 +453,18 @@ def test_r080_inventory_floor_uses_bridge_env_secret_like(tmp_path):
         (tmp_path / "docs" / "INVENTORY.md").write_text(inv, encoding="utf-8")
     rc, out = run(tmp_path)
     v, line = verdict(out, "No secret through an environment variable")
-    assert v == "MISSING" and "GITHUB_PAT" in line, (v, line)
+    assert v == "MISSING" and "GITHUB_PAT" in line and "AUTHOR_NAME" not in line, (v, line)
 
 
 def test_r080_session_note_lists_bridge_env_forms_not_boundary_cases(tmp_path):
     """R-080 (J11): the session NOTE uses bridge_env.secret_like; boundary cases like DATABASE_HOST are not listed."""
     make_workspace(tmp_path)
-    env = dict(os.environ)
+    env = {k: os.environ[k] for k in ("SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT") if k in os.environ}
+    env["PATH"] = os.environ.get("PATH", "")
     env["GITHUB_PAT"] = "x-never-printed"
     env["DATABASE_HOST"] = "localhost"
-    p = subprocess.run([sys.executable, PROG, str(tmp_path), "--offline"], capture_output=True, text=True, env=env)
+    p = subprocess.run([sys.executable, PROG, str(tmp_path), "--offline"], capture_output=True, text=True, env=env,
+                       timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     v, line = verdict(p.stdout, "Account keys in the session's environment")
     assert v == "NOTE" and "GITHUB_PAT" in line and "DATABASE_HOST" not in line, (v, line)
     assert "x-never-printed" not in p.stdout

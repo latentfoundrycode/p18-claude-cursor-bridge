@@ -52,12 +52,13 @@ KEEP_PREFIXES = ("CURSOR_", "GIT_CONFIG_KEY_")
 
 def secret_like(name, keep_cursor=True):
     u = name.upper()
-    if u.startswith("GIT_CONFIG_KEY_"):
-        return False
     if not SECRET_LIKE.search(u):
         return False
-    if keep_cursor and u.startswith("CURSOR_"):
-        return False
+    for prefix in KEEP_PREFIXES:
+        if u.startswith(prefix):
+            if prefix == "CURSOR_" and not keep_cursor:
+                break
+            return False
     return True
 
 
@@ -278,14 +279,19 @@ def write_gitconfig(real):
     return path
 
 
-def stripped_env(env=None, kind=None):
+def stripped_env(env=None, kind=None, is_agent=None):
     """Return a copy of `env` (default: os.environ) in which gh is logged out, no token
     variable and no variable named like an account key survives, git has no credential
     helper and never prompts, and the home folder is the agent's own (KP-038), APPDATA and
     LOCALAPPDATA with it where they are set (release S: APP_FOLDERS, the tools' caches
     passed first by APP_CACHES). Raises AgentHomeError when that folder cannot be
     prepared: the run must not start."""
-    keep_cursor = kind is None or kind in ("builder", "review")
+    if is_agent is not None:
+        keep_cursor = is_agent
+    elif kind is None:
+        keep_cursor = True
+    else:
+        keep_cursor = False
     e = dict(os.environ if env is None else env)
     empty = gh_empty_dir()
     try:
