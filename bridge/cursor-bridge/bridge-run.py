@@ -224,6 +224,10 @@ PACKAGE_FOLDER_CANON = {
     "yarn": {"--cwd": "cwd"},
 }
 PACKAGE_ALLOWED_FLAGS = ("--silent", "-s", "--if-present")
+PACKAGE_FOLDER_VALUE_RE = re.compile(
+    r"(?:[A-Za-z]:)?[A-Za-z0-9._\-/\\]+",
+    re.ASCII,
+)
 PACKAGE_CACHE_ENV = frozenset(("NPM_CONFIG_CACHE", "YARN_CACHE_FOLDER"))
 CMD_EXE_BAD_CHARS = '&|<>^%!"\r\n()'
 
@@ -330,7 +334,7 @@ def _package_scan_folder_options(argv, head, folder):
                 return run_dir, label
             if value.startswith("-"):
                 return run_dir, label
-            if value.startswith("~"):
+            if not PACKAGE_FOLDER_VALUE_RE.fullmatch(value):
                 return run_dir, label
             if not _package_folder_ok(value, base):
                 return run_dir, label

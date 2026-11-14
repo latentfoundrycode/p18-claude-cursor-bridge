@@ -360,3 +360,19 @@ def test_r078_npm_prefix_value_beginning_with_tilde_is_refused(program, tmp_path
     os.makedirs(os.path.join(base, "~", "frontend"), exist_ok=True)
     assert br.test_suite(["npm", "--prefix", "frontend", "test"], base)
     assert not br.test_suite(["npm", "--prefix", "~/frontend", "test"], base)
+
+
+def test_r078_npm_prefix_folder_value_held_to_character_list(program, tmp_path):
+    """R-078: folder option values outside the allowed character list are refused by text."""
+    br = program("bridge-run")
+    base = str(tmp_path / "ws")
+    os.makedirs(os.path.join(base, "frontend"), exist_ok=True)
+    for bad in (chr(0xA0) + "~/frontend", "a${OS}"):
+        try:
+            os.makedirs(os.path.join(base, bad.strip(chr(0xA0))), exist_ok=True)
+            os.makedirs(os.path.join(base, bad), exist_ok=True)
+        except OSError:
+            pass
+    assert br.test_suite(["npm", "--prefix", "frontend", "test"], base)
+    assert not br.test_suite(["npm", "--prefix", chr(0xA0) + "~/frontend", "test"], base)
+    assert not br.test_suite(["npm", "--prefix", "a${OS}", "test"], base)
