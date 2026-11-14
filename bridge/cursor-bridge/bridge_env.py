@@ -1361,7 +1361,7 @@ def read_runs_jsonl(log_folder):
             for line in f:
                 try:
                     o = json.loads(line)
-                except ValueError:
+                except (ValueError, RecursionError):
                     continue
                 if _valid_log_row(o):
                     rows.append(o)

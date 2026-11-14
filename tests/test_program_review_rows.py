@@ -120,6 +120,35 @@ def test_r079_a_healthy_row_whose_seconds_is_not_finite_teaches_nothing(program,
     assert limit == 3450 and INSIDE["id"] in why, (limit, why)
 
 
+BIG = "1" + "0" * 400                                           # a JSON whole number Python reads as an int too big for a float
+
+
+@pytest.mark.parametrize("kind", ["test", "builder", "review"])
+def test_r079_a_review_row_whose_seconds_is_too_big_for_a_float_ignores_nothing(program, tmp_path, kind):
+    """Round 4: a review row's length is read by one reader that never raises; a whole number too big is no end."""
+    br = program("bridge-run")
+    log = tmp_path / "run" / "launcher"
+    log.mkdir(parents=True, exist_ok=True)
+    inside = dict(INSIDE, kind=kind)
+    outside = dict(OUTSIDE, kind=kind)
+    review = '{"id": "%s", "kind": "review", "seconds": %s, "exit": 0, "healthy": null}\n' % (REVIEW["id"], BIG)
+    (log / "runs.jsonl").write_text(json.dumps(inside) + "\n" + json.dumps(outside) + "\n" + review, encoding="utf-8")
+    limit, why = br.learned_limit(kind, str(tmp_path))
+    assert inside["id"] in why, (limit, why)
+
+
+@pytest.mark.parametrize("big", [BIG, "-" + BIG], ids=["positive", "negative"])
+def test_r079_a_healthy_row_whose_seconds_is_too_big_for_a_float_teaches_nothing(program, tmp_path, big):
+    """Round 4: a healthy row's length is read by the same reader; a whole number too big for a float teaches nothing."""
+    br = program("bridge-run")
+    log = tmp_path / "run" / "launcher"
+    log.mkdir(parents=True, exist_ok=True)
+    row = '{"id": "x", "kind": "test", "seconds": %s, "exit": 0, "healthy": true}\n' % big
+    (log / "runs.jsonl").write_text(row + json.dumps(INSIDE) + "\n" + json.dumps(OUTSIDE) + "\n", encoding="utf-8")
+    limit, why = br.learned_limit("test", str(tmp_path))
+    assert limit == 3450 and INSIDE["id"] in why, (limit, why)
+
+
 def test_r079_a_line_nested_too_deep_to_read_is_skipped(program, tmp_path):
     """Round 3: a line Python's json cannot read for its depth (RecursionError) is skipped like any unreadable line."""
     br = program("bridge-run")

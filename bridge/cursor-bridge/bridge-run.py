@@ -1415,7 +1415,8 @@ def learned_limit(kind, folder):
     rows = read_log(folder)
     intervals = bridge_env.review_run_intervals(rows)
     healthy = [r for r in rows if r.get("kind") == kind and r.get("healthy") is True
-               and isinstance(r.get("seconds"), (int, float)) and r.get("exit") in exits
+               and isinstance(r.get("seconds"), (int, float)) and not isinstance(r.get("seconds"), bool)
+               and math.isfinite(r.get("seconds")) and r.get("exit") in exits
                and not bridge_env.row_inside_review_run(r, intervals)]
     if not healthy:
         return default, "the default for %s" % kind
