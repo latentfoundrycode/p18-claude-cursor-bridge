@@ -638,5 +638,6 @@ def test_r078_driver_with_interpreter_flags_substitutes_program_end_to_end(tmp_p
     prog = folder / "run" / "supervisor" / "flags_probe.py"
     prog.write_text("import sys\nprint('ok', sys.flags.dont_write_bytecode, sys.flags.utf8_mode)\n", encoding="utf-8")
     p = subprocess.run([sys.executable, PROG, "--limit", "120", "--kind", "driver", "--", "python", "-B", "-X", "utf8", "run/supervisor/flags_probe.py"],
-                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(folder), timeout=120)
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(folder), timeout=120,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     assert p.returncode == 0 and "ok 1 1" in p.stdout, (p.stdout, p.stderr)

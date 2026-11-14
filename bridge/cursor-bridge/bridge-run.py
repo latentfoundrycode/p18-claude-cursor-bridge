@@ -225,6 +225,9 @@ PACKAGE_FOLDER_CANON = {
 }
 NPM_PACKAGE_ENV = ("npm_config_workspace", "npm_config_workspaces")
 PNPM_PACKAGE_ENV = ("npm_config_workspace_dir",)
+NPM_RUN_OTHER_ENV = ("npm_config_script_shell", "npm_config_node_options")
+PACKAGE_ALLOWED_FLAGS = ("--silent", "-s", "--if-present")
+CMD_EXE_BAD_CHARS = '&|<>^%!"\r\n()'
 
 
 def python_interpreter_lead(argv, folder=None):
@@ -258,23 +261,25 @@ def python_interpreter_lead(argv, folder=None):
     return i, None
 
 
-def _package_folder_long_match(head, name):
-    for long in PACKAGE_FOLDER_LONG.get(head, ()):
-        if name == long or (name.startswith("--") and len(name) >= 3 and long.startswith(name)):
-            return long
-    return None
-
-
 def _package_folder_token(head, word):
-    """The folder option named by word, ``attached`` for -C<path>, or None."""
+    """The folder option named by word in an exact listed form, ``attached`` for -C<path>, or None."""
     if head not in PACKAGE_FOLDER_LONG:
         return None
-    if word == "-C" or (word.startswith("-C=") and head in ("npm", "pnpm")):
-        return "-C"
     if head in ("npm", "pnpm") and len(word) > 2 and word.startswith("-C") and not word.startswith("-C="):
         return "attached"
     name = word.split("=", 1)[0]
-    return _package_folder_long_match(head, name)
+    if head == "npm" and name in ("--prefix", "-C"):
+        return name
+    if head == "pnpm" and name in ("--dir", "-C"):
+        return name
+    if head == "yarn" and name == "--cwd":
+        return name
+    return None
+
+
+def _package_allowed_flag(word):
+    name = word.split("=", 1)[0]
+    return word in PACKAGE_ALLOWED_FLAGS or name in PACKAGE_ALLOWED_FLAGS
 
 
 def _package_folder_value(word, argv, i):
@@ -285,22 +290,23 @@ def _package_folder_value(word, argv, i):
     return None, i + 1, word
 
 
-def _package_folder_ok(value, folder):
-    base = folder or os.getcwd()
+def _package_folder_ok(value, launch_folder, relative_base=None):
+    walk_base = launch_folder or os.getcwd()
+    join_base = relative_base if relative_base is not None else walk_base
     if not (value or "").strip():
         return False
-    path = value if os.path.isabs(value) else os.path.join(base, value)
+    path = value if os.path.isabs(value) else os.path.join(join_base, value)
     try:
         path = os.path.abspath(path)
     except OSError:
         return False
     if not os.path.isdir(path):
         return False
-    roots = launch_roots(folder)
+    roots = launch_roots(walk_base)
     full = _real_path(path)
     if not any(full == r or full.startswith(r.rstrip(os.sep) + os.sep) for r in roots):
         return False
-    return _link_walk_ok(path, base)
+    return _link_walk_ok(path, walk_base)
 
 
 def _package_scan_folder_options(argv, head, folder):
@@ -312,47 +318,63 @@ def _package_scan_folder_options(argv, head, folder):
     while i < len(argv):
         if argv[i] == "--":
             break
-        opt = _package_folder_token(head, argv[i])
-        if opt is None:
+        word = argv[i]
+        if not word.startswith("-"):
             i += 1
             continue
+        opt = _package_folder_token(head, word)
         if opt == "attached":
-            return run_dir, "-C"
-        long = _package_folder_long_match(head, argv[i].split("=", 1)[0]) if opt == "-C" else opt
-        canon = PACKAGE_FOLDER_CANON[head].get(long or opt, long or opt)
-        value, nxt, shown = _package_folder_value(argv[i], argv, i)
-        label = shown.split("=", 1)[0] if "=" in shown else shown
-        if canon in seen:
-            return run_dir, seen[canon]
-        seen[canon] = label
-        if value is None or not (value or "").strip():
-            return run_dir, shown.split("=", 1)[0] if "=" in shown else shown
-        if not _package_folder_ok(value, folder):
-            return run_dir, shown.split("=", 1)[0] if "=" in shown else shown
-        run_dir = os.path.abspath(value if os.path.isabs(value) else os.path.join(base, value))
-        i = nxt
+            return run_dir, word
+        if opt is not None:
+            long = opt
+            canon = PACKAGE_FOLDER_CANON[head].get(long, long)
+            value, nxt, shown = _package_folder_value(word, argv, i)
+            label = shown.split("=", 1)[0] if "=" in shown else shown
+            if canon in seen:
+                return run_dir, seen[canon]
+            seen[canon] = label
+            if value is None or not (value or "").strip():
+                return run_dir, label
+            if value.startswith("-"):
+                return run_dir, label
+            if not _package_folder_ok(value, base):
+                return run_dir, label
+            run_dir = os.path.abspath(value if os.path.isabs(value) else os.path.join(base, value))
+            i = nxt
+            continue
+        if _package_allowed_flag(word):
+            i += 1
+            continue
+        return run_dir, word.split("=", 1)[0]
     return run_dir, None
 
 
 def _package_body_index(argv, head):
-    """Index of the subcommand word, skipping folder options only."""
+    """Index of the subcommand word, skipping listed folder options and allowed flags only."""
     if head not in PACKAGE_FOLDER_LONG:
         return 1
     i = 1
     while i < len(argv):
         if argv[i] == "--":
             return None
-        opt = _package_folder_token(head, argv[i])
-        if opt is None:
+        word = argv[i]
+        if not word.startswith("-"):
             return i
+        opt = _package_folder_token(head, word)
         if opt == "attached":
             return None
-        if "=" in argv[i]:
+        if opt is not None:
+            if "=" in word:
+                i += 1
+            elif i + 1 < len(argv):
+                i += 2
+            else:
+                return None
+            continue
+        if _package_allowed_flag(word):
             i += 1
-        elif i + 1 < len(argv):
-            i += 2
-        else:
-            return i
+            continue
+        return None
     return None
 
 
@@ -387,7 +409,7 @@ def _escape_refuse_word(argv, folder=None):
     if head in ("python", "python3", "py"):
         scan_from = start
     elif head == "uv":
-        scan_from = 2
+        scan_from = 1
     for i in range(scan_from, len(argv)):
         a = argv[i]
         name = a.split("=", 1)[0]
@@ -401,7 +423,42 @@ def _escape_refuse_word(argv, folder=None):
 
 
 def _python_suite_intent(argv):
-    return "-m" in argv and any(w in argv for w in ("pytest", "unittest"))
+    if not argv or not python_interpreter_ok(argv):
+        return False
+    i = 1
+    while i < len(argv):
+        a = argv[i]
+        if a == "-c":
+            return False
+        if a == "-m":
+            return i + 1 < len(argv) and argv[i + 1] in ("pytest", "unittest")
+        if a in ("-X", "-W"):
+            if i + 1 < len(argv):
+                i += 2
+                continue
+            return False
+        if a.startswith("-"):
+            i += 1
+            continue
+        return False
+    return False
+
+
+def _would_cmd_exe(argv):
+    if sys.platform != "win32" or is_agent_argv(argv):
+        return False
+    import shutil
+    found = shutil.which(argv[0]) or argv[0]
+    return found.lower().endswith((".cmd", ".bat"))
+
+
+def _cmd_exe_refuse_word(argv, folder=None):
+    if not _would_cmd_exe(argv):
+        return None
+    for w in argv[1:]:
+        if any(c in CMD_EXE_BAD_CHARS for c in w):
+            return w
+    return None
 
 
 def known_runner_refuse_word(argv, folder=None):
@@ -410,11 +467,16 @@ def known_runner_refuse_word(argv, folder=None):
         _, bad = python_interpreter_lead(argv, folder)
         if bad and _python_suite_intent(argv):
             return bad
+    if not named_suite(argv, folder):
+        return None
     head = head_of(argv)
     if head in PACKAGE_FOLDER_LONG:
         _, refused = _package_scan_folder_options(argv, head, folder)
         if refused:
             return refused
+    refused = _cmd_exe_refuse_word(argv, folder)
+    if refused:
+        return refused
     return _escape_refuse_word(argv, folder)
 
 
@@ -754,6 +816,13 @@ def outside_by_environment(argv, environ, folder=None):
     word, start = runner_word(argv)
     head = head_of(argv)
     env = {name.upper(): value for name, value in environ.items() if (value or "").strip()}
+    launch = folder or os.getcwd()
+    if head in ("npm", "pnpm") and named_suite(argv, folder):
+        for name in NPM_RUN_OTHER_ENV:
+            upper = name.upper()
+            found = next((env[k] for k in env if k.upper() == upper), None)
+            if found is not None and found != "":
+                return upper
     if head in PACKAGE_FOLDER_LONG and named_suite(argv, folder):
         run_dir = package_runner_cwd(argv, folder)
         names = NPM_PACKAGE_ENV if head == "npm" else (PNPM_PACKAGE_ENV if head == "pnpm" else ())
@@ -762,7 +831,7 @@ def outside_by_environment(argv, environ, folder=None):
             found = next((env[k] for k in env if k.upper() == upper), None)
             if found is None:
                 continue
-            if not _package_folder_ok(found, run_dir):
+            if not _package_folder_ok(found, launch, relative_base=run_dir):
                 return upper
         return None
     if word != "pytest":
@@ -923,6 +992,8 @@ def read_log(folder):
 def write_log(folder, entry):
     """Append one run to the project's run log; written only where a project's `run/` folder
     exists (the Workspace the loop runs from), and a log that cannot be written never stops a run."""
+    if not os.path.isdir(os.path.join(folder, "run")):
+        return
     try:
         os.makedirs(os.path.dirname(os.path.join(folder, LOG)), exist_ok=True)
         with open(os.path.join(folder, LOG), "a", encoding="utf-8") as f:
@@ -1380,6 +1451,9 @@ def head_text(argv):
         i = _package_body_index(argv, head)
         if i is not None:
             start = i
+    if head in PACKAGE_FOLDER_LONG or python_interpreter_ok(argv):
+        chunk = argv[start:start + 2]
+        return " ".join([head] + chunk)[:40]
     subs = [a for a in argv[start:start + 3] if a in ("pr", "checks", "test", "run", "pytest", "unittest", "vitest", "jest", "playwright", "--test", "-m") or a.startswith("test")]
     return " ".join([head] + subs)[:40]
 
@@ -2045,6 +2119,10 @@ def main():
             sys.stderr.write(line)
         else:
             sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name, without an option that runs another program, and an npx tool only when the project has it (got %r); a benchmark or an unknown runner runs directly in the background, marked # wake\n" % cmd[0])
+        return 125
+    cmd_inj = _cmd_exe_refuse_word(cmd, folder)
+    if cmd_inj and named_suite(cmd, folder):
+        sys.stderr.write(KNOWN_RUNNER_REFUSE % cmd_inj)
         return 125
     read_keys = None
     if kind != "driver" and named_suite(cmd):
