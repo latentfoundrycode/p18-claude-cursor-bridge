@@ -41,7 +41,8 @@ def test_limit_kills_parent_and_child(tmp_path):
     pidfile = tmp_path / "pids.txt"
     t0 = time.time()
     p = subprocess.run([sys.executable, PROG, "--limit", "3", "--", sys.executable, TREE, str(pidfile)],
-                       capture_output=True, text=True, env=env_for(tmp_path))
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path),
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
     assert p.returncode == 124, p.stderr
     assert time.time() - t0 < 20
     assert p.stderr.startswith("bridge-run: started 20") and "Z\n" in p.stderr.splitlines()[0] + "\n"
@@ -61,7 +62,8 @@ def test_an_orphan_left_at_a_normal_end_is_killed(tmp_path):
     inner = "import time,os; open('%s','a').write(str(os.getpid())); time.sleep(600)" % pidfile
     code = ("import subprocess,sys,time; subprocess.Popen([sys.executable,'-c',%r]); time.sleep(1.5); sys.exit(7)" % inner)
     p = subprocess.run([sys.executable, PROG, "--limit", "30", "--", sys.executable, "-c", code],
-                       capture_output=True, text=True, env=env_for(tmp_path))
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path),
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
     assert p.returncode == 7
     time.sleep(1)
     pid = int(open(pidfile).read().strip())
@@ -73,7 +75,8 @@ def test_an_orphan_left_at_a_normal_end_is_killed(tmp_path):
 def test_exit_code_and_output_pass_through(tmp_path):
     p = subprocess.run([sys.executable, PROG, "--limit", "30", "--", sys.executable, "-c",
                         "import sys; print('out line'); sys.stderr.write('err line' + chr(10)); sys.exit(7)"],
-                       capture_output=True, text=True, env=env_for(tmp_path))
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path),
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
     assert p.returncode == 7
     assert "out line" in p.stdout and "err line" in p.stderr
     assert p.stderr.rstrip().endswith("bridge-run: exit 7"), "the last line is the exit code, which review-guard.py reads"
@@ -83,10 +86,12 @@ def test_only_the_loops_commands_are_accepted(tmp_path):
     env = env_for(tmp_path)
     env.pop("BRIDGE_RUN_ALLOW_ANY")
     p = subprocess.run([sys.executable, PROG, "--limit", "5", "--", sys.executable, "-c", "print(1)"],
-                       capture_output=True, text=True, env=env)
+                       capture_output=True, text=True, env=env, cwd=str(tmp_path),
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
     assert p.returncode == 125 and "refused" in p.stderr
     p = subprocess.run([sys.executable, PROG, "--limit", "5", "--", "powershell", "-c", "Remove-Item x"],
-                       capture_output=True, text=True, env=env)
+                       capture_output=True, text=True, env=env, cwd=str(tmp_path),
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
     assert p.returncode == 125
 
 
@@ -252,9 +257,11 @@ def test_the_key_file_reaches_the_child_only_and_must_lie_outside_the_workspace(
 
 
 def test_usage_errors(tmp_path):
-    p = subprocess.run([sys.executable, PROG, "--limit", "x", "--", "echo"], capture_output=True, text=True, env=env_for(tmp_path))
+    p = subprocess.run([sys.executable, PROG, "--limit", "x", "--", "echo"], capture_output=True, text=True, env=env_for(tmp_path),
+                       cwd=str(tmp_path), creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
     assert p.returncode == 2
-    p = subprocess.run([sys.executable, PROG], capture_output=True, text=True, env=env_for(tmp_path))
+    p = subprocess.run([sys.executable, PROG], capture_output=True, text=True, env=env_for(tmp_path),
+                       cwd=str(tmp_path), creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
     assert p.returncode == 2
 
 
@@ -262,17 +269,20 @@ def test_stripped_environment_reaches_the_child(tmp_path):
     """With --strip the child sees no token and gh's empty config folder (what cursor-agent gets)."""
     code = "import os; print(os.environ.get('GH_TOKEN','absent'), os.environ.get('GH_CONFIG_DIR',''), os.environ.get('GIT_TERMINAL_PROMPT',''), repr('' if os.environ.get('GIT_CONFIG_GLOBAL','').replace(chr(92),'/').endswith('/.cursor-bridge/gitconfig') and 'GIT_CONFIG_VALUE_0' not in os.environ else None))"
     p = subprocess.run([sys.executable, PROG, "--limit", "30", "--strip", "--", sys.executable, "-c", code],
-                       capture_output=True, text=True, env=env_for(tmp_path, GH_TOKEN="secret"))
+                       capture_output=True, text=True, env=env_for(tmp_path, GH_TOKEN="secret"), cwd=str(tmp_path),
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
     assert p.returncode == 0, p.stderr
     token, gh_dir, prompt, helper = p.stdout.split()
     assert token == "absent" and prompt == "0" and helper == "''"
     assert gh_dir.startswith(str(tmp_path / "localappdata")) and gh_dir.endswith("gh-empty")
     p = subprocess.run([sys.executable, PROG, "--limit", "30", "--", sys.executable, "-c", code],
-                       capture_output=True, text=True, env=env_for(tmp_path, GH_TOKEN="secret"))
+                       capture_output=True, text=True, env=env_for(tmp_path, GH_TOKEN="secret"), cwd=str(tmp_path),
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
     assert p.stdout.split()[0] == "secret", "without --strip (and not cursor-agent) the environment is untouched"
     code = "import os; print(os.environ['HOME']); print(os.environ.get('USERPROFILE', ''))"
     p = subprocess.run([sys.executable, PROG, "--limit", "30", "--strip", "--", sys.executable, "-c", code],
-                       capture_output=True, text=True, env=env_for(tmp_path))
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(tmp_path),
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
     home = os.path.join(os.environ["USERPROFILE"], ".cursor-bridge", "agent-home")
     assert p.returncode == 0 and os.path.normcase(p.stdout.splitlines()[0].strip()) == os.path.normcase(home), "the child runs in the agent's own home (KP-038): " + p.stdout + p.stderr
     assert os.path.lexists(os.path.join(home, ".cursor"))
@@ -297,7 +307,10 @@ def test_r055_d004_a_stripped_run_gets_the_notes_names(tmp_path):
         if name not in ("HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA"):
             env.pop(name, None)
     code = "import json, os; print(json.dumps({'names': sorted(os.environ), 'homes': [os.environ.get('HOME'), os.environ.get('USERPROFILE')]}))"
-    p = subprocess.run([sys.executable, PROG, "--limit", "30", "--strip", "--", sys.executable, "-c", code], capture_output=True, text=True, env=env)
+    launch = tmp_path / "launch"
+    launch.mkdir()
+    p = subprocess.run([sys.executable, PROG, "--limit", "30", "--strip", "--", sys.executable, "-c", code], capture_output=True, text=True, env=env,
+                       cwd=str(launch), creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
     assert p.returncode == 0, p.stderr
     seen = json.loads(p.stdout)
     names = set(seen["names"])
@@ -305,7 +318,8 @@ def test_r055_d004_a_stripped_run_gets_the_notes_names(tmp_path):
     assert not set(withheld) & names, "a name the note withholds reached the child"
     missing = set(set_names) - names if os.name == "nt" else set(set_names) - names - {"HOMEDRIVE", "HOMEPATH"}
     assert not missing, "a name the note says is set did not reach the child: " + ", ".join(sorted(missing))
-    p = subprocess.run([sys.executable, PROG, "--limit", "30", "--", sys.executable, "-c", code], capture_output=True, text=True, env=env)
+    p = subprocess.run([sys.executable, PROG, "--limit", "30", "--", sys.executable, "-c", code], capture_output=True, text=True, env=env,
+                       cwd=str(launch), creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
     assert p.returncode == 0 and set(withheld) <= set(json.loads(p.stdout)["names"]), p.stderr
 
 
@@ -455,3 +469,64 @@ def test_r080_stripped_cursor_agent_keeps_cursor_keys_while_stripped_test_does_n
     assert "CURSOR_API_KEY" not in non_agent
     default = be.stripped_env({**base})
     assert "CURSOR_API_KEY" in default and "CURSOR_TRACE_LEVEL" in default
+
+
+# ---------------------------------------------------------------- R-079 learned_limit
+
+
+def _write_learn_rows(tmp_path, rows):
+    log = tmp_path / "run" / "launcher"
+    log.mkdir(parents=True, exist_ok=True)
+    (log / "runs.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+
+
+def test_r079_learned_limit_row_at_review_end_is_inside(program, tmp_path):
+    """R-079: both ends of a review run are inclusive, so a row at the end is ignored."""
+    br = program("bridge-run")
+    review = {"id": "2026-10-07T10:00:00Z", "kind": "review", "seconds": 1200, "exit": 0, "healthy": True}
+    at_end = {"id": "2026-10-07T10:20:00Z", "kind": "test", "seconds": 3000, "exit": 0, "healthy": True}
+    outside = {"id": "2026-10-07T12:00:00Z", "kind": "test", "seconds": 1600, "exit": 0, "healthy": True}
+    _write_learn_rows(tmp_path, [at_end, outside, review])
+    limit, why = br.learned_limit("test", str(tmp_path))
+    assert limit == 2400 and outside["id"] in why and at_end["id"] not in why, (limit, why)
+
+
+def test_r079_learned_limit_row_at_review_start_with_suffix(program, tmp_path):
+    """R-079: a suffixed id at the review start is inside the review run and teaches nothing."""
+    br = program("bridge-run")
+    review = {"id": "2026-10-07T10:00:00Z", "kind": "review", "seconds": 1200, "exit": 0, "healthy": True}
+    inside = {"id": "2026-10-07T10:00:00Z-2", "kind": "test", "seconds": 3000, "exit": 0, "healthy": True}
+    outside = {"id": "2026-10-07T12:00:00Z", "kind": "test", "seconds": 1600, "exit": 0, "healthy": True}
+    _write_learn_rows(tmp_path, [inside, outside, review])
+    limit, why = br.learned_limit("test", str(tmp_path))
+    assert limit == 2400 and outside["id"] in why, (limit, why)
+
+
+@pytest.mark.parametrize("seconds", ["600", True, -1])
+def test_r079_learned_limit_bad_review_seconds_ignores_nothing(program, tmp_path, seconds):
+    """R-079: a review row with no valid end does not exclude other rows."""
+    br = program("bridge-run")
+    review = {"id": "2026-10-07T10:00:00Z", "kind": "review", "seconds": seconds, "exit": 0, "healthy": True}
+    inside = {"id": "2026-10-07T10:05:00Z", "kind": "test", "seconds": 2000, "exit": 0, "healthy": True}
+    _write_learn_rows(tmp_path, [inside, review])
+    limit, why = br.learned_limit("test", str(tmp_path))
+    assert limit == 3000 and inside["id"] in why, (limit, why)
+
+
+def test_r079_learned_limit_non_launcher_id_still_teaches(program, tmp_path):
+    """R-079: a row whose id is not the launcher's form is taught as today."""
+    br = program("bridge-run")
+    row = {"id": "not-a-stamp", "kind": "test", "seconds": 2000, "exit": 0, "healthy": True}
+    review = {"id": "2026-10-07T10:00:00Z", "kind": "review", "seconds": 1200, "exit": 0, "healthy": True}
+    _write_learn_rows(tmp_path, [row, review])
+    limit, why = br.learned_limit("test", str(tmp_path))
+    assert limit == 3000 and row["id"] in why, (limit, why)
+
+
+def test_r079_learned_limit_review_kind_keeps_learning(program, tmp_path):
+    """R-079: the review kind still learns from its own healthy rows."""
+    br = program("bridge-run")
+    long = {"id": "2026-10-07T11:00:00Z", "kind": "review", "seconds": 4000, "exit": 0, "healthy": True}
+    _write_learn_rows(tmp_path, [long])
+    limit, why = br.learned_limit("review", str(tmp_path))
+    assert limit > br.KINDS["review"] and long["id"] in why, (limit, why)

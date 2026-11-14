@@ -23,6 +23,7 @@ R-057 (TASK-046): read_header, HeaderError, HEADER_SCHEMAS, check_header and hea
 ASCII-only on purpose (cp1252 consoles). Writes nothing (read-only helpers except gh_empty_dir
 and agent_home side effects used by stripped_env).
 """
+import datetime
 import json
 import os
 import re
@@ -1276,6 +1277,60 @@ def norm_branch(branch):
     if branch.startswith("refs/heads/"):
         return branch[len("refs/heads/") :]
     return branch
+
+
+_LAUNCHER_ID_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})Z(?:-\d+)?$")
+
+
+def row_start_utc(row):
+    """UTC start in whole seconds from a launcher row id, or None when the id is not the launcher's form."""
+    rid = row.get("id")
+    if not isinstance(rid, str):
+        return None
+    m = _LAUNCHER_ID_RE.match(rid)
+    if not m:
+        return None
+    try:
+        dt = datetime.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc)
+        return int(dt.timestamp())
+    except ValueError:
+        return None
+
+
+def review_run_interval(row):
+    """(start, end) inclusive in whole seconds for a review row with a valid end, or None."""
+    if row.get("kind") != "review":
+        return None
+    start = row_start_utc(row)
+    if start is None:
+        return None
+    sec = row.get("seconds")
+    if isinstance(sec, bool) or not isinstance(sec, (int, float)) or sec < 0:
+        return None
+    return start, start + int(sec)
+
+
+def review_run_intervals(rows):
+    """Every review row's run as (start, end, id), in log order."""
+    out = []
+    for row in rows:
+        iv = review_run_interval(row)
+        if iv is not None:
+            rid = row.get("id")
+            out.append((iv[0], iv[1], rid if isinstance(rid, str) else ""))
+    return out
+
+
+def row_inside_review_run(row, intervals):
+    """True when the row's start lies inside a review run; the review row itself is never inside its own run."""
+    start = row_start_utc(row)
+    if start is None:
+        return False
+    rid = row.get("id")
+    for lo, hi, owner in intervals:
+        if lo <= start <= hi and rid != owner:
+            return True
+    return False
 
 
 def _valid_log_row(o):

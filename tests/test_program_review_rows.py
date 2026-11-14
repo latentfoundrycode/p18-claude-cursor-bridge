@@ -95,20 +95,43 @@ def test_r079_a_row_after_the_review_s_end_still_teaches(program, tmp_path):
     assert limit == 3450 and after["id"] in why, (limit, why)
 
 
+@pytest.mark.parametrize("seconds", ["NaN", "Infinity", "-Infinity", "1e400"])
+def test_r079_a_review_row_whose_seconds_is_not_finite_ignores_nothing(program, tmp_path, seconds):
+    """Round 2: Python's json reads NaN, Infinity and 1e400 as floats; such a length is no end, never an exception."""
+    br = program("bridge-run")
+    log = tmp_path / "run" / "launcher"
+    log.mkdir(parents=True, exist_ok=True)
+    review = '{"id": "%s", "kind": "review", "seconds": %s, "exit": 0, "healthy": true}\n' % (REVIEW["id"], seconds)
+    (log / "runs.jsonl").write_text(json.dumps(INSIDE) + "\n" + json.dumps(OUTSIDE) + "\n" + review, encoding="utf-8")
+    limit, why = br.learned_limit("test", str(tmp_path))
+    assert limit == 3450 and INSIDE["id"] in why, (limit, why)
+
+
+@pytest.mark.parametrize("rid", [REVIEW["id"] + "\n", "".join(chr(0x0660 + int(c)) for c in REVIEW["id"][:4]) + REVIEW["id"][4:]],
+                         ids=["trailing-newline", "non-ascii-digits"])
+def test_r079_only_the_whole_launcher_form_has_a_start(program, tmp_path, rid):
+    """Round 2: an id is the launcher's only as a whole and in ASCII digits; any other review row defines no run."""
+    br = program("bridge-run")
+    write_rows(tmp_path, [INSIDE, OUTSIDE, dict(REVIEW, id=rid)])
+    limit, why = br.learned_limit("test", str(tmp_path))
+    assert limit == 3450 and INSIDE["id"] in why, (limit, why)
+
+
 # ---------------------------------------------------------------- review-guard verify's note
 
 
-def reviewed_with_rows(repo, rows_of):
-    """snapshot; a Review B launch line at T; the log's rows as rows_of(T) gives them; verify. (rc, out, T)"""
+def reviewed_with_rows(repo, rows_of, suffix="", raw=False):
+    """snapshot; a Review B launch line at T; the log's rows as rows_of(T) gives them; verify. (rc, out, T)
+    suffix: the launch id's suffix, as the launcher prints it; raw: rows_of gives the log's lines as text."""
     rc, out = guard(repo, "snapshot", "TASK-001")
     assert rc == 0, out
     t = time.time() + 2
     (repo / "run" / "review" / "REVIEW-TASK-001.err").write_text(
-        "bridge-run: started %s\nsome output of the reviewer\nbridge-run: exit 0\n" % stamp(t), encoding="utf-8")
+        "bridge-run: started %s%s\nsome output of the reviewer\nbridge-run: exit 0\n" % (stamp(t), suffix), encoding="utf-8")
     rows = rows_of(t)
     log = repo / "run" / "launcher"
     log.mkdir(parents=True, exist_ok=True)
-    (log / "runs.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    (log / "runs.jsonl").write_text("".join(rows) if raw else "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
     rc, out = guard(repo, "verify", "TASK-001")
     return rc, out, t
 
@@ -144,6 +167,65 @@ def test_r079_verify_prints_no_note_where_no_row_was_written_during_the_review(r
     rc, out, t = reviewed_with_rows(repo, rows)
     assert rc == 0 and "verified mark written" in out, out
     assert after_verdict(out).strip() == "", "nothing after the verdict where no row was written during the review: " + out
+
+
+def test_r079_verify_names_a_row_at_the_review_s_last_second(repo):
+    def rows(t):
+        return [{"id": stamp(t + 600), "kind": "test", "seconds": 5, "exit": 0, "healthy": True},
+                {"id": stamp(t), "kind": "review", "seconds": 600, "exit": 0, "healthy": None}]
+    rc, out, t = reviewed_with_rows(repo, rows)
+    assert rc == 0, out
+    assert stamp(t + 600) in after_verdict(out), "both ends of the review's run are inclusive: " + out
+
+
+@pytest.mark.parametrize("seconds", ["NaN", "Infinity", "1e400"])
+def test_r079_a_review_row_whose_seconds_is_not_finite_leaves_verify_s_exit(repo, seconds):
+    """Round 2: the note never changes the exit; a review row with no finite end gives no note and exit 0."""
+    def rows(t):
+        return [json.dumps({"id": stamp(t + 60), "kind": "test", "seconds": 5, "exit": 0, "healthy": True}) + "\n",
+                '{"id": "%s", "kind": "review", "seconds": %s, "exit": 0, "healthy": null}\n' % (stamp(t), seconds)]
+    rc, out, t = reviewed_with_rows(repo, rows, raw=True)
+    assert rc == 0 and "verified mark written" in out, out
+    assert after_verdict(out).strip() == "", out
+    assert "Traceback" not in out, out
+
+
+@pytest.mark.parametrize("kind", ["x y", "test\nforged", 7, None], ids=["space", "newline", "number", "absent"])
+def test_r079_a_row_of_any_kind_is_named_by_its_id(repo, kind):
+    """Round 2: every row inside the run is named; a kind that is not a plain word is not printed as it stands."""
+    def rows(t):
+        row = {"id": stamp(t + 60), "seconds": 5, "exit": 0, "healthy": True}
+        if kind is not None:
+            row["kind"] = kind
+        return [row, {"id": stamp(t), "kind": "review", "seconds": 600, "exit": 0, "healthy": None}]
+    rc, out, t = reviewed_with_rows(repo, rows)
+    assert rc == 0, out
+    note = after_verdict(out)
+    assert len([l for l in note.splitlines() if l.strip()]) == 1, out
+    assert stamp(t + 60) in note, "the row is named whatever its kind: " + out
+    assert "x y" not in note and "forged" not in note, out
+
+
+def test_r079_verify_reads_the_review_s_own_row_the_last_one_with_its_id(repo):
+    """Round 2: the launcher writes the review's row at the run's end, so an earlier row with the same id is not it."""
+    def rows(t):
+        return [{"id": stamp(t), "kind": "review", "seconds": 0, "exit": 0, "healthy": None},
+                {"id": stamp(t + 60), "kind": "test", "seconds": 5, "exit": 0, "healthy": True},
+                {"id": stamp(t), "kind": "review", "seconds": 600, "exit": 0, "healthy": None}]
+    rc, out, t = reviewed_with_rows(repo, rows)
+    assert rc == 0, out
+    assert stamp(t + 60) in after_verdict(out), out
+
+
+def test_r079_verify_finds_a_suffixed_review_row(repo):
+    """A review started in the same second as another run carries a suffix; its .err line prints it."""
+    def rows(t):
+        return [{"id": stamp(t + 60), "kind": "test", "seconds": 5, "exit": 0, "healthy": True},
+                {"id": stamp(t) + "-2", "kind": "review", "seconds": 600, "exit": 0, "healthy": None}]
+    rc, out, t = reviewed_with_rows(repo, rows, suffix="-2")
+    assert rc == 0, out
+    note = after_verdict(out)
+    assert stamp(t + 60) in note and stamp(t) + "-2" not in note, out
 
 
 # ---------------------------------------------------------------- the launcher tests write no row into the checkout

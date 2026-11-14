@@ -324,3 +324,38 @@ def test_premerge_rejects_a_head_that_does_not_descend_from_the_reviewed_one(rep
 def test_missing_snapshot_cannot_verify(repo):
     rc, out = guard(repo, "verify", "TASK-009")
     assert rc == 2 and "no snapshot" in out
+
+
+# ---------------------------------------------------------------- R-079 verify note
+
+
+def test_r079_verify_tolerates_malformed_log_lines(repo):
+    """R-079: malformed jsonl and a non-launcher id never raise; verify stays OK."""
+    rc, _ = guard(repo, "snapshot", "TASK-001")
+    assert rc == 0
+    (repo / "run" / "launcher").mkdir(parents=True, exist_ok=True)
+    log = repo / "run" / "launcher" / "runs.jsonl"
+    log.write_text("{not json\n"
+                   + '{"id": "bogus", "kind": "test", "seconds": 1, "exit": 0, "healthy": true}\n'
+                   + '{"id": "2026-10-07T10:00:00Z", "kind": "review", "seconds": 60, "exit": 0}\n',
+                   encoding="utf-8")
+    (repo / "run" / "review" / "REVIEW-TASK-001.err").write_text(
+        "bridge-run: started 2026-10-07T10:00:00Z\nbridge-run: exit 0\n", encoding="utf-8")
+    rc, out = guard(repo, "verify", "TASK-001")
+    assert rc == 0 and "verified mark written" in out
+    assert "launcher rows during the review" not in out
+
+
+def test_r079_verify_missing_err_prints_no_note(repo):
+    """R-079: with no .err launch line, verify prints no launcher-rows note after OK."""
+    rc, _ = guard(repo, "snapshot", "TASK-001")
+    assert rc == 0
+    err = repo / "run" / "review" / "REVIEW-TASK-001.err"
+    if err.is_file():
+        err.unlink()
+    rc, out = guard(repo, "verify", "TASK-001")
+    assert rc == 0 and "verified mark written" in out
+    lines = out.splitlines()
+    ok = [i for i, l in enumerate(lines) if l.startswith("review-guard: OK")]
+    assert len(ok) == 1
+    assert not "".join(lines[ok[0] + 1:]).strip()

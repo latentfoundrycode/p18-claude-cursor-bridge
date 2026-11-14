@@ -435,6 +435,48 @@ def record_flagged_launch(common, root, nnn, snap):
     write_rounds(common, id_part, data)
 
 
+_KIND_WORD_RE = re.compile(r"^[A-Za-z]+$")
+
+
+def _launcher_rows_during_review_note(root, launched_at):
+    """One stdout line naming launcher rows inside the review's own run, or None (Requirement 4: note only)."""
+    if not launched_at:
+        return None
+    rows = bridge_env.read_runs_jsonl(root)
+    prefix = launched_at.rstrip("Z") + "Z"
+    review_iv = None
+    review_id = None
+    for row in rows:
+        if row.get("kind") != "review":
+            continue
+        rid = row.get("id")
+        if not isinstance(rid, str) or not (rid == prefix or rid.startswith(prefix + "-")):
+            continue
+        iv = bridge_env.review_run_interval(row)
+        if iv is not None and review_iv is None:
+            review_iv = iv
+            review_id = rid
+    if review_iv is None:
+        return None
+    lo, hi = review_iv
+    parts = []
+    for row in rows:
+        if row.get("id") == review_id:
+            continue
+        start = bridge_env.row_start_utc(row)
+        if start is None or start < lo or start > hi:
+            continue
+        kind = row.get("kind")
+        rid = row.get("id")
+        if not isinstance(rid, str):
+            continue
+        if isinstance(kind, str) and _KIND_WORD_RE.fullmatch(kind):
+            parts.append("%s %s" % (rid, kind))
+    if not parts:
+        return None
+    return "launcher rows during the review: " + ", ".join(parts)
+
+
 def launch_info(err_path):
     """(launch time, exit code) from run/review/REVIEW-<nnn>.err: the launcher's first line
     `bridge-run: started <UTC>Z` and its last `bridge-run: exit <code>` (None while it runs)."""
@@ -1116,6 +1158,9 @@ def cmd_verify(nnn, cwd):
     print("review-guard: OK - checkout restored to %s on %s (%d item(s) restored or removed, %d ignored entr%s left behind); verified mark written%s" % (
         snap["head"][:12], snap["branch"] or "detached HEAD", len(dirty) + len(cleaned), left, "y" if left == 1 else "ies",
         " (Review B launched %s, exit %s)" % (mark["launched"], mark["exit"]) if mark["launched"] else " (no launch time: run/review/REVIEW-%s.err missing, premerge will refuse)" % nnn))
+    note = _launcher_rows_during_review_note(root, launched_at)
+    if note:
+        print(note)
     return 0
 
 
