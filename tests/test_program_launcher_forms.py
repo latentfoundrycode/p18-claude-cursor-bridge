@@ -12,29 +12,40 @@ What each group pins, in the forms the brief repeats:
   the driver's checks of its program. Any other interpreter option before the module or the program is refused. A
   suite launched with both flags runs with them, and the launcher sets no `PYTHONUTF8`.
 - F5: npm's `--prefix` and `-C` (npm's short form of `--prefix`, the reality check), pnpm's `--dir` and `-C` and
-  yarn's `--cwd` are read wherever they stand before a bare `--`, in the two-word and the `=` form, and a long option
-  word whose name is a leading part of the folder option's name, at least three characters with its dashes, is read as
-  that option (npm and pnpm take an unambiguous abbreviation; the reality check's third probe moved npm's folder with
-  `--prefi=`). The folder is accepted only where it exists, lies under the launch roots by its resolved path and is
-  reached through no link; it is refused where it is given twice (an option and its other name count as one option),
-  where its value is missing, and in the attached form `-C<folder>`, which is not read. A suite so launched is
+  yarn's `--cwd` are read wherever they stand before a bare `--`, in the two-word and the `=` form. The folder is
+  accepted only where it exists, lies under the launch roots by its resolved path and is reached through no link; it is
+  refused where it is given twice (an option and its other name count as one option), where its value is missing or
+  starts with `-`. Since round 1's reviews (both reviewers reproduced npm, whose parser strips every leading dash,
+  expands a cluster of one-letter options and takes an unambiguous abbreviation, running outside the launch roots by
+  `-prefix`, `---prefix`, `-sC`, `--C` and the like), a named npm, pnpm or yarn suite takes, before a bare `--`, no
+  option word but these folder options in exactly those forms and three harmless flags (`--silent`, `-s`,
+  `--if-present`): every other word that starts with `-` is refused, an abbreviation, a cluster, an attached `-C<folder>`,
+  `--script-shell` and `-w` among them, as `uv_run_pytest` holds uv's options to a list. A suite so launched is
   stripped, logged as `npm test` (the folder never in the head) and limited as any named suite.
 - The environment names the reality check found to move the folder: `npm_config_workspace` and `npm_config_workspaces`
   for npm, `npm_config_workspace_dir` for pnpm, none for yarn, any letter case. In the run's environment (the
   launcher's own or a key file's line), such a name is refused where its value resolves outside the launch roots,
-  inside through a link, or not at all; a relative value is resolved against the folder the runner runs in. The name
-  is printed and its value never. Names the check found not to move the folder (`npm_config_prefix`, `INIT_CWD`) are
-  not refused.
-- J4: a refused option of a runner the launcher knows (an escape option of a named suite, an interpreter option before
-  `-m pytest` or `-m unittest`, every refusal of the folder rule) gets the message beginning KNOWN below, naming the
-  option and saying it is a defect to report, never a run to start by hand, with no `# wake`; an unknown runner keeps
-  today's message, beginning UNKNOWN, with its advice to run directly in the background marked `# wake`.
+  inside through a link, or not at all; a relative value is joined to the folder the runner runs in and then held to the
+  launch roots and the link walk from the launch folder, as a folder option is. `npm_config_script_shell` and
+  `npm_config_node_options`, which have npm or pnpm run another program, are refused for an npm or pnpm run when set at
+  all, as `PYTEST_PLUGINS` is. The name is printed and its value never. Names the check found not to move the folder
+  (`npm_config_prefix`, `INIT_CWD`) are not refused.
+- On Windows a `.cmd` or `.bat` runner is started through cmd.exe, which reads `& | < > ^ % ! " ( )` and line breaks
+  in its arguments as its own (round 1's security audit ran a command through it): such an argument is refused before
+  anything starts.
+- J4: a refused option of a named suite (an escape option, an option outside the npm, pnpm and yarn list, every refusal
+  of the folder rule, a cmd.exe character), and an interpreter option before `-m pytest` or `-m unittest` that the
+  interpreter's options lead to, gets the message beginning KNOWN below, naming the word and saying it is a defect to
+  report, never a run to start by hand, with no `# wake`; every other refused command (an unknown runner, or a known one
+  that is no named suite, `npm run dev --prefix <folder>` among them) keeps today's message, beginning UNKNOWN, with its
+  advice to run directly in the background marked `# wake`.
 - J9: a builder run's `merge_ids` is written sorted, whatever order the brief's `Merge unit:` line gives.
 - J12: both plan globs (bridge-run.py's header check and `bridge_env.plan_increment_ids`) escape their root, so a
   Workspace whose path holds `[` reads its plan.
 
-Every case is red on the checkpoint but the three that pin what stays as it is: every other interpreter option refused,
-the unknown runner's message, and the names the reality check found not to move a folder. npm, pnpm and yarn are stand-ins on PATH that print STAND-IN and whether
+At the first checkpoint (6e3d569) every case was red but the three that pin what stays as it is: every other interpreter
+option refused, the unknown runner's message, and the names the reality check found not to move a folder; the cases
+added after round 1's reviews are red on round 1's code. npm, pnpm and yarn are stand-ins on PATH that print STAND-IN and whether
 the made-up secret-like name reached them, so no runner needs to be installed; the one test that reads the folder a real
 npm runs in is skipped where npm is not installed. The builder adds its cases to tests/test_bridge_run.py,
 tests/test_bridge_run_driver.py and tests/test_release_s_launcher.py and edits nothing in this file.
@@ -63,7 +74,13 @@ REFUSED_FLAGS = [["-B", "-B"], ["-X", "utf8", "-X", "utf8"], ["-B", "-X", "utf8"
                  ["-X"], ["-E"], ["-I"], ["-O"], ["-u"], ["-S"], ["-B", "-E"], ["-X", "utf8", "-I"]]
 OPTIONS = [("npm", "--prefix"), ("npm", "-C"), ("pnpm", "--dir"), ("pnpm", "-C"), ("yarn", "--cwd")]
 OTHER_NAME = {("npm", "--prefix"): "-C", ("npm", "-C"): "--prefix", ("pnpm", "--dir"): "-C", ("pnpm", "-C"): "--dir"}
-ABBREVIATED = {"--prefix": ["--pre", "--prefi"], "--dir": ["--di"], "--cwd": ["--cw"]}
+ALLOWED_FLAGS = ["--silent", "-s", "--if-present"]
+# Option words npm's parser (nopt) reads as the folder option or another one, refused whatever their value
+# (round 1's reviews ran npm in a folder outside by the first five of npm's).
+NOT_LISTED = {"npm": ["-prefix", "---prefix", "-prefi=frontend", "--C", "-sC", "-dC", "-sC=frontend", "--pre", "--prefi=frontend", "--p",
+                      "-Cfrontend", "--script-shell", "--node-options=--require=x.js", "-w", "--workspace=frontend", "--workspaces", "--loglevel"],
+              "pnpm": ["-dir", "---dir", "--C", "-sC", "--di", "-Cfrontend", "--filter", "-r", "-w", "--script-shell"],
+              "yarn": ["-cwd", "---cwd", "--cw", "--cwdx", "-C", "--verbose"]}
 
 
 @pytest.fixture
@@ -110,6 +127,7 @@ def ws(tmp_path):
     ws = tmp_path / "ws"
     (ws / "frontend").mkdir(parents=True)
     (ws / "tests").mkdir()
+    (ws / "run").mkdir()                          # the launcher logs a run only where the launch folder holds run/
     (tmp_path / ("elsewhere-" + HIDDEN)).mkdir()
     write_runners(tmp_path / "bin")
     return ws
@@ -220,6 +238,7 @@ def _clean_env(tmp_path):
 def test_r078_a_suite_launched_with_both_flags_runs_with_them_and_no_pythonutf8(tmp_path):
     ws = tmp_path / "ws"
     (ws / "tests").mkdir(parents=True)
+    (ws / "run").mkdir()                          # the launcher logs a run only where the launch folder holds run/
     (ws / "tests" / "test_flags.py").write_text(
         "import os\nimport sys\n\n\ndef test_flags():\n    assert sys.flags.dont_write_bytecode == 1\n    assert sys.flags.utf8_mode == 1\n"
         "    assert 'PYTHONUTF8' not in os.environ\n", encoding="utf-8")
@@ -253,10 +272,10 @@ def forms(runner, option, value):
 def test_r078_a_folder_inside_the_launch_folder_is_accepted_in_every_form(ws, runner, option):
     for words in forms(runner, option, "frontend") + [[runner, option, ".", "test"], [runner, "test", option, str(ws / "frontend")]]:
         assert_started(launch(ws, words), words)
-    for abbreviated in ABBREVIATED.get(option, []):
-        for words in ([runner, abbreviated, "frontend", "test"], [runner, "test", abbreviated + "=frontend"]):
+    for flag in ALLOWED_FLAGS:                                          # the three harmless flags, before and after the folder option
+        for words in ([runner, option, "frontend", "test", flag], [runner, "test", flag, option + "=frontend"]):
             assert_started(launch(ws, words), words)
-    words = [runner, "test", "--", option, str(outside_of(ws))]        # after a bare --: the script's own argument, not the runner's
+    words = [runner, "test", "--", option, str(outside_of(ws)), "-sC", "--script-shell"]   # after a bare --: the script's own arguments
     assert_started(launch(ws, words), words)
 
 
@@ -269,9 +288,6 @@ def test_r078_a_folder_outside_missing_or_through_a_link_is_refused_naming_the_o
         for value in (out, os.path.join("..", "elsewhere-" + HIDDEN), "out-link", "in-link", os.path.join("in-link", os.curdir), "no-such-folder"):
             for words in forms(runner, option, value):
                 assert_known_refusal(launch(ws, words), words, option)
-        for abbreviated in ABBREVIATED.get(option, []):
-            words = [runner, "test", abbreviated + "=" + out]
-            assert_known_refusal(launch(ws, words), words, abbreviated)
     finally:
         _unlink(ws / "out-link")
         _unlink(ws / "in-link")
@@ -279,14 +295,29 @@ def test_r078_a_folder_outside_missing_or_through_a_link_is_refused_naming_the_o
 
 @pytest.mark.parametrize("runner,option", OPTIONS)
 def test_r078_a_folder_option_given_twice_or_without_its_value_is_refused(ws, runner, option):
+    (ws / "-x").mkdir()                                                 # a folder named like an option: still no value
     cases = [[runner, option, "frontend", "test", option, "frontend"], [runner, option + "=frontend", "test", option + "=frontend"],
-             [runner, "test", option], [runner, "test", option + "="], [runner, "test", "--silent", option]]
+             [runner, "test", option], [runner, "test", option + "="], [runner, "test", "--silent", option],
+             [runner, "test", option, "-x"], [runner, "test", option + "=-x"], [runner, option, "-x", "test"]]
     if (runner, option) in OTHER_NAME:
         cases.append([runner, option, "frontend", OTHER_NAME[(runner, option)], "frontend", "test"])
-    if option == "-C":
-        cases.append([runner, "test", "-Cfrontend"])
     for words in cases:
         assert_known_refusal(launch(ws, words), words, option)
+
+
+@pytest.mark.parametrize("runner", ["npm", "pnpm", "yarn"])
+def test_r078_an_option_word_outside_the_list_is_refused_whatever_its_value(ws, runner):
+    """Each word refused with the folder an inside one, so the refusal is the word's, not the folder rule's; the control
+    is the listed form, accepted."""
+    listed = {"npm": "--prefix", "pnpm": "--dir", "yarn": "--cwd"}[runner]
+    assert_started(launch(ws, [runner, "test", listed, "frontend"]), [runner, "test", listed, "frontend"])
+    for word in NOT_LISTED[runner]:
+        for words in ([runner, "test", word, "frontend"], [runner, word, "frontend", "test"] if "=" not in word else [runner, "test", word]):
+            p = launch(ws, words)
+            line = refusal_line(p, words)
+            if words[1] == word:                                        # a leading word outside the list leaves the command unnamed
+                continue
+            assert line.startswith(KNOWN) and word.split("=", 1)[0] in line and "# wake" not in p.stderr, (words, line)
 
 
 def test_r078_a_suite_in_a_subfolder_is_stripped_logged_and_limited(ws):
@@ -332,10 +363,19 @@ def test_r078_a_name_that_moves_the_folder_is_held_to_the_rule(br, tmp_path):
                     assert (got or "").upper() == name.upper(), (argv, name, value, got)
                 for value in ("frontend", str(base / "frontend"), ".", ""):
                     assert br.outside_by_environment(argv, {name: value}, str(base)) is None, (argv, name, value)
-        there = ["npm", "--prefix", "frontend", "test"]                    # a relative value is read against the runner's folder
+        there = ["npm", "--prefix", "frontend", "test"]                    # a relative value is joined to the runner's folder
         assert br.outside_by_environment(there, {"npm_config_workspace": "pkg"}, str(base)) is None
         assert br.outside_by_environment(there, {"npm_config_workspace": "pkg-link"}, str(base)) == "NPM_CONFIG_WORKSPACE"
         assert br.outside_by_environment(["npm", "test"], {"npm_config_workspace": "pkg-link"}, str(base)) == "NPM_CONFIG_WORKSPACE"
+        # round 1's Review A: then held to the launch roots and walked from the launch folder, not from the runner's
+        for value in (str(base / "pkg"), os.path.join("..", "pkg")):
+            assert br.outside_by_environment(there, {"npm_config_workspace": value}, str(base)) is None, value
+        assert br.outside_by_environment(there, {"npm_config_workspace": os.path.join("..", "out-link")}, str(base)) == "NPM_CONFIG_WORKSPACE"
+        # round 1's security audit: the names that have npm or pnpm run another program, refused when set at all
+        for argv in (["npm", "test"], ["pnpm", "test"], there):
+            for name in ("npm_config_script_shell", "NPM_CONFIG_NODE_OPTIONS"):
+                assert br.outside_by_environment(argv, {name: "x"}, str(base)) == name.upper(), (argv, name)
+                assert br.outside_by_environment(argv, {name: ""}, str(base)) is None, (argv, name)
     finally:
         for link in (base / "out-link", base / "in-link", base / "frontend" / "pkg-link"):
             _unlink(link)
@@ -375,9 +415,52 @@ def test_r078_a_refused_option_of_a_known_runner_is_a_defect_to_report(ws):
 
 
 def test_r078_an_unknown_runner_keeps_todays_advice(ws):
-    for words in (["make", "test"], ["python", "-c", "print(1)"], ["npm", "run", "dev"], ["bash", "-c", "true"]):
+    """Round 1's Review A: a known runner that is no named suite keeps the unknown runner's advice, a folder option and a
+    script run behind interpreter options among them."""
+    out = str(outside_of(ws))
+    for words in (["make", "test"], ["python", "-c", "print(1)"], ["npm", "run", "dev"], ["bash", "-c", "true"],
+                  ["npm", "run", "dev", "--prefix", out], ["npm", "install", "--prefix", out], ["pnpm", "build", "-Cfrontend"],
+                  ["python", "-I", "x.py", "-m", "pytest"]):
         line = refusal_line(launch(ws, words), words)
         assert line.startswith(UNKNOWN) and "# wake" in line, (words, line)
+
+
+def test_r078_the_logged_head_is_the_heads_as_before(br):
+    """Round 1's Review A: the logged head reads two words from where the command proper begins, as it read two from the
+    first argument before, so a target or an option never joins it."""
+    for flagged, plain in ((["python", "-B", "-m", "pytest", "tests", "-q"], ["python", "-m", "pytest", "tests", "-q"]),
+                           (["python", "-X", "utf8", "-m", "unittest", "discover"], ["python", "-m", "unittest", "discover"]),
+                           (["npm", "--prefix", "frontend", "test", "test-x", "test-y"], ["npm", "test", "test-x", "test-y"]),
+                           (["pnpm", "-C", "frontend", "run", "test:unit", "x"], ["pnpm", "run", "test:unit", "x"])):
+        assert br.head_text(flagged) == br.head_text(plain), (flagged, br.head_text(flagged), br.head_text(plain))
+    assert br.head_text(["python", "-m", "pytest", "tests"]) == "python -m pytest"
+    assert br.head_text(["npm", "test", "test-x", "test-y"]) == "npm test test-x"
+
+
+def test_r078_the_escape_lists_hold_every_python_head_and_uv_from_its_first_word(br, tmp_path):
+    """Round 1's Review A: python's escape list now holds python3 and py too (they had none at 3a37bde, so `py -m pytest
+    -p evil` passed there); uv's options are read from its first word, as before round 1."""
+    base = str(tmp_path)
+    for head in ("python", "python3", "py"):
+        assert not br.test_suite([head, "-m", "pytest", "-c", "x.ini"], base), head
+        assert not br.test_suite([head, "-m", "pytest", "-p", "evil"], base), head
+        assert br.test_suite([head, "-m", "pytest", "-p", "no:cacheprovider"], base), head
+    for argv in (["uv", "-p=x", "pytest"], ["uv", "-p", "3.12", "run", "pytest"]):
+        assert not br.test_suite(argv, base), argv
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="cmd.exe starts a .cmd runner on Windows only")
+def test_r078_a_cmd_character_in_an_argument_of_a_cmd_runner_is_refused(ws):
+    """Round 1's security audit: npm.cmd is started through cmd.exe, which reads these characters as its own; the run
+    is refused before anything starts, the stand-in never runs."""
+    for extra in (["&", "echo", "INJECTED"], ["|", "echo", "INJECTED"], ['x"&echo INJECTED&"'], ["a>b"], ["a<b"], ["^x"], ["%PATH%"], ["!x!"],
+                  ["(x)"], ["a\nb"]):
+        for words in (["npm", "test"] + extra, ["npm", "--prefix", "frontend", "test", "--"] + extra):
+            p = launch(ws, words)
+            line = refusal_line(p, words)
+            assert line.startswith(KNOWN) and "defect" in line, (words, line)
+            assert "INJECTED" not in p.stdout, (words, p.stdout)
+    assert_started(launch(ws, ["npm", "test", "--", "plain", "words"]), ["npm", "test", "--", "plain", "words"])
 
 
 # ---------------------------------------------------------------- J9: merge_ids sorted

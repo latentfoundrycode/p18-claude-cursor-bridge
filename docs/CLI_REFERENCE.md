@@ -177,8 +177,10 @@ so the launcher's allow rule cannot become a way to run arbitrary commands unsee
 benchmark or a runner the launcher does not know runs directly in the background, marked
 `# wake`. `--kind driver` accepts only `python <program> [args]` where the program is a `.py`
 file under `run/supervisor/` of the launch folder (no link on the path) or
-`~/.claude/cursor-bridge/mutation-run.py`; interpreter options before the program (`-c`,
-`-m`, `py -3`) are refused. The tests set BRIDGE_RUN_ALLOW_ANY=1 to run their own helpers
+`~/.claude/cursor-bridge/mutation-run.py`; interpreter options before the program are
+refused except the two leading flags `-B` and `-X utf8` (each at most once, in either
+order); every other interpreter option is refused. A suite may name a subfolder through
+npm's `--prefix` or `-C`, pnpm's `--dir` or `-C`, or yarn's `--cwd` before the subcommand. The tests set BRIDGE_RUN_ALLOW_ANY=1 to run their own helpers
 through it (driver commands are never exempt).
 
 Ceilings (release A2, plan 10.3): every run is logged to `run/launcher/runs.jsonl` under the
