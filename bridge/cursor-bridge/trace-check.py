@@ -632,8 +632,8 @@ def parse_move_entries(text):
     return entries
 
 
-def instruction_paths_in_rev(root, rev):
-    proc, err = git_run(root, ["ls-tree", "-r", "--name-only", "-z", rev, "--", "bridge/"])
+def instruction_paths_from_git(root, git_args):
+    proc, err = git_run(root, git_args)
     if proc is None:
         return None, err
     if proc.returncode != 0:
@@ -650,26 +650,14 @@ def instruction_paths_in_rev(root, rev):
             paths.append(slash(rel))
     paths.sort()
     return paths, None
+
+
+def instruction_paths_in_rev(root, rev):
+    return instruction_paths_from_git(root, ["ls-tree", "-r", "--name-only", "-z", rev, "--", "bridge/"])
 
 
 def changed_instruction_paths(root, base, head):
-    proc, err = git_run(root, ["diff", "--name-only", "--no-renames", "-z", base, head, "--", "bridge/"])
-    if proc is None:
-        return None, err
-    if proc.returncode != 0:
-        return None, "command failed"
-    paths = []
-    for part in proc.stdout.split(b"\0"):
-        if not part:
-            continue
-        try:
-            rel = decode_git_bytes(part)
-        except UnicodeDecodeError:
-            return None, "cannot be read as UTF-8"
-        if is_instruction_md(rel):
-            paths.append(slash(rel))
-    paths.sort()
-    return paths, None
+    return instruction_paths_from_git(root, ["diff", "--name-only", "--no-renames", "-z", base, head, "--", "bridge/"])
 
 
 def head_passage_norms(root, head):
