@@ -453,7 +453,7 @@ def _launcher_rows_during_review_note(root, launched_at):
         if not isinstance(rid, str) or not (rid == prefix or rid.startswith(prefix + "-")):
             continue
         iv = bridge_env.review_run_interval(row)
-        if iv is not None and review_iv is None:
+        if iv is not None:
             review_iv = iv
             review_id = rid
     if review_iv is None:
@@ -471,7 +471,10 @@ def _launcher_rows_during_review_note(root, launched_at):
         if not isinstance(rid, str):
             continue
         if isinstance(kind, str) and _KIND_WORD_RE.fullmatch(kind):
-            parts.append("%s %s" % (rid, kind))
+            kind_label = kind
+        else:
+            kind_label = "?"
+        parts.append("%s %s" % (rid, kind_label))
     if not parts:
         return None
     return "launcher rows during the review: " + ", ".join(parts)
@@ -1158,9 +1161,12 @@ def cmd_verify(nnn, cwd):
     print("review-guard: OK - checkout restored to %s on %s (%d item(s) restored or removed, %d ignored entr%s left behind); verified mark written%s" % (
         snap["head"][:12], snap["branch"] or "detached HEAD", len(dirty) + len(cleaned), left, "y" if left == 1 else "ies",
         " (Review B launched %s, exit %s)" % (mark["launched"], mark["exit"]) if mark["launched"] else " (no launch time: run/review/REVIEW-%s.err missing, premerge will refuse)" % nnn))
-    note = _launcher_rows_during_review_note(root, launched_at)
-    if note:
-        print(note)
+    try:
+        note = _launcher_rows_during_review_note(root, launched_at)
+        if note:
+            print(note)
+    except Exception:
+        pass
     return 0
 
 

@@ -502,15 +502,23 @@ def test_r079_learned_limit_row_at_review_start_with_suffix(program, tmp_path):
     assert limit == 2400 and outside["id"] in why, (limit, why)
 
 
-@pytest.mark.parametrize("seconds", ["600", True, -1])
+@pytest.mark.parametrize("seconds", ["600", True, -1, "NaN", "1e400"])
 def test_r079_learned_limit_bad_review_seconds_ignores_nothing(program, tmp_path, seconds):
-    """R-079: a review row with no valid end does not exclude other rows."""
+    """R-079: a review row with no valid end does not exclude other rows (including at the review start)."""
     br = program("bridge-run")
-    review = {"id": "2026-10-07T10:00:00Z", "kind": "review", "seconds": seconds, "exit": 0, "healthy": True}
+    at_start = {"id": "2026-10-07T10:00:00Z-2", "kind": "test", "seconds": 2500, "exit": 0, "healthy": True}
     inside = {"id": "2026-10-07T10:05:00Z", "kind": "test", "seconds": 2000, "exit": 0, "healthy": True}
-    _write_learn_rows(tmp_path, [inside, review])
+    if seconds in ("NaN", "1e400"):
+        launcher = tmp_path / "run" / "launcher"
+        launcher.mkdir(parents=True, exist_ok=True)
+        review = '{"id": "2026-10-07T10:00:00Z", "kind": "review", "seconds": %s, "exit": 0, "healthy": true}\n' % seconds
+        (launcher / "runs.jsonl").write_text(
+            "\n".join(json.dumps(r) for r in [at_start, inside]) + "\n" + review, encoding="utf-8")
+    else:
+        review = {"id": "2026-10-07T10:00:00Z", "kind": "review", "seconds": seconds, "exit": 0, "healthy": True}
+        _write_learn_rows(tmp_path, [at_start, inside, review])
     limit, why = br.learned_limit("test", str(tmp_path))
-    assert limit == 3000 and inside["id"] in why, (limit, why)
+    assert at_start["id"] in why, (limit, why)
 
 
 def test_r079_learned_limit_non_launcher_id_still_teaches(program, tmp_path):

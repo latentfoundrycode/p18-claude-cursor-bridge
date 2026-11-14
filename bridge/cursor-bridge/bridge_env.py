@@ -25,6 +25,7 @@ and agent_home side effects used by stripped_env).
 """
 import datetime
 import json
+import math
 import os
 import re
 import shutil
@@ -1279,7 +1280,7 @@ def norm_branch(branch):
     return branch
 
 
-_LAUNCHER_ID_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})Z(?:-\d+)?$")
+_LAUNCHER_ID_RE = re.compile(r"(\d{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})Z(?:-[0-9]+)?", re.ASCII)
 
 
 def row_start_utc(row):
@@ -1287,7 +1288,7 @@ def row_start_utc(row):
     rid = row.get("id")
     if not isinstance(rid, str):
         return None
-    m = _LAUNCHER_ID_RE.match(rid)
+    m = _LAUNCHER_ID_RE.fullmatch(rid)
     if not m:
         return None
     try:
@@ -1306,6 +1307,8 @@ def review_run_interval(row):
         return None
     sec = row.get("seconds")
     if isinstance(sec, bool) or not isinstance(sec, (int, float)) or sec < 0:
+        return None
+    if not math.isfinite(sec):
         return None
     return start, start + int(sec)
 

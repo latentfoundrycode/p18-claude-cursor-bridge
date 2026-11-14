@@ -107,6 +107,29 @@ def test_r079_a_review_row_whose_seconds_is_not_finite_ignores_nothing(program, 
     assert limit == 3450 and INSIDE["id"] in why, (limit, why)
 
 
+@pytest.mark.parametrize("seconds", ["NaN", "Infinity", "-Infinity", "1e400"])
+@pytest.mark.parametrize("rid", ["x", "2026-10-07T09:00:00Z"])
+def test_r079_a_healthy_row_whose_seconds_is_not_finite_teaches_nothing(program, tmp_path, seconds, rid):
+    """Round 3: a healthy row of the kind with a length that is not finite is skipped, never an exception."""
+    br = program("bridge-run")
+    log = tmp_path / "run" / "launcher"
+    log.mkdir(parents=True, exist_ok=True)
+    row = '{"id": "%s", "kind": "test", "seconds": %s, "exit": 0, "healthy": true}\n' % (rid, seconds)
+    (log / "runs.jsonl").write_text(row + json.dumps(INSIDE) + "\n" + json.dumps(OUTSIDE) + "\n", encoding="utf-8")
+    limit, why = br.learned_limit("test", str(tmp_path))
+    assert limit == 3450 and INSIDE["id"] in why, (limit, why)
+
+
+def test_r079_a_line_nested_too_deep_to_read_is_skipped(program, tmp_path):
+    """Round 3: a line Python's json cannot read for its depth (RecursionError) is skipped like any unreadable line."""
+    br = program("bridge-run")
+    log = tmp_path / "run" / "launcher"
+    log.mkdir(parents=True, exist_ok=True)
+    (log / "runs.jsonl").write_text("[" * 100000 + "\n" + json.dumps(INSIDE) + "\n" + json.dumps(OUTSIDE) + "\n", encoding="utf-8")
+    limit, why = br.learned_limit("test", str(tmp_path))
+    assert limit == 3450 and INSIDE["id"] in why, (limit, why)
+
+
 @pytest.mark.parametrize("rid", [REVIEW["id"] + "\n", "".join(chr(0x0660 + int(c)) for c in REVIEW["id"][:4]) + REVIEW["id"][4:]],
                          ids=["trailing-newline", "non-ascii-digits"])
 def test_r079_only_the_whole_launcher_form_has_a_start(program, tmp_path, rid):

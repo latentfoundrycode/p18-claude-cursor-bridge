@@ -330,29 +330,35 @@ def test_missing_snapshot_cannot_verify(repo):
 
 
 def test_r079_verify_tolerates_malformed_log_lines(repo):
-    """R-079: malformed jsonl and a non-launcher id never raise; verify stays OK."""
+    """R-079: malformed jsonl and a non-launcher id never raise; verify stays OK and names valid rows inside the run."""
     rc, _ = guard(repo, "snapshot", "TASK-001")
     assert rc == 0
     (repo / "run" / "launcher").mkdir(parents=True, exist_ok=True)
     log = repo / "run" / "launcher" / "runs.jsonl"
+    inside = '{"id": "2026-10-07T10:00:30Z", "kind": "test", "seconds": 1, "exit": 0, "healthy": true}\n'
     log.write_text("{not json\n"
                    + '{"id": "bogus", "kind": "test", "seconds": 1, "exit": 0, "healthy": true}\n'
+                   + inside
                    + '{"id": "2026-10-07T10:00:00Z", "kind": "review", "seconds": 60, "exit": 0}\n',
                    encoding="utf-8")
     (repo / "run" / "review" / "REVIEW-TASK-001.err").write_text(
         "bridge-run: started 2026-10-07T10:00:00Z\nbridge-run: exit 0\n", encoding="utf-8")
     rc, out = guard(repo, "verify", "TASK-001")
     assert rc == 0 and "verified mark written" in out
-    assert "launcher rows during the review" not in out
+    assert "2026-10-07T10:00:30Z" in out and "bogus" not in out
 
 
 def test_r079_verify_missing_err_prints_no_note(repo):
-    """R-079: with no .err launch line, verify prints no launcher-rows note after OK."""
+    """R-079: with no .err launch line, verify prints no launcher-rows note after OK even when the log has rows inside a review run."""
     rc, _ = guard(repo, "snapshot", "TASK-001")
     assert rc == 0
-    err = repo / "run" / "review" / "REVIEW-TASK-001.err"
-    if err.is_file():
-        err.unlink()
+    log = repo / "run" / "launcher"
+    log.mkdir(parents=True, exist_ok=True)
+    t = "2026-10-07T10:00:00Z"
+    (log / "runs.jsonl").write_text(
+        '{"id": "2026-10-07T10:05:00Z", "kind": "test", "seconds": 5, "exit": 0, "healthy": true}\n'
+        + '{"id": "%s", "kind": "review", "seconds": 600, "exit": 0, "healthy": null}\n' % t,
+        encoding="utf-8")
     rc, out = guard(repo, "verify", "TASK-001")
     assert rc == 0 and "verified mark written" in out
     lines = out.splitlines()
