@@ -1457,6 +1457,15 @@ def mark_healthy(run_id, folder, kind=None):
     return 0
 
 
+HOME_KEY_VARS = frozenset({"USERPROFILE", "HOME", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA"})
+
+
+def key_file_home_refusal(keys):
+    """The home variables a key file must not name; the strip sets them itself (R-080)."""
+    bad = [name for name in keys if name.upper() in HOME_KEY_VARS]
+    return ", ".join(bad) if bad else None
+
+
 def key_file_env(path, folder):
     """{NAME: value} from a key file outside the Workspace; values are never printed."""
     full = os.path.abspath(path)
@@ -2179,6 +2188,10 @@ def main():
             except (IndexError, OSError, ValueError) as e:  # never read a second time for the run: the lines checked here are the lines it gets
                 sys.stderr.write("bridge-run: refused - key file: %s\n" % e)
                 return 125
+            bad = key_file_home_refusal(read_keys)
+            if bad:
+                sys.stderr.write("bridge-run: refused - key file names a home variable (%s)\n" % bad)
+                return 125
             coming.update(read_keys)
         by_environment = outside_by_environment(cmd, coming, folder)
         if by_environment is not None:
@@ -2243,18 +2256,20 @@ def main():
     while run_id in taken:                                 # two runs in one second: the second gets a suffix
         run_id = run_id.split("Z")[0] + "Z-%d" % n
         n += 1
-    sys.stderr.write("bridge-run: started %s\n" % run_id)         # the FIRST line: review-guard and pr-activity-check read it
-    for note in NOTES:
-        sys.stderr.write("bridge-run: note - %s\n" % note)
-    if scale_raw and os.environ.get("BRIDGE_RUN_ALLOW_ANY") != "1":
-        sys.stderr.write("bridge-run: note - BRIDGE_RUN_SLOT_SCALE is ignored without BRIDGE_RUN_ALLOW_ANY=1\n")
-    sys.stderr.flush()
+    if "--key-file" in flags and kind != "driver":
+        if read_keys is None:
+            try:
+                read_keys = key_file_env(flags[flags.index("--key-file") + 1], folder)
+            except (IndexError, OSError, ValueError) as e:
+                sys.stderr.write("bridge-run: refused - key file: %s\n" % e)
+                return 125
+        bad = key_file_home_refusal(read_keys)
+        if bad:
+            sys.stderr.write("bridge-run: refused - key file names a home variable (%s)\n" % bad)
+            return 125
     cap, cap_note = cap_for(kind, folder)
-    if cap_note:
-        sys.stderr.write("bridge-run: %s\n" % cap_note)
     if raw == "auto":
         limit, why = learned_limit(kind, folder)
-        sys.stderr.write("bridge-run: limit %ds for %s (%s)\n" % (limit, kind, why))
     else:
         limit = float(raw)
         if limit > cap:
@@ -2266,13 +2281,23 @@ def main():
     if kind == "watch" and kind_of(cmd) != "watch":
         sys.stderr.write(WATCH_ONLY_REFUSE)
         return 125
+    sys.stderr.write("bridge-run: started %s\n" % run_id)         # the FIRST line: review-guard and pr-activity-check read it
+    for note in NOTES:
+        sys.stderr.write("bridge-run: note - %s\n" % note)
+    if scale_raw and os.environ.get("BRIDGE_RUN_ALLOW_ANY") != "1":
+        sys.stderr.write("bridge-run: note - BRIDGE_RUN_SLOT_SCALE is ignored without BRIDGE_RUN_ALLOW_ANY=1\n")
+    sys.stderr.flush()
+    if cap_note:
+        sys.stderr.write("bridge-run: %s\n" % cap_note)
+    if raw == "auto":
+        sys.stderr.write("bridge-run: limit %ds for %s (%s)\n" % (limit, kind, why))
     strip = "--strip" in flags
     if kind == "driver" and driver_prog is not None:
         cmd = list(cmd)
         cmd[driver_prog_index] = driver_prog
     cmd, is_agent = resolve(cmd)
     try:
-        env = bridge_env.stripped_env() if (is_agent or strip) else dict(os.environ)
+        env = bridge_env.stripped_env(is_agent=is_agent) if (is_agent or strip) else dict(os.environ)
     except bridge_env.AgentHomeError as e:
         sys.stderr.write("bridge-run: refused - %s\n" % e)
         return 125

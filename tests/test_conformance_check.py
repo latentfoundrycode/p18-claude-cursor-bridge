@@ -76,7 +76,7 @@ def make_workspace(root, conformant=True):
     (root / "package.json").write_text("{}", encoding="utf-8")
     (root / "package-lock.json").write_text("{}", encoding="utf-8")
     (root / ".github" / "workflows" / "ci.yml").write_text(GATE, encoding="utf-8")
-    (root / ".env").write_text("DATABASE_URL=postgres://localhost/x\nLOG_LEVEL=debug\n", encoding="utf-8")
+    (root / ".env").write_text("DATABASE_HOST=localhost\nLOG_LEVEL=debug\n", encoding="utf-8")
     if not conformant:
         (root / ".github" / "workflows" / "ci.yml").write_text(GATE.replace("pipx run semgrep==1.176.1 ci", "echo no").replace("@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09", "@v5").replace("ubuntu-latest", "windows-latest"), encoding="utf-8")
         (root / "docs" / "diagrams" / "INDEX.md").unlink()
@@ -124,7 +124,7 @@ def test_each_missing_floor_is_named_and_secret_values_never_printed(tmp_path):
     assert verdict(out, "Runner OS")[0] == "NOTE"
     assert "MODAL_TOKEN_SECRET" in out and "OPENROUTER_API_KEY" in out
     assert "abc123" not in out and "sk-live-999" not in out, "values must never be printed"
-    assert "DATABASE_URL" not in verdict(out, "Keys out of the builder's reach")[1]
+    assert "DATABASE_URL" in verdict(out, "Keys out of the builder's reach")[1]
     assert verdict(out, "OSV-Scanner in the gate")[0] == "OK", "OSV is present in the fixture"
 
 
@@ -439,3 +439,33 @@ def test_the_three_floors_of_release_a1b(tmp_path):
     rc, out = run(tmp_path)
     kind, detail = verdict(out, "Adapters tested against recorded replies")
     assert kind == "MISSING" and "api" in detail and "bfl" in detail and "health" not in detail, "a JavaScript call to a provider counts, a call to the product's own API does not: " + out
+
+
+def test_r080_inventory_floor_uses_bridge_env_secret_like(tmp_path):
+    """R-080 (J11): the inventory floor counts names bridge_env.SECRET_LIKE matches, such as GITHUB_PAT, and not a
+    boundary name such as AUTHOR_NAME. The floor reads the inventory's rows only, so both rows are written there (the
+    supervisor's fix after round 2's Review A: the boundary name had been put in .env, which the floor never reads)."""
+    make_workspace(tmp_path)
+    inv = (tmp_path / "docs" / "INVENTORY.md").read_text(encoding="utf-8")
+    rows = ("| GITHUB_PAT | API token | environment variable the owner sets | app | 2026-01-01 |\n"
+            "| AUTHOR_NAME | display name | environment variable the owner sets | app | 2026-01-01 |\n")
+    inv = inv.replace("| Socket account |", rows + "| Socket account |", 1)
+    assert "| GITHUB_PAT |" in inv and "| AUTHOR_NAME |" in inv, "the fixture lost its insertion point"
+    (tmp_path / "docs" / "INVENTORY.md").write_text(inv, encoding="utf-8")
+    rc, out = run(tmp_path)
+    v, line = verdict(out, "No secret through an environment variable")
+    assert v == "MISSING" and "GITHUB_PAT" in line and "AUTHOR_NAME" not in line, (v, line)
+
+
+def test_r080_session_note_lists_bridge_env_forms_not_boundary_cases(tmp_path):
+    """R-080 (J11): the session NOTE uses bridge_env.secret_like; boundary cases like DATABASE_HOST are not listed."""
+    make_workspace(tmp_path)
+    env = {k: os.environ[k] for k in ("SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT") if k in os.environ}
+    env["PATH"] = os.environ.get("PATH", "")
+    env["GITHUB_PAT"] = "x-never-printed"
+    env["DATABASE_HOST"] = "localhost"
+    p = subprocess.run([sys.executable, PROG, str(tmp_path), "--offline"], capture_output=True, text=True, env=env,
+                       timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    v, line = verdict(p.stdout, "Account keys in the session's environment")
+    assert v == "NOTE" and "GITHUB_PAT" in line and "DATABASE_HOST" not in line, (v, line)
+    assert "x-never-printed" not in p.stdout

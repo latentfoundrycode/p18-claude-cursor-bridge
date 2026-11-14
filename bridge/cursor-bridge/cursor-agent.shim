@@ -20,9 +20,10 @@ unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0   # the helper is res
 unset GIT_ASKPASS SSH_ASKPASS
 # Every variable whose NAME looks like an account key is withheld too (2026.10.04e): the
 # builder, and a reviewer that may execute code, must not inherit the owner's paid keys from
-# the Windows user environment. The same test as bridge_env.SECRET_LIKE; Cursor's own
-# variables and GIT_CONFIG_* are kept (the helper is reset through the bridge's git config file and GIT_CONFIG_PARAMETERS).
-for BRIDGE_V in $(env | awk -F= '$1 ~ /^[A-Za-z_][A-Za-z0-9_]*$/ { u = toupper($1); if (u ~ /^CURSOR_/ || u ~ /^GIT_CONFIG_KEY_/) next; if (u ~ /(^|_)TOKENS?(_|$)/ || u ~ /(^|_)SECRETS?(_|$)/ || u ~ /PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY/ || u ~ /_KEYS?$/) print $1 }'); do
+# the Windows user environment. The same test as bridge_env.SECRET_LIKE, including PAT, CREDS
+# and AUTH as bounded name parts, DATABASE_URL and SSH_AUTH_SOCK; Cursor's own variables and
+# GIT_CONFIG_* are kept (the helper is reset through the bridge's git config file and GIT_CONFIG_PARAMETERS).
+for BRIDGE_V in $(env | awk -F= '$1 ~ /^[A-Za-z_][A-Za-z0-9_]*$/ { u = toupper($1); if (u ~ /^CURSOR_/ || u ~ /^GIT_CONFIG_KEY_/) next; if (u ~ /(^|_)TOKENS?(_|$)/ || u ~ /(^|_)SECRETS?(_|$)/ || u ~ /(^|_)PAT(_|$)/ || u ~ /(^|_)CREDS(_|$)/ || u ~ /(^|_)AUTH(_|$)/ || u ~ /^DATABASE_URL$/ || u ~ /^SSH_AUTH_SOCK$/ || u ~ /PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY/ || u ~ /_KEYS?$/) print $1 }'); do
   unset "$BRIDGE_V"
 done
 unset BRIDGE_V

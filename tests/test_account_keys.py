@@ -20,14 +20,15 @@ WITHHELD = ["ANTHROPIC_API_KEY", "OPENROUTER_API_KEY", "AZURE_DI_API_KEY", "MODA
             "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "PGPASSWORD", "MINIO_ROOT_PASSWORD", "MY_PRIVATE_KEY",
             "GOOGLE_APPLICATION_CREDENTIALS", "LLM_APIKEY", "GH_TOKEN", "GITHUB_TOKEN", "TOKEN", "SECRET",
             "SFVF_SECRETS_PASSPHRASE", "SFVF_SECRETS_PATH", "DEPLOY_KEYS", "API_TOKENS", "MY_PASSWD", "MY_PASSPHRASE",
-            "DEPLOY_KEY", "AWS_ACCESSKEY", "MY_PRIVATEKEY", "GIT_ASKPASS", "SSH_ASKPASS"]
+            "DEPLOY_KEY", "AWS_ACCESSKEY", "MY_PRIVATEKEY", "GIT_ASKPASS", "SSH_ASKPASS",
+            "GITHUB_PAT", "AWS_CREDS", "GH_AUTH", "DATABASE_URL", "SSH_AUTH_SOCK"]
 # release S (C1): what the recipe passes through by the tool's own variable, each from the owner's real folder
 APP_CACHE_FOLDERS = {"UV_CACHE_DIR": ("localappdata", "uv/cache"), "UV_PYTHON_INSTALL_DIR": ("appdata", "uv/python"),
                      "PIP_CACHE_DIR": ("localappdata", "pip/Cache"), "PYTHONUSERBASE": ("appdata", "Python"),
                      "NPM_CONFIG_CACHE": ("localappdata", "npm-cache"), "YARN_CACHE_FOLDER": ("localappdata", "Yarn/Cache"),
                      "PLAYWRIGHT_BROWSERS_PATH": ("localappdata", "ms-playwright"), "GOCACHE": ("localappdata", "go-build")}
 KEPT = ["PATH", "HOME", "CURSOR_API_KEY", "CURSOR_TOKEN", "TOKENIZERS_PARALLELISM", "SECRETARY", "KEYBOARD_LAYOUT",
-        "MONKEY", "PYTHONUTF8", "DATABASE_URL", "REANGLE_INSTANCE_NAME", "LOG_LEVEL"]
+        "MONKEY", "PYTHONUTF8", "REANGLE_INSTANCE_NAME", "LOG_LEVEL", "PATTERN", "AUTHOR_NAME", "DATABASE_HOST"]
 
 
 def sample_env(tmp_path):
@@ -274,8 +275,24 @@ def test_r055_d004_the_withheld_names_are_the_notes(program, tmp_path, monkeypat
     withheld, words, kept, _ = d004_stripped_note()
     assert sorted(withheld) == sorted(be.TOKEN_VARS + GIT_CONFIG_VARS)
     singular = {"TOKENS": "TOKEN", "SECRETS": "SECRET", "KEYS": "KEY"}
-    in_the_recipe = {singular.get(w, w) for w in re.findall(r"[A-Z]{3,}", be.SECRET_LIKE.pattern)}
-    assert {singular.get(w.strip("_"), w.strip("_")) for w in words} == in_the_recipe
+
+    def anchored_whole_names(pattern):
+        return set(re.findall(r"\^([A-Z][A-Z0-9_]*)\$", pattern))
+
+    def pattern_bare_words(pattern):
+        scrubbed = re.sub(r"\^[A-Z][A-Z0-9_]*\$", "", pattern)
+        return {singular.get(w, w) for w in re.findall(r"[A-Z]{3,}", scrubbed)}
+
+    def note_whole_and_bare(note_words):
+        whole = {w for w in note_words if re.match(r"^[A-Z][A-Z0-9_]*_[A-Z0-9_]+$", w)}
+        bare = {singular.get(w.strip("_"), w.strip("_")) for w in note_words - whole}
+        return whole, bare
+
+    recipe_whole = anchored_whole_names(be.SECRET_LIKE.pattern)
+    recipe_bare = pattern_bare_words(be.SECRET_LIKE.pattern)
+    note_whole, note_bare = note_whole_and_bare(words)
+    assert note_whole == recipe_whole
+    assert note_bare == recipe_bare
     assert {"_KEY", "_KEYS"} <= words and "_KEYS?$" in be.SECRET_LIKE.pattern
     assert sorted(kept) == sorted(be.KEEP_PREFIXES)
     sample = sample_env(tmp_path)
@@ -310,3 +327,39 @@ def test_r055_d004_the_set_names_are_the_notes(program, tmp_path, monkeypatch):
     preset = sample_env(tmp_path)
     preset["UV_CACHE_DIR"] = str(tmp_path / "elsewhere")
     assert be.stripped_env(preset)["UV_CACHE_DIR"] == preset["UV_CACHE_DIR"], "a cache variable the owner set is kept as set"
+
+
+@pytest.mark.parametrize("name,expected", [
+    ("PAT", "withheld"), ("GITHUB_PAT", "withheld"), ("AWS_CREDS", "withheld"), ("GH_AUTH", "withheld"),
+    ("DATABASE_URL", "withheld"), ("SSH_AUTH_SOCK", "withheld"), ("SCREDS", "kept"),
+    ("PATTERN", "kept"), ("AUTHOR_NAME", "kept"), ("DATABASE_HOST", "kept"),
+])
+def test_r080_shim_and_stripped_env_agree_on_r080_forms(program, tmp_path, name, expected):
+    """R-080 (J11): the shim and stripped_env withhold or keep the new forms and boundary cases alike."""
+    be = program("bridge_env")
+    env = sample_env(tmp_path)
+    env[name] = "probe"
+    py = set(be.stripped_env(env))
+    if not shutil.which("sh"):
+        pytest.skip("needs a POSIX shell (Git Bash on Windows)")
+    got = shim_env(tmp_path, env)
+    py_has = name in py
+    shim_has = name in got
+    assert py_has == shim_has, (name, py_has, shim_has)
+    if expected == "withheld":
+        assert not py_has and not shim_has, name
+    else:
+        assert py_has and shim_has, name
+
+
+def test_r080_stripped_env_withholds_new_forms_from_test_kind(program, tmp_path):
+    """R-080 (J11): stripped_env with kind=test withholds the new secret-like forms."""
+    be = program("bridge_env")
+    env = sample_env(tmp_path)
+    for name in ("GITHUB_PAT", "AWS_CREDS", "DATABASE_URL"):
+        env[name] = "x"
+    env["CURSOR_TRACE_LEVEL"] = "1"
+    out = be.stripped_env(env, kind="test")
+    for name in ("GITHUB_PAT", "AWS_CREDS", "DATABASE_URL", "CURSOR_API_KEY"):
+        assert name not in out, name
+    assert "CURSOR_TRACE_LEVEL" in out

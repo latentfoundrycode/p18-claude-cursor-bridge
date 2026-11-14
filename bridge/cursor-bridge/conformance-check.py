@@ -126,7 +126,6 @@ bridge_env = _load_bridge_env()
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 SECRET_NAME = re.compile(r"(TOKEN|SECRET|KEY|PASSWORD|PASSWD|CREDENTIAL|API_?KEY)", re.I)
 LOCAL_SERVICE = re.compile(r"^(POSTGRES|PG|MYSQL|MARIADB|MONGO|REDIS|MINIO|RABBITMQ|CLICKHOUSE|ELASTIC|OPENSEARCH|NEO4J|DB|DATABASE|LOCAL|DEV|TEST)[A-Z0-9_]*(PASSWORD|PASSWD|PASS|SECRET)$", re.I)
-ENV_SECRET = re.compile(r"((^|_)TOKENS?(_|$)|(^|_)SECRETS?(_|$)|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY|_KEYS?$)")  # as bridge_env.SECRET_LIKE
 LOCATION_NAME = re.compile(r"_(PATH|DIR|FILE|FOLDER|URL)$")  # where a store is, not a secret
 SCANNERS = (("Semgrep", r"\bsemgrep\b"), ("OSV-Scanner", r"osv-scanner"), ("Socket", r"\bsocket(security)?\b"))   # `npm install -g @socketsecurity/cli@<version>` carries the pin (2026.10.11c)
 GH_TIMEOUT = 25
@@ -1216,9 +1215,11 @@ def main():
         rel = os.path.relpath(env_path, ws).replace("\\", "/")
         for line in env_text.splitlines():
             m = re.match(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=", line)
-            if not m or not SECRET_NAME.search(m.group(1)):
+            if not m:
                 continue
             name = m.group(1)
+            if not SECRET_NAME.search(name) and not (hasattr(bridge_env, "secret_like") and bridge_env.secret_like(name)):
+                continue
             shown = "%s (%s)" % (name, rel) if rel != ".env" else name
             if LOCAL_SERVICE.match(name):
                 locals_.append(shown)
@@ -1354,7 +1355,8 @@ def main():
         if not re.search(r"env(ironment)? var", NEGATED_ENV.sub(" ", line), re.I):
             continue                                       # no mention, or a negated one only: "never an environment variable the owner sets" (TDP FB-006)
         for name in re.findall(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b", line.split("|")[1] if line.count("|") > 2 else line):
-            if ENV_SECRET.search(name) and not LOCATION_NAME.search(name) and name not in by_env:
+            if (hasattr(bridge_env, "SECRET_LIKE") and bridge_env.SECRET_LIKE.search(name)
+                    and not LOCATION_NAME.search(name) and name not in by_env):
                 by_env.append(name)
     if inv:
         if by_env:
@@ -1363,7 +1365,7 @@ def main():
             add("OK", "No secret through an environment variable")
 
     # --- account keys in this session's own environment (names only)
-    env_keys = sorted(k for k in os.environ if ENV_SECRET.search(k.upper()) and not k.upper().startswith(("CURSOR_", "GIT_CONFIG_KEY_")))
+    env_keys = sorted(k for k in os.environ if hasattr(bridge_env, "secret_like") and bridge_env.secret_like(k))
     if env_keys:
         add("NOTE", "Account keys in the session's environment", "%s: every program the owner starts inherits these; the launcher withholds them from builder and reviewer runs (since 2026.10.04e), and a key file outside the Workspace is the better home" % (", ".join(env_keys[:8]) + (" ..." if len(env_keys) > 8 else "")))
 
