@@ -15,7 +15,8 @@ What each group pins, in the forms the brief repeats:
   yarn's `--cwd` are read wherever they stand before a bare `--`, in the two-word and the `=` form. The folder is
   accepted only where it exists, lies under the launch roots by its resolved path and is reached through no link; it is
   refused where it is given twice (an option and its other name count as one option), where its value is missing or
-  starts with `-`. Since round 1's reviews (both reviewers reproduced npm, whose parser strips every leading dash,
+  starts with `-`, and, since round 3's security audit (npm's parser reads `~/` as the user's home folder, and ran a home
+  folder's script with `<ws>/~/x` planted), where its value starts with `~`, by its text. Since round 1's reviews (both reviewers reproduced npm, whose parser strips every leading dash,
   expands a cluster of one-letter options and takes an unambiguous abbreviation, running outside the launch roots by
   `-prefix`, `---prefix`, `-sC`, `--C` and the like), a named npm, pnpm or yarn suite takes, before a bare `--`, no
   option word but these folder options in exactly those forms and three harmless flags (`--silent`, `-s`,
@@ -54,7 +55,8 @@ What each group pins, in the forms the brief repeats:
 
 At the first checkpoint (6e3d569) every case was red but the three that pin what stays as it is: every other interpreter
 option refused, the unknown runner's message, and the names the reality check found not to move a folder; the cases
-added after round 1's reviews are red on round 1's code, and those added after round 2's on round 2's (e50cb1d). npm, pnpm and yarn are stand-ins on PATH that print STAND-IN and whether
+added after round 1's reviews are red on round 1's code, those added after round 2's on round 2's (e50cb1d), and the one
+added after round 3's on round 3's (02e9ad7). npm, pnpm and yarn are stand-ins on PATH that print STAND-IN and whether
 the made-up secret-like name reached them, so no runner needs to be installed; the one test that reads the folder a real
 npm runs in is skipped where npm is not installed. The builder adds its cases to tests/test_bridge_run.py,
 tests/test_bridge_run_driver.py and tests/test_release_s_launcher.py and edits nothing in this file.
@@ -316,6 +318,20 @@ def test_r078_a_folder_option_given_twice_or_without_its_value_is_refused(ws, ru
         cases.append([runner, option, "frontend", OTHER_NAME[(runner, option)], "frontend", "test"])
     for words in cases:
         assert_known_refusal(launch(ws, words), words, option)
+
+
+@pytest.mark.parametrize("runner,option", OPTIONS)
+def test_r078_a_folder_value_beginning_with_a_tilde_is_refused(ws, runner, option):
+    """Round 3's security audit: npm's parser reads a folder value beginning with `~/` (or `~\\` on Windows) as the
+    user's home folder, while the folder rule read it as a folder named `~` under the launch folder, so `npm --prefix ~/x
+    test` ran a home folder's script with `<ws>/~/x` planted. A value beginning with `~` is refused by its text, before
+    any filesystem call; the control: the same option with an inside folder, accepted."""
+    (ws / "~" / "x").mkdir(parents=True)
+    (ws / "~x").mkdir()                                                   # each value names a folder that exists inside
+    assert_started(launch(ws, [runner, option, "frontend", "test"]), [runner, option, "frontend", "test"])
+    for value in ("~/x", "~" + os.sep + "x", "~", "~x"):
+        for words in forms(runner, option, value):
+            assert_known_refusal(launch(ws, words), words, option)
 
 
 @pytest.mark.parametrize("runner", ["npm", "pnpm", "yarn"])
