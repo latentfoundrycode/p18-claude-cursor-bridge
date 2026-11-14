@@ -16,7 +16,10 @@ What each group pins, in the forms the brief repeats:
   accepted only where it exists, lies under the launch roots by its resolved path and is reached through no link; it is
   refused where it is given twice (an option and its other name count as one option), where its value is missing or
   starts with `-`, and, since round 3's security audit (npm's parser reads `~/` as the user's home folder, and ran a home
-  folder's script with `<ws>/~/x` planted), where its value starts with `~`, by its text. Since round 1's reviews (both reviewers reproduced npm, whose parser strips every leading dash,
+  folder's script with `<ws>/~/x` planted), where its value starts with `~`, by its text; since round 4's security audit
+  (npm trims a value's leading Unicode or ASCII space before that rule and expands `${NAME}` in it after the folder rule
+  read the literal text), a folder value is held to a list of characters: ASCII letters, digits, `.`, `_`, `-`, `/`,
+  the backslash, a leading drive `X:`, never `-` or `~` first; every other value is refused by its text, before any filesystem call. Since round 1's reviews (both reviewers reproduced npm, whose parser strips every leading dash,
   expands a cluster of one-letter options and takes an unambiguous abbreviation, running outside the launch roots by
   `-prefix`, `---prefix`, `-sC`, `--C` and the like), a named npm, pnpm or yarn suite takes, before a bare `--`, no
   option word but these folder options in exactly those forms and three harmless flags (`--silent`, `-s`,
@@ -55,8 +58,8 @@ What each group pins, in the forms the brief repeats:
 
 At the first checkpoint (6e3d569) every case was red but the three that pin what stays as it is: every other interpreter
 option refused, the unknown runner's message, and the names the reality check found not to move a folder; the cases
-added after round 1's reviews are red on round 1's code, those added after round 2's on round 2's (e50cb1d), and the one
-added after round 3's on round 3's (02e9ad7). npm, pnpm and yarn are stand-ins on PATH that print STAND-IN and whether
+added after round 1's reviews are red on round 1's code, those added after round 2's on round 2's (e50cb1d), the one
+added after round 3's on round 3's (02e9ad7), and the two added after round 4's on round 4's (25414fa). npm, pnpm and yarn are stand-ins on PATH that print STAND-IN and whether
 the made-up secret-like name reached them, so no runner needs to be installed; the one test that reads the folder a real
 npm runs in is skipped where npm is not installed. The builder adds its cases to tests/test_bridge_run.py,
 tests/test_bridge_run_driver.py and tests/test_release_s_launcher.py and edits nothing in this file.
@@ -332,6 +335,50 @@ def test_r078_a_folder_value_beginning_with_a_tilde_is_refused(ws, runner, optio
     for value in ("~/x", "~" + os.sep + "x", "~", "~x"):
         for words in forms(runner, option, value):
             assert_known_refusal(launch(ws, words), words, option)
+
+
+# Round 4's security audit: npm trims a folder value (JS trim: U+00A0, U+2000-U+200A, U+3000, U+FEFF and the ASCII
+# spaces) before its home rule, and expands `${NAME}` in it after the folder rule checked the literal text, so a value
+# the rule read as a folder inside ran npm elsewhere. A folder value is now held to a list of characters (ASCII letters,
+# digits, `.`, `_`, `-`, `/`, `\`, a leading drive `X:`), never `-` or `~` first, as the option words are held to theirs.
+NOT_A_FOLDER = [chr(0xA0) + "~/x", chr(0x3000) + "~/x", chr(0xFEFF) + "~/x", chr(0x2002) + "~/x", " ~/x", "frontend ", " frontend",
+                "\tfrontend", "a${OS}/x", "${HOME}", "a${Z?}b", "a{b}", "front" + chr(0xEB) + "nd", "a$b", "a b", "a;b", "a'b", "a,b"]
+FOLDER_SHAPED = ["frontend", "./frontend", "sub-dir_1.x", os.path.join("frontend", "pkg"), "frontend/pkg"]
+
+
+def test_r078_a_folder_value_outside_the_character_list_is_refused(br, tmp_path):
+    """Each value names a folder that exists inside the launch folder where the system allows the name, so the refusal
+    is the character list's, not the folder rule's; the controls: plain names, accepted."""
+    base = tmp_path / "ws"
+    (base / "frontend" / "pkg").mkdir(parents=True)
+    (base / "sub-dir_1.x").mkdir()
+    for value in NOT_A_FOLDER:
+        try:
+            (base / value.strip(chr(0xA0) + chr(0x3000) + chr(0xFEFF) + chr(0x2002) + " \t")).mkdir(parents=True, exist_ok=True)
+            (base / value).mkdir(parents=True, exist_ok=True)
+        except (OSError, ValueError):
+            pass                                                        # a name the system refuses is refused all the more
+    for runner, option in OPTIONS:
+        for value in FOLDER_SHAPED:
+            for argv in ([runner, option, value, "test"], [runner, "test", option + "=" + value]):
+                assert br.test_suite(argv, str(base)), (argv, br.known_runner_refuse_word(argv, str(base)))
+        for value in NOT_A_FOLDER:
+            for argv in ([runner, option, value, "test"], [runner, "test", option + "=" + value], [runner, "test", option, value]):
+                assert not br.test_suite(argv, str(base)), argv
+                assert br.known_runner_refuse_word(argv, str(base)) == option, (argv, br.known_runner_refuse_word(argv, str(base)))
+
+
+@pytest.mark.parametrize("value", [chr(0xA0) + "~/x", "a${OS}/x"])
+def test_r078_a_trimmed_or_expanded_folder_value_is_refused_before_anything_starts(ws, value):
+    """Round 4's security audit's two reproductions, through the launcher: the planted folder exists, the run is refused
+    with the known message naming the option, before `bridge-run: started`."""
+    try:
+        (ws / value).mkdir(parents=True)
+    except OSError:
+        pass
+    words = ["npm", "--prefix", value, "test"]
+    assert_known_refusal(launch(ws, words), words, "--prefix")
+    assert_started(launch(ws, ["npm", "--prefix", "frontend", "test"]), ["npm", "--prefix", "frontend", "test"])
 
 
 @pytest.mark.parametrize("runner", ["npm", "pnpm", "yarn"])
