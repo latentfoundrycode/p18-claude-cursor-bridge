@@ -376,3 +376,17 @@ def test_r078_npm_prefix_folder_value_held_to_character_list(program, tmp_path):
     assert br.test_suite(["npm", "--prefix", "frontend", "test"], base)
     assert not br.test_suite(["npm", "--prefix", chr(0xA0) + "~/frontend", "test"], base)
     assert not br.test_suite(["npm", "--prefix", "a${OS}", "test"], base)
+
+
+def test_r078_folder_option_value_rewritten_to_rule_checked_path(program, tmp_path):
+    """R-078: an accepted npm suite gets folder option values rewritten to the absolute path the folder rule checked."""
+    br = program("bridge-run")
+    base = str(tmp_path / "ws")
+    os.makedirs(os.path.join(base, "frontend"), exist_ok=True)
+    abs_front = os.path.abspath(os.path.join(base, "frontend"))
+    assert br._package_folder_rewrite(["npm", "test", "--prefix", "frontend"], base) == [
+        "npm", "test", "--prefix", abs_front,
+    ]
+    assert br._package_folder_rewrite(["npm", "--prefix=frontend", "test", "--", "--prefix", "x"], base) == [
+        "npm", "--prefix=" + abs_front, "test", "--", "--prefix", "x",
+    ]

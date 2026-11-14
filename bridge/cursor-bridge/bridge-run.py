@@ -348,6 +348,47 @@ def _package_scan_folder_options(argv, head, folder):
     return run_dir, None
 
 
+def _package_folder_rewrite(argv, folder):
+    """Argv with each folder option value replaced by the absolute folder the rule checked."""
+    head = head_of(argv)
+    if head not in PACKAGE_FOLDER_LONG or not named_suite(argv, folder):
+        return list(argv)
+    base = folder or os.getcwd()
+    out = [argv[0]]
+    i, past_sub = 1, False
+    while i < len(argv):
+        if argv[i] == "--":
+            out.extend(argv[i:])
+            return out
+        word = argv[i]
+        if not word.startswith("-"):
+            past_sub = True
+            out.append(word)
+            i += 1
+            continue
+        opt = _package_folder_token(head, word)
+        if opt is not None:
+            value, nxt, shown = _package_folder_value(word, argv, i)
+            if value is not None and (value or "").strip():
+                abs_path = os.path.abspath(value if os.path.isabs(value) else os.path.join(base, value))
+                if "=" in shown:
+                    out.append(shown.split("=", 1)[0] + "=" + abs_path)
+                else:
+                    out.append(shown)
+                    out.append(abs_path)
+            else:
+                out.append(word)
+            i = nxt
+            continue
+        if past_sub and word in PACKAGE_ALLOWED_FLAGS:
+            out.append(word)
+            i += 1
+            continue
+        out.append(word)
+        i += 1
+    return out
+
+
 def _package_body_index(argv, head):
     """Index of the subcommand word, skipping listed folder options only."""
     if head not in PACKAGE_FOLDER_LONG:
@@ -2108,6 +2149,8 @@ def main():
         else:
             sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name, without an option that runs another program, and an npx tool only when the project has it (got %r); a benchmark or an unknown runner runs directly in the background, marked # wake\n" % cmd[0])
         return 125
+    if head_of(cmd) in PACKAGE_FOLDER_LONG and named_suite(cmd, folder):
+        cmd = _package_folder_rewrite(cmd, folder)
     cmd_inj = _cmd_exe_refuse_word(cmd, folder)
     if cmd_inj:
         sys.stderr.write(KNOWN_RUNNER_REFUSE % cmd_inj)
