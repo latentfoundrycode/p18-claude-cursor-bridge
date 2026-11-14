@@ -13,7 +13,8 @@ TASK-060's Done when.
   runs (a `CURSOR_` name that is not secret-like passes); `conformance-check.py` holds no copy of its own and its floor
   on keys within the builder's reach names the new forms.
 
-At the checkpoint every case is red but the controls. The builder adds its cases to tests/test_bridge_run.py,
+At the checkpoint every case is red but the controls. After round 1's reviews two cases were added: every home name a
+key file names is named, and the `--kind` word does not keep Cursor's names for a suite. The builder adds its cases to tests/test_bridge_run.py,
 tests/test_account_keys.py and tests/test_conformance_check.py and edits nothing in this file.
 """
 import os
@@ -131,6 +132,15 @@ def test_r080_a_key_file_naming_a_home_variable_is_refused_before_a_watch(tmp_pa
     assert "STAND-IN gh" not in p.stdout
 
 
+def test_r080_every_home_variable_a_key_file_names_is_named(tmp_path):
+    """Round 1's reviews: the refusal names each such name as the key file writes it, not the first alone."""
+    ws = project(tmp_path)
+    env = launcher_env(tmp_path)
+    p = launch(ws, suite(ws), env, key_file=key_file(tmp_path, ["HOME=%s" % HIDDEN, "FIX060_SETTING=1", "appdata=%s" % HIDDEN]))
+    assert_refused_before_start(p, "HOME")
+    assert "appdata" in p.stderr, p.stderr
+
+
 # ---------------------------------------------------------------- J11: the name test
 
 
@@ -173,6 +183,23 @@ def test_r080_a_secret_like_cursor_name_is_withheld_from_a_test_run(tmp_path):
     seen = names_seen(ws)
     assert "CURSOR_API_KEY" not in seen and "CURSOR_TOKEN" not in seen, sorted(n for n in seen if n.startswith("CURSOR"))
     assert "CURSOR_TRACE_LEVEL" in seen
+
+
+def test_r080_the_kind_label_does_not_keep_cursor_names_for_a_suite(tmp_path):
+    """Round 1's reviews: what keeps Cursor's own names is the run being cursor-agent, never the `--kind` word typed. A
+    stripped named suite labelled `--kind builder` or `--kind review` either is refused before it starts or runs without
+    them."""
+    for label in ("builder", "review"):
+        ws = project(tmp_path / label)
+        env = launcher_env(tmp_path / label, CURSOR_API_KEY=HIDDEN, CURSOR_TRACE_LEVEL="1")
+        p = launch(ws, suite(ws), env, kind=label)
+        assert "Traceback" not in p.stderr and HIDDEN not in p.stdout + p.stderr, p.stderr
+        if p.returncode == 125:
+            assert "bridge-run: started" not in p.stderr and not (ws / "run" / "names.txt").exists(), (label, p.stderr)
+            continue
+        assert p.returncode == 0, (label, p.stderr)
+        seen = names_seen(ws)
+        assert "CURSOR_API_KEY" not in seen and "CURSOR_TRACE_LEVEL" in seen, (label, sorted(n for n in seen if n.startswith("CURSOR")))
 
 
 def test_r080_a_secret_like_cursor_name_is_withheld_from_a_driver_run(tmp_path):
