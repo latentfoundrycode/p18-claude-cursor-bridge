@@ -330,6 +330,8 @@ def _package_scan_folder_options(argv, head, folder):
                 return run_dir, label
             if value.startswith("-"):
                 return run_dir, label
+            if value.startswith("~"):
+                return run_dir, label
             if not _package_folder_ok(value, base):
                 return run_dir, label
             run_dir = os.path.abspath(value if os.path.isabs(value) else os.path.join(base, value))

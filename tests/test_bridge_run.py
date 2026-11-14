@@ -350,3 +350,13 @@ def test_r078_npm_prefix_and_c_count_as_one_folder_option(program, tmp_path):
     assert br.test_suite(["npm", "--prefix", "frontend", "test"], base)
     assert not br.test_suite(["npm", "--prefix", "frontend", "test", "-C", "frontend"], base)
     assert br.known_runner_refuse_word(["npm", "--prefix", "frontend", "test", "-C", "frontend"], base) == "--prefix"
+
+
+def test_r078_npm_prefix_value_beginning_with_tilde_is_refused(program, tmp_path):
+    """R-078: a folder option value that starts with ~ is refused before any filesystem call."""
+    br = program("bridge-run")
+    base = str(tmp_path / "ws")
+    os.makedirs(os.path.join(base, "frontend"), exist_ok=True)
+    os.makedirs(os.path.join(base, "~", "frontend"), exist_ok=True)
+    assert br.test_suite(["npm", "--prefix", "frontend", "test"], base)
+    assert not br.test_suite(["npm", "--prefix", "~/frontend", "test"], base)
