@@ -11,8 +11,8 @@ launcher adds a key file's names after the strip. tests/test_bridge_run.py's
 What no test held through a real launch: a name the note does not list, withheld only because `SECRET_LIKE` matches it,
 set in the launching environment. These tests launch `bridge-run.py --strip --kind test` with such names, made up, and
 read the child's environment: alone, and beside a key file that names another variable, so that a launcher which put
-the launching environment back after the strip, or with the key file's lines, would fail them. Each case runs once
-without `--strip` too, so the names are shown to reach the child when nothing withholds them.
+the launching environment back after the strip, or with the key file's lines, would fail them. Each case, each name
+alone among them, runs once without `--strip` too, so the names are shown to reach the child when nothing withholds them.
 """
 import json
 import os
@@ -49,8 +49,9 @@ def env_for(tmp_path, **extra):
     return env
 
 
-def child_names(tmp_path, strip, key_file=None):
-    """The names the child sees when bridge-run.py --kind test launches it from a Workspace in tmp_path."""
+def child_names(tmp_path, strip, key_file=None, values=()):
+    """The names the child sees when bridge-run.py --kind test launches it from a Workspace in tmp_path; no value of
+    the made-up names, nor any of `values` (a key file's), appears on the launcher's output or the child's."""
     ws = tmp_path / "Workspace"
     ws.mkdir(exist_ok=True)
     argv = [sys.executable, PROG, "--limit", "30"]
@@ -62,7 +63,7 @@ def child_names(tmp_path, strip, key_file=None):
     argv += ["--", sys.executable, "-c", CODE]
     p = subprocess.run(argv, capture_output=True, text=True, env=env_for(tmp_path, **MADE_UP), cwd=str(ws))
     assert p.returncode == 0, p.stderr
-    for value in MADE_UP.values():
+    for value in list(MADE_UP.values()) + list(values):
         assert value not in p.stdout and value not in p.stderr, "a value is never printed"
     return set(json.loads(p.stdout.strip().splitlines()[-1]))
 
@@ -85,17 +86,21 @@ def test_r052_a_stripped_launch_withholds_a_secret_like_name_set_in_the_launchin
 
 def test_r052_a_key_file_adds_its_own_names_and_never_brings_the_stripped_ones_back(tmp_path):
     """A key file naming another variable (the route the loop allows a suite): the child gets the key file's name, which
-    the launcher adds after the strip, and still none of the made-up names from the launching environment."""
+    the launcher adds after the strip, and still none of the made-up names from the launching environment; the key
+    file's value, which the launcher reads and reports on by name, is never printed either."""
     keys = tmp_path / "keys.txt"
     keys.write_text("%s=kf-never-printed\n" % KEY_FILE_NAME, encoding="utf-8")
-    names = child_names(tmp_path, strip=True, key_file=keys)
+    names = child_names(tmp_path, strip=True, key_file=keys, values=("kf-never-printed",))
     assert KEY_FILE_NAME in names, "the key file's name reaches the child"
     assert not set(MADE_UP) & names, "a secret-like name of the launching environment came back with the key file"
-    assert set(MADE_UP) <= child_names(tmp_path, strip=False, key_file=keys), "the control: without --strip they reach it"
+    control = child_names(tmp_path, strip=False, key_file=keys, values=("kf-never-printed",))
+    assert set(MADE_UP) <= control, "the control: without --strip they reach it"
 
 
 @pytest.mark.parametrize("name", sorted(MADE_UP))
 def test_r052_each_made_up_name_is_withheld_alone(name, tmp_path, monkeypatch):
-    """Each name on its own, so that a strip which caught one word of the pattern and missed another shows which."""
+    """Each name on its own, so that a strip which caught one word of the pattern and missed another shows which; its
+    control without --strip hands the child that name."""
     monkeypatch.setattr(sys.modules[__name__], "MADE_UP", {name: MADE_UP[name]})
     assert name not in child_names(tmp_path, strip=True), name
+    assert name in child_names(tmp_path, strip=False), "the control: " + name
