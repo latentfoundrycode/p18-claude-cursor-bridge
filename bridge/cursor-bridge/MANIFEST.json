@@ -1,6 +1,6 @@
 {
   "version": "2026.11.12a",
-  "generated": "2026-11-13 22:47",
+  "generated": "2026-11-14 02:03",
   "files": {
     "agents/cursor-configurator.md": "a8aad7838a9bc5b4f00e13fd3749919158cbe37ec7acfa9a40960600398784bc",
     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
@@ -104,7 +104,7 @@
     "cursor-bridge/shell-guard.py": "6abdc15bd149afdf1561997512b75253a154f58ddb05355577b4ebbcec36c67b",
     "cursor-bridge/stage-diff.py": "167685045331b10e550679eb28fd51e7d829603310bde841bafb3a1cdd9a1ecc",
     "cursor-bridge/sync-check.py": "41d4e74931b150bba23a67a1a024b640f95673a490b3a6522af3f9d6ff43e0de",
-    "cursor-bridge/trace-check.py": "447a21dce395cf738057bd39d7415f70f2467c0712f0fc25915fe35003801263",
+    "cursor-bridge/trace-check.py": "54d78dbce9574022a922ffbd4599441bcae4a6b0b9d27f9b521016b01680306e",
     "cursor-bridge/vercel-interface.snapshot.md": "7f8cb0092a1b8df1d13320519faa421579261a052b7375c13f1565047364bafa",
     "cursor-bridge/wake-timer.py": "9650ad04fc02222e42073563c1f9cc2530d12ef69722312260dc578c64bc82d7",
     "cursor-bridge/windowless-check.py": "755010ad6aeffd4908fc4ce9ae6d3ab1a1f3efeb3f1ec5f7058016e7a7a79a67",
