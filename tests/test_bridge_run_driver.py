@@ -630,3 +630,13 @@ def test_r039_driver_grandchild_windowless(tmp_path):
     assert int(driver_pid) in on_console and int(gc_pid) in on_console
     launcher_pid = runs_of(folder)[-1]["pid"]
     assert launcher_pid not in on_console
+
+
+def test_r078_driver_with_interpreter_flags_substitutes_program_end_to_end(tmp_path):
+    """R-078: --kind driver accepts python with leading -B and -X utf8; the program path is substituted after the flags."""
+    folder = launch_folder(tmp_path)
+    prog = folder / "run" / "supervisor" / "flags_probe.py"
+    prog.write_text("import sys\nprint('ok', sys.flags.dont_write_bytecode, sys.flags.utf8_mode)\n", encoding="utf-8")
+    p = subprocess.run([sys.executable, PROG, "--limit", "120", "--kind", "driver", "--", "python", "-B", "-X", "utf8", "run/supervisor/flags_probe.py"],
+                       capture_output=True, text=True, env=env_for(tmp_path), cwd=str(folder), timeout=120)
+    assert p.returncode == 0 and "ok 1 1" in p.stdout, (p.stdout, p.stderr)

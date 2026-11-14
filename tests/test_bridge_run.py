@@ -340,3 +340,12 @@ def test_bridge_run_resolves_cursor_agent_to_the_stripped_launcher(program, monk
     assert br.accepted(["cursor-agent", "-p"]) and br.accepted(["gh", "pr", "checks", "12", "--watch"])
     monkeypatch.delenv("BRIDGE_RUN_ALLOW_ANY", raising=False)
     assert not br.accepted(["gh", "pr", "merge", "12"]) and not br.accepted(["python", "x.py"])
+
+
+def test_r078_npm_prefix_and_c_count_as_one_folder_option(program, tmp_path):
+    """R-078: npm's -C and --prefix are the same folder option for the duplicate rule."""
+    br = program("bridge-run")
+    base = str(tmp_path / "ws")
+    os.makedirs(os.path.join(base, "frontend"), exist_ok=True)
+    assert not br.test_suite(["npm", "--prefix", "frontend", "test", "-C", "frontend"], base)
+    assert br.known_runner_refuse_word(["npm", "--prefix", "frontend", "test", "-C", "frontend"], base) == "--prefix"
