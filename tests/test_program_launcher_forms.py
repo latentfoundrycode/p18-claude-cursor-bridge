@@ -22,7 +22,10 @@ What each group pins, in the forms the brief repeats:
   the backslash, a leading drive `X:`, never `-` or `~` first; every other value is refused by its text, before any filesystem call;
   and since round 5's security audit (Windows' path functions drop a last component's trailing dots, so the rule checked
   the launch folder for `...` while npm read the word through a junction planted under that name), the runner is given
-  the absolute folder the rule checked in place of the value given, so the folder that runs is the folder checked. Since round 1's reviews (both reviewers reproduced npm, whose parser strips every leading dash,
+  the folder the rule checked in place of the value given, so the folder that runs is the folder checked; since the
+  resolution round on round 6 (handoff/RESOLUTION-TASK-059.md: round 6's absolute folder failed a launch folder with a
+  space under a spaced npm.cmd and was refused for one holding a cmd.exe character), that folder is handed relative to
+  the launch folder, beginning with `.` (so never with `-`), and never holds the launch folder's own path. Since round 1's reviews (both reviewers reproduced npm, whose parser strips every leading dash,
   expands a cluster of one-letter options and takes an unambiguous abbreviation, running outside the launch roots by
   `-prefix`, `---prefix`, `-sC`, `--C` and the like), a named npm, pnpm or yarn suite takes, before a bare `--`, no
   option word but these folder options in exactly those forms and three harmless flags (`--silent`, `-s`,
@@ -62,8 +65,9 @@ What each group pins, in the forms the brief repeats:
 At the first checkpoint (6e3d569) every case was red but the three that pin what stays as it is: every other interpreter
 option refused, the unknown runner's message, and the names the reality check found not to move a folder; the cases
 added after round 1's reviews are red on round 1's code, those added after round 2's on round 2's (e50cb1d), the one
-added after round 3's on round 3's (02e9ad7), the two added after round 4's on round 4's (25414fa), and the two added after round 5's on round 5's
-(f62855a). npm, pnpm and yarn are stand-ins on PATH that print STAND-IN and whether
+added after round 3's on round 3's (02e9ad7), the two added after round 4's on round 4's (25414fa), the two added after round 5's on round 5's
+(f62855a), and the three added after the resolution round on round 6 on round 6's (009e42f), where the two round 5's
+added were changed to the relative word. npm, pnpm and yarn are stand-ins on PATH that print STAND-IN and whether
 the made-up secret-like name reached them, so no runner needs to be installed; the one test that reads the folder a real
 npm runs in is skipped where npm is not installed. The builder adds its cases to tests/test_bridge_run.py,
 tests/test_bridge_run_driver.py and tests/test_release_s_launcher.py and edits nothing in this file.
@@ -408,30 +412,62 @@ def same_folder(a, b):
     return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
 
 
+def handed(got, option, words):
+    """The folder word the stand-in was given for the option, in the form the command gave it: the `=` form stays one
+    word (and the option never stands alone), the two-word form stays two."""
+    if any(w.startswith(option + "=") for w in words):
+        eq = [w for w in got if w.startswith(option + "=")]
+        assert option not in got and len(eq) == 1, (words, got)
+        return eq[0].split("=", 1)[1]
+    assert option in got, (words, got)
+    return got[got.index(option) + 1]
+
+
+def expected_word(ws, folder):
+    """The word the decision names: `.` for the launch folder itself, else `.`, the separator and the relative path."""
+    rel = os.path.relpath(str(folder), str(ws))
+    return "." if rel == "." else os.path.join(".", rel)
+
+
+def assert_handed(word, ws, folder, context):
+    """The resolution round on round 6: the runner is given the folder checked relative to the launch folder, beginning
+    with `.` (never `-`, never the launch folder's own path), exactly the word the decision names (a check through
+    realpath alone cannot see a trailing dot Windows drops: the pre-launch read of round 7's brief), and that word, read
+    from the launch folder, is the folder."""
+    assert not os.path.isabs(word) and not os.path.splitdrive(word)[0] and word.startswith("."), (word, context)
+    assert word == expected_word(ws, folder), (word, expected_word(ws, folder), context)
+    assert same_folder(os.path.join(str(ws), word), str(folder)), (word, context)
+
+
+def make_launch_folder(parent):
+    ws = parent / "ws"
+    (ws / "frontend").mkdir(parents=True)
+    (ws / "tests").mkdir()
+    (ws / "run").mkdir()
+    return ws
+
+
 @pytest.mark.parametrize("runner,option", OPTIONS)
 def test_r078_the_runner_is_given_the_folder_the_rule_checked(ws, runner, option):
     """Round 5's security audit: Windows' path functions drop a last component's trailing dots, so the rule checked the
     launch folder for `...` (or `a` for `a..`) while npm read the word as written, through a junction planted under that
-    name. The launcher now hands the runner the absolute folder it checked in place of the value given, in both forms,
-    before or after the subcommand, so the folder that runs is the folder checked whatever either side normalises; the
-    words after a bare `--` stay as given."""
+    name. The launcher hands the runner the folder it checked in place of the value given, in both forms, before or after
+    the subcommand, so the folder that runs is the folder checked whatever either side normalises; since the resolution
+    round on round 6, relative to the launch folder and beginning with `.`; the words after a bare `--` stay as given."""
     argbin = ws.parent / "argbin"
     write_arg_runners(argbin)
     path = {"PATH": str(argbin) + os.pathsep + os.environ.get("PATH", "")}
     frontend = ws / "frontend"
-    for words in ([runner, option, "frontend", "test"], [runner, "test", option, "frontend"], [runner, option, "./frontend", "test"]):
+    for words in ([runner, option, "frontend", "test"], [runner, "test", option, "frontend"], [runner, option, "./frontend", "test"],
+                  [runner, "test", option, str(frontend)],                 # an absolute value: handed relative all the same
+                  [runner, option + "=frontend", "test"], [runner, "test", option + "=frontend"], [runner, "test", option + "=" + str(frontend)]):
         p = launch(ws, words, extra=path, stand_ins=False)
         assert_started(p, words)
-        got = given_words(p)
-        i = got.index(option)
-        assert os.path.isabs(got[i + 1]) and same_folder(got[i + 1], frontend), (words, got)
-    for words in ([runner, option + "=frontend", "test"], [runner, "test", option + "=frontend"]):
+        assert_handed(handed(given_words(p), option, words), ws, frontend, words)
+    for words in ([runner, option, ".", "test"], [runner, "test", option + "=frontend/.."]):   # the launch folder: `.` alone
         p = launch(ws, words, extra=path, stand_ins=False)
         assert_started(p, words)
-        got = [w for w in given_words(p) if w.startswith(option + "=")]
-        assert len(got) == 1, (words, given_words(p))
-        value = got[0].split("=", 1)[1]
-        assert os.path.isabs(value) and same_folder(value, frontend), (words, given_words(p))
+        assert handed(given_words(p), option, words) == ".", (words, given_words(p))
     words = [runner, "test", "--", option, "frontend"]                   # after a bare --: the script's own words, untouched
     p = launch(ws, words, extra=path, stand_ins=False)
     assert_started(p, words)
@@ -441,7 +477,9 @@ def test_r078_the_runner_is_given_the_folder_the_rule_checked(ws, runner, option
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows drops a last component's trailing dots")
 def test_r078_a_trailing_dot_name_never_reaches_the_runner_as_written(ws):
     """Round 5's security audit's reproduction: `...` and `a..` planted as junctions to a folder outside (made through the
-    `\\\\?\\` prefix, which keeps the dots); the run is refused, or the runner is given a folder inside, never the word."""
+    `\\\\?\\` prefix, which keeps the dots); each value runs (round 6's audit ran every one in the folder checked), and the
+    runner is given exactly the folder checked, `.` or `.` and `a`, never the word (a check through realpath alone would
+    not see the dots: the pre-launch read of round 7's brief)."""
     import _winapi
     argbin = ws.parent / "argbin"
     write_arg_runners(argbin)
@@ -457,23 +495,75 @@ def test_r078_a_trailing_dot_name_never_reaches_the_runner_as_written(ws):
             except OSError:
                 pytest.skip("this account cannot make a junction")
             planted.append(target)
+        names = os.listdir("\\\\?\\" + str(ws))                           # the precondition: the names kept their dots
+        assert all(n in names for n in ("...", "a..", "....")), names
+        exact = {"...": ".", "....": ".", ".../": ".", "a..": os.path.join(".", "a"), "a...": os.path.join(".", "a")}
         for value in ("...", "a..", "a...", "....", ".../"):
             words = ["npm", "--prefix", value, "test"]
             p = launch(ws, words, extra=path, stand_ins=False)
-            if p.returncode == 125:
-                assert_known_refusal(p, words, "--prefix")
-                continue
             assert_started(p, words)
             got = given_words(p)
             given = got[got.index("--prefix") + 1]
-            assert given != value and os.path.isabs(given), (value, got)
-            assert not same_folder(given, out) and os.path.normcase(os.path.realpath(given)).startswith(os.path.normcase(os.path.realpath(str(ws)))), (value, got)
+            assert given == exact[value], (value, got)
+            read = os.path.join(str(ws), given)
+            assert not same_folder(read, out) and os.path.normcase(os.path.realpath(read)).startswith(os.path.normcase(os.path.realpath(str(ws)))), (value, got)
     finally:
         for target in planted:
             try:
                 os.rmdir(target)
             except OSError:
                 pass
+
+
+def FORMS_OF(runner, option):
+    return ([runner, option, "frontend", "test"], [runner, "test", option, "frontend"], [runner, "test", option + "=frontend"])
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="cmd.exe starts a .cmd runner on Windows only")
+def test_r078_a_launch_folder_with_a_space_runs_under_a_runner_in_a_spaced_folder(tmp_path):
+    """The resolution round on round 6, R1 (a): with the runner under a folder holding a space (as Node's default
+    `C:\\Program Files\\nodejs`), round 6's absolute folder put four quotes on cmd.exe's line, which strips the first and
+    the last, so a launch folder with a space never ran its suite; the relative word keeps the launch folder off the line."""
+    ws = make_launch_folder(tmp_path / "proj space")
+    argbin = tmp_path / "Program Files x" / "nodejs"
+    write_arg_runners(argbin)
+    path = {"PATH": str(argbin) + os.pathsep + os.environ.get("PATH", "")}
+    for runner, option in OPTIONS:
+        for words in FORMS_OF(runner, option):
+            p = launch(ws, words, extra=path, stand_ins=False)
+            assert_started(p, words)
+            assert_handed(handed(given_words(p), option, words), ws, ws / "frontend", words)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="cmd.exe starts a .cmd runner on Windows only")
+@pytest.mark.parametrize("name", ["P (old)", "R&D", "x^y", "100%", "wow!"])
+def test_r078_a_launch_folder_holding_a_cmd_character_runs(tmp_path, name):
+    """The resolution round on round 6, R1 (b): round 6's absolute folder brought the launch folder's own characters to the
+    cmd.exe check, which refused a project under such a folder; the relative word holds only the value's own characters."""
+    ws = make_launch_folder(tmp_path / name)
+    argbin = tmp_path / "argbin"
+    write_arg_runners(argbin)
+    path = {"PATH": str(argbin) + os.pathsep + os.environ.get("PATH", "")}
+    for runner, option in OPTIONS:
+        for words in FORMS_OF(runner, option):
+            p = launch(ws, words, extra=path, stand_ins=False)
+            assert_started(p, words)
+            assert_handed(handed(given_words(p), option, words), ws, ws / "frontend", words)
+
+
+@pytest.mark.parametrize("runner,option", OPTIONS)
+def test_r078_a_handed_folder_never_begins_with_a_dash(ws, runner, option):
+    """Review A's vote in the resolution round on round 6: a folder named `-r` given as `./-r` passes the leading-dash
+    rule, and relative to the launch folder it is `-r`, which a runner's parser may read as an option (pnpm's
+    `--recursive` runs in other folders); the word handed begins with `.`."""
+    (ws / "-r").mkdir()
+    argbin = ws.parent / "argbin"
+    write_arg_runners(argbin)
+    path = {"PATH": str(argbin) + os.pathsep + os.environ.get("PATH", "")}
+    for words in ([runner, option, "./-r", "test"], [runner, "test", option + "=./-r"]):
+        p = launch(ws, words, extra=path, stand_ins=False)
+        assert_started(p, words)
+        assert_handed(handed(given_words(p), option, words), ws, ws / "-r", words)
 
 
 @pytest.mark.parametrize("runner", ["npm", "pnpm", "yarn"])
