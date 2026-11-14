@@ -412,3 +412,31 @@ def test_r078_folder_option_rewrite_refused_when_relpath_raises(program, tmp_pat
         result, refuse = br._package_folder_rewrite(argv, base)
         assert refuse == "--prefix"
         assert result is None
+
+
+HIDDEN = "VALUE-NEVER-PRINTED"
+
+
+def test_r080_a_key_file_home_variable_is_refused_before_start_for_a_test_run(tmp_path):
+    """R-080 (J10): a key file naming a home variable is refused before `bridge-run: started` for a test-kind launch that is not a named suite."""
+    keys = tmp_path / "keys.env"
+    keys.write_text("USERPROFILE=%s\nSAFE_KEY=1\n" % HIDDEN, encoding="utf-8")
+    env = env_for(tmp_path)
+    code = "import os; print(os.environ.get('SAFE_KEY', ''))"
+    p = subprocess.run([sys.executable, PROG, "--limit", "30", "--kind", "test", "--key-file", str(keys), "--", sys.executable, "-c", code],
+                       capture_output=True, text=True, env=env)
+    assert p.returncode == 125 and "bridge-run: started" not in p.stderr and "USERPROFILE" in p.stderr, p.stderr
+    assert HIDDEN not in p.stderr and HIDDEN not in p.stdout
+
+
+def test_r080_stripped_cursor_agent_keeps_cursor_keys_while_stripped_test_does_not(program, tmp_path, monkeypatch):
+    """R-080 (J11): secret-like CURSOR_ names stay for builder runs and are withheld from stripped test runs."""
+    be = program("bridge_env")
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    base = {"PATH": os.environ.get("PATH", ""), "HOME": str(tmp_path / "home"), "USERPROFILE": str(tmp_path / "home"),
+            "CURSOR_API_KEY": HIDDEN, "CURSOR_TRACE_LEVEL": "1"}
+    (tmp_path / "home" / ".cursor").mkdir(parents=True)
+    agent = be.stripped_env({**base}, kind="test")
+    assert "CURSOR_API_KEY" not in agent and "CURSOR_TRACE_LEVEL" in agent
+    builder = be.stripped_env({**base})
+    assert "CURSOR_API_KEY" in builder and "CURSOR_TRACE_LEVEL" in builder

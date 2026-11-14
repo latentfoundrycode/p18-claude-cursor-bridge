@@ -43,13 +43,22 @@ TOKEN_VARS = ("GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPR
 # SFVF_SECRETS_PASSPHRASE; not TOKENIZERS_PARALLELISM); a store's unlock PASSPHRASE is a
 # key; KEY only as API/ACCESS/PRIVATE key or a name ending in _KEY or _KEYS (not
 # GIT_CONFIG_KEY_0, which the recipe itself sets). Cursor's own variables are kept.
-SECRET_LIKE = re.compile(r"((^|_)TOKENS?(_|$)|(^|_)SECRETS?(_|$)|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY|_KEYS?$)")
+SECRET_LIKE = re.compile(
+    r"((^|_)TOKENS?(_|$)|(^|_)SECRETS?(_|$)|(^|_)PAT(_|$)|(^|_)CREDS(_|$)|(^|_)AUTH(_|$)"
+    r"|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY|_KEYS?$"
+    r"|^DATABASE_URL$|^SSH_AUTH_SOCK$)")
 KEEP_PREFIXES = ("CURSOR_", "GIT_CONFIG_KEY_")
 
 
-def secret_like(name):
+def secret_like(name, keep_cursor=True):
     u = name.upper()
-    return bool(SECRET_LIKE.search(u)) and not u.startswith(KEEP_PREFIXES)
+    if u.startswith("GIT_CONFIG_KEY_"):
+        return False
+    if not SECRET_LIKE.search(u):
+        return False
+    if keep_cursor and u.startswith("CURSOR_"):
+        return False
+    return True
 
 
 def gh_empty_dir():
@@ -269,13 +278,14 @@ def write_gitconfig(real):
     return path
 
 
-def stripped_env(env=None):
+def stripped_env(env=None, kind=None):
     """Return a copy of `env` (default: os.environ) in which gh is logged out, no token
     variable and no variable named like an account key survives, git has no credential
     helper and never prompts, and the home folder is the agent's own (KP-038), APPDATA and
     LOCALAPPDATA with it where they are set (release S: APP_FOLDERS, the tools' caches
     passed first by APP_CACHES). Raises AgentHomeError when that folder cannot be
     prepared: the run must not start."""
+    keep_cursor = kind is None or kind in ("builder", "review")
     e = dict(os.environ if env is None else env)
     empty = gh_empty_dir()
     try:
@@ -285,7 +295,7 @@ def stripped_env(env=None):
     e["GH_CONFIG_DIR"] = empty
     for k in TOKEN_VARS:
         e.pop(k, None)
-    for k in [k for k in e if secret_like(k)]:
+    for k in [k for k in e if secret_like(k, keep_cursor=keep_cursor)]:
         e.pop(k, None)
     e["GIT_TERMINAL_PROMPT"] = "0"
     for k in ("GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"):
