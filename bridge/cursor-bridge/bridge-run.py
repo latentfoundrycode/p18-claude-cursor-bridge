@@ -349,17 +349,17 @@ def _package_scan_folder_options(argv, head, folder):
 
 
 def _package_folder_rewrite(argv, folder):
-    """Argv with each folder option value replaced by the absolute folder the rule checked."""
+    """Argv with each folder option value replaced by the folder the rule checked, relative to the launch folder."""
     head = head_of(argv)
     if head not in PACKAGE_FOLDER_LONG or not named_suite(argv, folder):
-        return list(argv)
+        return list(argv), None
     base = folder or os.getcwd()
     out = [argv[0]]
     i, past_sub = 1, False
     while i < len(argv):
         if argv[i] == "--":
             out.extend(argv[i:])
-            return out
+            return out, None
         word = argv[i]
         if not word.startswith("-"):
             past_sub = True
@@ -371,11 +371,17 @@ def _package_folder_rewrite(argv, folder):
             value, nxt, shown = _package_folder_value(word, argv, i)
             if value is not None and (value or "").strip():
                 abs_path = os.path.abspath(value if os.path.isabs(value) else os.path.join(base, value))
+                try:
+                    rel = os.path.relpath(abs_path, base)
+                except ValueError:
+                    label = shown.split("=", 1)[0] if "=" in shown else shown
+                    return None, label
+                handed = "." if rel == "." else os.path.join(".", rel)
                 if "=" in shown:
-                    out.append(shown.split("=", 1)[0] + "=" + abs_path)
+                    out.append(shown.split("=", 1)[0] + "=" + handed)
                 else:
                     out.append(shown)
-                    out.append(abs_path)
+                    out.append(handed)
             else:
                 out.append(word)
             i = nxt
@@ -386,7 +392,7 @@ def _package_folder_rewrite(argv, folder):
             continue
         out.append(word)
         i += 1
-    return out
+    return out, None
 
 
 def _package_body_index(argv, head):
@@ -2150,7 +2156,11 @@ def main():
             sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name, without an option that runs another program, and an npx tool only when the project has it (got %r); a benchmark or an unknown runner runs directly in the background, marked # wake\n" % cmd[0])
         return 125
     if head_of(cmd) in PACKAGE_FOLDER_LONG and named_suite(cmd, folder):
-        cmd = _package_folder_rewrite(cmd, folder)
+        rewritten, refuse = _package_folder_rewrite(cmd, folder)
+        if refuse:
+            sys.stderr.write(KNOWN_RUNNER_REFUSE % refuse)
+            return 125
+        cmd = rewritten
     cmd_inj = _cmd_exe_refuse_word(cmd, folder)
     if cmd_inj:
         sys.stderr.write(KNOWN_RUNNER_REFUSE % cmd_inj)
