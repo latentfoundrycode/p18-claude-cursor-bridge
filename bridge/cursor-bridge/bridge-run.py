@@ -223,16 +223,14 @@ PACKAGE_FOLDER_CANON = {
     "pnpm": {"--dir": "dir", "-C": "dir"},
     "yarn": {"--cwd": "cwd"},
 }
-NPM_PACKAGE_ENV = ("npm_config_workspace", "npm_config_workspaces")
-PNPM_PACKAGE_ENV = ("npm_config_workspace_dir",)
-NPM_RUN_OTHER_ENV = ("npm_config_script_shell", "npm_config_node_options")
 PACKAGE_ALLOWED_FLAGS = ("--silent", "-s", "--if-present")
+PACKAGE_CACHE_ENV = frozenset(("NPM_CONFIG_CACHE", "YARN_CACHE_FOLDER"))
 CMD_EXE_BAD_CHARS = '&|<>^%!"\r\n()'
 
 
 def python_interpreter_lead(argv, folder=None):
     """Where a python command's own words begin after its leading -B and -X utf8, and a refused word if any."""
-    if not argv or not python_interpreter_ok(argv, folder):
+    if not argv or head_of(argv) not in ("python", "python3", "py"):
         return 1, None
     i, saw_b, saw_x = 1, False, False
     while i < len(argv):
@@ -277,11 +275,6 @@ def _package_folder_token(head, word):
     return None
 
 
-def _package_allowed_flag(word):
-    name = word.split("=", 1)[0]
-    return word in PACKAGE_ALLOWED_FLAGS or name in PACKAGE_ALLOWED_FLAGS
-
-
 def _package_folder_value(word, argv, i):
     if "=" in word:
         return word.split("=", 1)[1], i + 1, word
@@ -290,12 +283,11 @@ def _package_folder_value(word, argv, i):
     return None, i + 1, word
 
 
-def _package_folder_ok(value, launch_folder, relative_base=None):
+def _package_folder_ok(value, launch_folder):
     walk_base = launch_folder or os.getcwd()
-    join_base = relative_base if relative_base is not None else walk_base
     if not (value or "").strip():
         return False
-    path = value if os.path.isabs(value) else os.path.join(join_base, value)
+    path = value if os.path.isabs(value) else os.path.join(walk_base, value)
     try:
         path = os.path.abspath(path)
     except OSError:
@@ -314,12 +306,13 @@ def _package_scan_folder_options(argv, head, folder):
     if head not in PACKAGE_FOLDER_LONG:
         return None, None
     base = folder or os.getcwd()
-    i, seen, run_dir = 1, {}, None
+    i, seen, run_dir, past_sub = 1, {}, None, False
     while i < len(argv):
         if argv[i] == "--":
             break
         word = argv[i]
         if not word.startswith("-"):
+            past_sub = True
             i += 1
             continue
         opt = _package_folder_token(head, word)
@@ -342,7 +335,7 @@ def _package_scan_folder_options(argv, head, folder):
             run_dir = os.path.abspath(value if os.path.isabs(value) else os.path.join(base, value))
             i = nxt
             continue
-        if _package_allowed_flag(word):
+        if past_sub and word in PACKAGE_ALLOWED_FLAGS:
             i += 1
             continue
         return run_dir, word.split("=", 1)[0]
@@ -350,7 +343,7 @@ def _package_scan_folder_options(argv, head, folder):
 
 
 def _package_body_index(argv, head):
-    """Index of the subcommand word, skipping listed folder options and allowed flags only."""
+    """Index of the subcommand word, skipping listed folder options only."""
     if head not in PACKAGE_FOLDER_LONG:
         return 1
     i = 1
@@ -370,9 +363,6 @@ def _package_body_index(argv, head):
                 i += 2
             else:
                 return None
-            continue
-        if _package_allowed_flag(word):
-            i += 1
             continue
         return None
     return None
@@ -399,7 +389,7 @@ def _escape_refuse_word(argv, folder=None):
         if refused:
             return refused
     start = 1
-    if python_interpreter_ok(argv, folder):
+    if head in ("python", "python3", "py"):
         lead, bad = python_interpreter_lead(argv, folder)
         if bad:
             return bad
@@ -423,7 +413,7 @@ def _escape_refuse_word(argv, folder=None):
 
 
 def _python_suite_intent(argv):
-    if not argv or not python_interpreter_ok(argv):
+    if not argv or head_of(argv) not in ("python", "python3", "py"):
         return False
     i = 1
     while i < len(argv):
@@ -463,7 +453,7 @@ def _cmd_exe_refuse_word(argv, folder=None):
 
 def known_runner_refuse_word(argv, folder=None):
     """The refused option word for a known runner, or None."""
-    if python_interpreter_ok(argv, folder):
+    if head_of(argv) in ("python", "python3", "py"):
         _, bad = python_interpreter_lead(argv, folder)
         if bad and _python_suite_intent(argv):
             return bad
@@ -601,7 +591,7 @@ def named_suite(argv, folder=None):
     head = head_of(argv)
     if head == "pytest":
         return True
-    if python_interpreter_ok(argv, folder):
+    if head in ("python", "python3", "py"):
         start, bad = python_interpreter_lead(argv, folder)
         if bad is not None:
             return False
@@ -768,7 +758,7 @@ def runner_word(argv):
     head = head_of(argv)
     if head == "pytest":
         return "pytest", 1
-    if python_interpreter_ok(argv):                         # `python -m pytest` and `python -m unittest`, the two forms `named_suite` takes
+    if head in ("python", "python3", "py"):
         start, _ = python_interpreter_lead(argv)
         if start + 2 <= len(argv) and argv[start:start + 2] == ["-m", "pytest"]:
             return "pytest", start + 2
@@ -816,22 +806,17 @@ def outside_by_environment(argv, environ, folder=None):
     word, start = runner_word(argv)
     head = head_of(argv)
     env = {name.upper(): value for name, value in environ.items() if (value or "").strip()}
-    launch = folder or os.getcwd()
-    if head in ("npm", "pnpm") and named_suite(argv, folder):
-        for name in NPM_RUN_OTHER_ENV:
-            upper = name.upper()
-            found = next((env[k] for k in env if k.upper() == upper), None)
-            if found is not None and found != "":
-                return upper
     if head in PACKAGE_FOLDER_LONG and named_suite(argv, folder):
-        run_dir = package_runner_cwd(argv, folder)
-        names = NPM_PACKAGE_ENV if head == "npm" else (PNPM_PACKAGE_ENV if head == "pnpm" else ())
-        for name in names:
+        for name in environ:
             upper = name.upper()
-            found = next((env[k] for k in env if k.upper() == upper), None)
-            if found is None:
+            if upper in PACKAGE_CACHE_ENV:
                 continue
-            if not _package_folder_ok(found, launch, relative_base=run_dir):
+            low = name.lower()
+            if low.startswith("npm_config_"):
+                return upper
+            if head == "pnpm" and low.startswith("pnpm_config_"):
+                return upper
+            if head == "yarn" and low.startswith("yarn_"):
                 return upper
         return None
     if word != "pytest":
@@ -1445,16 +1430,13 @@ def head_text(argv):
     if is_agent_argv(argv):
         return "cursor-agent"
     start = 1
-    if python_interpreter_ok(argv):
+    if head in ("python", "python3", "py"):
         start, _ = python_interpreter_lead(argv)
-    if head in PACKAGE_FOLDER_LONG:
+    elif head in PACKAGE_FOLDER_LONG:
         i = _package_body_index(argv, head)
         if i is not None:
             start = i
-    if head in PACKAGE_FOLDER_LONG or python_interpreter_ok(argv):
-        chunk = argv[start:start + 2]
-        return " ".join([head] + chunk)[:40]
-    subs = [a for a in argv[start:start + 3] if a in ("pr", "checks", "test", "run", "pytest", "unittest", "vitest", "jest", "playwright", "--test", "-m") or a.startswith("test")]
+    subs = [a for a in argv[start:start + 2] if a in ("pr", "checks", "test", "run", "pytest", "unittest", "vitest", "jest", "playwright", "--test", "-m") or a.startswith("test")]
     return " ".join([head] + subs)[:40]
 
 
@@ -2121,7 +2103,7 @@ def main():
             sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name, without an option that runs another program, and an npx tool only when the project has it (got %r); a benchmark or an unknown runner runs directly in the background, marked # wake\n" % cmd[0])
         return 125
     cmd_inj = _cmd_exe_refuse_word(cmd, folder)
-    if cmd_inj and named_suite(cmd, folder):
+    if cmd_inj:
         sys.stderr.write(KNOWN_RUNNER_REFUSE % cmd_inj)
         return 125
     read_keys = None

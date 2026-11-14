@@ -143,13 +143,14 @@ def test_r078_npm_prefix_through_an_inbound_link_is_refused(tmp_path):
     stub.write_text("@echo STAND-IN\n" if sys.platform == "win32" else "#!/bin/sh\necho STAND-IN\n", encoding="ascii")
     if sys.platform != "win32":
         stub.chmod(0o755)
-    env = dict(os.environ, LOCALAPPDATA=str(tmp_path / "localappdata"), PATH=str(bin_dir) + os.pathsep + os.environ.get("PATH", ""))
+    env = {k: v for k, v in os.environ.items() if not k.lower().startswith(("npm_config_", "pnpm_config_", "yarn_"))}
+    env.update(LOCALAPPDATA=str(tmp_path / "localappdata"), PATH=str(bin_dir) + os.pathsep + os.environ.get("PATH", ""))
     env.pop("BRIDGE_RUN_ALLOW_ANY", None)
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    ok = subprocess.run([sys.executable, PROG, "--limit", "60", "--kind", "test", "--", "npm", "--prefix", "frontend", "test"],
-                        capture_output=True, text=True, cwd=str(ws), env=env, timeout=120, creationflags=flags)
-    assert ok.returncode == 0 and "STAND-IN" in ok.stdout, (ok.returncode, ok.stderr, ok.stdout)
     try:
+        ok = subprocess.run([sys.executable, PROG, "--limit", "60", "--kind", "test", "--", "npm", "--prefix", "frontend", "test"],
+                            capture_output=True, text=True, cwd=str(ws), env=env, timeout=120, creationflags=flags)
+        assert ok.returncode == 0 and "STAND-IN" in ok.stdout, (ok.returncode, ok.stderr, ok.stdout)
         p = subprocess.run([sys.executable, PROG, "--limit", "60", "--kind", "test", "--", "npm", "--prefix", "in-link", "test"],
                            capture_output=True, text=True, cwd=str(ws), env=env, timeout=120, creationflags=flags)
         assert p.returncode == 125 and "defect" in p.stderr and "--prefix" in p.stderr and "bridge-run: started" not in p.stderr, p.stderr
