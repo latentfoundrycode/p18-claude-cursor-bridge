@@ -442,15 +442,16 @@ def test_the_three_floors_of_release_a1b(tmp_path):
 
 
 def test_r080_inventory_floor_uses_bridge_env_secret_like(tmp_path):
-    """R-080 (J11): the inventory floor counts names bridge_env.SECRET_LIKE matches, such as GITHUB_PAT."""
+    """R-080 (J11): the inventory floor counts names bridge_env.SECRET_LIKE matches, such as GITHUB_PAT, and not a
+    boundary name such as AUTHOR_NAME. The floor reads the inventory's rows only, so both rows are written there (the
+    supervisor's fix after round 2's Review A: the boundary name had been put in .env, which the floor never reads)."""
     make_workspace(tmp_path)
-    env_text = (tmp_path / ".env").read_text(encoding="utf-8") + "AUTHOR_NAME=owner\n"
-    (tmp_path / ".env").write_text(env_text, encoding="utf-8")
     inv = (tmp_path / "docs" / "INVENTORY.md").read_text(encoding="utf-8")
-    if "GITHUB_PAT" not in inv:
-        row = "| GITHUB_PAT | API token | environment variable the owner sets | app | 2026-01-01 |\n"
-        inv = inv.replace("| Socket account |", row + "| Socket account |")
-        (tmp_path / "docs" / "INVENTORY.md").write_text(inv, encoding="utf-8")
+    rows = ("| GITHUB_PAT | API token | environment variable the owner sets | app | 2026-01-01 |\n"
+            "| AUTHOR_NAME | display name | environment variable the owner sets | app | 2026-01-01 |\n")
+    inv = inv.replace("| Socket account |", rows + "| Socket account |", 1)
+    assert "| GITHUB_PAT |" in inv and "| AUTHOR_NAME |" in inv, "the fixture lost its insertion point"
+    (tmp_path / "docs" / "INVENTORY.md").write_text(inv, encoding="utf-8")
     rc, out = run(tmp_path)
     v, line = verdict(out, "No secret through an environment variable")
     assert v == "MISSING" and "GITHUB_PAT" in line and "AUTHOR_NAME" not in line, (v, line)
