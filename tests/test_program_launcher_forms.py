@@ -1,0 +1,432 @@
+"""TASK-059, the supervisor's acceptance tests: the launcher's command forms (R-078).
+
+enforces: docs/REQUIREMENTS.md R-078; docs/DESIGN.md, "Change: the program release", "What changes - the items by
+home", "The launcher, `bridge-run.py`": C6 (the interpreter's two flags), F5 (a suite in a subfolder), J4 (the two
+exit-125 messages), J9 (`merge_ids` sorted) and J12 (the plan glob escapes its root); docs/BUILD_PLAN.md, TASK-059's
+Done when; docs/HARDENING.md, TASK-059's reality check (the environment names that move a runner's folder).
+
+What each group pins, in the forms the brief repeats:
+- C6: the test and the driver kind take the interpreter's own leading flags, exactly `-B` and the two words `-X utf8`,
+  in either order and each once, and every reading of the command starts after them: the named suite, the runner's
+  word, the `-p no:` rule, the target rule, the environment rule, the logged head (the same as without the flags) and
+  the driver's checks of its program. Any other interpreter option before the module or the program is refused. A
+  suite launched with both flags runs with them, and the launcher sets no `PYTHONUTF8`.
+- F5: npm's `--prefix` and `-C` (npm's short form of `--prefix`, the reality check), pnpm's `--dir` and `-C` and
+  yarn's `--cwd` are read wherever they stand before a bare `--`, in the two-word and the `=` form, and a long option
+  word whose name is a leading part of the folder option's name, at least three characters with its dashes, is read as
+  that option (npm and pnpm take an unambiguous abbreviation; the reality check's third probe moved npm's folder with
+  `--prefi=`). The folder is accepted only where it exists, lies under the launch roots by its resolved path and is
+  reached through no link; it is refused where it is given twice (an option and its other name count as one option),
+  where its value is missing, and in the attached form `-C<folder>`, which is not read. A suite so launched is
+  stripped, logged as `npm test` (the folder never in the head) and limited as any named suite.
+- The environment names the reality check found to move the folder: `npm_config_workspace` and `npm_config_workspaces`
+  for npm, `npm_config_workspace_dir` for pnpm, none for yarn, any letter case. In the run's environment (the
+  launcher's own or a key file's line), such a name is refused where its value resolves outside the launch roots,
+  inside through a link, or not at all; a relative value is resolved against the folder the runner runs in. The name
+  is printed and its value never. Names the check found not to move the folder (`npm_config_prefix`, `INIT_CWD`) are
+  not refused.
+- J4: a refused option of a runner the launcher knows (an escape option of a named suite, an interpreter option before
+  `-m pytest` or `-m unittest`, every refusal of the folder rule) gets the message beginning KNOWN below, naming the
+  option and saying it is a defect to report, never a run to start by hand, with no `# wake`; an unknown runner keeps
+  today's message, beginning UNKNOWN, with its advice to run directly in the background marked `# wake`.
+- J9: a builder run's `merge_ids` is written sorted, whatever order the brief's `Merge unit:` line gives.
+- J12: both plan globs (bridge-run.py's header check and `bridge_env.plan_increment_ids`) escape their root, so a
+  Workspace whose path holds `[` reads its plan.
+
+Every case is red on the checkpoint but the three that pin what stays as it is: every other interpreter option refused,
+the unknown runner's message, and the names the reality check found not to move a folder. npm, pnpm and yarn are stand-ins on PATH that print STAND-IN and whether
+the made-up secret-like name reached them, so no runner needs to be installed; the one test that reads the folder a real
+npm runs in is skipped where npm is not installed. The builder adds its cases to tests/test_bridge_run.py,
+tests/test_bridge_run_driver.py and tests/test_release_s_launcher.py and edits nothing in this file.
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+import pytest
+
+import test_task032_supervisor_launcher as t32
+import test_header_plan as hp
+from test_header_plan_r3 import _with_orphan
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "bridge-run.py")
+KNOWN = "bridge-run: refused - the launcher knows this runner and refuses "
+UNKNOWN = "bridge-run: refused - the launcher runs only cursor-agent"
+PROBE = "FIX059_PROBE_TOKEN"                     # made up, secret-like: the strip withholds it
+HIDDEN = "VALUE-NEVER-PRINTED"                    # part of every value a refusal must not print
+
+ACCEPTED_FLAGS = [["-B"], ["-X", "utf8"], ["-B", "-X", "utf8"], ["-X", "utf8", "-B"]]
+REFUSED_FLAGS = [["-B", "-B"], ["-X", "utf8", "-X", "utf8"], ["-B", "-X", "utf8", "-B"], ["-Xutf8"], ["-X", "dev"], ["-X", "utf8=1"],
+                 ["-X"], ["-E"], ["-I"], ["-O"], ["-u"], ["-S"], ["-B", "-E"], ["-X", "utf8", "-I"]]
+OPTIONS = [("npm", "--prefix"), ("npm", "-C"), ("pnpm", "--dir"), ("pnpm", "-C"), ("yarn", "--cwd")]
+OTHER_NAME = {("npm", "--prefix"): "-C", ("npm", "-C"): "--prefix", ("pnpm", "--dir"): "-C", ("pnpm", "-C"): "--dir"}
+ABBREVIATED = {"--prefix": ["--pre", "--prefi"], "--dir": ["--di"], "--cwd": ["--cw"]}
+
+
+@pytest.fixture
+def br(program, monkeypatch):
+    monkeypatch.delenv("BRIDGE_RUN_ALLOW_ANY", raising=False)
+    return program("bridge-run")
+
+
+def _link(link, target):
+    try:
+        os.symlink(str(target), str(link), target_is_directory=True)
+    except (OSError, NotImplementedError):
+        try:
+            import _winapi
+            _winapi.CreateJunction(str(target), str(link))
+        except (ImportError, OSError):
+            pytest.skip("this account can make neither a symbolic link nor a junction")
+
+
+def _unlink(link):
+    if os.path.lexists(str(link)):
+        os.rmdir(str(link)) if os.name == "nt" else os.unlink(str(link))
+
+
+def write_runners(bin_dir):
+    """npm, pnpm and yarn stand-ins: each prints STAND-IN, its name and whether the made-up secret-like name reached it."""
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("npm", "pnpm", "yarn"):
+        if sys.platform == "win32":
+            text = ("@echo off\r\nif defined %s (echo STAND-IN %s TOKEN-SEEN) else (echo STAND-IN %s TOKEN-ABSENT)\r\nexit /b 0\r\n"
+                    % (PROBE, name, name))
+            (bin_dir / (name + ".cmd")).write_text(text, encoding="ascii")
+        else:
+            text = ('#!/bin/sh\nif [ -n "${%s+x}" ]; then echo "STAND-IN %s TOKEN-SEEN"; else echo "STAND-IN %s TOKEN-ABSENT"; fi\n'
+                    % (PROBE, name, name))
+            path = bin_dir / name
+            path.write_text(text, encoding="ascii")
+            path.chmod(0o755)
+
+
+@pytest.fixture
+def ws(tmp_path):
+    """A launch folder with a frontend subfolder, a folder beside it (outside) and the stand-ins."""
+    ws = tmp_path / "ws"
+    (ws / "frontend").mkdir(parents=True)
+    (ws / "tests").mkdir()
+    (tmp_path / ("elsewhere-" + HIDDEN)).mkdir()
+    write_runners(tmp_path / "bin")
+    return ws
+
+
+def outside_of(ws):
+    return ws.parent / ("elsewhere-" + HIDDEN)
+
+
+def launch(ws, words, extra=None, key_file=None, strip=True, stand_ins=True, limit="60", kind="test"):
+    tmp = ws.parent
+    env = {k: v for k, v in os.environ.items() if not k.lower().startswith("npm_config_")
+           and k.upper() not in ("BRIDGE_RUN_ALLOW_ANY", "BRIDGE_RUN_SLOT_SCALE", "PYTHONUTF8", PROBE, "INIT_CWD")}
+    env["LOCALAPPDATA"] = str(tmp / "localappdata")
+    if stand_ins:
+        env["PATH"] = str(tmp / "bin") + os.pathsep + env.get("PATH", "")
+    env.update(extra or {})
+    argv = [sys.executable, PROG, "--limit", limit] + (["--strip"] if strip else []) + ["--kind", kind]
+    argv += (["--key-file", str(key_file)] if key_file is not None else []) + ["--"] + list(words)
+    return subprocess.run(argv, capture_output=True, text=True, cwd=str(ws), env=env, timeout=300)
+
+
+def assert_started(p, words):
+    assert "Traceback" not in p.stderr, p.stderr
+    assert "bridge-run: refused" not in p.stderr and "bridge-run: started" in p.stderr, (words, p.stderr)
+    assert p.returncode == 0 and "STAND-IN" in p.stdout, (words, p.returncode, p.stdout, p.stderr)
+
+
+def refusal_line(p, words):
+    assert "Traceback" not in p.stderr, p.stderr
+    assert p.returncode == 125, (words, p.returncode, p.stderr)
+    assert "bridge-run: started" not in p.stderr and "STAND-IN" not in p.stdout, (words, p.stderr)
+    lines = [line for line in p.stderr.splitlines() if line.startswith("bridge-run: refused")]
+    assert lines, (words, p.stderr)
+    return lines[0]
+
+
+def assert_known_refusal(p, words, option):
+    line = refusal_line(p, words)
+    assert line.startswith(KNOWN), (words, line)
+    assert option in line and "defect" in line, (words, line)
+    assert "# wake" not in p.stderr, (words, p.stderr)
+    return line
+
+
+# ---------------------------------------------------------------- C6: the interpreter's two flags
+
+
+def test_r078_the_two_flags_name_the_suite_after_them(br, tmp_path):
+    """Each accepted form is a named suite of the test kind, its runner's word read after the flags, and logged with the
+    head it has without them."""
+    for head in ("python", "python3", "py"):
+        for mod in ("pytest", "unittest"):
+            plain = [head, "-m", mod]
+            assert br.named_suite(plain) and br.accepted(plain, str(tmp_path)), plain        # the control: today's form
+            for flags in ACCEPTED_FLAGS:
+                argv = [head] + flags + ["-m", mod]
+                assert br.named_suite(argv) and br.kind_of(argv) == "test" and br.accepted(argv, str(tmp_path)), argv
+                assert br.runner_word(argv + ["-q"]) == (mod, len(flags) + 3), argv
+                assert br.head_text(argv + ["-q"]) == br.head_text(plain + ["-q"]), argv
+
+
+def test_r078_every_other_interpreter_option_is_refused(br, tmp_path):
+    for flags in REFUSED_FLAGS:
+        for mod in ("pytest", "unittest"):
+            argv = ["python"] + flags + ["-m", mod, "tests"]
+            assert not br.accepted(argv, str(tmp_path)), argv
+
+
+def test_r078_the_target_the_environment_and_the_plugin_rules_read_after_the_flags(br, tmp_path):
+    """Release S's target rule and environment rule, and the `-p no:` exception, see the runner behind the flags."""
+    base = str(tmp_path / "ws")
+    os.makedirs(os.path.join(base, "tests"))
+    out = str(tmp_path / "elsewhere" / "test_a.py")
+    for flags in ACCEPTED_FLAGS:
+        lead = ["python"] + flags + ["-m", "pytest"]
+        assert br.outside_target(lead + [out], base) is not None, flags
+        assert br.outside_target(lead + ["tests"], base) is None, flags
+        assert br.outside_target(["python"] + flags + ["-m", "unittest", "discover", "-s", str(tmp_path / "elsewhere")], base) is not None, flags
+        assert br.outside_by_environment(lead, {"PYTEST_PLUGINS": "x"}, base) == "PYTEST_PLUGINS", flags
+        assert br.outside_by_environment(lead, {"PYTEST_ADDOPTS": out}, base) == "PYTEST_ADDOPTS", flags
+        assert br.test_suite(lead + ["-p", "no:cacheprovider", "-q"], base), flags
+        for escape in (["-p", "evil"], ["-c", "x.ini"], ["--basetemp=../.."]):
+            assert not br.test_suite(lead + escape, base), (flags, escape)
+
+
+def test_r078_the_driver_kind_takes_the_two_flags_before_its_program(br, tmp_path):
+    ws = tmp_path / "ws"
+    (ws / "run" / "supervisor").mkdir(parents=True)
+    prog = ws / "run" / "supervisor" / "probe.py"
+    prog.write_text("print('probe')\n", encoding="utf-8")
+    (tmp_path / "elsewhere.py").write_text("print('elsewhere')\n", encoding="utf-8")
+    assert br.resolve_driver_program(["python", "run/supervisor/probe.py"], str(ws)) == os.path.abspath(str(prog))   # the control
+    for flags in ACCEPTED_FLAGS:
+        assert br.resolve_driver_program(["python"] + flags + ["run/supervisor/probe.py"], str(ws)) == os.path.abspath(str(prog)), flags
+        for bad in ("../elsewhere.py", str(tmp_path / "elsewhere.py"), "run/supervisor/../../elsewhere.py", "run/supervisor/missing.py"):
+            assert br.resolve_driver_program(["python"] + flags + [bad], str(ws)) is None, (flags, bad)
+    for flags in REFUSED_FLAGS:
+        assert br.resolve_driver_program(["python"] + flags + ["run/supervisor/probe.py"], str(ws)) is None, flags
+
+
+def _clean_env(tmp_path):
+    env = {k: v for k, v in os.environ.items() if k.upper() not in ("BRIDGE_RUN_ALLOW_ANY", "BRIDGE_RUN_SLOT_SCALE", "PYTHONUTF8", "PYTHONDONTWRITEBYTECODE")}
+    env["LOCALAPPDATA"] = str(tmp_path / "localappdata")
+    return env
+
+
+def test_r078_a_suite_launched_with_both_flags_runs_with_them_and_no_pythonutf8(tmp_path):
+    ws = tmp_path / "ws"
+    (ws / "tests").mkdir(parents=True)
+    (ws / "tests" / "test_flags.py").write_text(
+        "import os\nimport sys\n\n\ndef test_flags():\n    assert sys.flags.dont_write_bytecode == 1\n    assert sys.flags.utf8_mode == 1\n"
+        "    assert 'PYTHONUTF8' not in os.environ\n", encoding="utf-8")
+    p = subprocess.run([sys.executable, PROG, "--limit", "120", "--kind", "test", "--", "python", "-B", "-X", "utf8", "-m", "pytest", "-q",
+                        "-p", "no:cacheprovider", "tests/test_flags.py"], capture_output=True, text=True, cwd=str(ws), env=_clean_env(tmp_path), timeout=300)
+    assert p.returncode == 0 and "bridge-run: exit 0" in p.stderr and "1 passed" in p.stdout, (p.stdout, p.stderr)
+    rows = t32.log_lines(ws / "run" / "launcher" / "runs.jsonl")
+    row = json.loads(rows[-1].decode("utf-8"))
+    assert row["kind"] == "test" and row["head"] == "python -m pytest" and row["exit"] == 0, row
+
+
+def test_r078_a_driver_launched_with_both_flags_runs_its_program_with_them(tmp_path):
+    ws = tmp_path / "ws"
+    (ws / "run" / "supervisor").mkdir(parents=True)
+    (ws / "run" / "supervisor" / "probe.py").write_text(
+        "import os\nimport sys\nprint('flags', sys.flags.dont_write_bytecode, sys.flags.utf8_mode, 'PYTHONUTF8' in os.environ)\n", encoding="utf-8")
+    p = subprocess.run([sys.executable, PROG, "--limit", "60", "--kind", "driver", "--", "python", "-X", "utf8", "-B", "run/supervisor/probe.py"],
+                       capture_output=True, text=True, cwd=str(ws), env=_clean_env(tmp_path), timeout=300)
+    assert p.returncode == 0 and "flags 1 1 False" in p.stdout, (p.stdout, p.stderr)
+
+
+# ---------------------------------------------------------------- F5: the folder options
+
+
+def forms(runner, option, value):
+    return [[runner, option, value, "test"], [runner, option + "=" + value, "test"], [runner, "test", option, value],
+            [runner, "test", option + "=" + value], [runner, option, value, "run", "test:unit"]]
+
+
+@pytest.mark.parametrize("runner,option", OPTIONS)
+def test_r078_a_folder_inside_the_launch_folder_is_accepted_in_every_form(ws, runner, option):
+    for words in forms(runner, option, "frontend") + [[runner, option, ".", "test"], [runner, "test", option, str(ws / "frontend")]]:
+        assert_started(launch(ws, words), words)
+    for abbreviated in ABBREVIATED.get(option, []):
+        for words in ([runner, abbreviated, "frontend", "test"], [runner, "test", abbreviated + "=frontend"]):
+            assert_started(launch(ws, words), words)
+    words = [runner, "test", "--", option, str(outside_of(ws))]        # after a bare --: the script's own argument, not the runner's
+    assert_started(launch(ws, words), words)
+
+
+@pytest.mark.parametrize("runner,option", OPTIONS)
+def test_r078_a_folder_outside_missing_or_through_a_link_is_refused_naming_the_option(ws, runner, option):
+    out = str(outside_of(ws))
+    _link(ws / "out-link", outside_of(ws))
+    _link(ws / "in-link", ws / "frontend")
+    try:
+        for value in (out, os.path.join("..", "elsewhere-" + HIDDEN), "out-link", "in-link", os.path.join("in-link", os.curdir), "no-such-folder"):
+            for words in forms(runner, option, value):
+                assert_known_refusal(launch(ws, words), words, option)
+        for abbreviated in ABBREVIATED.get(option, []):
+            words = [runner, "test", abbreviated + "=" + out]
+            assert_known_refusal(launch(ws, words), words, abbreviated)
+    finally:
+        _unlink(ws / "out-link")
+        _unlink(ws / "in-link")
+
+
+@pytest.mark.parametrize("runner,option", OPTIONS)
+def test_r078_a_folder_option_given_twice_or_without_its_value_is_refused(ws, runner, option):
+    cases = [[runner, option, "frontend", "test", option, "frontend"], [runner, option + "=frontend", "test", option + "=frontend"],
+             [runner, "test", option], [runner, "test", option + "="], [runner, "test", "--silent", option]]
+    if (runner, option) in OTHER_NAME:
+        cases.append([runner, option, "frontend", OTHER_NAME[(runner, option)], "frontend", "test"])
+    if option == "-C":
+        cases.append([runner, "test", "-Cfrontend"])
+    for words in cases:
+        assert_known_refusal(launch(ws, words), words, option)
+
+
+def test_r078_a_suite_in_a_subfolder_is_stripped_logged_and_limited(ws):
+    words = ["npm", "--prefix", "frontend", "test"]
+    control = launch(ws, words, extra={PROBE: "t"}, strip=False)
+    assert_started(control, words)
+    assert "TOKEN-SEEN" in control.stdout, control.stdout                 # the probe reaches a run nothing strips
+    p = launch(ws, words, extra={PROBE: "t"}, limit="45")
+    assert_started(p, words)
+    assert "TOKEN-ABSENT" in p.stdout, p.stdout
+    row = json.loads(t32.log_lines(ws / "run" / "launcher" / "runs.jsonl")[-1].decode("utf-8"))
+    assert row["kind"] == "test" and row["head"] == "npm test" and row["limit"] == 45 and row["exit"] == 0, row
+
+
+@pytest.mark.skipif(shutil.which("npm") is None, reason="npm is not installed")
+def test_r078_npm_runs_in_the_folder_its_option_names(ws):
+    for folder, name in ((ws, "WS"), (ws / "frontend", "FRONTEND")):
+        (folder / "package.json").write_text(json.dumps({"name": "probe-" + name.lower(), "version": "0.0.0", "private": True,
+                                                          "scripts": {"test": "node -e \"console.log('RAN-IN-%s')\"" % name}}), encoding="utf-8")
+    for words in (["npm", "--prefix", "frontend", "test"], ["npm", "test", "-C", "frontend"]):
+        p = launch(ws, words, strip=False, stand_ins=False, limit="300")
+        assert p.returncode == 0 and "RAN-IN-FRONTEND" in p.stdout and "RAN-IN-WS" not in p.stdout, (words, p.stdout, p.stderr)
+
+
+# ---------------------------------------------------------------- the environment names that move the folder
+
+
+def test_r078_a_name_that_moves_the_folder_is_held_to_the_rule(br, tmp_path):
+    base = tmp_path / "ws"
+    (base / "frontend" / "pkg").mkdir(parents=True)
+    (base / "pkg").mkdir()
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    _link(base / "out-link", outside)
+    _link(base / "in-link", base / "frontend")
+    _link(base / "frontend" / "pkg-link", outside)
+    try:
+        for argv, names in ((["npm", "test"], ("npm_config_workspace", "NPM_CONFIG_WORKSPACE", "Npm_Config_Workspaces", "npm_config_workspaces")),
+                            (["pnpm", "test"], ("npm_config_workspace_dir", "NPM_CONFIG_WORKSPACE_DIR"))):
+            for name in names:
+                for value in (str(outside), os.path.join("..", "elsewhere"), "out-link", "in-link", "probe-sub", "true"):
+                    got = br.outside_by_environment(argv, {name: value}, str(base))
+                    assert (got or "").upper() == name.upper(), (argv, name, value, got)
+                for value in ("frontend", str(base / "frontend"), ".", ""):
+                    assert br.outside_by_environment(argv, {name: value}, str(base)) is None, (argv, name, value)
+        there = ["npm", "--prefix", "frontend", "test"]                    # a relative value is read against the runner's folder
+        assert br.outside_by_environment(there, {"npm_config_workspace": "pkg"}, str(base)) is None
+        assert br.outside_by_environment(there, {"npm_config_workspace": "pkg-link"}, str(base)) == "NPM_CONFIG_WORKSPACE"
+        assert br.outside_by_environment(["npm", "test"], {"npm_config_workspace": "pkg-link"}, str(base)) == "NPM_CONFIG_WORKSPACE"
+    finally:
+        for link in (base / "out-link", base / "in-link", base / "frontend" / "pkg-link"):
+            _unlink(link)
+
+
+def test_r078_a_name_the_reality_check_found_not_to_move_the_folder_is_not_refused(br, tmp_path):
+    outside = str(tmp_path / "elsewhere")
+    for name in ("npm_config_prefix", "NPM_CONFIG_PREFIX", "INIT_CWD", "npm_config_local_prefix"):
+        assert br.outside_by_environment(["npm", "test"], {name: outside}, str(tmp_path)) is None, name
+
+
+@pytest.mark.parametrize("route", ["environment", "key file"])
+def test_r078_a_moving_name_is_refused_by_name_and_its_value_is_never_printed(ws, route):
+    out = str(outside_of(ws))
+    words, extra, key_file = ["npm", "test"], None, None
+    if route == "environment":
+        extra = {"npm_config_workspace": out}
+    else:
+        key_file = ws.parent / "keys.env"
+        key_file.write_text("npm_config_workspace=%s\n" % out, encoding="utf-8")
+    p = launch(ws, words, extra=extra, key_file=key_file)
+    line = refusal_line(p, words)
+    assert "NPM_CONFIG_WORKSPACE" in line.upper(), line
+    assert HIDDEN not in p.stderr and HIDDEN not in p.stdout, "the value is never printed"
+
+
+# ---------------------------------------------------------------- J4: the two exit-125 messages
+
+
+def test_r078_a_refused_option_of_a_known_runner_is_a_defect_to_report(ws):
+    out = str(outside_of(ws))
+    for words, option in ((["pytest", "-p", "evil"], "-p"), (["python", "-m", "pytest", "-c", "x.ini"], "-c"), (["python", "-X", "dev", "-m", "pytest"], "-X"),
+                          (["python", "-E", "-m", "pytest", "tests"], "-E"), (["python", "-B", "-B", "-m", "unittest"], "-B"),
+                          (["npm", "--prefix", out, "test"], "--prefix"), (["pnpm", "test", "--dir"], "--dir"),
+                          (["yarn", "--cwd", "frontend", "test", "--cwd", "frontend"], "--cwd")):
+        assert_known_refusal(launch(ws, words), words, option)
+
+
+def test_r078_an_unknown_runner_keeps_todays_advice(ws):
+    for words in (["make", "test"], ["python", "-c", "print(1)"], ["npm", "run", "dev"], ["bash", "-c", "true"]):
+        line = refusal_line(launch(ws, words), words)
+        assert line.startswith(UNKNOWN) and "# wake" in line, (words, line)
+
+
+# ---------------------------------------------------------------- J9: merge_ids sorted
+
+
+def test_r078_merge_ids_is_written_sorted_whatever_the_briefs_order(tmp_path, monkeypatch):
+    """Four briefs of one merge unit, each listing the unit in another order and launched under another hash seed: the
+    row's `merge_ids` is the sorted list every time."""
+    ids = ["TASK-010", "TASK-012", "TASK-015", "TASK-020"]
+    orders = [["TASK-020", "TASK-010", "TASK-015", "TASK-012"], ["TASK-015", "TASK-020", "TASK-012", "TASK-010"],
+              ["TASK-012", "TASK-015", "TASK-010", "TASK-020"], ["TASK-010", "TASK-012", "TASK-020", "TASK-015"]]
+    lab = t32.Lab(tmp_path, branch="task-010")
+    t32.write_plan(lab, *ids)
+    for seed, (brief, order) in enumerate(zip(ids, orders), 1):
+        monkeypatch.setenv("PYTHONHASHSEED", str(seed))
+        t32.write_brief(lab.root, brief, "\nMerge unit: %s\n" % " ".join(order))
+        row = t32.assert_ran(t32.launch(lab, t32.build(brief)))
+        assert row.get("merge_ids") == ids, (brief, order, row.get("merge_ids"))
+
+
+# ---------------------------------------------------------------- J12: the plan globs escape their root
+
+
+def test_r078_the_plan_reading_escapes_its_root(program, tmp_path):
+    be = program("bridge_env")
+    root = tmp_path / "p[1]" / "ws"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "BUILD_PLAN.md").write_text("# Plan\n\n## Stage 1\n\n### TASK-010 %s the one\nKind: increment\n" % hp.DASH, encoding="utf-8")
+    assert "TASK-010" in be.plan_increment_ids(str(root))
+
+
+def test_r078_the_launcher_reads_a_merge_unit_under_a_root_that_holds_a_bracket(tmp_path):
+    lab = t32.Lab(tmp_path, branch="task-010", name="la[u]nch")
+    t32.write_plan(lab, "TASK-010", "TASK-015")
+    t32.write_brief(lab.root, "TASK-010", "\nMerge unit: TASK-010 TASK-015\n")
+    row = t32.assert_ran(t32.launch(lab, t32.build("TASK-010")))
+    assert row.get("merge_ids") == ["TASK-010", "TASK-015"], row
+
+
+def test_r078_the_launchers_plan_header_check_escapes_its_root(tmp_path):
+    """The header check's own glob: a headed plan with a heading outside any stage is refused by the plan's header check,
+    which an unescaped glob would never read (test_header_plan_r3's case, under a root that holds `[`)."""
+    lab = t32.Lab(tmp_path, branch="task-010", name="la[v]nch")
+    t32.write_plan(lab, "TASK-010")
+    stages = [{"name": "Stage 9", "demo": "it runs.", "incs": [
+        {"id": "TASK-015", "title": "two", "lines": ["Kind: increment", "Scope: src/two.py"],
+         "h": {"kind": "increment", "parent": None, "depends_on": [], "parallel": False, "diagrams": [],
+               "scope": ["src/two.py"], "satisfies": [], "historic": False}}]}]
+    (lab.root / "docs" / "BUILD_PLAN-2026-11-04.md").write_bytes((hp.plan_header(stages) + _with_orphan(hp.plan_prose(stages))).encode("utf-8"))
+    t32.write_brief(lab.root, "TASK-010", "\nMerge unit: TASK-010 TASK-009\n")
+    line = t32.assert_refused(t32.launch(lab, t32.build("TASK-010")), "bridge-run: refused - header: ")
+    assert "outside any stage" in line, line
