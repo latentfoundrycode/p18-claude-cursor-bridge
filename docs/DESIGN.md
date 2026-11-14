@@ -472,3 +472,84 @@ The owner: the order and this release's place and items (2026-11-08, decision D6
 ### Version
 
 Claude Code 2.1.321, read on 2026-11-13 from this session's transcript records (release B2 recorded 2.1.317 on 2026-11-04; the session has no `claude` on its PATH). The host's version changed, so the facts the release relies on are checked again by the first increment that relies on each; the allow rules' bare-command match and the hooks' timing are re-observed in this session (the launcher, the checkers and the guard ran on their rules with no prompt; the session-start hook's digest was injected after the compaction of 2026-11-13). The facts the release adds are the table's above.
+
+## Change: the one-increment merge unit (2026-11-14) — the field finding F7 joins the program release
+
+**Subject** (the critique's token): `program-f7`, a scoped revision mid-build of the program release (design.md, "The procedure"), one subject with its plan revision: the one increment it adds, TASK-084, and the increment it revises, TASK-082 (docs/BUILD_PLAN.md, stage P2), stand in this subject's round-1 file. The section "Change: the program release" above stands as the owner approved it on 2026-11-13; this section adds one item to that release and changes no sentence of it.
+
+### Purpose and scope
+
+The field finding F7, met in the video factory's work on 2026.11.12a on 2026-11-13 and placed in the program release by the owner the same day (the maintainer's message of that day; the owner in this chat: "I confirm F7 as part of the program release next to F1 to F6"). `spec-packager` wrote a brief for one increment with the line `Merge unit: TASK-109` and the header `merge_unit: ["TASK-109"]`. The launcher refused the brief before any run with `header: disagrees merge_unit` (exit 125). No run was lost; the supervisor found the cause by reading the program, and removed the line.
+
+**The cause, read on main 1cf6337.** A brief declares a merge unit only where its branch builds more than one increment: a brief without the line declares its own ID alone (the launcher's branch rule, R-042; the brief's header, R-059). The reader of a brief's prose, `MERGE_UNIT_RE` in `bridge_env.py`, matches a `Merge unit:` line of two or more IDs, so a line of one ID is no merge-unit line to it and the prose reads as naming no unit; the header's reader, `_merge_unit_from_header`, takes a list of one ID as a unit. Three cases follow, and none of them tells the writer what is wrong:
+
+| The brief | 2026.11.12a |
+|---|---|
+| a `Merge unit:` line of one ID, the header listing that ID (the field's case) | refused, `header: disagrees merge_unit`: the key is named, the cause is not |
+| a `Merge unit:` line of one ID, the header's `merge_unit: null`, or a brief with no header | launched, the line unread: the launcher's refusal of a `Merge unit:` line that is not valid reads through the same pattern and never sees it |
+| no `Merge unit:` line, the header listing one ID | refused, `header: disagrees merge_unit` |
+
+`agents/spec-packager.md` says that the header's `merge_unit` is "the `Merge unit:` line's IDs as a list" and `null` where the brief has no such line. It does not say that a merge unit is two or more increments, so a packager that writes the line for a single increment follows its text.
+
+**Why.** The item is of the release's own class: a program that answers a wrong brief with a line that does not name what is wrong (the first and third cases), or that lets through a line it is said to check (the second).
+
+### Non-goals
+
+- A merge unit of one is not made valid. Reading one ID as a unit would change what `merge_unit_ids` returns, and with it the launcher's path: a brief that declares a unit needs `docs/BUILD_PLAN.md` and each ID as an increment heading of it, so a fix brief of one increment whose ID the plan does not head would be refused further on for a line that says nothing; and a merged brief in the field that carries such a line beside `merge_unit: null`, which agrees with its header today, would disagree at its project's next `inventory-check.py`. The definition stays: two or more.
+- No reader changes what it returns: `MERGE_UNIT_RE`, `_merge_unit_from_prose`, `_merge_unit_from_header`, `merge_unit_ids`, `merge_unit_line_present`, `header_agrees` and the header `records-migrate.py` composes stand as built. No record of any project reads differently after the install; `inventory-check.py`, `scope-check.py` and the review guard's snapshot answer on every brief as they do today.
+- The other forms of a `Merge unit:` line the pattern does not read (an ID in lower case, a comma between the IDs, words after them) stay unread, as today. The field met the line of one ID and no other form; a refusal of every line that begins `Merge unit:` and is not read as a unit would also refuse a brief whose prose shows the line's form as an example at a line's start (`Merge unit: <ID> <ID> ...`, in a fence), a false refusal bought for a case nobody has met. A unit so mistyped is launched as a single increment, as today, the branch rule counting the brief's own ID alone. A recorded lead (HARDENING, at the increment).
+- The launcher's other brief rules, the branch rule, the header's schema and the template's `merge_unit: null` are unchanged. An empty `Merge unit:` line names no unit, as today.
+
+### What changes — the item by home
+
+**The launcher, `bridge-run.py`, with one function in `bridge_env.py`.**
+- *F7.* Before any run of a builder brief, the launcher refuses, with exit 125, a brief that names a merge unit of one increment. A brief does so where one of two things holds and neither its prose nor its header names a unit of two or more: its prose holds a line that is, after the bullet mark the reader allows, `Merge unit:` followed by exactly one word of the pattern's ID form and nothing else; or its header's `merge_unit` is a list of exactly one entry. Where one of the two names a unit of two or more and the other names one, the two disagree, and the brief keeps the refusal it has, `header: disagrees merge_unit` (the case `tests/test_header_plan.py` holds, a line of two IDs beside a header listing one). The refusal is a brief-rule line of its own, `brief rule: a merge unit names two or more increments; a brief of one increment carries no Merge unit: line and merge_unit: null in its header`, followed by the pointer every brief-rule refusal carries. It stands before the header's agreement with the prose is judged, so that the cause is named where 2026.11.12a named the key; a header that cannot be read, or that breaks its schema, keeps its own refusal, which comes first. One function of `bridge_env.py` says whether a brief names a unit of one, by the prose or by the header, and the launcher is its one caller. The one word is read by the pattern's own ID form (a capital letter, then letters, digits and hyphens), so `Merge unit: None` is refused by the same line, whose advice fits it, and an example line that holds a placeholder (`Merge unit: <ID>`) is not.
+
+**Instruction text.**
+- *F7.* `agents/spec-packager.md`, in its sentence on the header, says that a merge unit is two or more increments and that a brief of one increment has no `Merge unit:` line and `merge_unit: null`. The clause is written by TASK-082, the text increment of stage P2, after the refusal it names has merged, and its words are paid by that increment's retirements ("Data model").
+
+### Architecture — the diagrams the change touches
+
+- **D-001** gains R-105 in the label of the use case that realizes it, packaging the brief and delegating it through the launcher; no actor, no use case, no goal is added.
+- **D-002** is unchanged: `bridge_run` has its edge to `bridge_env`, and no program is added. **D-003**, **D-004** and **D-005** are unchanged: no state of the review round, no flow across a trust boundary and no header schema changes (the brief header's `merge_unit` stays "list of string or null"; a list of one is refused by the launcher's rule, not by the schema, which `inventory-check.py` reads over merged briefs).
+- `diagram-check.py --mode design` passes before the critique's first round.
+
+### The host — Claude Code
+
+Unchanged. The item relies on no fact of the host: the launcher reads a file and prints a line before it starts anything. The program release's host table stands.
+
+### Delivery (the trait's Delivery section, scoped to the kind host-installation)
+
+The item ships in the program release's stamp (TASK-081) and its one install; it has no entry, stamp or run sheet of its own. The release's CHANGELOG entry gains, under What changed, the refusal and the packager's clause, and under `Running projects must` one line for the building and changing phases: a brief not yet merged that carries a `Merge unit:` line naming one ID loses the line, and its header reads `merge_unit: null`, before its next launch; a merged brief is left as it is. `If rolled back`: nothing to restore, since 2026.11.12a reads every brief this release accepts.
+
+### Security and secret handling
+
+Nothing new. The change adds a refusal and removes none: no brief that 2026.11.12a refused is launched, and the one form newly refused is a line that says nothing. A brief is the supervisor's own record, written inside the trust boundary and committed before the run (INVENTORY, the bridge's threat model as a whole), and the refusal reads the brief's text and header alone: no secret, no path of this computer, no network. The security auditor does not read the increment, for that reason; Review A and Review B do.
+
+### Data model and development data
+
+No file changes shape and none is migrated. **The rule budget** is not raised: the packager's clause is some twenty-five words, written by TASK-082 inside that increment's own measure (its count after the change at most the count before it less 100), its sentence reworded under an entry of `docs/TRACE_MOVES.md`. `Development data:` as recorded; the tests run on scratch Workspaces.
+
+### Testing strategy
+
+The supervisor's acceptance tests first, named from the brief's start (ISS-017), each red on the checkpoint by node id: the field's case (the line of one ID beside the header listing it), refused by the new line where the checkpoint answers `header: disagrees merge_unit`; the line of one ID beside `merge_unit: null`, and in a brief with no header, refused where the checkpoint launches; the header listing one ID with no line, refused by the new line. Beside them, what must stay: a unit of two IDs and of three passes the brief rules as before; a line of two IDs beside a header listing one, and a line of one ID beside a header listing two, keep `header: disagrees merge_unit` (the first held by `tests/test_header_plan.py`, which is not edited); a brief with no line and `null` passes; an empty `Merge unit:` line passes; a malformed header keeps its own refusal ahead of the new one; a placeholder line passes; the bulleted forms of the line (`- ` and `* `) are refused like the plain one; `bridge_env`'s readers return on every one of these briefs what they return on the checkpoint (a test that compares). A small mutants file is swept before the stage review: the refusal removed, the header's list not read, the prose line not read, the count compared wrongly (one taken as two, two taken as one), the check moved behind the agreement. The launcher is started on a scratch Workspace with a stand-in for `cursor-agent`, as its other brief-rule tests start it, so no builder runs. Text carries no wording test (release S).
+
+### Failure modes
+
+A brief of one increment that carries the line: refused before any run, the line naming the cause and the remedy; the supervisor removes the line, sets the header to `null` and launches again, the brief's bytes having changed after no completed run. A unit of two whose second ID was dropped by mistake, in the line and in the header alike: refused by the same line, where today it meets the first case above; the remedy the line gives (no line) is not the one it needs, and the words "two or more increments" say what the line must hold. Dropped in one of the two only: the header disagrees with the prose and says so, as today. A brief whose prose quotes a line of one ID as an example at a line's start: refused, a false refusal the writer removes by quoting the line inline; the briefs of this release are written so (TASK-084's own names the form inline). A merged brief in the field that carries the line: never launched again, read by the checks as today.
+
+### Impact on existing behaviour
+
+Altered, named in the CHANGELOG entry: the launcher refuses a brief whose `Merge unit:` line names one ID, or whose header lists one, and that names no unit of two or more, with a brief-rule line of its own; two of the three cases were refused before under another line, and the third, the line beside `merge_unit: null` or in a brief with no header, was launched with the line unread. Unchanged: every reader of a brief, every record, every other refusal and every allowed form of a brief; the gates, the ceilings and the run parameters.
+
+### Open questions
+
+None for the owner: the item and its place are theirs as given. The form, a refusal that names the cause together with the packager's clause, where the maintainer's message offered either, is the supervisor's, under the critique.
+
+### Who decided (rule 51)
+
+The owner: F7 as an item of the program release beside F1 to F6 (2026-11-13, in the maintainer's chat in the question form, "Send; F7 into program release", and confirmed in this chat the same day, rule 57), and the time of its incorporation left to the supervisor ("Incorporate it at the time you deem best"). The supervisor: the incorporation at stage P1's close; both halves of the form; the refusal standing ahead of the header's agreement; no reader changed and a unit of one not made valid; the increment's place in stage P2 and the clause's in TASK-082.
+
+### Version
+
+The bridge's version is the program release's, set at its stamp. Claude Code as the program release's section records it; no host fact is added.
