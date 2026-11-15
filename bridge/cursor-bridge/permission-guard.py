@@ -129,30 +129,319 @@ def program_behind(w):
     return None
 
 
+def _slashes_before(text, i):
+    """Count consecutive backslashes immediately before index i."""
+    n = 0
+    j = i - 1
+    while j >= 0 and text[j] == "\\":
+        n += 1
+        j -= 1
+    return n
+
+
+def _double_quote_ends(text, i):
+    """Inside a double-quoted string: True when the quote at i closes the string (bash rules)."""
+    return _slashes_before(text, i) % 2 == 0
+
+
+def _substitution_opens(text, i, in_single):
+    """At i: whether $(`, backtick, <( or >( starts a substitution (not escaped, not in single quotes)."""
+    if in_single:
+        return None
+    if _slashes_before(text, i) % 2 == 1:
+        return None
+    if text.startswith("$(", i):
+        return "dollar", i + 2
+    if text.startswith("<(", i):
+        return "process", i + 2
+    if text.startswith(">(", i):
+        return "process", i + 2
+    if text[i] == "`":
+        return "backtick", i + 1
+    return None
+
+
+def _matching_paren(text, open_paren):
+    """Index after the closing paren matching the '(' at open_paren (quotes respected)."""
+    depth = 1
+    i = open_paren + 1
+    quote = None
+    n = len(text)
+    while i < n and depth:
+        if quote == "'":
+            if text[i] == "'":
+                quote = None
+            i += 1
+            continue
+        if quote == '"':
+            if text[i] == '"' and _double_quote_ends(text, i):
+                quote = None
+            i += 1
+            continue
+        if quote == "ansi":
+            if text[i] == "\\" and i + 1 < n:
+                i += 2
+                continue
+            if text[i] == "'":
+                quote = None
+            i += 1
+            continue
+        if text[i] == "'":
+            quote = "'"
+            i += 1
+            continue
+        if text[i] == '"':
+            quote = '"'
+            i += 1
+            continue
+        if text.startswith("$'", i):
+            quote = "ansi"
+            i += 2
+            continue
+        kind, start = _substitution_opens(text, i, False) or (None, 0)
+        if kind in ("dollar", "process"):
+            inner_end = _matching_paren(text, start - 1)
+            i = inner_end
+            continue
+        if kind == "backtick":
+            j = start
+            while j < n:
+                if text[j] == "\\" and j + 1 < n:
+                    j += 2
+                    continue
+                if text[j] == "`" and _slashes_before(text, j) % 2 == 0:
+                    i = j + 1
+                    break
+                j += 1
+            else:
+                i = n
+            continue
+        if text.startswith("${", i):
+            j = i + 2
+            bd = 1
+            while j < n and bd:
+                if quote:
+                    break
+                if text[j] == "{":
+                    bd += 1
+                elif text[j] == "}":
+                    bd -= 1
+                j += 1
+            i = j
+            continue
+        if text[i] == "(":
+            depth += 1
+        elif text[i] == ")":
+            depth -= 1
+        i += 1
+    return i
+
+
+def _substitution_inners(text):
+    """Yield the inner command text of every command or process substitution (nested, quote-aware)."""
+    i = 0
+    n = len(text)
+    quote = None
+    while i < n:
+        if quote == "'":
+            if text[i] == "'":
+                quote = None
+            i += 1
+            continue
+        if quote == '"':
+            kind, start = _substitution_opens(text, i, False) or (None, 0)
+            if kind in ("dollar", "backtick", "process"):
+                if kind == "backtick":
+                    j = start
+                    while j < n:
+                        if text[j] == "\\" and j + 1 < n:
+                            j += 2
+                            continue
+                        if text[j] == "`" and _slashes_before(text, j) % 2 == 0:
+                            yield text[start:j]
+                            for inner in _substitution_inners(text[start:j]):
+                                yield inner
+                            i = j + 1
+                            break
+                        j += 1
+                    else:
+                        i = n
+                    continue
+                inner_end = _matching_paren(text, start - 1)
+                yield text[start:inner_end - 1]
+                for inner in _substitution_inners(text[start:inner_end - 1]):
+                    yield inner
+                i = inner_end
+                continue
+            if text.startswith("${", i):
+                j = i + 2
+                bd = 1
+                while j < n and bd:
+                    if text[j] == "{":
+                        bd += 1
+                    elif text[j] == "}":
+                        bd -= 1
+                    j += 1
+                body = text[i + 2:j - 1] if bd == 0 else text[i + 2:]
+                for inner in _substitution_inners(body):
+                    yield inner
+                i = j
+                continue
+            if text[i] == '"' and _double_quote_ends(text, i):
+                quote = None
+            i += 1
+            continue
+        if quote == "ansi":
+            if text[i] == "\\" and i + 1 < n:
+                i += 2
+                continue
+            if text[i] == "'":
+                quote = None
+            i += 1
+            continue
+        if text[i] == "'":
+            quote = "'"
+            i += 1
+            continue
+        if text[i] == '"':
+            quote = '"'
+            i += 1
+            continue
+        if text.startswith("$'", i):
+            quote = "ansi"
+            i += 2
+            continue
+        kind, start = _substitution_opens(text, i, False) or (None, 0)
+        if kind in ("dollar", "process"):
+            inner_end = _matching_paren(text, start - 1)
+            yield text[start:inner_end - 1]
+            for inner in _substitution_inners(text[start:inner_end - 1]):
+                yield inner
+            i = inner_end
+            continue
+        if kind == "backtick":
+            j = start
+            while j < n:
+                if text[j] == "\\" and j + 1 < n:
+                    j += 2
+                    continue
+                if text[j] == "`" and _slashes_before(text, j) % 2 == 0:
+                    yield text[start:j]
+                    for inner in _substitution_inners(text[start:j]):
+                        yield inner
+                    i = j + 1
+                    break
+                j += 1
+            else:
+                i = n
+            continue
+        if text.startswith("${", i):
+            j = i + 2
+            bd = 1
+            while j < n and bd:
+                if text[j] == "{":
+                    bd += 1
+                elif text[j] == "}":
+                    bd -= 1
+                j += 1
+            body = text[i + 2:j - 1] if bd == 0 else text[i + 2:]
+            for inner in _substitution_inners(body):
+                yield inner
+            i = j
+            continue
+        i += 1
+
+
+def _amp_is_command_separator(text, i):
+    """A bare & that separates commands, not 2>&1 or an embedded query ampersand in gh api."""
+    if text[i] != "&":
+        return False
+    if i > 0 and text[i - 1] in "<>":
+        return False
+    if i + 1 < len(text) and text[i + 1] == ">":
+        return False
+    left = text[i - 1] if i > 0 else " "
+    right = text[i + 1] if i + 1 < len(text) else " "
+    if not left.isspace() and not right.isspace():
+        return False
+    return True
+
+
+def _split_on_separators(text, chain_only):
+    """Split a line on shell separators; chain_only omits |, ( ), ` and does not split on embedded &-in-URL."""
+    parts, buf, quote, i = [], "", None, 0
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if quote == "'":
+            buf += c
+            if c == "'":
+                quote = None
+            i += 1
+            continue
+        if quote == '"':
+            buf += c
+            if c == '"' and _double_quote_ends(text, i):
+                quote = None
+            i += 1
+            continue
+        if quote == "ansi":
+            if c == "\\" and i + 1 < n:
+                buf += text[i:i + 2]
+                i += 2
+                continue
+            buf += c
+            if c == "'":
+                quote = None
+            i += 1
+            continue
+        if c == "'":
+            quote = "'"
+            buf += c
+            i += 1
+            continue
+        if c == '"':
+            quote = '"'
+            buf += c
+            i += 1
+            continue
+        if text.startswith("$'", i):
+            quote = "ansi"
+            buf += text[i:i + 2]
+            i += 2
+            continue
+        if text.startswith("&&", i) or text.startswith("||", i):
+            parts.append(buf); buf = ""; i += 1
+            continue
+        if c in (";", "\n") or (not chain_only and c in ("|", "(", ")")):
+            parts.append(buf); buf = ""
+            i += 1
+            continue
+        if c == "&" and _amp_is_command_separator(text, i):
+            parts.append(buf); buf = ""
+            i += 1
+            continue
+        buf += c
+        i += 1
+    parts.append(buf)
+    return parts
+
+
 def split_commands(text):
     """Break a shell command line into its simple commands: on &&, ||, ;, |, newlines and
     subshell parentheses. Quotes are respected. Good enough for commands a model writes."""
-    parts, buf, quote, i = [], "", None, 0
-    while i < len(text):
-        c = text[i]
-        if quote:
-            buf += c
-            if c == quote and (i == 0 or text[i - 1] != "\\"):
-                quote = None
-        elif c in ("'", '"'):
-            quote = c
-            buf += c
-        elif text.startswith("&&", i) or text.startswith("||", i):
-            parts.append(buf); buf = ""; i += 1
-        elif c in (";", "|", "&", "\n", "(", ")", "`"):   # a single & separates too (cmd; PowerShell's call operator)
-            parts.append(buf); buf = ""
-        elif c == "$" and text.startswith("$(", i):
-            parts.append(buf); buf = ""; i += 1
-        else:
-            buf += c
-        i += 1
-    parts.append(buf)
-    return [p.strip() for p in parts if p.strip()]
+    result = []
+
+    def absorb(segment):
+        for piece in _split_on_separators(segment, chain_only=False):
+            piece = piece.strip()
+            if piece:
+                result.append(piece)
+            for inner in _substitution_inners(piece):
+                absorb(inner)
+
+    absorb(text)
+    return result
 
 
 def in_workspace(cwd):
@@ -162,27 +451,167 @@ def in_workspace(cwd):
 
 def chain_parts(text):
     """The commands a line chains with &&, ||, ; or a new line (quotes respected); a pipe is one command."""
-    parts, buf, quote, i = [], "", None, 0
-    while i < len(text):
-        c = text[i]
-        if quote:
-            buf += c
-            if c == quote and (i == 0 or text[i - 1] != "\\"):
-                quote = None
-        elif c in ("'", '"'):
-            quote = c
-            buf += c
-        elif text.startswith("&&", i) or text.startswith("||", i):
-            parts.append(buf); buf = ""; i += 1
-        elif c in (";", "\n"):
-            parts.append(buf); buf = ""
-        elif c == "&" and (i == 0 or text[i - 1] not in "<>") and (i + 1 >= len(text) or text[i + 1] != ">"):
-            parts.append(buf); buf = ""                        # a single & sequences in cmd and backgrounds in bash; 2>&1 is not one
-        else:
-            buf += c
+    text = strip_heredocs(text)
+    parts = []
+    for piece in _split_on_separators(text, chain_only=True):
+        piece = piece.strip()
+        if piece:
+            parts.append(re.sub(r"^\(+|\)+$", "", piece).strip())
+    return [p for p in parts if p]
+
+
+def chain_parts_with_substitutions(text):
+    """Top-level chain parts, plus any substitution whose interior chains on its own."""
+    parts = chain_parts(text)
+    expanded = list(parts)
+    for piece in parts:
+        for inner in _substitution_inners(piece):
+            inner_parts = chain_parts(strip_heredocs(inner))
+            if len(inner_parts) >= 2:
+                expanded.extend(inner_parts)
+    return expanded
+
+
+def contains_command_substitution(text):
+    """True when text holds an unescaped $( or backtick pair outside single quotes."""
+    for _ in _substitution_inners(text):
+        return True
+    return False
+
+
+def leading_husky_zero(simple):
+    """True when HUSKY=0 is a leading shell assignment, not text inside a quoted argument."""
+    w = words(simple)
+    i = 0
+    while i < len(w):
+        tok = w[i]
+        if tok == "HUSKY=0":
+            return True
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tok):
+            i += 1
+            continue
+        if tok in ("&", ".", "{", "}", "then", "do", "else", "elif", "if", "while", "until", "!"):
+            i += 1
+            continue
+        name = tok.replace(".exe", "")
+        if name in ("xargs", "env", "nice", "nohup", "stdbuf", "time", "sudo", "command", "builtin", "exec", "timeout"):
+            i += 1
+            if name == "env":
+                while i < len(w):
+                    if w[i] == "HUSKY=0":
+                        return True
+                    if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w[i]):
+                        i += 1
+                        continue
+                    if w[i].startswith("-"):
+                        i += 1
+                        continue
+                    break
+                continue
+            vals = VALUE_OPTIONS.get(name, ())
+            while i < len(w) and (w[i].startswith("-") or (name == "xargs" and (w[i].isdigit() or w[i] == "{}"))):
+                opt = w[i]
+                i += 1
+                if opt in vals and i < len(w):
+                    i += 1
+            if name == "timeout" and i < len(w):
+                i += 1
+            continue
+        break
+    return False
+
+
+def hook_skipper_option(sub, args, snapshot):
+    """--no-verify or commit's -n as a git option, never another option's value."""
+    skip_value = {"-m", "--message", "-F", "--file", "--author", "-e", "--edit", "--cleanup",
+                  "--date", "--pathspec-from-file", "-p", "--patch", "-c", "-C", "--amend"}
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a in ("-m", "--message", "-F", "--file") and i + 1 < len(args):
+            i += 2
+            continue
+        if a.startswith("--message=") or a.startswith("--file="):
+            i += 1
+            continue
+        if a.startswith("-") and "=" in a:
+            i += 1
+            continue
+        if a in skip_value and i + 1 < len(args) and not args[i + 1].startswith("-"):
+            i += 2
+            continue
+        if a == "--no-verify" and not snapshot:
+            return a
+        if sub == "commit" and re.match(r"^-[A-Za-z]*n[A-Za-z]*$", a) and not snapshot:
+            return a
         i += 1
-    parts.append(buf)
-    return [re.sub(r"^\(+|\)+$", "", p.strip()).strip() for p in parts if p.strip()]
+    return None
+
+
+def gh_api_unquoted_ampersand_reason(command):
+    """An unquoted & glued into a gh api endpoint is not a separator; quote the argument."""
+    i = 0
+    n = len(command)
+    quote = None
+    while i < n:
+        if quote == "'":
+            if command[i] == "'":
+                quote = None
+            i += 1
+            continue
+        if quote == '"':
+            if command[i] == '"' and _double_quote_ends(command, i):
+                quote = None
+            i += 1
+            continue
+        if quote == "ansi":
+            if command[i] == "\\" and i + 1 < n:
+                i += 2
+                continue
+            if command[i] == "'":
+                quote = None
+            i += 1
+            continue
+        if command[i] == "'":
+            quote = "'"
+            i += 1
+            continue
+        if command[i] == '"':
+            quote = '"'
+            i += 1
+            continue
+        if command.startswith("$'", i):
+            quote = "ansi"
+            i += 2
+            continue
+        if re.match(r"\bgh\s+api\b", command[i:]):
+            j = re.search(r"\bgh\s+api\b", command[i:]).end() + i
+            while j < n:
+                if quote:
+                    break
+                if command[j] == "'":
+                    quote = "'"
+                    j += 1
+                    continue
+                if command[j] == '"':
+                    quote = '"'
+                    j += 1
+                    continue
+                if command.startswith("$'", j):
+                    quote = "ansi"
+                    j += 2
+                    continue
+                if command[j] == "&" and not _amp_is_command_separator(command, j):
+                    return "gh api with an unquoted & in an argument (quote the endpoint or URL so the shell does not split on &)"
+                if command[j] in (";", "\n") or command.startswith("&&", j) or command.startswith("||", j):
+                    break
+                if command[j] == "&" and _amp_is_command_separator(command, j):
+                    break
+                j += 1
+            i = j
+            continue
+        i += 1
+    return None
 
 
 def state_changing(w):
@@ -214,7 +643,7 @@ def chain_reason(command, cwd):
     """Inside a Workspace, a chain carrying a state change or wrapped in cd is refused (rule 8)."""
     if not in_workspace(cwd):
         return None
-    parts = chain_parts(strip_heredocs(command))
+    parts = chain_parts_with_substitutions(command)
     if len(parts) < 2:
         return None
     heads = [strip_prefix(words(p)) for p in parts]
@@ -432,8 +861,9 @@ def in_worktree(w, cwd):
 def check(command, cwd=None):
     """Return the reason to refuse, or None."""
     command = re.sub(r"\\\r?\n|`\r?\n", " ", command)                     # a line continued with \ or a PowerShell backtick is one line
-    if re.search(r"\bgh\s+api\s+graphql\b[^\n]*(\$\(|`)", command):
-        return "gh api graphql with a query built by a command substitution, which the guard cannot read (write the query on the command line)"
+    r = gh_api_unquoted_ampersand_reason(command)
+    if r:
+        return r
     r = chain_reason(command, cwd)
     if r:
         return r
@@ -442,8 +872,12 @@ def check(command, cwd=None):
         if not w:
             continue
         head = base(w[0])
-        if re.search(r"(^|\s)HUSKY=0(\s|$)", simple) and re.search(r"\bgit\s+(commit|push|merge)\b", simple):
-            return "HUSKY=0 switches the hook runner off (a commit that skips its checks; rule 4)"
+        if leading_husky_zero(simple):
+            wgit = strip_prefix(words(simple))
+            if wgit and is_git(wgit):
+                sub, _ = git_subcommand(wgit)
+                if sub in ("commit", "push", "merge"):
+                    return "HUSKY=0 switches the hook runner off (a commit that skips its checks; rule 4)"
         if head == "eval" and len(w) > 1:
             r = check(" ".join(w[1:]), cwd)
             if r:
@@ -483,9 +917,9 @@ def check(command, cwd=None):
             if sub in HOOK_SKIPPERS and not helpful:
                 message = commit_message(args, command)
                 snapshot = snapshot_subject(message) or (bool(re.search(r"\bhand-off\b", message, re.I)) and in_worktree(w, cwd))
-                for a in args:
-                    if (a == "--no-verify" or (sub == "commit" and re.match(r"^-[A-Za-z]*n[A-Za-z]*$", a))) and not snapshot:
-                        return "git %s %s (a commit that skips its checks; the merge policy allows it only for the checkpoint commit, whose subject says `checkpoint` and names the increment before any parenthesis without an accept, merge or release word, and for a builder's hand-off snapshot inside a worktree)" % (sub, a)
+                skipper = hook_skipper_option(sub, args, snapshot)
+                if skipper:
+                    return "git %s %s (a commit that skips its checks; the merge policy allows it only for the checkpoint commit, whose subject says `checkpoint` and names the increment before any parenthesis without an accept, merge or release word, and for a builder's hand-off snapshot inside a worktree)" % (sub, skipper)
             if sub == "push" and not helpful:
                 r = force_push_reason(args)
                 if r:
@@ -500,8 +934,11 @@ def check(command, cwd=None):
                     return r
             if group == "api" and any(m in tok for tok in w for m in MERGE_MUTATIONS):
                 return "gh api with a merge mutation (merging outside the gate)"
-            if group == "api" and sub == "graphql" and any(t == "--input" or t.startswith("--input=") or t.startswith("@") or "=@" in t for t in args):
-                return "gh api graphql with a query read from a file, which the guard cannot read (write the query on the command line)"
+            if group == "api" and sub == "graphql":
+                if any(contains_command_substitution(t) for t in args) or contains_command_substitution(simple):
+                    return "gh api graphql with a query built by a command substitution, which the guard cannot read (write the query on the command line)"
+                if any(t == "--input" or t.startswith("--input=") or t.startswith("@") or "=@" in t for t in args):
+                    return "gh api graphql with a query read from a file, which the guard cannot read (write the query on the command line)"
             if group == "alias" and sub in ("set", "import"):
                 expansion = (args[-1] if args else "").strip("'\"").lstrip("!").strip()   # the last word is the expansion
                 if sub == "import" or re.match(r"^(pr\s+merge|api)\b", expansion) or "worktree" in expansion:

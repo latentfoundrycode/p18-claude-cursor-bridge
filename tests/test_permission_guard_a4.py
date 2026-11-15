@@ -159,3 +159,48 @@ def test_the_remaining_chain_spellings_are_refused(workspace, command):
 def test_a_wrappers_quoted_string_is_read(tmp_path, command):
     rc, err = run(command, tmp_path)
     assert rc == 2, (command, err)
+
+
+def _run_r082(command, cwd=None, tool="Bash"):
+    """R-082 builder cases: hook JSON, windowless subprocess, bounded wait."""
+    payload = {"tool_name": tool, "tool_input": {"command": command}, "permission_mode": "auto"}
+    if cwd:
+        payload["cwd"] = str(cwd)
+    return subprocess.run(
+        [sys.executable, PROG],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        timeout=120,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+
+
+def test_r082_checkpoint_commit_form_with_no_verify_passes_in_a_workspace(workspace):
+    """R-082 (req 11a): the app's commit form may carry --no-verify inside a Workspace when the subject is a checkpoint."""
+    command = 'git commit --no-verify -m "$(cat <<\'EOF\'\ncheckpoint before TASK-003\n\nthe tree as delegated\nEOF\n)"'
+    p = _run_r082(command, workspace)
+    assert p.returncode == 0, (command, p.stderr)
+
+
+def test_r082_unquoted_ampersand_in_gh_api_is_refused_in_a_workspace(workspace):
+    """R-082 (req 11b): an unquoted & in a gh api argument is refused with a quoting remedy in a Workspace."""
+    command = "gh api repos/o/r/pulls?state=all&per_page=1"
+    p = _run_r082(command, workspace)
+    assert p.returncode == 2 and "quote" in p.stderr.lower(), (command, p.stderr)
+
+
+@pytest.mark.parametrize("command,expect", [
+    ('git commit -m x --message="--no-verify"', 0),
+    ("git commit -m x --no-verify", 2),
+])
+def test_r082_no_verify_after_message_is_not_the_message_value(tmp_path, command, expect):
+    """R-082 (req 11c): --no-verify in a message value passes; as an option after -m it is refused."""
+    p = _run_r082(command, tmp_path)
+    assert p.returncode == expect, (command, p.stderr)
+
+
+def test_r082_env_husky_zero_before_git_push_is_refused(tmp_path):
+    """R-082 (req 11d): env HUSKY=0 git push is refused like a leading HUSKY=0 assignment."""
+    p = _run_r082("env HUSKY=0 git push origin task-012", tmp_path)
+    assert p.returncode == 2 and "HUSKY" in p.stderr, p.stderr

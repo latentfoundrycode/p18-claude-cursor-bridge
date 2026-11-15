@@ -196,6 +196,157 @@ def test_r082_a_quoted_ampersand_in_a_gh_api_argument_passes(plain):
     passes("gh api 'repos/o/r/pulls?state=all&per_page=1'", plain)
 
 
+# ---------------------------------------------------------------- the supervisor's tests after round 1 (forms bash reads that round 1 did not)
+
+GLUED = [
+    ("glued-ampersand-before-a-worktree-removal", "git status&" + WR),
+    ("glued-ampersand-before-a-merge", "git fetch&" + MERGE),
+    ("quoted-paren-inside-a-double-quoted-substitution", 'echo "$(echo ")" ; ' + WR + ')"'),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in GLUED], ids=[n for n, _ in GLUED])
+def test_r082_a_refused_command_after_a_glued_ampersand_or_a_quoted_paren_is_refused(plain, command):
+    """bash ends a command at an unquoted & with or without a space, and a quote inside $( ) opens a new context."""
+    refused(command, plain)
+
+
+def test_r082_a_chain_glued_with_an_ampersand_is_refused_in_a_workspace(workspace):
+    err = refused("git add -A&git commit -m x", workspace)
+    assert "chain" in err, err
+
+
+def test_r082_an_unquoted_substitution_building_a_graphql_query_is_refused(plain):
+    err = refused("gh api graphql -f query=$(cat merge.graphql)", plain)
+    assert "graphql" in err, err
+
+
+@pytest.mark.parametrize("sub,command", [
+    ("rebase", "git rebase -m --no-verify main"),
+    ("am", "git am -m --no-verify fix.patch"),
+], ids=["rebase-m-is-a-flag", "am-m-is-a-flag"])
+def test_r082_no_verify_after_a_flag_that_takes_no_value_is_refused(plain, sub, command):
+    """-m is rebase's --merge and am's --message-id, flags that take no value: the --no-verify after them is an option."""
+    err = refused(command, plain)
+    assert "--no-verify" in err, err
+
+
+def test_r082_an_unquoted_ampersand_after_a_quoted_gh_api_argument_is_refused_with_its_remedy(plain):
+    err = refused("gh api -H 'Accept: application/json' repos/o/r/pulls?state=all&per_page=1", plain)
+    assert "quote" in err.lower(), err
+
+
+def _nested_quoted(depth, core):
+    """echo "$(echo "$(... core)")": every level but the innermost echoes the next; the innermost runs core."""
+    return 'echo "$(' * depth + core + ')"' * depth
+
+
+def _nested_unquoted(depth, core):
+    """echo "$(echo $(echo ... $(core)))": one double quote around a nest of unquoted substitutions."""
+    return 'echo "' + '$(echo ' * (depth - 1) + '$(' + core + ')' * depth + '"'
+
+
+NESTS = [
+    ("quoted-depth-25", _nested_quoted(25, WR)),
+    ("quoted-depth-400", _nested_quoted(400, WR)),
+    ("unquoted-depth-1000", _nested_unquoted(1000, WR)),
+    ("parameter-expansion-depth-1000", "echo " + "${x:-" * 1000 + "}" * 1000 + " ; " + WR),
+    ("twenty-nests-of-400-then-a-removal", " ; ".join([_nested_unquoted(400, "true")] * 20) + " ; " + WR),
+    ("eval-depth-1000", "eval " * 1000 + WR),
+    ("thirty-thousand-backslashes-quoted", 'echo "' + BS * 30000 + '" ; ' + WR),
+    ("forty-thousand-backslashes-unquoted", "echo " + BS * 40000 + " ; " + WR),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in NESTS], ids=[n for n, _ in NESTS])
+def test_r082_a_refused_command_after_deep_nesting_or_a_long_escape_run_is_refused_within_the_hooks_time(plain, command):
+    """A depth the reading cannot finish, or a recursion it cannot hold, must not end in an exit other than 2
+    (an exit 1 or the hook's timeout lets the command run)."""
+    started = time.monotonic()
+    refused(command, plain)
+    assert time.monotonic() - started < HOOK_SECONDS
+
+
+# ---------------------------------------------------------------- the reviewers' reproductions after round 1
+
+NL = "\n"
+TAB = "\t"
+
+READ_AS_BASH_READS = [
+    ("husky-before-eval", "HUSKY=0 eval git commit -m x"),
+    ("husky-before-bash-c", 'HUSKY=0 bash -c "git commit -m x"'),
+    ("husky-before-sh-c", "HUSKY=0 sh -c 'git push origin main'"),
+    ("env-u-value-then-husky", "env -u FOO HUSKY=0 git commit -m x"),
+    ("env-C-value-then-husky", "env -C sub HUSKY=0 git commit -m x"),
+    ("apostrophe-in-a-comment", "git status # don't worry" + NL + WR),
+    ("double-quote-in-a-comment", 'git status # say "hi' + NL + WR),
+    ("comment-inside-a-double-quoted-substitution", 'echo "$(# )' + NL + WR + ')"'),
+    ("case-pattern-inside-a-double-quoted-substitution", 'echo "$(case x in x) ' + WR + ';; esac)"'),
+    ("pipe-quoted-inside-a-double-quoted-substitution", 'echo "$(echo ";" | ' + WR + ')"'),
+    ("quoted-paren-inside-a-backtick-in-double-quotes", 'echo "' + BT + 'echo ")" ; ' + WR + BT + '"'),
+    ("escaped-backslash-before-a-newline", "echo a" + BS + BS + NL + WR),
+    ("backtick-before-a-newline-under-bash", "echo " + BT + NL + WR + NL + BT),
+    ("escaped-double-quote-outside-quotes", "echo " + BS + '" ; ' + WR + " ; echo " + BS + '"'),
+    ("escaped-single-quote-outside-quotes", "echo " + BS + "' ; " + WR + " ; echo " + BS + "'"),
+    ("ansi-c-quoted-subcommand", "git $'worktree' remove ../Worktrees/TASK-012"),
+    ("locale-quoted-subcommand", 'git $"worktree" remove ../Worktrees/TASK-012'),
+    ("ansi-c-hex-escape-in-a-subcommand", "git worktree $'" + BS + "x72emove' ../Worktrees/TASK-012"),
+    ("ansi-c-quoted-force-flag", "git push $'--force' origin main"),
+    ("heredoc-operator-inside-quotes", 'echo "<<EOF"' + NL + WR + NL + "EOF"),
+    ("here-string-is-no-heredoc", "cat <<<EOF" + NL + WR + NL + "EOF"),
+    ("tab-indented-heredoc-terminator", "cat <<-EOF" + NL + "x" + NL + TAB + "EOF" + NL + WR + NL + "EOF"),
+    ("heredoc-piped-to-a-shell", "cat <<EOF | bash" + NL + WR + NL + "EOF"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in READ_AS_BASH_READS], ids=[n for n, _ in READ_AS_BASH_READS])
+def test_r082_a_refused_command_the_shell_runs_is_refused(plain, command):
+    refused(command, plain)
+
+
+STILL_PASS = [
+    ("gh-api-with-stderr-redirect", "gh api repos/o/r/pulls 2>&1"),
+    ("gh-api-with-both-redirect", "gh api repos/o/r &>/dev/null"),
+    ("gh-api-and-and", "gh api repos/o/r&&echo ok"),
+    ("gh-api-words-in-an-echo", "echo gh api a&b"),
+    ("gh-api-words-in-a-heredoc-body", "cat > notes.md <<'EOF'" + NL + "run gh api repos/o/r/pulls?a=1&b=2" + NL + "EOF"),
+    ("process-substitution-words-inside-double-quotes", 'git commit -m "see <(gh pr merge 12 --squash) in docs"'),
+    ("substitution-inside-a-comment", "echo hi # $(" + WR + ")"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in STILL_PASS], ids=[n for n, _ in STILL_PASS])
+def test_r082_a_form_the_shell_does_not_run_as_a_refused_command_passes(plain, command):
+    passes(command, plain)
+
+
+def test_r082_the_apps_commit_form_with_an_apostrophe_in_its_body_passes_in_a_workspace(workspace):
+    """The app's commit form: a here-document's body is data, an apostrophe in it opens no quote."""
+    passes("git commit -m \"$(cat <<'EOF'" + NL + "fix: don't read the body" + NL + NL + "a body line" + NL + "EOF" + NL + ')"', workspace)
+
+
+def test_r082_a_state_change_inside_a_substitution_of_a_chain_is_refused_in_a_workspace(workspace):
+    err = refused('ls && echo "$(git commit -m x)"', workspace)
+    assert "chain" in err, err
+
+
+def guard_tool(command, cwd, tool):
+    payload = {"tool_name": tool, "tool_input": {"command": command}, "permission_mode": "auto", "cwd": str(cwd)}
+    p = subprocess.run([sys.executable, PROG], input=json.dumps(payload), capture_output=True, text=True, timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    return p.returncode, p.stderr
+
+
+def test_r082_a_backslash_before_a_quote_is_no_escape_under_powershell(plain):
+    """PowerShell has no backslash escape: "C:\\dir\\" closes at its last quote and the removal after it runs."""
+    rc, err = guard_tool('Get-ChildItem "C:' + BS + 'dir' + BS + '" ; ' + WR + ' ; echo "done"', plain, "PowerShell")
+    assert rc == 2 and "refused" in err, (rc, err)
+
+
+def test_r082_a_backtick_before_a_newline_continues_the_line_under_powershell(plain):
+    rc, err = guard_tool("git status " + BT + NL + "  --short", plain, "PowerShell")
+    assert rc == 0, (rc, err)
+
+
 # ---------------------------------------------------------------- a long command, read within the hook's time
 
 @pytest.mark.parametrize("command", [
