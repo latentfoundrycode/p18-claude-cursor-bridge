@@ -538,3 +538,127 @@ def test_r079_learned_limit_review_kind_keeps_learning(program, tmp_path):
     _write_learn_rows(tmp_path, [long])
     limit, why = br.learned_limit("review", str(tmp_path))
     assert limit > br.KINDS["review"] and long["id"] in why, (limit, why)
+
+
+# ---------------------------------------------------------------- R-081 git config detection
+
+
+def _r081_repo(tmp_path):
+    ws = tmp_path / "proj" / "Workspace"
+    ws.mkdir(parents=True)
+    (ws / "run").mkdir()
+    for args in (
+        ["init", "-q"],
+        ["config", "user.email", "test@example.invalid"],
+        ["config", "user.name", "test"],
+        ["config", "commit.gpgsign", "false"],
+    ):
+        p = subprocess.run(["git", "-C", str(ws)] + args, capture_output=True, text=True,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
+        assert p.returncode == 0, p.stderr
+    (ws / "a.txt").write_text("a\n", encoding="utf-8")
+    p = subprocess.run(["git", "-C", str(ws), "add", "a.txt"], capture_output=True, text=True,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
+    assert p.returncode == 0, p.stderr
+    p = subprocess.run(["git", "-C", str(ws), "commit", "-q", "-m", "init"], capture_output=True, text=True,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
+    assert p.returncode == 0, p.stderr
+    return ws
+
+
+def _r081_env(tmp_path, **extra):
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    env = dict(os.environ)
+    env.update(HOME=str(home), USERPROFILE=str(home), LOCALAPPDATA=str(tmp_path / "localappdata"),
+               BRIDGE_RUN_ALLOW_ANY="1", GIT_CEILING_DIRECTORIES=str(tmp_path))
+    for name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE"):
+        env.pop(name, None)
+    env.update(extra)
+    return env
+
+
+def test_r081_limit_path_prints_git_config_before_exit_124(tmp_path):
+    """R-081: on the limit path a test run that changed `.git/config` prints `.git/config changed` before `bridge-run: exit 124`."""
+    import re
+    line = re.compile(r"^bridge-run: GIT-CONFIG (.+) (new|removed|changed|unreadable)$")
+    ws = _r081_repo(tmp_path)
+    code = (
+        "import pathlib, time, sys\n"
+        "pathlib.Path('.git/config').write_text(\n"
+        "    pathlib.Path('.git/config').read_text(encoding='utf-8')\n"
+        "    + '\\n\\tfsmonitor = echo limit\\n', encoding='utf-8')\n"
+        "time.sleep(30)\n"
+        "sys.exit(0)\n"
+    )
+    p = subprocess.run([sys.executable, PROG, "--limit", "5", "--kind", "test", "--", sys.executable, "-c", code],
+                       capture_output=True, text=True, env=_r081_env(tmp_path), cwd=str(ws),
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
+    assert p.returncode == 124, p.stderr
+    lines = [m.group(1).replace("\\", "/") + " " + m.group(2)
+             for m in (line.match(x) for x in p.stderr.splitlines()) if m]
+    assert lines == [".git/config changed"], p.stderr
+    assert p.stderr.splitlines()[-1] == "bridge-run: exit 124", p.stderr
+
+
+def test_r081_child_exit_124_still_prints_git_config_hook_new(tmp_path):
+    """R-081: a child that exits 124 within its limit after adding a hook prints that hook's `new` line (no exit line)."""
+    import re
+    line = re.compile(r"^bridge-run: GIT-CONFIG (.+) (new|removed|changed|unreadable)$")
+    ws = _r081_repo(tmp_path)
+    code = (
+        "import pathlib, sys\n"
+        "pathlib.Path('.git/hooks/post-commit').write_text('exit 0' + chr(10))\n"
+        "sys.exit(124)\n"
+    )
+    p = subprocess.run([sys.executable, PROG, "--limit", "60", "--kind", "test", "--", sys.executable, "-c", code],
+                       capture_output=True, text=True, env=_r081_env(tmp_path), cwd=str(ws),
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
+    assert p.returncode == 124, p.stderr
+    git_lines = sorted(m.group(1).replace("\\", "/") + " " + m.group(2)
+                       for m in (line.match(x) for x in p.stderr.splitlines()) if m)
+    assert git_lines == [".git/hooks/post-commit new"], p.stderr
+    assert "bridge-run: exit" not in p.stderr, p.stderr
+
+
+def test_r081_hook_without_hooks_path_one_line(tmp_path):
+    """R-081: without `core.hooksPath`, a hook added gives exactly one GIT-CONFIG line (hooks folder read once)."""
+    import re
+    line = re.compile(r"^bridge-run: GIT-CONFIG (.+) (new|removed|changed|unreadable)$")
+    ws = _r081_repo(tmp_path)
+    code = "import pathlib\npathlib.Path('.git/hooks/pre-commit').write_text('#!/bin/sh' + chr(10))"
+    p = subprocess.run([sys.executable, PROG, "--limit", "60", "--kind", "test", "--", sys.executable, "-c", code],
+                       capture_output=True, text=True, env=_r081_env(tmp_path), cwd=str(ws),
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
+    assert p.returncode == 0, p.stderr
+    git_lines = sorted(m.group(1).replace("\\", "/") + " " + m.group(2)
+                       for m in (line.match(x) for x in p.stderr.splitlines()) if m)
+    assert git_lines == [".git/hooks/pre-commit new"], p.stderr
+
+
+def test_r081_refused_driver_prints_no_git_config(tmp_path):
+    """R-081: a refused driver run makes no GIT-CONFIG line; the refused program would plant a hook under run/supervisor/."""
+    import re
+    line = re.compile(r"^bridge-run: GIT-CONFIG (.+) (new|removed|changed|unreadable)$")
+    ws = _r081_repo(tmp_path)
+    plant = "import pathlib\npathlib.Path('.git/hooks/post-merge').write_text('exit 0' + chr(10))"
+    config_before = (ws / ".git" / "config").read_bytes()
+    rogue = ws / "rogue.py"
+    rogue.write_text(plant, encoding="utf-8")
+    p = subprocess.run([sys.executable, PROG, "--limit", "60", "--kind", "driver", "--", "python", str(rogue)],
+                       capture_output=True, text=True, env=_r081_env(tmp_path), cwd=str(ws),
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
+    assert p.returncode == 125, p.stderr
+    assert "GIT-CONFIG" not in p.stderr, p.stderr
+    assert not (ws / ".git" / "hooks" / "post-merge").exists()
+    assert (ws / ".git" / "config").read_bytes() == config_before
+    prog = ws / "run" / "supervisor" / "plant.py"
+    prog.parent.mkdir(parents=True, exist_ok=True)
+    prog.write_text(plant, encoding="utf-8")
+    ok = subprocess.run([sys.executable, PROG, "--limit", "60", "--kind", "driver", "--", "python", str(prog)],
+                        capture_output=True, text=True, env=_r081_env(tmp_path), cwd=str(ws),
+                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
+    assert ok.returncode == 0, ok.stderr
+    git_lines = sorted(m.group(1).replace("\\", "/") + " " + m.group(2)
+                       for m in (line.match(x) for x in ok.stderr.splitlines()) if m)
+    assert git_lines == [".git/hooks/post-merge new"], ok.stderr

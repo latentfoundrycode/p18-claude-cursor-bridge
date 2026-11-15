@@ -1,5 +1,6 @@
 # Builder notes
 
+
 2026-10-12 TASK-002-r2: Semgrep CLI 1.176.1 rejects `semgrep scan --dry-run` (suggests `--dryrun`, which is autofix-only); used `semgrep --validate --config …` to confirm rule load counts per the handoff report.
 
 2026-10-12 TASK-002-r3: Push-to-`main` Semgrep uses `--baseline-commit ${{ github.event.before }}` (skip baseline when `before` is the all-zero SHA) so the floor gates only code introduced by the push; PR path still uses `git merge-base`.
@@ -41,3 +42,5 @@
 2026-11-11 TASK-051: `test_fix001_no_test_starts_a_program_around_the_default` fails on supervisor `tests/test_records_migrate.py` lines 76 and 81 (`creationflags=NO_WINDOW`); Scope forbids editing above the builder marker, so the supervisor should spell `getattr(subprocess, "CREATE_NO_WINDOW", 0)` there. Closed 2026-11-11 (stage H2's review): the file no longer holds those lines.
 
 2026-11-13 TASK-057-r2: `test_r077_the_help_names_the_move_mode_and_its_base` asserts the substring `SUPPRESS` is absent from the whole of `docs/cli-reference.json`, but `tools/dump-cli.py` on Python 3.12 records every argparse `-h` default as the string `==SUPPRESS==` (17 occurrences after `--moves`/`--base` help is fixed); the test's first assertion and the trace-check section of the reference already match S1, while the second assertion cannot pass without a dump-cli change (out of scope for r2). Closed 2026-11-14 (stage P1's review): the supervisor's test now asserts that no option's help is `==SUPPRESS==` (TASK-057, 1916e72; HARDENING, TASK-057).
+
+2026-11-15 TASK-062-r2: `git rev-parse --git-path hooks` from a worktree sub-folder returns a path relative to the launch folder (for example `../.githooks`), not to `--show-toplevel`; `_git_resolved_path` must join against `os.getcwd()` or the hook watch misses the planted file.
