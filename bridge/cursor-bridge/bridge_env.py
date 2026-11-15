@@ -496,9 +496,9 @@ MERGE_UNIT_RE = re.compile(
 MERGE_UNIT_ONE_LINE_RE = re.compile(
     r"^\s*(?:"
     + MERGE_UNIT_BULLET_CLASS
-    + r"\s+)?Merge unit:\s*"
+    + r"\s+)?Merge unit:\s*(?:("
     + MERGE_UNIT_ID_FORM
-    + r"\s*$",
+    + r")\s*$|(\S+\s+\S))",
 )
 
 DESIGN_PATH_NORM = re.compile(r"[/\\]+(?:\.[/\\]+)*")
@@ -988,18 +988,6 @@ def plan_increment_ids(folder):
     return ids
 
 
-def _merge_unit_field_line_words(stripped):
-    s = stripped.lstrip()
-    if s and s[0] in "-*" and len(s) > 1 and s[1] == " ":
-        s = s[2:].lstrip()
-    if not s.startswith("Merge unit:"):
-        return None
-    rest = s[len("Merge unit:") :].lstrip()
-    if not rest:
-        return []
-    return rest.split()
-
-
 def brief_merge_unit_one_side(text):
     """When a brief names a merge unit of one increment on a side and neither names two or more as written,
     return which side; else None. The launcher is the sole caller."""
@@ -1013,11 +1001,12 @@ def brief_merge_unit_one_side(text):
     line_two = False
     for line in src.splitlines():
         stripped = line.strip()
-        if MERGE_UNIT_ONE_LINE_RE.match(stripped):
-            line_one = True
-        words = _merge_unit_field_line_words(stripped)
-        if words is not None and len(words) >= 2:
-            line_two = True
+        m = MERGE_UNIT_ONE_LINE_RE.match(stripped)
+        if m:
+            if m.group(1) is not None:
+                line_one = True
+            elif m.group(2) is not None:
+                line_two = True
     header_one = False
     header_two = False
     if rec.header is not None:
