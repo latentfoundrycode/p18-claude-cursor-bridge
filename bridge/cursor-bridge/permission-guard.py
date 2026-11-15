@@ -56,7 +56,6 @@ that cannot read its input never blocks the loop. ASCII-only on purpose. Never w
 import json
 import os
 import re
-import shlex
 import subprocess
 import sys
 
@@ -196,13 +195,45 @@ def _strip_outer_parens(s):
     return s
 
 
+def _join_bs_newlines(text, backslash_escapes):
+    if not backslash_escapes:
+        return text
+    out, i, n = [], 0, len(text)
+    while i < n:
+        if text[i] == "\\":
+            j, bs = i, 0
+            while j < n and text[j] == "\\":
+                bs += 1
+                j += 1
+            if j < n and text[j] in "\r\n" and bs % 2 == 1:
+                out.append("\\" * (bs - 1))
+                while j < n and text[j] in "\r\n":
+                    j += 1
+                i = j
+                continue
+            out.append("\\" * bs)
+            i = j
+            continue
+        out.append(text[i])
+        i += 1
+    return "".join(out)
+
+
 def read_shell(text, backslash_escapes=True):
     """One iterative read: quoting, separators, substitutions, here-documents (R-082)."""
+    text = _join_bs_newlines(text, backslash_escapes)
     n = len(text)
-    full_cmds, subst_inners, heredocs = [], [], []
+    full_cmds, subst_inners, heredocs, cmd_words_list, sub_chains_list = [], [], [], [], []
     depth_exceeded, saw_subst = False, False
-    stack = [{"k": "spl", "buf": [], "cbuf": [], "chain_segs": [], "top": True, "nest": 0, "pd": 0, "cs": 0, "cmt": False, "inh": 0}]
+    unreadable, gh_amp_reason = None, None
+    stack = [{"k": "spl", "buf": [], "cbuf": [], "chain_segs": [], "top": True, "nest": 0, "pd": 0, "cmt": False, "inh": 0,
+              "wmerge": [], "words": [], "chain_wds": [], "gh": False, "hd_line": False}]
     i, bs_run = 0, 0
+
+    def refuse(msg):
+        nonlocal unreadable
+        if unreadable is None:
+            unreadable = msg
 
     def active_split():
         for fr in reversed(stack):
@@ -210,62 +241,192 @@ def read_shell(text, backslash_escapes=True):
                 return fr
         return None
 
+    def in_quote():
+        return any(fr["k"] in ("sq", "dq", "ansi", "loc") for fr in stack)
+
+    def subst_counts():
+        return not any(fr["k"] in ("sq", "ansi") for fr in stack)
+
+    def mark_gh(fr):
+        ws = fr["words"]
+        if fr.get("wmerge"):
+            ws = ws + ["".join(fr["wmerge"])]
+        i = 0
+        while i < len(ws):
+            if base(ws[i]) not in ("gh", "gh.exe"):
+                i += 1
+                continue
+            j = i + 1
+            while j < len(ws):
+                t = ws[j]
+                if t == "api":
+                    fr["gh"] = True
+                    return
+                if t.startswith("-"):
+                    j += 1
+                    if j < len(ws) and not ws[j].startswith("-"):
+                        j += 1
+                    continue
+                j += 1
+            i += 1
+
+    def flush_word(fr):
+        if not fr.get("wmerge"):
+            return
+        w = "".join(fr["wmerge"])
+        fr["wmerge"] = []
+        fr["words"].append(w)
+        if w == "case":
+            refuse("the guard cannot read the command: a case statement")
+        mark_gh(fr)
+
+    def wadd(ch):
+        sp = active_split()
+        if sp and sp.get("wmerge") is not None:
+            sp["wmerge"].append(ch)
+
+    def append_ch(fr, ch, word=True):
+        fr["buf"].append(ch)
+        fr["cbuf"].append(ch)
+        if word and fr.get("wmerge") is not None and not in_quote():
+            if ch in " \t\n\r":
+                flush_word(fr)
+            elif ch not in "'\"":
+                fr["wmerge"].append(ch)
+
+    def spl_emit(ch, word=True):
+        sp = active_split()
+        if sp:
+            append_ch(sp, ch, word=word)
+
     def heredoc_op_at(i):
-        if not text.startswith("<<", i) or text.startswith("<<<", i):
+        if text.startswith("<<<", i):
+            refuse("the guard cannot read the command: a here-string (<<<)")
+            return False
+        if text.startswith("<<-", i):
+            refuse("the guard cannot read the command: a tab-stripping here-document (<<-)")
+            return False
+        if not text.startswith("<<", i):
             return False
         return i == 0 or text[i - 1] != "<"
 
-    def flush_spl(fr, chain_too=True):
+    def flush_spl(fr, chain_too=True, collect_chain=True):
+        nonlocal gh_amp_reason
+        flush_word(fr)
         seg = "".join(fr["buf"]).strip()
         fr["buf"] = []
+        wd = list(fr["words"])
+        fr["words"] = []
         if seg and fr.get("top"):
             full_cmds.append(seg)
+            cmd_words_list.append(wd)
+        elif seg and not fr.get("top"):
+            subst_inners.append(seg)
+            sub_chains_list.append(list(fr["chain_segs"]))
         if chain_too:
             cseg = "".join(fr["cbuf"]).strip()
             fr["cbuf"] = []
             if cseg:
                 fr["chain_segs"].append(cseg)
+            if collect_chain and cseg:
+                fr["chain_wds"].append(wd if wd else list(fr.get("_last_wds", [])))
+        if wd:
+            fr["_last_wds"] = wd
 
-    def append_ch(fr, ch):
-        fr["buf"].append(ch)
-        fr["cbuf"].append(ch)
+    def try_redirect(i, fr):
+        if in_quote() or fr.get("wmerge"):
+            return None
+        m = None
+        if text.startswith(">&-", i):
+            m = 4
+        elif i + 2 < n and text[i:i + 3] in (">>>", "<<<"):
+            return None
+        elif text.startswith(">>", i) and not text.startswith(">>>", i):
+            m = 2
+        elif text.startswith("<<", i):
+            return None
+        elif text.startswith("<&", i) or text.startswith(">&", i):
+            m = 2
+        elif text.startswith("<>", i):
+            m = 2
+        elif text.startswith(">|", i):
+            m = 2
+        elif text.startswith("&>>", i):
+            m = 3
+        elif text.startswith("&>", i):
+            m = 2
+        elif text[i] in "<>" and not (text[i] == "<" and i + 1 < n and text[i + 1] == "(") and not (text[i] == ">" and i + 1 < n and text[i + 1] == "("):
+            m = 1
+        else:
+            k = i
+            while k < n and text[k].isdigit():
+                k += 1
+            if k > i and k < n and text[k] in "<>":
+                if text.startswith(">&-", k):
+                    m = (k - i) + 4
+                elif text.startswith(">>", k):
+                    m = (k - i) + 2
+                elif text.startswith("<<", k):
+                    return None
+                elif text[k:k + 2] in ("<&", ">&", "<>"):
+                    m = (k - i) + 2
+                elif text[k] in "<>":
+                    m = (k - i) + 1
+        if m:
+            for ch in text[i:i + m]:
+                append_ch(fr, ch, word=False)
+            j = i + m
+            while j < n and text[j] in " \t":
+                append_ch(fr, text[j], word=False); j += 1
+            if j < n and text[j] in "'\"":
+                return j
+            while j < n and text[j] not in " \t\n\r;|&":
+                if text.startswith("$(", j) or text[j] in "'\"":
+                    return j
+                append_ch(fr, text[j], word=False)
+                j += 1
+            return j
+        return None
 
-    def spl_emit(ch):
-        sp = active_split()
-        if sp:
-            append_ch(sp, ch)
-
-    def push_split(top, nest):
-        if nest > READ_DEPTH_BOUND:
-            nonlocal depth_exceeded
-            depth_exceeded = True
-        stack.append({"k": "spl", "buf": [], "cbuf": [], "chain_segs": [], "top": top, "nest": nest, "pd": 0, "cs": 0, "cmt": False, "inh": nest})
-
-    def bare_amp(i):
+    def bare_amp(i, fr):
         if i >= n or text[i] != "&":
             return False
         if i > 0 and text[i - 1] in "<>":
+            return False
+        if i > 0 and text[i - 1] not in " \t\n\r;|&(":
             return False
         if i + 1 < n and text[i + 1] in ">&":
             return False
         if i + 1 < n and text[i + 1] == "&":
             return False
+        if i + 1 < n and text[i + 1] not in " \t\n\r;|&)":
+            return False
         return True
 
+    def push_split(top, nest):
+        nonlocal depth_exceeded
+        if nest > READ_DEPTH_BOUND:
+            depth_exceeded = True
+            refuse("the guard cannot read the command: nesting past the bound")
+            return
+        stack.append({"k": "spl", "buf": [], "cbuf": [], "chain_segs": [], "top": top, "nest": nest, "pd": 0, "cmt": False, "inh": nest,
+                        "wmerge": [], "words": [], "chain_wds": [], "gh": False, "hd_line": False})
+
     def try_sep(i, fr, subst=False):
+        nonlocal gh_amp_reason
         chain_hit = full_hit = None
         if i + 1 < n and text[i:i + 2] in ("&&", "||"):
             chain_hit = full_hit = i + 2
         elif text[i] in (";", "\n"):
-            bb = "".join(fr["buf"])
-            heredoc_op = re.search(r"(?<!<)<<-?(?![<-])", bb)
-            if not (subst and text[i] == "\n" and heredoc_op):
+            if not (subst and text[i] == "\n" and fr.get("hd_line")):
                 chain_hit = full_hit = i + 1
-        elif bare_amp(i):
+        elif bare_amp(i, fr):
+            if fr.get("gh") and fr.get("wmerge") and not gh_amp_reason:
+                gh_amp_reason = "gh api with an unquoted & in an argument (quote the endpoint or URL so the shell does not split on &)"
+            if fr.get("wmerge"):
+                flush_word(fr)
             chain_hit = full_hit = i + 1
         elif text[i] == "|":
-            full_hit = i + 1
-        elif not subst and text[i] in "()":
             full_hit = i + 1
         if full_hit is not None:
             flush_spl(fr, chain_too=chain_hit is not None)
@@ -292,48 +453,245 @@ def read_shell(text, backslash_escapes=True):
         while j < n and text[j] in " \t":
             j += 1
         if j >= n:
-            return None
+            return None, None, None, None
         if text[j] in ("'", '"'):
             quoted, q = text[j], j + 1
             while q < n and text[q] != quoted:
                 q += 1
-            return text[j + 1:q], quoted, q + 1
+            if q >= n:
+                refuse("the guard cannot read the command: an unclosed quote or substitution")
+                return None, None, None, None
+            dname = text[j + 1:q]
+            if q + 1 < n and text[q + 1] not in " \t\n;|&":
+                refuse("the guard cannot read the command: a here-document delimiter is not one plain word or one quoted plain word")
+                return None, None, None, None
+            return dname, quoted, q + 1, j
         start = j
         while j < n and text[j] not in " \t\n;|&":
             j += 1
-        return text[start:j], None, j
+        dname = text[start:j]
+        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", dname):
+            refuse("the guard cannot read the command: a here-document delimiter is not one plain word or one quoted plain word")
+            return None, None, None, None
+        return dname, None, j, start
 
     def in_dq():
         return any(fr["k"] == "dq" for fr in stack)
 
-    def absorb_expanded_heredoc(hd_start, body_end, dj, delim, quoted, strip_tabs):
+    def unescape_bt(s):
+        out, j, bn = [], 0, len(s)
+        while j < bn:
+            if s[j] == "\\" and j + 1 < bn:
+                nxt = s[j + 1]
+                if nxt in "$\\\"":
+                    out.append({"$": "$", "\\": "\\", '"': '"'}[nxt])
+                else:
+                    out.append(s[j:j + 2])
+                j += 2
+            else:
+                out.append(s[j]); j += 1
+        return "".join(out)
+
+    def scan_btick_body(body, nest):
+        push_split(False, nest)
+        bi, bn, bt_bs = 0, len(body), 0
+        while bi < bn:
+            if unreadable or depth_exceeded:
+                break
+            bc = body[bi]
+            sp = active_split()
+            if not sp:
+                break
+            if sp.get("cmt"):
+                if bc == "\n":
+                    sp["cmt"] = False
+                bi += 1
+                continue
+            if bc == "#" and (not sp["buf"] or sp["buf"][-1].isspace()):
+                sp["cmt"] = True
+                bi += 1
+                continue
+            if bc == "\\" and backslash_escapes:
+                append_ch(sp, bc, word=False)
+                bt_bs += 1
+                bi += 1
+                continue
+            escd = backslash_escapes and bt_bs % 2 == 1
+            bt_bs = 0
+            if not escd and body.startswith("$(", bi):
+                saw_subst = True
+                append_ch(sp, "$(", word=False)
+                push_split(False, nest + 1)
+                stack.append({"k": "sub", "start": bi + 2, "pd": 1})
+                bi += 2
+                continue
+            if not escd and bc == "`":
+                refuse("the guard cannot read the command: a nested backtick")
+                break
+            if not escd and bc == "'":
+                append_ch(sp, "'", word=False)
+                stack.append({"k": "sq"})
+                bi += 1
+                continue
+            if not escd and bc == '"':
+                append_ch(sp, '"', word=False)
+                stack.append({"k": "dq", "nest": nest})
+                bi += 1
+                continue
+            tsep = try_sep(bi, sp, subst=True)
+            if tsep is not None:
+                bi = tsep
+                continue
+            append_ch(sp, bc)
+            bi += 1
+        flush_spl(active_split())
+        while len(stack) > 1 and stack[-1]["k"] == "spl" and stack[-1]["nest"] >= nest:
+            stack.pop()
+
+    def scan_unquoted_hd_body(start, end, delim):
         nonlocal saw_subst
-        if quoted is not None:
-            return
-        blob = text[hd_start:body_end]
-        if "\n" not in blob:
-            return
-        body = blob.split("\n", 1)[1]
-        lines = body.splitlines()
-        if lines:
-            last = lines[-1]
-            if strip_tabs:
-                last = last.lstrip("\t")
-            if last.rstrip(" \t") == delim:
-                body = "\n".join(lines[:-1])
-        if not body.strip():
-            return
-        inn = read_shell(body, backslash_escapes=backslash_escapes)
-        saw_subst = saw_subst or inn["hassub"]
-        for s in inn["subs"]:
-            if s.strip():
-                subst_inners.append(s.strip())
-        for c in inn["full"]:
-            if c.strip():
-                subst_inners.append(c.strip())
+        j = start
+        in_sq = in_dq = False
+        bs = 0
+        while j < end:
+            line_nl = text.find("\n", j)
+            if line_nl < 0 or line_nl > end:
+                line_nl = end
+            if text[j:line_nl].lstrip("\t").rstrip(" \t") == delim:
+                return
+            k = j
+            while k < line_nl:
+                c = text[k]
+                if in_sq:
+                    if c == "'":
+                        in_sq = False
+                    k += 1
+                    continue
+                if in_dq:
+                    esc = backslash_escapes and bs % 2 == 1
+                    if c == "\\" and backslash_escapes and not esc:
+                        bs += 1; k += 1; continue
+                    if c == '"' and not esc:
+                        in_dq = False
+                    bs = 0; k += 1; continue
+                if c == "'":
+                    in_sq = True; k += 1; continue
+                if c == '"':
+                    in_dq = True; k += 1; continue
+                if text.startswith("$(", k):
+                    saw_subst = True
+                    dep = 1
+                    k2 = k + 2
+                    while k2 < end and dep:
+                        if text.startswith("$(", k2):
+                            dep += 1; k2 += 2; continue
+                        if text[k2] == ")":
+                            dep -= 1
+                        k2 += 1
+                    if dep:
+                        refuse("the guard cannot read the command: an unclosed quote or substitution")
+                        return
+                    inner = text[k + 2:k2 - 1].strip()
+                    if inner:
+                        subst_inners.append(inner)
+                    k = k2
+                    continue
+                if c == "`":
+                    refuse("the guard cannot read the command: a backtick inside an unquoted here-document body")
+                    return
+                k += 1
+            j = line_nl + 1 if line_nl < end else end
+
+    def finish_heredoc(i, fr):
+        nonlocal gh_amp_reason
+        line_end = text.find("\n", i)
+        if line_end < 0:
+            line_end = n
+        if fr.get("hdcnt", 0):
+            refuse("the guard cannot read the command: two here-documents on one line")
+            return line_end + 1 if line_end < n else n
+        fr["hdcnt"] = fr.get("hdcnt", 0) + 1
+        fr["hd_line"] = True
+        delim, quoted, dj, _ = parse_heredoc_delim(i + 2)
+        if delim is None and unreadable:
+            return line_end + 1 if line_end < n else n
+        if delim is None:
+            refuse("the guard cannot read the command: a here-document without a delimiter")
+            return i + 2
+        in_sq = in_dq = False
+        j, bs = i, 0
+        while j < line_end:
+            if text.startswith("<<", j) and j > i:
+                refuse("the guard cannot read the command: two here-documents on one line")
+                break
+            c = text[j]
+            if in_sq:
+                append_ch(fr, c, word=False)
+                if c == "'":
+                    in_sq = False
+                j += 1
+                continue
+            if in_dq:
+                esc = backslash_escapes and bs % 2 == 1
+                if c == "\\" and backslash_escapes and not esc:
+                    append_ch(fr, c, word=False); bs += 1; j += 1; continue
+                append_ch(fr, c, word=False)
+                if c == '"' and not esc:
+                    in_dq = False
+                bs = 0
+                j += 1
+                continue
+            if c == "'":
+                in_sq = True; append_ch(fr, c, word=False); j += 1; continue
+            if c == '"':
+                in_dq = True; append_ch(fr, c, word=False); j += 1; continue
+            if j + 1 < line_end and text[j:j + 2] in ("&&", "||"):
+                flush_spl(fr); j += 2; continue
+            if c in ";|&" and (c != "&" or not (j > 0 and text[j - 1] in "<>")):
+                if c == "&" and j + 1 < line_end and text[j + 1] in ">&":
+                    append_ch(fr, c, word=False); j += 1; continue
+                if c == "&" and j + 1 < line_end and text[j + 1] == "&":
+                    flush_spl(fr); j += 2; continue
+                if c == "&":
+                    if fr.get("gh") and fr.get("wmerge") and not gh_amp_reason:
+                        gh_amp_reason = "gh api with an unquoted & in an argument (quote the endpoint or URL so the shell does not split on &)"
+                    if fr.get("wmerge"):
+                        flush_word(fr)
+                    flush_spl(fr); j += 1; continue
+                if c in ";|":
+                    flush_spl(fr); j += 1; continue
+            append_ch(fr, c); j += 1
+        if line_end < n:
+            append_ch(fr, "\n", word=False)
+        body_start = line_end + 1 if line_end < n else n
+        body_end = skip_heredoc_body(body_start, delim, False)
+        if not quoted:
+            scan_unquoted_hd_body(body_start, body_end, delim)
+        line_start_ix = text[:i].rfind("\n") + 1
+        heredocs.append({"start": i, "end": body_end, "delim": delim, "quoted": quoted, "strip": False,
+                         "line": text[line_start_ix:line_end]})
+        if len(heredocs) > READ_DEPTH_BOUND:
+            refuse("the guard cannot read the command: nesting past the bound")
+        fr["hd_line"] = False
+        fr["hdcnt"] = 0
+        return body_end
+
+    if not backslash_escapes:
+        j = 0
+        while j < n:
+            if text.startswith("@'", j) or text.startswith('@"', j):
+                refuse("the guard cannot read the command: a PowerShell here-string")
+                break
+            if text.startswith("<#", j):
+                refuse("the guard cannot read the command: a PowerShell block comment")
+                break
+            if text[j] == "\r" and (j + 1 >= n or text[j + 1] != "\n"):
+                refuse("the guard cannot read the command: a lone carriage return")
+                break
+            j += 1
 
     while i < n:
-        if depth_exceeded:
+        if unreadable or depth_exceeded:
             break
         fr = active_split()
         if fr and fr["cmt"]:
@@ -345,46 +703,80 @@ def read_shell(text, backslash_escapes=True):
             continue
         topk = stack[-1]["k"] if stack else ""
         if topk == "sq":
-            fr = stack[-1]
-            fr["buf"].append(text[i])
-            spl_emit(text[i])
-            if text[i] == "'":
+            c = text[i]
+            if c == "'":
+                spl_emit(c, word=False)
                 stack.pop()
+            else:
+                spl_emit(c, word=False)
+                wadd(c)
             i += 1
             bs_run = 0
             continue
         if topk == "dq":
             fr = stack[-1]
             c = text[i]
+            if not backslash_escapes and c == "\\" and i + 1 < n and text[i + 1] == '"':
+                refuse("the guard cannot read the command: a backslash before a quote under PowerShell")
+                break
             esc = backslash_escapes and bs_run % 2 == 1
             if c == "\\" and backslash_escapes and not esc:
-                fr["buf"].append(c); spl_emit(c); bs_run += 1; i += 1; continue
+                spl_emit(c, word=False); bs_run += 1; i += 1; continue
             if c == '"' and not esc:
-                spl_emit(c); stack.pop(); bs_run = 0; i += 1; continue
+                spl_emit('"', word=False); stack.pop(); bs_run = 0; i += 1; continue
             if not esc and text.startswith("$(", i):
-                fr["buf"].append("$("); spl_emit("$("); i += 2; bs_run = 0
-                saw_subst = True
+                spl_emit("$(", word=False); i += 2; bs_run = 0
+                if subst_counts():
+                    saw_subst = True
                 push_split(False, fr.get("nest", 0) + 1)
-                stack.append({"k": "sub", "start": i, "pd": 1, "cs": 0})
+                stack.append({"k": "sub", "start": i, "pd": 1})
+                continue
+            if not esc and text.startswith("${", i):
+                spl_emit("${", word=False); wadd("$"); wadd("{"); i += 2; bs_run = 0
+                stack.append({"k": "br", "body": [], "nest": fr.get("nest", 0)})
                 continue
             if not esc and c == "`":
-                fr["buf"].append(c); spl_emit(c); i += 1; bs_run = 0
-                saw_subst = True
+                spl_emit(c, word=False); i += 1; bs_run = 0
+                if subst_counts():
+                    saw_subst = True
                 stack.append({"k": "btf", "buf": [], "nest": fr.get("nest", 0)})
                 continue
-            fr["buf"].append(c); spl_emit(c); bs_run = 0; i += 1
+            if esc:
+                if c not in "$\"\\`":
+                    wadd("\\")
+                wadd(c)
+            else:
+                wadd(c)
+            spl_emit(c, word=False); bs_run = 0; i += 1
             continue
         if topk == "ansi":
             fr = stack[-1]
             c = text[i]
             if c == "\\" and i + 1 < n:
-                fr["buf"].append(text[i:i + 2])
-                spl_emit(text[i:i + 2])
+                fr.setdefault("raw", []).append(text[i:i + 2])
+                spl_emit(text[i:i + 2], word=False)
                 i += 2; continue
-            fr["buf"].append(c)
-            spl_emit(c)
             if c == "'":
+                raw = "".join(fr.get("raw", []))
+                try:
+                    decoded = _ansi_c_decode(raw)
+                except Exception:
+                    decoded = raw
+                if "\x00" in decoded:
+                    decoded = decoded.split("\x00", 1)[0]
+                    if not decoded and "\x00" in _ansi_c_decode(raw):
+                        refuse("the guard cannot read the command: an ANSI-C string with a NUL byte")
+                spl_emit("'", word=False)
+                sp = active_split()
+                if sp:
+                    sp.setdefault("wmerge", []).extend(list(decoded))
+                    mark_gh(sp)
                 stack.pop()
+                if i + 1 < n and text[i + 1] not in " \t\n\r;|&":
+                    refuse("the guard cannot read the command: an ANSI-C string that is not a whole word")
+                i += 1; bs_run = 0; continue
+            fr.setdefault("raw", []).append(c)
+            spl_emit(c, word=False)
             i += 1
             bs_run = 0
             continue
@@ -393,38 +785,39 @@ def read_shell(text, backslash_escapes=True):
             c = text[i]
             esc = backslash_escapes and bs_run % 2 == 1
             if c == "\\" and backslash_escapes and not esc:
-                fr["buf"].append(c); spl_emit(c); bs_run += 1; i += 1; continue
+                fr.setdefault("raw", []).append(c); spl_emit(c, word=False); bs_run += 1; i += 1; continue
             if c == '"' and not esc:
-                spl_emit(c); stack.pop(); bs_run = 0; i += 1; continue
-            fr["buf"].append(c); spl_emit(c); bs_run = 0; i += 1
+                spl_emit('"', word=False)
+                sp = active_split()
+                if sp:
+                    sp.setdefault("wmerge", []).extend(list("".join(fr.get("raw", []))))
+                    mark_gh(sp)
+                stack.pop()
+                if i + 1 < n and text[i + 1] not in " \t\n\r;|&":
+                    refuse("the guard cannot read the command: a locale string that is not a whole word")
+                bs_run = 0; i += 1; continue
+            fr.setdefault("raw", []).append(c); spl_emit(c, word=False); i += 1; bs_run = 0
             continue
         if topk == "br":
             fr = stack[-1]
-            if fr["bd"] <= 0:
-                stack.pop()
-                continue
             c = text[i]
-            if c == "'":
-                stack.append({"k": "sq", "buf": ["'"]}); i += 1; bs_run = 0; continue
-            if c == '"':
-                stack.append({"k": "dq", "buf": ['"'], "nest": 0}); i += 1; bs_run = 0; continue
-            if text.startswith("$'", i):
-                stack.append({"k": "ansi", "buf": list("$'")}); i += 2; bs_run = 0; continue
-            if text.startswith('$"', i):
-                stack.append({"k": "loc", "buf": list('$"')}); i += 2; bs_run = 0; continue
-            if text.startswith("${", i):
-                stack.append({"k": "br", "bd": 1, "buf": []}); i += 2; bs_run = 0; continue
-            if not in_dq() and text.startswith("$(", i) and bs_run % 2 == 0:
-                saw_subst = True
-                push_split(False, fr["nest"] + 1)
-                stack.append({"k": "sub", "start": i + 2, "pd": 1, "cs": 0})
-                i += 2; bs_run = 0; continue
-            if text[i] == "{":
-                fr["bd"] += 1
-            elif text[i] == "}":
-                fr["bd"] -= 1
-                if fr["bd"] == 0:
-                    stack.pop(); i += 1; bs_run = 0; continue
+            if c == "}":
+                body = "".join(fr.get("body", []))
+                stack.pop()
+                sp = active_split()
+                if sp:
+                    spl_emit("}", word=False)
+                bad = any(x in body for x in "\"'`$({")
+                if bad or (not re.match(r"^!?[A-Za-z_][A-Za-z0-9_]*$", body) and not re.match(r"^#[A-Za-z_][A-Za-z0-9_]*$", body) and not re.match(r"^[A-Za-z_][A-Za-z0-9_]*:-[^\"'`${}()]*$", body)):
+                    refuse("the guard cannot read the command: a parameter expansion holding a quote, substitution or brace")
+                else:
+                    for ch in body + "}":
+                        wadd(ch)
+                i += 1; bs_run = 0; continue
+            if c in "\"'`$({" or text.startswith("$(", i):
+                refuse("the guard cannot read the command: a parameter expansion holding a quote, substitution or brace")
+                break
+            fr.setdefault("body", []).append(c)
             i += 1; bs_run = 0
             continue
         if topk == "btf":
@@ -433,53 +826,16 @@ def read_shell(text, backslash_escapes=True):
             if c == "\\" and i + 1 < n and backslash_escapes:
                 fr["buf"].append(text[i:i + 2]); i += 2; continue
             if c == "`" and (not backslash_escapes or bs_run % 2 == 0):
-                body = "".join(fr["buf"])
+                raw = "".join(fr["buf"])
+                body = unescape_bt(raw)
+                nest = fr["nest"]
                 stack.pop()
                 spl = active_split()
                 if spl:
-                    spl["buf"].append("`")
-                subst_inners.append(body)
+                    spl_emit("`", word=False)
                 saw_subst = True
-                push_split(False, fr["nest"] + 1)
-                bi, bn = 0, len(body)
-                bt_bs = 0
-                while bi < bn:
-                    bc = body[bi]
-                    sp = active_split()
-                    if not sp:
-                        break
-                    if sp["cmt"]:
-                        if bc == "\n":
-                            sp["cmt"] = False
-                        bi += 1; continue
-                    if bc == "#" and sp["inh"] == 0 and (not sp["buf"] or sp["buf"][-1].isspace()):
-                        sp["cmt"] = True; bi += 1; continue
-                    if bc == "\\" and backslash_escapes:
-                        sp["buf"].append(bc); bt_bs += 1; bi += 1; continue
-                    escd = backslash_escapes and bt_bs % 2 == 1
-                    bt_bs = 0
-                    if not escd and body.startswith("$(", bi):
-                        saw_subst = True
-                        flush_spl(sp)
-                        push_split(False, fr["nest"] + 2)
-                        stack.append({"k": "sub", "start": bi + 2, "pd": 1, "cs": 0})
-                        bi += 2; continue
-                    ns = try_sep(bi, sp, subst=True)
-                    if ns is not None:
-                        bi = ns; continue
-                    if not escd and bc == "`":
-                        stack.append({"k": "btf", "buf": [], "nest": fr["nest"] + 1})
-                        bi += 1; continue
-                    if not escd and bc == "'":
-                        stack.append({"k": "sq", "buf": ["'"]}); bi += 1; continue
-                    if not escd and bc == '"':
-                        stack.append({"k": "dq", "buf": ['"'], "nest": 0}); bi += 1; continue
-                    sp["buf"].append(bc); bi += 1
-                flush_spl(active_split())
-                while stack and stack[-1]["k"] == "spl" and stack[-1]["nest"] > fr["nest"]:
-                    stack.pop()
-                if spl:
-                    spl["buf"].append("`")
+                subst_inners.append(body)
+                scan_btick_body(body, nest + 1)
                 i += 1; bs_run = 0
                 continue
             fr["buf"].append(c); i += 1
@@ -499,171 +855,188 @@ def read_shell(text, backslash_escapes=True):
                     sp["cmt"] = False
                 i += 1; continue
             if c == "\\" and backslash_escapes:
-                append_ch(sp, c); bs_run += 1; i += 1; continue
+                append_ch(sp, c, word=False); bs_run += 1; i += 1; continue
             escd = backslash_escapes and bs_run % 2 == 0 and False
             escd = backslash_escapes and (bs_run % 2 == 1)
             bs_run = 0
             if escd:
-                append_ch(sp, c); i += 1; continue
+                wadd(c); append_ch(sp, c, word=False); i += 1; continue
             if c == "#" and (not sp["buf"] or sp["buf"][-1].isspace() or sp["buf"][-1] in ";|&"):
                 sp["cmt"] = True; i += 1; continue
             if c == "'":
-                append_ch(sp, c); stack.append({"k": "sq", "buf": ["'"]}); i += 1; continue
+                append_ch(sp, c, word=False); stack.append({"k": "sq"}); i += 1; continue
             if c == '"':
-                append_ch(sp, c); stack.append({"k": "dq", "buf": ['"'], "nest": sp["nest"]}); i += 1; continue
+                append_ch(sp, c, word=False); stack.append({"k": "dq", "nest": sp["nest"]}); i += 1; continue
             if text.startswith("$'", i):
-                append_ch(sp, "$'"); stack.append({"k": "ansi", "buf": list("$'")}); i += 2; continue
+                if sp.get("wmerge"):
+                    refuse("the guard cannot read the command: an ANSI-C string that is not a whole word")
+                append_ch(sp, "$'", word=False); stack.append({"k": "ansi"}); i += 2; continue
             if text.startswith('$"', i):
-                append_ch(sp, '$"'); stack.append({"k": "loc", "buf": list('$"')}); i += 2; continue
+                if sp.get("wmerge"):
+                    refuse("the guard cannot read the command: a locale string that is not a whole word")
+                append_ch(sp, '$"', word=False); stack.append({"k": "loc"}); i += 2; continue
             if text.startswith("${", i):
-                append_ch(sp, "${"); stack.append({"k": "br", "bd": 1, "buf": [], "nest": sp["nest"]}); i += 2; continue
+                append_ch(sp, "${"); wadd("$"); wadd("{"); stack.append({"k": "br", "body": [], "nest": sp["nest"]}); i += 2; continue
             if text.startswith("$(", i):
                 saw_subst = True
                 append_ch(sp, "$(")
                 push_split(False, sp["nest"] + 1)
-                stack.append({"k": "sub", "start": i + 2, "pd": 1, "cs": 0})
+                stack.append({"k": "sub", "start": i + 2, "pd": 1})
                 i += 2; continue
             if not in_dq() and text.startswith("<(", i):
                 saw_subst = True
-                append_ch(sp, text[i:i + 2])
+                append_ch(sp, text[i:i + 2], word=False)
                 push_split(False, sp["nest"] + 1)
-                stack.append({"k": "sub", "start": i + 2, "pd": 1, "cs": 0, "proc": 1})
+                stack.append({"k": "sub", "start": i + 2, "pd": 1, "proc": 1})
                 i += 2; continue
             if not in_dq() and text.startswith(">(", i):
                 saw_subst = True
-                append_ch(sp, text[i:i + 2])
+                append_ch(sp, text[i:i + 2], word=False)
                 push_split(False, sp["nest"] + 1)
-                stack.append({"k": "sub", "start": i + 2, "pd": 1, "cs": 0, "proc": 1})
+                stack.append({"k": "sub", "start": i + 2, "pd": 1, "proc": 1})
                 i += 2; continue
             if c == "`":
                 saw_subst = True
-                append_ch(sp, c)
+                append_ch(sp, c, word=False)
                 stack.append({"k": "btf", "buf": [], "nest": sp["nest"]})
                 i += 1; continue
             if not in_dq() and heredoc_op_at(i):
-                strip_tabs = text.startswith("<<-", i)
-                adj = 3 if strip_tabs else 2
-                delim, quoted, dj = parse_heredoc_delim(i + adj)
-                if delim:
-                    body_end = skip_heredoc_body(dj, delim, strip_tabs)
-                    line_start = text[:i].rfind("\n") + 1
-                    heredocs.append({"start": i, "end": body_end, "delim": delim, "quoted": quoted, "strip": strip_tabs, "line": text[line_start:dj]})
-                    for ch in text[i:dj]:
-                        append_ch(sp, ch)
-                    absorb_expanded_heredoc(i, body_end, dj, delim, quoted, strip_tabs)
-                    i = body_end
-                    continue
+                i = finish_heredoc(i, sp)
+                continue
             if c == "(":
                 fr["pd"] += 1; append_ch(sp, c); i += 1; continue
             if c == ")":
-                buf_s = "".join(sp["buf"])
-                in_case_pat = fr.get("cs") >= 2 if fr.get("cs") else False
-                if not in_case_pat and fr.get("cs") == 1 and re.search(r"\sin\s", buf_s) and re.search(r"(?:^|[\s(])case", buf_s):
-                    in_case_pat = True
-                    fr["cs"] = 3
-                elif in_case_pat and fr.get("cs") == 2:
-                    fr["cs"] = 3
-                if in_case_pat:
-                    append_ch(sp, c); i += 1; continue
+                append_ch(sp, c)
                 fr["pd"] -= 1
                 if fr["pd"] == 0:
                     body = text[fr["start"]:i].strip()
                     if body:
                         subst_inners.append(body)
-                    flush_spl(sp)
+                    si = len(stack) - 1
+                    while si > 0 and stack[si]["k"] != "sub":
+                        if stack[si]["k"] == "spl" and not stack[si].get("top"):
+                            flush_spl(stack[si], chain_too=True)
+                            if stack[si]["chain_segs"]:
+                                sub_chains_list.append(list(stack[si]["chain_segs"]))
+                        si -= 1
                     stack.pop()
                     while stack and stack[-1]["k"] == "spl" and not stack[-1].get("top"):
                         stack.pop()
                     if stack and stack[-1]["k"] == "dq":
-                        stack[-1]["buf"].append(")")
-                        spl_emit(")")
+                        spl_emit(")", word=False)
                     i += 1; continue
-                append_ch(sp, c); i += 1; continue
+                i += 1; continue
             ns = try_sep(i, sp, subst=True)
             if ns is not None:
                 i = ns; continue
-            if text.startswith(";;", i):
-                append_ch(sp, ";;"); i += 2
-                if fr.get("cs") == 3:
-                    fr["cs"] = 2
-                continue
-            if c.isspace():
-                tail = "".join(sp["buf"])
-                if re.search(r"(?:^|[\s(])case(?:\s|$)", tail):
-                    fr["cs"] = 1
-                elif fr.get("cs") == 1 and re.search(r"\sin\s", tail + c):
-                    fr["cs"] = 2
-                if re.search(r"\sesac(?:\s|$)", tail + c):
-                    fr["cs"] = 0
+            rr = try_redirect(i, sp) if not in_quote() else None
+            if rr is not None:
+                i = rr; continue
             append_ch(sp, c); i += 1; continue
         if not fr:
             i += 1; continue
         c = text[i]
+        if not backslash_escapes and c == "`" and not any(s["k"] == "sq" for s in stack):
+            if i + 1 < n and text[i + 1] in "\r\n":
+                while i + 1 < n and text[i + 1] in "\r\n":
+                    i += 1
+                i += 1
+                bs_run = 0
+                if active_split():
+                    append_ch(active_split(), " ")
+                continue
+            if i + 1 >= n or text[i + 1] not in "\r\n":
+                refuse("the guard cannot read the command: a backtick that is not a line continuation under PowerShell")
+                break
+        if text.startswith("$((", i) and bs_run % 2 == 0 and not in_dq():
+            refuse("the guard cannot read the command: arithmetic expansion")
+            break
+        if text.startswith("((", i) and bs_run % 2 == 0 and not in_dq():
+            refuse("the guard cannot read the command: an arithmetic command")
+            break
         if c == "\\" and backslash_escapes:
-            append_ch(fr, c); bs_run += 1; i += 1; continue
+            append_ch(fr, c, word=False); bs_run += 1; i += 1; continue
         escd = backslash_escapes and (bs_run % 2 == 1)
         bs_run = 0
         if escd:
-            append_ch(fr, c); i += 1; continue
+            wadd(c); append_ch(fr, c, word=False); i += 1; continue
         if c == "#" and (not fr["buf"] or fr["buf"][-1].isspace() or fr["buf"][-1] in ";|&("):
             fr["cmt"] = True; i += 1; continue
+        if not backslash_escapes and c == "\\" and i + 1 < n and text[i + 1] == '"':
+            refuse("the guard cannot read the command: a backslash before a quote under PowerShell")
+            break
+        if not in_quote() and fr.get("wmerge") and "".join(fr["wmerge"]).strip() and text[i] in "<>":
+            flush_word(fr)
+        rr = try_redirect(i, fr) if not in_quote() else None
+        if rr is not None:
+            i = rr; continue
+        if c == "{" and not in_quote():
+            m = re.match(r"^\{[A-Za-z_][A-Za-z0-9_]*\}>", text[i:])
+            if m:
+                refuse("the guard cannot read the command: a named file descriptor redirection")
+                break
+            end = text.find("}", i + 1)
+            if end > i and ("," in text[i + 1:end] or ".." in text[i + 1:end]):
+                refuse("the guard cannot read the command: an unquoted brace expansion")
+                break
         if c == "'":
-            append_ch(fr, c); stack.append({"k": "sq", "buf": ["'"]}); i += 1; continue
+            append_ch(fr, c, word=False); stack.append({"k": "sq"}); i += 1; continue
         if c == '"':
-            append_ch(fr, c); stack.append({"k": "dq", "buf": ['"'], "nest": fr["nest"]}); i += 1; continue
+            append_ch(fr, c, word=False); stack.append({"k": "dq", "nest": fr["nest"]}); i += 1; continue
         if text.startswith("$'", i):
-            append_ch(fr, "$'"); stack.append({"k": "ansi", "buf": list("$'")}); i += 2; continue
+            if fr.get("wmerge") and "".join(fr["wmerge"]).strip():
+                refuse("the guard cannot read the command: an ANSI-C string that is not a whole word")
+            append_ch(fr, "$'", word=False); stack.append({"k": "ansi"}); i += 2; continue
         if text.startswith('$"', i):
-            append_ch(fr, '$"'); stack.append({"k": "loc", "buf": list('$"')}); i += 2; continue
+            if fr.get("wmerge") and "".join(fr["wmerge"]).strip():
+                refuse("the guard cannot read the command: a locale string that is not a whole word")
+            append_ch(fr, '$"', word=False); stack.append({"k": "loc"}); i += 2; continue
         if text.startswith("${", i):
-            append_ch(fr, "${"); stack.append({"k": "br", "bd": 1, "buf": [], "nest": fr["nest"]}); i += 2; continue
+            append_ch(fr, "${"); wadd("$"); wadd("{"); stack.append({"k": "br", "body": [], "nest": fr["nest"]}); i += 2; continue
         if text.startswith("$(", i):
             saw_subst = True
             append_ch(fr, "$(")
             push_split(False, fr["nest"] + 1)
-            stack.append({"k": "sub", "start": i + 2, "pd": 1, "cs": 0})
+            stack.append({"k": "sub", "start": i + 2, "pd": 1})
             i += 2; continue
-        if not in_dq() and text.startswith("<(", i):
+        if not in_dq() and c == "<" and i + 1 < n and text[i + 1] == "(":
             saw_subst = True
-            append_ch(fr, text[i:i + 2])
+            append_ch(fr, "<(", word=False)
             push_split(False, fr["nest"] + 1)
-            stack.append({"k": "sub", "start": i + 2, "pd": 1, "cs": 0, "proc": 1})
+            stack.append({"k": "sub", "start": i + 2, "pd": 1, "proc": 1})
             i += 2; continue
-        if not in_dq() and text.startswith(">(", i):
+        if not in_dq() and c == ">" and i + 1 < n and text[i + 1] == "(":
             saw_subst = True
-            append_ch(fr, text[i:i + 2])
+            append_ch(fr, ">(", word=False)
             push_split(False, fr["nest"] + 1)
-            stack.append({"k": "sub", "start": i + 2, "pd": 1, "cs": 0, "proc": 1})
+            stack.append({"k": "sub", "start": i + 2, "pd": 1, "proc": 1})
             i += 2; continue
         if c == "`":
             saw_subst = True
-            append_ch(fr, c)
+            append_ch(fr, c, word=False)
             stack.append({"k": "btf", "buf": [], "nest": fr["nest"]})
             i += 1; continue
         if not in_dq() and heredoc_op_at(i):
-            strip_tabs = text.startswith("<<-", i)
-            adj = 3 if strip_tabs else 2
-            delim, quoted, dj = parse_heredoc_delim(i + adj)
-            if delim:
-                body_end = skip_heredoc_body(dj, delim, strip_tabs)
-                prefix = text[:i]
-                line_start = prefix.rfind("\n") + 1
-                heredocs.append({"start": i, "end": body_end, "delim": delim, "quoted": quoted, "strip": strip_tabs, "line": text[line_start:dj]})
-                for ch in text[i:dj]:
-                    append_ch(fr, ch)
-                absorb_expanded_heredoc(i, body_end, dj, delim, quoted, strip_tabs)
-                i = body_end
-                if fr.get("top"):
-                    flush_spl(fr, chain_too=False)
-                continue
+            i = finish_heredoc(i, fr)
+            if fr.get("top"):
+                flush_spl(fr, chain_too=False)
+            continue
         ns = try_sep(i, fr)
         if ns is not None:
             i = ns; continue
         append_ch(fr, c); i += 1
     flush_spl(stack[0]) if stack else None
     chain_cmds = stack[0]["chain_segs"] if stack else []
-    return {"full": full_cmds, "chain": chain_cmds, "subs": subst_inners, "heredocs": heredocs,
-            "deep": depth_exceeded, "hassub": saw_subst, "text": text}
+    if depth_exceeded and unreadable is None:
+        unreadable = "the guard cannot read the command: nesting past the bound"
+    if unreadable is None and stack:
+        for fr in stack:
+            if fr["k"] in ("sq", "dq", "sub", "btf", "br", "ansi", "loc"):
+                unreadable = "the guard cannot read the command: an unclosed quote or substitution"
+                break
+    return {"unreadable": unreadable, "full": full_cmds, "cmd_words": cmd_words_list, "chain": chain_cmds,
+            "subs": subst_inners, "sub_chains": sub_chains_list, "heredocs": heredocs,
+            "deep": depth_exceeded, "hassub": saw_subst, "gh_amp": gh_amp_reason, "text": text}
 
 
 def _parsed_snapshot(text, backslash_escapes=True):
@@ -743,7 +1116,7 @@ def _heredoc_body(text, hd):
 def split_commands(text):
     """Break a shell command line into simple commands (one read_shell pass)."""
     p = _parsed_snapshot(text, backslash_escapes=_READ_ESCAPES)
-    if p["deep"]:
+    if p.get("unreadable") or p["deep"]:
         return []
     seen, out = set(), []
     for c in p["full"]:
@@ -804,143 +1177,22 @@ def contains_command_substitution(text):
     return _parsed_snapshot(text, backslash_escapes=_READ_ESCAPES)["hassub"]
 
 
-def gh_api_unquoted_ampersand_reason(command):
-    """Unquoted & glued into a gh api argument (checked on parsed commands)."""
-    text = strip_heredocs(command)
-    i, n = 0, len(text)
-    in_sq = in_dq = False
-    at_cmd = True
-    in_gh = False
-
-    def cmd_head(j):
-        t = text[j:].lstrip()
-        return t.startswith("gh api") or t.startswith("gh.exe api")
-
-    while i < n:
-        c = text[i]
-        if in_sq:
-            in_sq = c != "'"
-            i += 1; continue
-        if in_dq:
-            if c == "\\" and i + 1 < n:
-                i += 2; continue
-            if c == '"':
-                in_dq = False
-            i += 1; continue
-        if c == "'":
-            in_sq = True; i += 1; continue
-        if c == '"':
-            in_dq = True; i += 1; continue
-        if text.startswith("$'", i):
-            j = i + 2
-            while j < n and text[j] != "'":
-                j += 2 if text[j] == "\\" and j + 1 < n else 1
-            i = j + 1; continue
-        if not in_sq and not in_dq and not c.isspace():
-            if at_cmd:
-                in_gh = cmd_head(i)
-                at_cmd = False
-        if in_gh and c == "&" and (i == 0 or text[i - 1] not in "<>") and (i + 1 >= n or text[i + 1] not in ">&"):
-            if i + 1 < n and text[i + 1] == "&":
-                in_gh = False; at_cmd = True; i += 2; continue
-            prev = text[i - 1] if i > 0 else " "
-            nxt = text[i + 1] if i + 1 < n else " "
-            if (not prev.isspace() and prev not in ";|&") or (not nxt.isspace() and nxt not in ";|&\n"):
-                return "gh api with an unquoted & in an argument (quote the endpoint or URL so the shell does not split on &)"
-        if c in (";", "\n") or text.startswith("&&", i) or text.startswith("||", i):
-            in_gh = False; at_cmd = True
-            i += 2 if text.startswith("&&", i) or text.startswith("||", i) else 1
-            continue
-        if c == "&":
-            if i > 0 and text[i - 1] in "<>":
-                i += 1; continue
-            if i + 1 < n and text[i + 1] in ">&":
-                i += 1; continue
-            if i + 1 < n and text[i + 1] == "&":
-                in_gh = False; at_cmd = True; i += 2; continue
-            in_gh = False; at_cmd = True
-            i += 1; continue
-        i += 1
-    return None
-
-
-def _shell_words(command):
-    parsed = _parsed_snapshot(command)
-    return _tokenize_parsed(command, parsed)
-
-
-def _tokenize_parsed(text, parsed):
-    words, buf, i, n = [], [], 0, len(text)
-    bs_run = 0
-
-    def flush():
-        if buf:
-            s = "".join(buf)
-            if s.startswith("$'") and s.endswith("'"):
-                words.append(_ansi_c_decode(s[2:-1]))
-            elif s.startswith('$"') and s.endswith('"'):
-                words.append(s[2:-1])
-            else:
-                words.append(s)
-            buf[:] = []
-
-    while i < n:
-        c = text[i]
-        if c.isspace() and not buf:
-            i += 1; continue
-        if c == "\\" and not buf and i + 1 < n:
-            buf.append(text[i:i + 2]); i += 2; continue
-        if c in ("'", '"') and not buf:
-            q, j = c, i + 1
-            while j < n and text[j] != q:
-                if q == '"' and text[j] == "\\" and j + 1 < n:
-                    j += 2; continue
-                j += 1
-            words.append(text[i + 1:j] if j < n else text[i + 1:])
-            i = j + 1 if j < n else n
-            continue
-        if text.startswith("$'", i):
-            j = i + 2
-            while j < n:
-                if text[j] == "\\" and j + 1 < n:
-                    j += 2; continue
-                if text[j] == "'":
-                    break
-                j += 1
-            words.append(_ansi_c_decode(text[i + 2:j])); i = j + 1; continue
-        if text.startswith('$"', i):
-            j = i + 2
-            while j < n:
-                if text[j] == "\\" and j + 1 < n:
-                    j += 2; continue
-                if text[j] == '"':
-                    break
-                j += 1
-            words.append(text[i + 2:j]); i = j + 1; continue
-        if c in " \t\n" and buf:
-            flush(); i += 1; continue
-        buf.append(c); i += 1
-    flush()
-    return words
-
-
 def words(command):
-    if "$'" in command or '$"' in command:
-        toks = _shell_words(command)
-    else:
-        try:
-            toks = shlex.split(command, posix=True)
-        except ValueError:
-            toks = command.split()
-    out = []
-    for t in toks:
-        if t.startswith("$'") and t.endswith("'") and len(t) > 2:
-            out.append(_ansi_c_decode(t[2:-1]))
-        elif t.startswith('$"') and t.endswith('"') and len(t) > 2:
-            out.append(t[2:-1])
-        else:
-            out.append(t)
-    return out
+    p = _parsed_snapshot(command, backslash_escapes=_READ_ESCAPES)
+    if p.get("unreadable") or p.get("deep"):
+        return []
+    cmd = command.strip()
+    for i, f in enumerate(p.get("full", [])):
+        if f.strip() == cmd and i < len(p.get("cmd_words", [])):
+            return list(p["cmd_words"][i])
+    cw = p.get("cmd_words") or []
+    if len(p.get("full", [])) == 1 and len(cw) == 1:
+        return list(cw[0])
+    if cw and len(p.get("full", [])) == len(cw):
+        for i, f in enumerate(p["full"]):
+            if f.strip() == cmd or cmd in f or f.strip() in cmd:
+                return list(cw[i])
+    return []
 
 
 def hook_skipper_option(sub, args, snapshot):
@@ -1012,32 +1264,41 @@ def chain_reason(command, cwd):
     """Inside a Workspace, a chain carrying a state change or wrapped in cd is refused (rule 8)."""
     if not in_workspace(cwd):
         return None
-    parsed_full = _parsed_snapshot(command)
-    parts = chain_parts_with_substitutions(command)
-    if len(parts) < 2:
-        top = [_strip_outer_parens(x) for x in parsed_full["chain"] if x.strip()]
-        if len(top) < 2:
-            return None
-        parts = top
-    heads = [strip_prefix(words(p)) for p in parts]
+    parsed = _parsed_snapshot(command)
+    if parsed.get("unreadable"):
+        return None
+    top = [_strip_outer_parens(x) for x in parsed["chain"] if x.strip()]
+    heads = [strip_prefix(words(p)) for p in top]
     heads = [h for h in heads if h]
     for h in list(heads):
         if base(h[0]) == "eval" and len(h) > 1:
             heads += [strip_prefix(words(p)) for p in chain_parts(" ".join(h[1:]))]
     if heads and base(heads[0][0]) == "cd":
         return "a command wrapped in cd (rule 8: never wrap a command in cd; run it with the path it needs, or git -C)"
-    for i, p in enumerate(parts):
-        w = _part_state_change(p, None)
-        if w:
-            return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (len(parts), " ".join(w[:2]))
-    if len(parts) >= 2:
-        for sub in parsed_full["subs"]:
-            sw = strip_prefix(words(sub))
-            if sw and state_changing(sw):
-                return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (len(parts), " ".join(sw[:2]))
-    for w in heads:
-        if state_changing(w):
-            return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (len(parts), " ".join(w[:2]))
+    lists = []
+    if len(top) >= 2:
+        lists.append(top)
+    for sc in parsed.get("sub_chains", []):
+        parts = [_strip_outer_parens(x) for x in sc if x.strip()]
+        if len(parts) >= 2:
+            lists.append(parts)
+    for sub in parsed.get("subs", []):
+        if re.search(r"&&|\|\||;", sub):
+            sp = _parsed_snapshot(sub, backslash_escapes=_READ_ESCAPES)
+            parts = [_strip_outer_parens(x) for x in sp.get("chain", []) if x.strip()]
+            if len(parts) >= 2:
+                lists.append(parts)
+    for parts in lists:
+        n = len(parts)
+        for p in parts:
+            w = strip_prefix(words(p))
+            if w and state_changing(w):
+                return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (n, " ".join(w[:2]))
+            pp = _parsed_snapshot(p)
+            for sub in pp.get("subs", []):
+                sw = strip_prefix(words(sub))
+                if sw and state_changing(sw):
+                    return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (n, " ".join(sw[:2]))
     return None
 
 
@@ -1264,55 +1525,13 @@ def commit_message(args, command):
                     return lines[0].strip()
             return None
 
-        subj = first_heredoc_subject(p, command)
-        if subj:
-            return subj
-        for sub in p["subs"]:
+        for sub in p.get("subs", []):
+            if sub not in command and command not in sub:
+                continue
             subj = first_heredoc_subject(_parsed_snapshot(sub), sub)
             if subj:
                 return subj
-            for line in sub.splitlines():
-                t = line.strip()
-                if t and not re.match(r"^\w+\s*<<", t):
-                    return t
     return msg.strip()
-
-
-def _join_continuations(command, tool):
-    out, i, n, bs = [], 0, len(command), 0
-    while i < n:
-        if command[i] == "\\":
-            bs += 1
-            out.append(command[i])
-            i += 1
-            if i < n and command[i] in "\r\n":
-                if tool == "PowerShell" or bs % 2 == 1:
-                    while i < n and command[i] in "\r\n":
-                        i += 1
-                    if tool == "PowerShell":
-                        out.append(" ")
-                else:
-                    out.append(command[i]); i += 1
-                bs = 0
-                continue
-            continue
-        if tool == "PowerShell" and command[i] == "`" and i + 1 < n and command[i + 1] in "\r\n":
-            while i + 1 < n and command[i + 1] in "\r\n":
-                i += 1
-            out.append(" ")
-            i += 1
-            bs = 0
-            continue
-        if tool == "Bash" and command[i] == "`" and i + 1 < n and command[i + 1] in "\r\n":
-            out.append(command[i]); i += 1
-            while i < n and command[i] in "\r\n":
-                out.append(command[i]); i += 1
-            bs = 0
-            continue
-        out.append(command[i])
-        bs = 0
-        i += 1
-    return "".join(out)
 
 
 def in_worktree(w, cwd):
@@ -1323,49 +1542,34 @@ def in_worktree(w, cwd):
 
 def check(command, cwd=None, tool="Bash", _depth=0):
     """Return the reason to refuse, or None."""
-    if tool == "PowerShell":
-        r1 = _check_one(command, cwd, "Bash", _depth, backslash_escapes=True)
-        r2 = _check_one(command, cwd, "PowerShell", _depth, backslash_escapes=False)
-        return r1 or r2
-    return _check_one(command, cwd, tool, _depth, backslash_escapes=True)
+    bs = tool != "PowerShell"
+    return _check_one(command, cwd, tool, _depth, backslash_escapes=bs)
 
 
 def _check_one(command, cwd, tool, depth, backslash_escapes=True):
     if depth > READ_DEPTH_BOUND:
-        return "command nests too deeply to read"
-    command = _join_continuations(command, tool)
+        return "the guard cannot read the command: nesting past the bound"
     global _READ_ESCAPES
     _parsed_snapshot._cache = {}
     _READ_ESCAPES = backslash_escapes
     parsed = _parsed_snapshot(command, backslash_escapes=backslash_escapes)
+    if parsed.get("unreadable"):
+        return parsed["unreadable"]
     if parsed["deep"]:
-        return "command nests too deeply to read"
-    r = gh_api_unquoted_ampersand_reason(command)
+        return "the guard cannot read the command: nesting past the bound"
+    r = parsed.get("gh_amp")
     if r:
         return r
     r = chain_reason(command, cwd)
     if r:
         return r
     for simple in split_commands(command):
+        if leading_husky_zero(simple) and re.search(r"\bgit\b.*\b(commit|push|merge)\b", simple, re.I | re.S):
+            return "HUSKY=0 switches the hook runner off (a commit that skips its checks; rule 4)"
         w = strip_prefix(words(simple))
         if not w:
             continue
         head = base(w[0])
-        husky = leading_husky_zero(simple)
-        if husky:
-            wgit = strip_prefix(words(simple))
-            if wgit and is_git(wgit):
-                sub, _ = git_subcommand(wgit)
-                if sub in ("commit", "push", "merge"):
-                    return "HUSKY=0 switches the hook runner off (a commit that skips its checks; rule 4)"
-            if head in ("eval", "bash", "bash.exe", "sh", "sh.exe", "setsid", "winpty"):
-                inner = shell_inner(w) if head not in ("eval", "setsid", "winpty") else " ".join(w[1:])
-                if inner:
-                    iw = strip_prefix(words(inner))
-                    if iw and is_git(iw):
-                        sub, _ = git_subcommand(iw)
-                        if sub in ("commit", "push", "merge"):
-                            return "HUSKY=0 switches the hook runner off (a commit that skips its checks; rule 4)"
         if head == "eval" and len(w) > 1:
             r = _check_one(" ".join(w[1:]), cwd, tool, depth + 1, backslash_escapes=backslash_escapes)
             if r:
@@ -1375,7 +1579,7 @@ def _check_one(command, cwd, tool, depth, backslash_escapes=True):
             if inner is ENCODED:
                 return "an encoded PowerShell command, which the guard cannot read"
             if inner:
-                ps_tool = tool if base(w[0]).replace(".exe", "") in ("powershell", "pwsh") else tool
+                ps_tool = "PowerShell" if base(w[0]).replace(".exe", "") in ("powershell", "pwsh") else tool
                 r = check(inner, cwd, tool=ps_tool, _depth=depth + 1)
                 if r:
                     return r
@@ -1424,7 +1628,10 @@ def _check_one(command, cwd, tool, depth, backslash_escapes=True):
             if group == "api" and any(m in tok for tok in w for m in MERGE_MUTATIONS):
                 return "gh api with a merge mutation (merging outside the gate)"
             if group == "api" and sub == "graphql":
-                if parsed["hassub"]:
+                gp = _parsed_snapshot(simple, backslash_escapes=backslash_escapes)
+                if gp.get("unreadable"):
+                    return gp["unreadable"]
+                if parsed.get("hassub") or gp.get("hassub"):
                     return "gh api graphql with a query built by a command substitution, which the guard cannot read (write the query on the command line)"
                 if any(t == "--input" or t.startswith("--input=") or t.startswith("@") or "=@" in t for t in args):
                     return "gh api graphql with a query read from a file, which the guard cannot read (write the query on the command line)"
