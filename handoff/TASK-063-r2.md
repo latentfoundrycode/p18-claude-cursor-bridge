@@ -12,6 +12,8 @@ blocking_class: null
 
 Round cause: security
 
+Satisfies: R-082 - the permission guard reads a command as the shell does; the full text stands in round 1's brief.
+
 ## Objective
 Round 1 (your work, committed at this round's checkpoint, 8063857) made the acceptance tests of round 1 pass, but both reviewers rejected it: it lets refused commands through in forms bash runs, fourteen of the acceptance file's forms refused at the checkpoint fae0860 and passing on round 1 (regressions), six forms that passed at fae0860 now refused wrongly, and it can crash (exit 1) or run past the hook's 15 seconds, and either lets the command run. The confirmed cause is structural, not a list of shapes: round 1 has four scanners that each keep their own quote state (`_split_on_separators`, `_substitution_inners`, `_matching_paren`, `gh_api_unquoted_ampersand_reason`), the splitter does not enter a new quoting context at `$(`, a backtick or `${` as bash does, and the substitution finder only sees the pieces the splitter already broke wrongly. This round replaces them with **one reader**: a single iterative scan with an explicit stack of contexts, from which both splitters, the substitution bodies and the `gh api` `&` check are all taken. Every requirement of `handoff/TASK-063.md` (round 1's brief) stays in force except where this brief changes it; read it whole first.
 
