@@ -25,14 +25,13 @@ import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "bridge-run.py")
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 LINE = re.compile(r"^bridge-run: GIT-CONFIG (.+) (new|removed|changed|unreadable)$")
 CHILD_DONE = "child done"
 
 
 def git(cwd, *args):
     p = subprocess.run(["git", "-C", str(cwd)] + list(args), capture_output=True, text=True,
-                       creationflags=NO_WINDOW, timeout=120)
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
     assert p.returncode == 0, p.stderr
     return p.stdout.strip()
 
@@ -75,7 +74,7 @@ def launch(tmp_path, cwd, code, kind="test", strip=False):
     flags = ["--limit", "60"] + (["--strip"] if strip else []) + ["--kind", kind]
     return subprocess.run([sys.executable, PROG] + flags + ["--", sys.executable, "-c", code],
                           capture_output=True, text=True, env=env_for(tmp_path), cwd=str(cwd),
-                          creationflags=NO_WINDOW, timeout=120)
+                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
 
 
 def git_config_lines(stderr):
@@ -218,7 +217,7 @@ def test_r081_a_driver_run_is_read_too(tmp_path):
     prog.write_text("import pathlib\npathlib.Path('.git/hooks/post-merge').write_text('exit 0')\n", encoding="utf-8")
     p = subprocess.run([sys.executable, PROG, "--limit", "60", "--kind", "driver", "--", "python", str(prog)],
                        capture_output=True, text=True, env=env_for(tmp_path), cwd=str(ws),
-                       creationflags=NO_WINDOW, timeout=120)
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
     assert p.returncode == 0, p.stderr
     assert git_config_lines(p.stderr) == [".git/hooks/post-merge new"], p.stderr
 
@@ -334,6 +333,53 @@ def test_r081_a_worktree_s_git_file_and_commondir_are_read(tmp_path):
     assert ".git/worktrees/wt/commondir changed" in lines, p.stderr
     assert any(line.endswith("wt/.git changed") for line in lines), p.stderr
     assert len(lines) == 2, p.stderr
+
+
+def test_r081_a_launch_folder_without_run_gains_no_run_folder(tmp_path):
+    """The launcher writes its row only where a project's `run/` folder exists (`write_log`): a test run in a
+    repository with no `run/` leaves none behind, GIT-CONFIG lines or not (Review A and the audit, round 1)."""
+    ws = make_repo(tmp_path)
+    os.rmdir(ws / "run")
+    p = launch(tmp_path, ws, child_code(GIT_IN_CHILD % ["config", "core.fsmonitor", "echo planted"]))
+    assert p.returncode == 0 and git_config_lines(p.stderr) == [".git/config changed"], p.stderr
+    assert not os.path.lexists(ws / "run"), "a launch folder without run/ gains none"
+
+
+def test_r081_one_entry_whose_read_fails_in_any_way_silences_no_other_line(program, tmp_path, monkeypatch):
+    """A read that fails with any exception, MemoryError among them (a huge file planted in a hooks folder: the
+    security audit's B1 of round 1), makes that one path unreadable and every other path's line stands."""
+    br = program("bridge-run")
+    for name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE"):
+        monkeypatch.delenv(name, raising=False)     # the watch runs git in this process's environment (Review A, round 2)
+    ws = make_repo(tmp_path)
+    watch = br.GitConfigWatch(str(ws))
+    before = watch.before()
+    assert before is not None
+    (ws / ".git" / "hooks" / "big").write_bytes(b"x" * 1024)
+    with open(ws / ".git" / "config", "a", encoding="utf-8") as f:
+        f.write("[core]\n\tfsmonitor = echo planted\n")
+    real_open = open
+
+    class Huge(object):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self, *args):
+            raise MemoryError("planted")
+
+    def fake_open(path, *args, **kwargs):
+        if os.path.basename(str(path)) == "big":
+            return Huge()
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(br, "open", fake_open, raising=False)
+    after = watch.after()
+    changes = br.git_config_changes(before, after)
+    assert (".git/config", "changed") in changes, changes
+    assert (".git/hooks/big", "unreadable") in changes, changes
 
 
 def test_r081_a_read_that_fails_is_unreadable_and_changes_nothing_else(tmp_path):

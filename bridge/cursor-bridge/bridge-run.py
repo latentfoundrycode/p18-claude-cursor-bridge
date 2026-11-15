@@ -2098,9 +2098,7 @@ def _git_resolved_path(folder, git_path_name):
         return None
     if os.path.isabs(raw):
         return os.path.normpath(raw)
-    top = _git_rev_parse(folder, "--show-toplevel")
-    base = os.path.abspath(top if top else folder or ".")
-    return os.path.normpath(os.path.join(base, raw))
+    return os.path.normpath(os.path.join(os.path.abspath(folder or "."), raw))
 
 
 def _git_display_path(abs_path, parent):
@@ -2113,15 +2111,41 @@ def _git_display_path(abs_path, parent):
     return rel.replace("\\", "/")
 
 
+def _git_hooks_dir_listable(path):
+    if not os.path.lexists(path):
+        return False
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return False
+    if bridge_env.is_link(path):
+        return False
+    import stat
+    return stat.S_ISDIR(st.st_mode)
+
+
 def _git_file_state(path):
     if not os.path.lexists(path):
         return None
-    if os.path.isdir(path):
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return "unreadable"
+    if bridge_env.is_link(path):
+        return "unreadable"
+    import stat
+    if not stat.S_ISREG(st.st_mode):
         return "unreadable"
     try:
+        h = hashlib.sha256()
         with open(path, "rb") as f:
-            return hashlib.sha256(f.read()).hexdigest()
-    except OSError:
+            while True:
+                chunk = f.read(65536)
+                if not chunk:
+                    break
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception:
         return "unreadable"
 
 
@@ -2146,6 +2170,14 @@ class GitConfigWatch(object):
             if git_dir:
                 wt_cfg = os.path.join(git_dir, "config.worktree")
                 self._files.append((wt_cfg, _git_display_path(wt_cfg, parent)))
+                commondir = os.path.join(git_dir, "commondir")
+                self._files.append((commondir, _git_display_path(commondir, parent)))
+            top = _git_rev_parse(folder, "--show-toplevel")
+            if top:
+                if not os.path.isabs(top):
+                    top = os.path.normpath(os.path.join(os.path.abspath(folder or "."), top))
+                dot_git = os.path.join(top, ".git")
+                self._files.append((dot_git, _git_display_path(dot_git, parent)))
             seen = set()
             for hooks in (_git_resolved_path(folder, "hooks"), os.path.join(common, "hooks")):
                 if not hooks:
@@ -2165,14 +2197,19 @@ class GitConfigWatch(object):
             state[display] = _git_file_state(abspath)
         if self._parent is not None:
             for hooks_dir in self._hooks_dirs:
+                disp = _git_display_path(hooks_dir, self._parent)
+                if not os.path.lexists(hooks_dir):
+                    continue
+                if not _git_hooks_dir_listable(hooks_dir):
+                    state[disp] = "unreadable"
+                    continue
                 try:
                     names = os.listdir(hooks_dir)
                 except OSError:
+                    state[disp] = "unreadable"
                     continue
                 for name in names:
                     full = os.path.join(hooks_dir, name)
-                    if os.path.isdir(full):
-                        continue
                     state[_git_display_path(full, self._parent)] = _git_file_state(full)
         return state
 
@@ -2635,11 +2672,6 @@ def main():
     if entry["exit"] is None:
         healthy = True if (kind == "test" and rc == 0) or (kind == "driver" and rc in (0, 1)) else None
         entry.update(seconds=int(time.time() - started), exit=rc, healthy=healthy)
-        try:
-            if not os.path.isdir(os.path.join(folder, "run")):
-                os.makedirs(os.path.join(folder, "run"), exist_ok=True)
-        except OSError:
-            pass
         write_log(folder, entry)
     # The job handle is deliberately not closed here: it closes when this process exits,
     # after the exit code is set, and "kill on close" then ends any orphan the command left.
