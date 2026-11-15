@@ -1412,8 +1412,11 @@ def learned_limit(kind, folder):
     default = KINDS[kind]
     cap, _ = cap_for(kind, folder)
     exits = LEARN_EXITS.get(kind, (0,))                    # a run ended at its limit measures the limit, not the work (ISS-030)
-    healthy = [r for r in read_log(folder) if r.get("kind") == kind and r.get("healthy") is True
-               and isinstance(r.get("seconds"), (int, float)) and r.get("exit") in exits]
+    rows = read_log(folder)
+    intervals = bridge_env.review_run_intervals(rows)
+    healthy = [r for r in rows if r.get("kind") == kind and r.get("healthy") is True
+               and bridge_env.log_seconds(r.get("seconds")) is not None and r.get("exit") in exits
+               and not bridge_env.row_inside_review_run(r, intervals)]
     if not healthy:
         return default, "the default for %s" % kind
     longest = max(healthy, key=lambda r: r["seconds"])
