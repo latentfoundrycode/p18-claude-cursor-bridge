@@ -258,3 +258,15 @@ def test_r082_req14_cd_in_substitution_is_not_rule8_refusal(workspace):
     command = 'echo "$(cd "$(dirname "$0")" && pwd)"'
     p = _run_r082(command, workspace)
     assert p.returncode == 0, (command, p.stderr)
+
+
+def test_r082_cmd_words_from_reader_not_a_second_scan(tmp_path):
+    """R-082 (req 1): a cut simple command is checked with the reader's word list, not an empty re-read."""
+    p = _run_r082('gh pr merge 12 --squash --body $(cat x)', tmp_path)
+    assert p.returncode == 2 and "match-head-commit" in p.stderr, p.stderr
+
+
+def test_r082_backslash_newline_in_comment_does_not_hide_next_command(tmp_path):
+    """R-082 (req 2): backslash-newline in a comment leaves the next physical line as its own command."""
+    p = _run_r082("echo a # c \\\n" + WR, tmp_path)
+    assert p.returncode == 2, (p.returncode, p.stderr)

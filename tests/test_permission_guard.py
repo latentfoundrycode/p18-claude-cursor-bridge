@@ -217,3 +217,15 @@ def test_other_tools_and_bad_input_pass():
     assert p.returncode == 0
     p = subprocess.run([sys.executable, PROG], input="not json", capture_output=True, text=True)
     assert p.returncode == 0
+
+
+def test_r082_force_push_with_unquoted_substitution_argument_is_refused():
+    """R-082 (req 1): command words come from the reader; a force-push in $(...) is not skipped."""
+    rc, err = run("Bash", "git push --force origin $(echo main)")
+    assert rc == 2 and "force" in err.lower(), err
+
+
+def test_r082_graphql_substitution_on_its_own_command_is_refused():
+    """R-082 (req 8): gh api graphql is refused when its own words hold a substitution."""
+    rc, err = run("Bash", 'gh api graphql -f query="$(echo mergePullRequest)"')
+    assert rc == 2 and "graphql" in err.lower(), err

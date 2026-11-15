@@ -67,7 +67,6 @@ WRAPPER_SHELLS = SHELLS + ("bash", "bash.exe", "sh", "sh.exe", "zsh", "dash")
 MERGE_MUTATIONS = ("mergePullRequest", "enablePullRequestAutoMerge", "enqueuePullRequest")
 GH_VALUE_FLAGS = ("-t", "--subject", "-b", "--body", "-F", "--body-file", "-A", "--author-email", "-R", "--repo", "--match-head-commit", "--hostname")
 ALIAS_RX = re.compile(r"^alias\.[\w-]+=\s*['\"]?\s*(!|worktree\b|pr\b|push\b|api\b)", re.I)
-HEREDOC_RX = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1[^\n]*\n.*?^\2[ \t]*$", re.S | re.M)
 VALUE_OPTIONS = {"xargs": ("-I", "-n", "-L", "-s", "-d", "-P", "-E", "-a", "--max-args", "--max-lines", "--delimiter", "--max-procs", "--arg-file", "--replace"),
                  "nice": ("-n", "--adjustment"), "timeout": ("-s", "--signal", "-k", "--kill-after"), "sudo": ("-u", "-g", "--user", "--group"),
                  "env": ("-u", "--unset", "-C", "--chdir", "-S", "--split-string")}
@@ -129,7 +128,6 @@ def program_behind(w):
 
 
 READ_DEPTH_BOUND = 64
-_READ_ESCAPES = True
 
 
 def _ansi_c_decode(s):
@@ -151,10 +149,10 @@ def _ansi_c_decode(s):
         elif e in ("'", '"', "\\", "?"): out.append(e)
         elif e == "c" and i < n: out.append(""); i += 1
         elif e in "01234567":
-            j, o = i, 0
-            while j < n and j < i + 3 and s[j] in "01234567":
+            j, o = i - 1, 0
+            while j < n and j < i + 2 and s[j] in "01234567":
                 o = o * 8 + int(s[j]); j += 1
-            if o: out.append(chr(o % 256))
+            out.append(chr(o % 256))
             i = j
         elif e == "x":
             j, hx = i, ""
@@ -195,35 +193,10 @@ def _strip_outer_parens(s):
     return s
 
 
-def _join_bs_newlines(text, backslash_escapes):
-    if not backslash_escapes:
-        return text
-    out, i, n = [], 0, len(text)
-    while i < n:
-        if text[i] == "\\":
-            j, bs = i, 0
-            while j < n and text[j] == "\\":
-                bs += 1
-                j += 1
-            if j < n and text[j] in "\r\n" and bs % 2 == 1:
-                out.append("\\" * (bs - 1))
-                while j < n and text[j] in "\r\n":
-                    j += 1
-                i = j
-                continue
-            out.append("\\" * bs)
-            i = j
-            continue
-        out.append(text[i])
-        i += 1
-    return "".join(out)
-
-
 def read_shell(text, backslash_escapes=True):
     """One iterative read: quoting, separators, substitutions, here-documents (R-082)."""
-    text = _join_bs_newlines(text, backslash_escapes)
     n = len(text)
-    full_cmds, subst_inners, heredocs, cmd_words_list, sub_chains_list = [], [], [], [], []
+    full_cmds, subst_inners, heredocs, cmd_words_list, sub_chains_list, sub_chain_wds_list = [], [], [], [], [], []
     depth_exceeded, saw_subst = False, False
     unreadable, gh_amp_reason = None, None
     stack = [{"k": "spl", "buf": [], "cbuf": [], "chain_segs": [], "top": True, "nest": 0, "pd": 0, "cmt": False, "inh": 0,
@@ -241,34 +214,40 @@ def read_shell(text, backslash_escapes=True):
                 return fr
         return None
 
+    def _spl_ix():
+        for fi in range(len(stack) - 1, -1, -1):
+            if stack[fi]["k"] == "spl":
+                return fi
+        return 0
+
     def in_quote():
-        return any(fr["k"] in ("sq", "dq", "ansi", "loc") for fr in stack)
+        top = _spl_ix()
+        return any(fr["k"] in ("sq", "dq", "ansi", "loc") for fr in stack[top + 1:])
 
     def subst_counts():
         return not any(fr["k"] in ("sq", "ansi") for fr in stack)
 
-    def mark_gh(fr):
-        ws = fr["words"]
+    def gh_api_cmd(fr):
+        ws = list(fr["words"])
         if fr.get("wmerge"):
-            ws = ws + ["".join(fr["wmerge"])]
-        i = 0
-        while i < len(ws):
-            if base(ws[i]) not in ("gh", "gh.exe"):
-                i += 1
+            wm = "".join(fr["wmerge"])
+            if wm:
+                ws.append(wm)
+        ws = strip_prefix(ws)
+        if not ws or base(ws[0]) not in ("gh", "gh.exe"):
+            return False
+        j = 1
+        while j < len(ws):
+            if ws[j] == "api":
+                return True
+            if ws[j] in ("-R", "--repo", "--hostname"):
+                j += 2
                 continue
-            j = i + 1
-            while j < len(ws):
-                t = ws[j]
-                if t == "api":
-                    fr["gh"] = True
-                    return
-                if t.startswith("-"):
-                    j += 1
-                    if j < len(ws) and not ws[j].startswith("-"):
-                        j += 1
-                    continue
+            if ws[j].startswith("-"):
                 j += 1
-            i += 1
+                continue
+            return False
+        return False
 
     def flush_word(fr):
         if not fr.get("wmerge"):
@@ -278,7 +257,6 @@ def read_shell(text, backslash_escapes=True):
         fr["words"].append(w)
         if w == "case":
             refuse("the guard cannot read the command: a case statement")
-        mark_gh(fr)
 
     def wadd(ch):
         sp = active_split()
@@ -313,6 +291,7 @@ def read_shell(text, backslash_escapes=True):
     def flush_spl(fr, chain_too=True, collect_chain=True):
         nonlocal gh_amp_reason
         flush_word(fr)
+        fr["gh"] = gh_api_cmd(fr)
         seg = "".join(fr["buf"]).strip()
         fr["buf"] = []
         wd = list(fr["words"])
@@ -393,13 +372,9 @@ def read_shell(text, backslash_escapes=True):
             return False
         if i > 0 and text[i - 1] in "<>":
             return False
-        if i > 0 and text[i - 1] not in " \t\n\r;|&(":
-            return False
         if i + 1 < n and text[i + 1] in ">&":
             return False
         if i + 1 < n and text[i + 1] == "&":
-            return False
-        if i + 1 < n and text[i + 1] not in " \t\n\r;|&)":
             return False
         return True
 
@@ -410,7 +385,7 @@ def read_shell(text, backslash_escapes=True):
             refuse("the guard cannot read the command: nesting past the bound")
             return
         stack.append({"k": "spl", "buf": [], "cbuf": [], "chain_segs": [], "top": top, "nest": nest, "pd": 0, "cmt": False, "inh": nest,
-                        "wmerge": [], "words": [], "chain_wds": [], "gh": False, "hd_line": False})
+                        "wmerge": [], "words": [], "chain_wds": [], "gh": False, "hd_line": False, "_subst_open": False})
 
     def try_sep(i, fr, subst=False):
         nonlocal gh_amp_reason
@@ -421,7 +396,7 @@ def read_shell(text, backslash_escapes=True):
             if not (subst and text[i] == "\n" and fr.get("hd_line")):
                 chain_hit = full_hit = i + 1
         elif bare_amp(i, fr):
-            if fr.get("gh") and fr.get("wmerge") and not gh_amp_reason:
+            if gh_api_cmd(fr) and fr.get("wmerge") and not gh_amp_reason:
                 gh_amp_reason = "gh api with an unquoted & in an argument (quote the endpoint or URL so the shell does not split on &)"
             if fr.get("wmerge"):
                 flush_word(fr)
@@ -476,7 +451,8 @@ def read_shell(text, backslash_escapes=True):
         return dname, None, j, start
 
     def in_dq():
-        return any(fr["k"] == "dq" for fr in stack)
+        top = _spl_ix()
+        return any(fr["k"] == "dq" for fr in stack[top + 1:])
 
     def unescape_bt(s):
         out, j, bn = [], 0, len(s)
@@ -493,6 +469,7 @@ def read_shell(text, backslash_escapes=True):
         return "".join(out)
 
     def scan_btick_body(body, nest):
+        nonlocal saw_subst
         push_split(False, nest)
         bi, bn, bt_bs = 0, len(body), 0
         while bi < bn:
@@ -512,6 +489,9 @@ def read_shell(text, backslash_escapes=True):
                 bi += 1
                 continue
             if bc == "\\" and backslash_escapes:
+                if bi + 1 < bn and body[bi + 1] == "`":
+                    refuse("the guard cannot read the command: a nested backtick")
+                    break
                 append_ch(sp, bc, word=False)
                 bt_bs += 1
                 bi += 1
@@ -520,7 +500,8 @@ def read_shell(text, backslash_escapes=True):
             bt_bs = 0
             if not escd and body.startswith("$(", bi):
                 saw_subst = True
-                append_ch(sp, "$(", word=False)
+                append_ch(sp, "$", word=False)
+                append_ch(sp, "(", word=False)
                 push_split(False, nest + 1)
                 stack.append({"k": "sub", "start": bi + 2, "pd": 1})
                 bi += 2
@@ -557,8 +538,17 @@ def read_shell(text, backslash_escapes=True):
             line_nl = text.find("\n", j)
             if line_nl < 0 or line_nl > end:
                 line_nl = end
-            if text[j:line_nl].lstrip("\t").rstrip(" \t") == delim:
+            line_body = text[j:line_nl]
+            if line_body.lstrip("\t").rstrip(" \t") == delim:
                 return
+            if backslash_escapes:
+                t = line_body.rstrip(" \t")
+                rb = 0
+                while rb < len(t) and t[-(rb + 1)] == "\\":
+                    rb += 1
+                if rb % 2 == 1:
+                    refuse("the guard cannot read the command: a backslash-newline in an unquoted here-document body")
+                    return
             k = j
             while k < line_nl:
                 c = text[k]
@@ -653,7 +643,7 @@ def read_shell(text, backslash_escapes=True):
                 if c == "&" and j + 1 < line_end and text[j + 1] == "&":
                     flush_spl(fr); j += 2; continue
                 if c == "&":
-                    if fr.get("gh") and fr.get("wmerge") and not gh_amp_reason:
+                    if gh_api_cmd(fr) and fr.get("wmerge") and not gh_amp_reason:
                         gh_amp_reason = "gh api with an unquoted & in an argument (quote the endpoint or URL so the shell does not split on &)"
                     if fr.get("wmerge"):
                         flush_word(fr)
@@ -667,9 +657,10 @@ def read_shell(text, backslash_escapes=True):
         body_end = skip_heredoc_body(body_start, delim, False)
         if not quoted:
             scan_unquoted_hd_body(body_start, body_end, delim)
-        line_start_ix = text[:i].rfind("\n") + 1
+        hd_line = "".join(fr["buf"]) + text[i:line_end]
+        flush_word(fr)
         heredocs.append({"start": i, "end": body_end, "delim": delim, "quoted": quoted, "strip": False,
-                         "line": text[line_start_ix:line_end]})
+                         "line": hd_line, "words": list(fr["words"])})
         if len(heredocs) > READ_DEPTH_BOUND:
             refuse("the guard cannot read the command: nesting past the bound")
         fr["hd_line"] = False
@@ -763,14 +754,11 @@ def read_shell(text, backslash_escapes=True):
                 except Exception:
                     decoded = raw
                 if "\x00" in decoded:
-                    decoded = decoded.split("\x00", 1)[0]
-                    if not decoded and "\x00" in _ansi_c_decode(raw):
-                        refuse("the guard cannot read the command: an ANSI-C string with a NUL byte")
+                    refuse("the guard cannot read the command: an ANSI-C string with a NUL byte")
                 spl_emit("'", word=False)
                 sp = active_split()
                 if sp:
                     sp.setdefault("wmerge", []).extend(list(decoded))
-                    mark_gh(sp)
                 stack.pop()
                 if i + 1 < n and text[i + 1] not in " \t\n\r;|&":
                     refuse("the guard cannot read the command: an ANSI-C string that is not a whole word")
@@ -791,7 +779,6 @@ def read_shell(text, backslash_escapes=True):
                 sp = active_split()
                 if sp:
                     sp.setdefault("wmerge", []).extend(list("".join(fr.get("raw", []))))
-                    mark_gh(sp)
                 stack.pop()
                 if i + 1 < n and text[i + 1] not in " \t\n\r;|&":
                     refuse("the guard cannot read the command: a locale string that is not a whole word")
@@ -856,7 +843,6 @@ def read_shell(text, backslash_escapes=True):
                 i += 1; continue
             if c == "\\" and backslash_escapes:
                 append_ch(sp, c, word=False); bs_run += 1; i += 1; continue
-            escd = backslash_escapes and bs_run % 2 == 0 and False
             escd = backslash_escapes and (bs_run % 2 == 1)
             bs_run = 0
             if escd:
@@ -879,7 +865,8 @@ def read_shell(text, backslash_escapes=True):
                 append_ch(sp, "${"); wadd("$"); wadd("{"); stack.append({"k": "br", "body": [], "nest": sp["nest"]}); i += 2; continue
             if text.startswith("$(", i):
                 saw_subst = True
-                append_ch(sp, "$(")
+                append_ch(sp, "$", word=False)
+                append_ch(sp, "(", word=False)
                 push_split(False, sp["nest"] + 1)
                 stack.append({"k": "sub", "start": i + 2, "pd": 1})
                 i += 2; continue
@@ -910,18 +897,34 @@ def read_shell(text, backslash_escapes=True):
                 fr["pd"] -= 1
                 if fr["pd"] == 0:
                     body = text[fr["start"]:i].strip()
-                    if body:
+                    if body and not fr.get("sh"):
                         subst_inners.append(body)
+                    elif body:
+                        subst_inners.append(body)
+                    inner_words = []
+                    inner_chain_wds = []
                     si = len(stack) - 1
                     while si > 0 and stack[si]["k"] != "sub":
                         if stack[si]["k"] == "spl" and not stack[si].get("top"):
+                            flush_word(stack[si])
+                            inner_words = list(stack[si]["words"])
+                            inner_chain_wds = list(stack[si].get("chain_wds", []))
                             flush_spl(stack[si], chain_too=True)
-                            if stack[si]["chain_segs"]:
+                            if stack[si].get("chain_segs"):
                                 sub_chains_list.append(list(stack[si]["chain_segs"]))
+                                sub_chain_wds_list.append(inner_chain_wds)
+                                stack[si]["chain_segs"] = []
+                                stack[si]["chain_wds"] = []
                         si -= 1
                     stack.pop()
                     while stack and stack[-1]["k"] == "spl" and not stack[-1].get("top"):
                         stack.pop()
+                    parent = active_split()
+                    if parent and inner_words:
+                        parent["words"].extend(inner_words)
+                    if parent:
+                        for ch in body + ")":
+                            append_ch(parent, ch)
                     if stack and stack[-1]["k"] == "dq":
                         spl_emit(")", word=False)
                     i += 1; continue
@@ -955,13 +958,27 @@ def read_shell(text, backslash_escapes=True):
             refuse("the guard cannot read the command: an arithmetic command")
             break
         if c == "\\" and backslash_escapes:
+            if i == 0 or text[i - 1] != "\\":
+                j = i
+                while j < n and text[j] == "\\":
+                    j += 1
+                if j < n and text[j] in "\r\n" and (fr.get("cmt") or (not in_quote() and not fr.get("hd_line"))):
+                    bs = j - i
+                    if bs % 2 == 1:
+                        while j < n and text[j] in "\r\n":
+                            j += 1
+                        i = j
+                        bs_run = 0
+                        continue
             append_ch(fr, c, word=False); bs_run += 1; i += 1; continue
         escd = backslash_escapes and (bs_run % 2 == 1)
         bs_run = 0
         if escd:
             wadd(c); append_ch(fr, c, word=False); i += 1; continue
-        if c == "#" and (not fr["buf"] or fr["buf"][-1].isspace() or fr["buf"][-1] in ";|&("):
-            fr["cmt"] = True; i += 1; continue
+        if c == "#":
+            last = fr["buf"][-1] if fr["buf"] else ""
+            if not fr["buf"] or (isinstance(last, str) and (last.isspace() or last in ";|&(")):
+                fr["cmt"] = True; i += 1; continue
         if not backslash_escapes and c == "\\" and i + 1 < n and text[i + 1] == '"':
             refuse("the guard cannot read the command: a backslash before a quote under PowerShell")
             break
@@ -995,10 +1012,17 @@ def read_shell(text, backslash_escapes=True):
             append_ch(fr, "${"); wadd("$"); wadd("{"); stack.append({"k": "br", "body": [], "nest": fr["nest"]}); i += 2; continue
         if text.startswith("$(", i):
             saw_subst = True
-            append_ch(fr, "$(")
+            append_ch(fr, "$", word=False)
+            append_ch(fr, "(", word=False)
             push_split(False, fr["nest"] + 1)
             stack.append({"k": "sub", "start": i + 2, "pd": 1})
             i += 2; continue
+        if c == "(" and not in_quote() and not fr.get("wmerge") and not "".join(fr.get("buf", [])).strip():
+            append_ch(fr, c, word=False)
+            push_split(False, fr["nest"] + 1)
+            stack.append({"k": "sub", "start": i + 1, "pd": 1, "sh": 1})
+            i += 1
+            continue
         if not in_dq() and c == "<" and i + 1 < n and text[i + 1] == "(":
             saw_subst = True
             append_ch(fr, "<(", word=False)
@@ -1034,8 +1058,10 @@ def read_shell(text, backslash_escapes=True):
             if fr["k"] in ("sq", "dq", "sub", "btf", "br", "ansi", "loc"):
                 unreadable = "the guard cannot read the command: an unclosed quote or substitution"
                 break
+    chain_wds = stack[0].get("chain_wds", []) if stack else []
     return {"unreadable": unreadable, "full": full_cmds, "cmd_words": cmd_words_list, "chain": chain_cmds,
-            "subs": subst_inners, "sub_chains": sub_chains_list, "heredocs": heredocs,
+            "chain_wds": chain_wds, "subs": subst_inners, "sub_chains": sub_chains_list,
+            "sub_chain_wds": sub_chain_wds_list, "heredocs": heredocs,
             "deep": depth_exceeded, "hassub": saw_subst, "gh_amp": gh_amp_reason, "text": text}
 
 
@@ -1050,52 +1076,24 @@ def _parsed_snapshot(text, backslash_escapes=True):
     return _parsed_snapshot._cache[key]
 
 
-def _apply_heredocs(text, parsed):
-    if not parsed["heredocs"]:
-        return text
-    out, pos = [], 0
-    for hd in sorted(parsed["heredocs"], key=lambda h: h["start"]):
-        out.append(text[pos:hd["start"]])
-        line = hd["line"]
-        head = strip_prefix(words(line.split("<<", 1)[0]))
-        blob = text[hd["start"]:hd["end"]]
-        first = blob.split("\n", 1)[0]
-        if len(blob.split("\n", 1)) > 1:
-            body = blob.split("\n", 1)[1]
-        else:
-            body = ""
-        shell_reads = head and base(head[0]) in WRAPPER_SHELLS
-        if "|" in first:
-            parts = first.split("|")
-            for p in parts[1:]:
-                if strip_prefix(words(p.strip())) and base(words(p.strip())[0]) in WRAPPER_SHELLS:
-                    shell_reads = True
-                    break
-        if shell_reads and body:
-            out.append("\n" + body)
-        else:
-            out.append(line.split("<<", 1)[0].rstrip() + "\n")
-        pos = hd["end"]
-    out.append(text[pos:])
-    return "".join(out)
-
-
-def strip_heredocs(text):
-    """A here-document's body is data unless a shell reads it: then its lines are checked."""
-    parsed = _parsed_snapshot(text, backslash_escapes=_READ_ESCAPES)
-    return _apply_heredocs(text, parsed)
-
-
 def _heredoc_shell_reads(hd, text):
-    line = hd["line"]
+    w = strip_prefix(hd.get("words") or [])
+    if w and base(w[0]) in WRAPPER_SHELLS:
+        return True
     first = text[hd["start"]:hd["end"]].split("\n", 1)[0]
-    head = strip_prefix(words(line.split("<<", 1)[0]))
-    shell_reads = head and base(head[0]) in WRAPPER_SHELLS
-    if "|" in first:
-        for part in first.split("|")[1:]:
-            if strip_prefix(words(part.strip())) and base(words(part.strip())[0]) in WRAPPER_SHELLS:
-                return True
-    return shell_reads
+    if "|" not in first:
+        return False
+    for part in first.split("|"):
+        pt = part.strip()
+        if not pt:
+            continue
+        p = _parsed_snapshot(pt, backslash_escapes=True)
+        if p.get("unreadable") or not p.get("cmd_words"):
+            continue
+        pw = strip_prefix(p["cmd_words"][0])
+        if pw and base(pw[0]) in WRAPPER_SHELLS:
+            return True
+    return False
 
 
 def _heredoc_body(text, hd):
@@ -1113,41 +1111,40 @@ def _heredoc_body(text, hd):
     return body
 
 
-def split_commands(text):
-    """Break a shell command line into simple commands (one read_shell pass)."""
-    p = _parsed_snapshot(text, backslash_escapes=_READ_ESCAPES)
-    if p.get("unreadable") or p["deep"]:
-        return []
-    seen, out = set(), []
-    for c in p["full"]:
-        cs = c.strip()
-        if cs and cs not in seen:
-            seen.add(cs)
-            out.append(cs)
-    for s in p["subs"]:
-        ss = s.strip()
-        if not ss:
+def iter_commands(text, backslash_escapes=True):
+    """Yield (command text, word list) from the reader without re-tokenizing cuts."""
+    seen_cmds, seen_work, queue = set(), set(), [(text, 0)]
+    while queue:
+        t, d = queue.pop(0)
+        if d > READ_DEPTH_BOUND or t in seen_work:
             continue
-        inner = _parsed_snapshot(ss, backslash_escapes=_READ_ESCAPES)
-        for c in inner["full"]:
+        seen_work.add(t)
+        p = _parsed_snapshot(t, backslash_escapes=backslash_escapes)
+        if p.get("unreadable") or p.get("deep"):
+            continue
+        tx = p.get("text", t)
+        for i, c in enumerate(p.get("full", [])):
             cs = c.strip()
-            if cs and cs not in seen:
-                seen.add(cs)
-                out.append(cs)
-        for b in inner["subs"]:
-            bs = b.strip()
-            if bs and bs not in seen:
-                seen.add(bs)
-                out.append(bs)
-    for hd in p["heredocs"]:
-        if not _heredoc_shell_reads(hd, text):
-            continue
-        body = _heredoc_body(text, hd)
-        for sc in split_commands(body):
-            if sc not in seen:
-                seen.add(sc)
-                out.append(sc)
-    return out
+            if not cs or cs in seen_cmds:
+                continue
+            seen_cmds.add(cs)
+            wds = list(p["cmd_words"][i]) if i < len(p.get("cmd_words", [])) else []
+            yield cs, wds
+        for s in p.get("subs", []):
+            ss = s.strip()
+            if ss:
+                queue.append((ss, d + 1))
+        for hd in p.get("heredocs", []):
+            if not _heredoc_shell_reads(hd, tx):
+                continue
+            body = _heredoc_body(tx, hd).strip()
+            if body:
+                queue.append((body, d + 1))
+
+
+def split_commands(text, backslash_escapes=True):
+    """Break a shell command line into simple commands (one read_shell pass)."""
+    return [cmd for cmd, _ in iter_commands(text, backslash_escapes=backslash_escapes)]
 
 
 def in_workspace(cwd):
@@ -1155,30 +1152,14 @@ def in_workspace(cwd):
     return bool(cwd) and os.path.isfile(os.path.join(cwd, "docs", "PROJECT_STATUS.md"))
 
 
-def chain_parts(text):
+def chain_parts(text, backslash_escapes=True):
     """Commands chained with &&, ||, ; or newline (quotes respected); a pipe stays one command."""
-    p = _parsed_snapshot(text, backslash_escapes=_READ_ESCAPES)
+    p = _parsed_snapshot(text, backslash_escapes=backslash_escapes)
     return [_strip_outer_parens(x) for x in p["chain"] if x.strip()]
 
 
-def chain_parts_with_substitutions(text):
-    p = _parsed_snapshot(text)
-    parts = [_strip_outer_parens(x) for x in p["chain"] if x.strip()]
-    expanded = list(parts)
-    for sub in p["subs"]:
-        sp = _parsed_snapshot(sub)
-        sub_parts = [_strip_outer_parens(x) for x in sp["chain"] if x.strip()]
-        if len(sub_parts) >= 2:
-            expanded.extend(sub_parts)
-    return expanded
-
-
-def contains_command_substitution(text):
-    return _parsed_snapshot(text, backslash_escapes=_READ_ESCAPES)["hassub"]
-
-
-def words(command):
-    p = _parsed_snapshot(command, backslash_escapes=_READ_ESCAPES)
+def words(command, backslash_escapes=True):
+    p = _parsed_snapshot(command, backslash_escapes=backslash_escapes)
     if p.get("unreadable") or p.get("deep"):
         return []
     cmd = command.strip()
@@ -1192,6 +1173,9 @@ def words(command):
         for i, f in enumerate(p["full"]):
             if f.strip() == cmd or cmd in f or f.strip() in cmd:
                 return list(cw[i])
+    for _, wds in iter_commands(command, backslash_escapes=backslash_escapes):
+        if command.strip() == _.strip() or _.strip() in command:
+            return list(wds)
     return []
 
 
@@ -1243,68 +1227,53 @@ def state_changing(w):
     return False
 
 
-def _part_state_change(part, parsed):
-    w = strip_prefix(words(part))
-    if w and state_changing(w):
-        return w
-    pp = _parsed_snapshot(part)
-    for sub in pp["subs"]:
-        for cmd in pp["full"] + (_parsed_snapshot(sub)["full"] if sub else []):
-            sw = strip_prefix(words(cmd))
-            if sw and state_changing(sw):
-                return sw
-    for sub in pp["subs"]:
-        sw = strip_prefix(words(sub))
-        if sw and state_changing(sw):
-            return sw
-    return None
-
-
-def chain_reason(command, cwd):
+def chain_reason(command, cwd, backslash_escapes=True):
     """Inside a Workspace, a chain carrying a state change or wrapped in cd is refused (rule 8)."""
     if not in_workspace(cwd):
         return None
-    parsed = _parsed_snapshot(command)
+    parsed = _parsed_snapshot(command, backslash_escapes=backslash_escapes)
     if parsed.get("unreadable"):
         return None
     top = [_strip_outer_parens(x) for x in parsed["chain"] if x.strip()]
-    heads = [strip_prefix(words(p)) for p in top]
-    heads = [h for h in heads if h]
+    top_wds = parsed.get("chain_wds") or []
+    heads = [strip_prefix(wds) for wds in top_wds if wds]
     for h in list(heads):
-        if base(h[0]) == "eval" and len(h) > 1:
-            heads += [strip_prefix(words(p)) for p in chain_parts(" ".join(h[1:]))]
+        if h and base(h[0]) == "eval" and len(h) > 1:
+            heads += [strip_prefix(wds) for wds in _parsed_snapshot(" ".join(h[1:]), backslash_escapes=backslash_escapes).get("chain_wds", []) if wds]
     if heads and base(heads[0][0]) == "cd":
         return "a command wrapped in cd (rule 8: never wrap a command in cd; run it with the path it needs, or git -C)"
     lists = []
     if len(top) >= 2:
-        lists.append(top)
-    for sc in parsed.get("sub_chains", []):
+        lists.append((top, top_wds))
+    for sc, scw in zip(parsed.get("sub_chains", []), parsed.get("sub_chain_wds", [])):
         parts = [_strip_outer_parens(x) for x in sc if x.strip()]
         if len(parts) >= 2:
-            lists.append(parts)
+            lists.append((parts, scw))
     for sub in parsed.get("subs", []):
         if re.search(r"&&|\|\||;", sub):
-            sp = _parsed_snapshot(sub, backslash_escapes=_READ_ESCAPES)
+            sp = _parsed_snapshot(sub, backslash_escapes=backslash_escapes)
             parts = [_strip_outer_parens(x) for x in sp.get("chain", []) if x.strip()]
             if len(parts) >= 2:
-                lists.append(parts)
-    for parts in lists:
+                lists.append((parts, sp.get("chain_wds") or []))
+    for parts, part_wds in lists:
         n = len(parts)
-        for p in parts:
-            w = strip_prefix(words(p))
+        for pi, p in enumerate(parts):
+            w = strip_prefix(part_wds[pi]) if pi < len(part_wds) and part_wds[pi] else strip_prefix(words(p, backslash_escapes=backslash_escapes))
             if w and state_changing(w):
                 return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (n, " ".join(w[:2]))
-            pp = _parsed_snapshot(p)
+            pp = _parsed_snapshot(p, backslash_escapes=backslash_escapes)
             for sub in pp.get("subs", []):
-                sw = strip_prefix(words(sub))
-                if sw and state_changing(sw):
-                    return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (n, " ".join(sw[:2]))
+                sp2 = _parsed_snapshot(sub, backslash_escapes=backslash_escapes)
+                for fw in sp2.get("cmd_words", []):
+                    sw = strip_prefix(fw)
+                    if sw and state_changing(sw):
+                        return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (n, " ".join(sw[:2]))
     return None
 
 
-def leading_husky_zero(simple):
+def leading_husky_zero(simple, backslash_escapes=True):
     """True when HUSKY=0 is a leading shell assignment, not text inside a quoted argument."""
-    w = words(simple)
+    w = words(simple, backslash_escapes=backslash_escapes)
     i = 0
     while i < len(w):
         tok = w[i]
@@ -1398,7 +1367,7 @@ def strip_prefix(w):
     i = 0
     while i < len(w):
         tok = w[i]
-        if tok in ("&", ".", "{", "}", "then", "do", "else", "elif", "if", "while", "until", "!"):
+        if tok in ("&", ".", "then", "do", "else", "elif", "if", "while", "until", "!"):
             i += 1
             continue
         if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tok):
@@ -1549,9 +1518,8 @@ def check(command, cwd=None, tool="Bash", _depth=0):
 def _check_one(command, cwd, tool, depth, backslash_escapes=True):
     if depth > READ_DEPTH_BOUND:
         return "the guard cannot read the command: nesting past the bound"
-    global _READ_ESCAPES
-    _parsed_snapshot._cache = {}
-    _READ_ESCAPES = backslash_escapes
+    if depth == 0:
+        _parsed_snapshot._cache = {}
     parsed = _parsed_snapshot(command, backslash_escapes=backslash_escapes)
     if parsed.get("unreadable"):
         return parsed["unreadable"]
@@ -1560,14 +1528,16 @@ def _check_one(command, cwd, tool, depth, backslash_escapes=True):
     r = parsed.get("gh_amp")
     if r:
         return r
-    r = chain_reason(command, cwd)
+    r = chain_reason(command, cwd, backslash_escapes=backslash_escapes)
     if r:
         return r
-    for simple in split_commands(command):
-        if leading_husky_zero(simple) and re.search(r"\bgit\b.*\b(commit|push|merge)\b", simple, re.I | re.S):
+    for simple, cmd_wds in iter_commands(command, backslash_escapes=backslash_escapes):
+        if leading_husky_zero(simple, backslash_escapes) and re.search(r"\bgit\b.*\b(commit|push|merge)\b", simple, re.I | re.S):
             return "HUSKY=0 switches the hook runner off (a commit that skips its checks; rule 4)"
-        w = strip_prefix(words(simple))
+        w = strip_prefix(cmd_wds)
         if not w:
+            if simple.strip():
+                return parsed.get("unreadable") or "the guard cannot read the command: an unclosed quote or substitution"
             continue
         head = base(w[0])
         if head == "eval" and len(w) > 1:
@@ -1631,7 +1601,7 @@ def _check_one(command, cwd, tool, depth, backslash_escapes=True):
                 gp = _parsed_snapshot(simple, backslash_escapes=backslash_escapes)
                 if gp.get("unreadable"):
                     return gp["unreadable"]
-                if parsed.get("hassub") or gp.get("hassub"):
+                if gp.get("hassub"):
                     return "gh api graphql with a query built by a command substitution, which the guard cannot read (write the query on the command line)"
                 if any(t == "--input" or t.startswith("--input=") or t.startswith("@") or "=@" in t for t in args):
                     return "gh api graphql with a query read from a file, which the guard cannot read (write the query on the command line)"
