@@ -1298,6 +1298,21 @@ def builder_review_refusal(argv, folder, kind):
         )
     brief_text = bridge_env.decode_record_bytes(brief_bytes)
     brief_shown = os.path.join("handoff", brief_name + ".md").replace("\\", "/")
+    header_reason = bridge_env.brief_header_refusal(
+        brief_text, brief_shown, keys=("id", "round", "satisfies", "scope")
+    )
+    if header_reason:
+        return (_ascii_refusal(header_reason), None)
+    mu_one_side = bridge_env.brief_merge_unit_one_side(brief_text)
+    if mu_one_side:
+        return (
+            _brief_rule_refusal(
+                "brief rule: a merge unit names two or more increments; "
+                "a brief of one increment carries no Merge unit: line and merge_unit: null in its header "
+                + mu_one_side
+            ),
+            None,
+        )
     header_reason = bridge_env.brief_header_refusal(brief_text, brief_shown)
     if header_reason:
         return (_ascii_refusal(header_reason), None)
