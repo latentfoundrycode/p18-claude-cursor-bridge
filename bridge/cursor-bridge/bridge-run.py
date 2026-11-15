@@ -2063,6 +2063,156 @@ def boundary_changes(before, after):
     return out
 
 
+def _git_rev_parse(folder, *args):
+    try:
+        p = subprocess.run(
+            ["git", "-C", folder or ".", "rev-parse"] + list(args),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=NO_WINDOW,
+            timeout=bridge_env.GIT_TIMEOUT,
+        )
+        if p.returncode != 0:
+            return None
+        out = p.stdout.strip()
+        return out if out else None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def _git_dir(folder):
+    raw = _git_rev_parse(folder, "--git-dir")
+    if raw is None:
+        return None
+    if os.path.isabs(raw):
+        return os.path.normpath(raw)
+    return os.path.normpath(os.path.join(os.path.abspath(folder or "."), raw))
+
+
+def _git_resolved_path(folder, git_path_name):
+    """Absolute path for `git rev-parse --git-path <name>`; relative answers resolve against the worktree top."""
+    raw = _git_rev_parse(folder, "--git-path", git_path_name)
+    if raw is None:
+        return None
+    if os.path.isabs(raw):
+        return os.path.normpath(raw)
+    top = _git_rev_parse(folder, "--show-toplevel")
+    base = os.path.abspath(top if top else folder or ".")
+    return os.path.normpath(os.path.join(base, raw))
+
+
+def _git_display_path(abs_path, parent):
+    try:
+        rel = os.path.relpath(abs_path, parent)
+    except ValueError:
+        return os.path.normpath(abs_path).replace("\\", "/")
+    if rel.startswith(".."):
+        return os.path.normpath(abs_path).replace("\\", "/")
+    return rel.replace("\\", "/")
+
+
+def _git_file_state(path):
+    if not os.path.lexists(path):
+        return None
+    if os.path.isdir(path):
+        return "unreadable"
+    try:
+        with open(path, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except OSError:
+        return "unreadable"
+
+
+class GitConfigWatch(object):
+    """Fixed git config paths and hooks folders for before/after reads (test and driver runs)."""
+
+    def __init__(self, folder):
+        self._files = []
+        self._hooks_dirs = []
+        self._parent = None
+        self.active = False
+        try:
+            common = git_common_dir(folder)
+            if not common:
+                return
+            parent = os.path.dirname(common)
+            self._parent = parent
+            self._files.append((os.path.join(common, "config"), _git_display_path(os.path.join(common, "config"), parent)))
+            attrs = os.path.join(common, "info", "attributes")
+            self._files.append((attrs, _git_display_path(attrs, parent)))
+            git_dir = _git_dir(folder)
+            if git_dir:
+                wt_cfg = os.path.join(git_dir, "config.worktree")
+                self._files.append((wt_cfg, _git_display_path(wt_cfg, parent)))
+            seen = set()
+            for hooks in (_git_resolved_path(folder, "hooks"), os.path.join(common, "hooks")):
+                if not hooks:
+                    continue
+                key = os.path.normcase(os.path.normpath(hooks))
+                if key in seen:
+                    continue
+                seen.add(key)
+                self._hooks_dirs.append(hooks)
+            self.active = True
+        except Exception:
+            pass
+
+    def _snapshot(self):
+        state = {}
+        for abspath, display in self._files:
+            state[display] = _git_file_state(abspath)
+        if self._parent is not None:
+            for hooks_dir in self._hooks_dirs:
+                try:
+                    names = os.listdir(hooks_dir)
+                except OSError:
+                    continue
+                for name in names:
+                    full = os.path.join(hooks_dir, name)
+                    if os.path.isdir(full):
+                        continue
+                    state[_git_display_path(full, self._parent)] = _git_file_state(full)
+        return state
+
+    def before(self):
+        if not self.active:
+            return None
+        try:
+            return self._snapshot()
+        except Exception:
+            return None
+
+    def after(self):
+        if not self.active:
+            return None
+        try:
+            return self._snapshot()
+        except Exception:
+            return None
+
+
+def git_config_changes(before, after):
+    """[(path, new|removed|changed|unreadable)] sorted by path."""
+    if before is None or after is None:
+        return []
+    out = []
+    for path in sorted(set(before) | set(after)):
+        b, a = before.get(path), after.get(path)
+        if b == a:
+            continue
+        if a == "unreadable" or b == "unreadable":
+            out.append((path, "unreadable"))
+        elif a is None:
+            out.append((path, "removed"))
+        elif b is None:
+            out.append((path, "new"))
+        else:
+            out.append((path, "changed"))
+    return out
+
+
 def resolve(argv):
     """Return (argv to start, is_agent)."""
     if is_agent_argv(argv):
@@ -2397,6 +2547,20 @@ def main():
         sys.stderr.write(DRIVER_REFUSE)
         return 125
 
+    git_watch = GitConfigWatch(folder) if kind in ("test", "driver") else None
+    git_before = git_watch.before() if git_watch else None
+
+    def report_git_config():
+        if git_before is None or git_watch is None:
+            return
+        after = git_watch.after()
+        if after is None:
+            return
+        changes = git_config_changes(git_before, after)
+        for path, word in changes:
+            sys.stderr.write("bridge-run: GIT-CONFIG %s %s\n" % (path, word))
+        sys.stderr.flush()
+
     killer = None
     if sys.platform == "win32":
         try:
@@ -2439,11 +2603,14 @@ def main():
     started = time.time()                                    # after the slot: the limit counts from here
     entry.update(pid=os.getpid(), child_pid=proc.pid)
     pid_file = write_pid_file(folder, run_id, os.getpid(), proc.pid)   # read by bridge-stop.py while the run lives (2026.10.11c)
+    timed_out = False
     try:
         rc = proc.wait(timeout=limit)
     except subprocess.TimeoutExpired:
+        timed_out = True
         sys.stderr.write("bridge-run: LIMIT %ds reached after %ds; terminating the whole process tree\n"
                          % (int(limit), int(time.time() - started)))
+        report_git_config()
         report_boundary()                   # before the exit line, which stays the last (the job ends this process)
         sys.stderr.write("bridge-run: exit 124\n")
         sys.stderr.flush()
@@ -2459,13 +2626,20 @@ def main():
             proc.kill()
         rc = 124
     remove_pid_file(pid_file)
-    if rc != 124:
-        report_boundary()
-        sys.stderr.write("bridge-run: exit %d\n" % rc)
-        sys.stderr.flush()
+    if not timed_out:
+        report_git_config()
+        if rc != 124:
+            report_boundary()
+            sys.stderr.write("bridge-run: exit %d\n" % rc)
+            sys.stderr.flush()
     if entry["exit"] is None:
         healthy = True if (kind == "test" and rc == 0) or (kind == "driver" and rc in (0, 1)) else None
         entry.update(seconds=int(time.time() - started), exit=rc, healthy=healthy)
+        try:
+            if not os.path.isdir(os.path.join(folder, "run")):
+                os.makedirs(os.path.join(folder, "run"), exist_ok=True)
+        except OSError:
+            pass
         write_log(folder, entry)
     # The job handle is deliberately not closed here: it closes when this process exits,
     # after the exit code is set, and "kill on close" then ends any orphan the command left.

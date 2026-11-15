@@ -1,5 +1,7 @@
 # Builder notes
 
+2026-11-15 TASK-062-r1: `test_program_git_config.make_repo` has no `run/` folder but `test_r081_a_run_that_changes_nothing` reads `runs.jsonl`, which `write_log` only writes when `run/` exists; `main()` now creates `run/` before `write_log` so that row assertion can pass without editing the supervisor acceptance file.
+
 2026-10-12 TASK-002-r2: Semgrep CLI 1.176.1 rejects `semgrep scan --dry-run` (suggests `--dryrun`, which is autofix-only); used `semgrep --validate --config …` to confirm rule load counts per the handoff report.
 
 2026-10-12 TASK-002-r3: Push-to-`main` Semgrep uses `--baseline-commit ${{ github.event.before }}` (skip baseline when `before` is the all-zero SHA) so the floor gates only code introduced by the push; PR path still uses `git merge-base`.

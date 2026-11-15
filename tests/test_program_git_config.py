@@ -38,9 +38,11 @@ def git(cwd, *args):
 
 
 def make_repo(tmp_path):
-    """A repository at <tmp>/proj/Workspace with one commit (a worktree needs one)."""
+    """A repository at <tmp>/proj/Workspace with one commit (a worktree needs one) and a project's `run/` folder,
+    where the launcher writes its log row (`write_log` writes only where `run/` exists; round 2's correction)."""
     ws = tmp_path / "proj" / "Workspace"
     ws.mkdir(parents=True)
+    (ws / "run").mkdir()
     git(ws, "init", "-q")
     git(ws, "config", "user.email", "test@example.invalid")
     git(ws, "config", "user.name", "test")
@@ -236,6 +238,102 @@ def test_r081_a_launch_folder_in_no_repository_prints_nothing(tmp_path):
     p = launch(tmp_path, folder, child_code("pathlib.Path('config').write_text('x')"))
     assert p.returncode == 0, p.stderr
     assert "GIT-CONFIG" not in p.stderr, p.stderr
+
+
+def test_r081_a_launch_from_a_sub_folder_reads_the_hooks_path_folder(tmp_path):
+    """Launched from a sub-folder of the worktree with a relative `core.hooksPath` set before the run: the folder git
+    uses is the one at the worktree's top, read once, its change named relative to the common folder's parent."""
+    ws = make_repo(tmp_path)
+    git(ws, "config", "core.hooksPath", ".githooks")
+    (ws / ".githooks").mkdir()
+    (ws / ".githooks" / "pre-commit").write_text("exit 0\n", encoding="utf-8")
+    sub = ws / "sub"
+    sub.mkdir()
+    p = launch(tmp_path, sub, child_code("pathlib.Path('../.githooks/pre-commit').write_text('exit 1' + chr(10))"))
+    assert p.returncode == 0, p.stderr
+    assert git_config_lines(p.stderr) == [".githooks/pre-commit changed"], p.stderr
+
+
+def test_r081_a_launch_from_a_sub_folder_without_a_hooks_path_reads_git_hooks_once(tmp_path):
+    ws = make_repo(tmp_path)
+    sub = ws / "sub"
+    sub.mkdir()
+    p = launch(tmp_path, sub, child_code("pathlib.Path('../.git/hooks/pre-push').write_text('exit 0')"))
+    assert p.returncode == 0, p.stderr
+    assert git_config_lines(p.stderr) == [".git/hooks/pre-push new"], p.stderr
+
+
+def test_r081_a_hook_replaced_by_a_folder_is_unreadable(tmp_path):
+    """A hooks entry that is not a regular file is never opened: it reads as unreadable."""
+    ws = make_repo(tmp_path)
+    (ws / ".git" / "hooks" / "pre-commit").write_text("exit 0\n", encoding="utf-8")
+    p = launch(tmp_path, ws, child_code("os.remove('.git/hooks/pre-commit'); os.makedirs('.git/hooks/pre-commit')"))
+    assert p.returncode == 0, p.stderr
+    assert git_config_lines(p.stderr) == [".git/hooks/pre-commit unreadable"], p.stderr
+
+
+def test_r081_a_sub_folder_of_a_hooks_folder_present_before_and_after_prints_nothing(tmp_path):
+    ws = make_repo(tmp_path)
+    (ws / ".git" / "hooks" / "lib").mkdir()
+    (ws / ".git" / "hooks" / "lib" / "x.sh").write_text("exit 0\n", encoding="utf-8")
+    p = launch(tmp_path, ws, child_code("pathlib.Path('.git/hooks/lib/x.sh').write_text('exit 1')"))
+    assert p.returncode == 0, p.stderr
+    assert git_config_lines(p.stderr) == [], p.stderr
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="a named pipe in a folder is POSIX's mkfifo")
+def test_r081_a_fifo_planted_in_a_hooks_folder_is_unreadable_and_the_run_ends(tmp_path):
+    """Opening a FIFO blocks until a writer comes: the after-read never opens what is not a regular file, so the run
+    ends with its exit line and the entry reads unreadable."""
+    ws = make_repo(tmp_path)
+    p = launch(tmp_path, ws, child_code("os.mkfifo('.git/hooks/post-merge')"))
+    assert p.returncode == 0, p.stderr
+    assert git_config_lines(p.stderr) == [".git/hooks/post-merge unreadable"], p.stderr
+    assert p.stderr.splitlines()[-1] == "bridge-run: exit 0", p.stderr
+
+
+# The child swaps the hooks folder for a link to a folder that needs no privilege: a junction on Windows, a symbolic
+# link elsewhere.
+LINK_CHILD = ("os.rename('.git/hooks', '.git/hooks-moved')\n"
+              + ("import _winapi\n_winapi.CreateJunction(%r, '.git/hooks')" if sys.platform == "win32"
+                 else "os.symlink(%r, '.git/hooks')"))
+
+
+def test_r081_a_hooks_folder_swapped_for_a_link_is_not_listed_through_it(tmp_path):
+    """A run that replaces the hooks folder with a junction (no privilege needed) to a folder full of files: the
+    after-read never lists through the link; the folder's own line is `unreadable` and its entries read as absent,
+    so no entry of the link's target is named."""
+    ws = make_repo(tmp_path)
+    target = tmp_path / "elsewhere"
+    target.mkdir()
+    for name in ("one.exe", "two.dll", "three.sys"):
+        (target / name).write_text(name, encoding="utf-8")
+    (ws / ".git" / "hooks" / "pre-commit").write_text("exit 0\n", encoding="utf-8")
+    p = launch(tmp_path, ws, child_code(LINK_CHILD % str(target)))
+    assert p.returncode == 0, p.stderr
+    lines = git_config_lines(p.stderr)
+    assert ".git/hooks unreadable" in lines, p.stderr
+    assert ".git/hooks/pre-commit removed" in lines, p.stderr
+    assert not any(n in line for line in lines for n in ("one.exe", "two.dll", "three.sys")), p.stderr
+    assert all(line == ".git/hooks unreadable" or line.endswith(" removed") for line in lines), p.stderr
+
+
+def test_r081_a_worktree_s_git_file_and_commondir_are_read(tmp_path):
+    """In a linked worktree, the `.git` file at its top (`gitdir: ...`) and `commondir` in its own git folder steer
+    every later git command there: a run that rewrites either is named (security audit, round 1)."""
+    ws = make_repo(tmp_path)
+    wt = tmp_path / "proj" / "wt"
+    git(ws, "worktree", "add", "-q", str(wt))
+    body = ("d = subprocess.run(['git', 'rev-parse', '--git-dir'], capture_output=True, text=True, check=True, "
+            "creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)).stdout.strip()\n"
+            "open(os.path.join(d, 'commondir'), 'a').write(chr(10))\n"
+            "open('.git', 'a').write(chr(10))")        # appended: Windows refuses to truncate the hidden `.git` file
+    p = launch(tmp_path, wt, child_code(body))
+    assert p.returncode == 0, p.stderr
+    lines = git_config_lines(p.stderr)
+    assert ".git/worktrees/wt/commondir changed" in lines, p.stderr
+    assert any(line.endswith("wt/.git changed") for line in lines), p.stderr
+    assert len(lines) == 2, p.stderr
 
 
 def test_r081_a_read_that_fails_is_unreadable_and_changes_nothing_else(tmp_path):
