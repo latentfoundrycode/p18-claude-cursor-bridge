@@ -4,7 +4,7 @@ Newest first. Each entry records a call the supervisor made on the record of a r
 
 ## 2026-11-14 TASK-061: round 2's split (Review A APPROVE, the security audit FAIL)
 
-- **Question:** whether round 2 merges, Review A approving it and the security audit failing it on two inputs of `run/launcher/runs.jsonl` that make `learned_limit` raise: a healthy row of the learned kind whose `seconds` is NaN or infinite, and a line nested too deep for json. Review A recorded both as older than the increment, for docs/HARDENING.md.
+- **Question:** whether round 2 merges, Review A approving it and the security audit failing it on two inputs of `run/launcher/runs.jsonl` that make `learned_limit` raise: a healthy row of the learned kind whose `seconds` is NaN or infinite, and a line nested too deep for json. Review A's round-2 reply named both under NOTED as older than the increment, for docs/HARDENING.md or a later brief.
 - **Decision: round 3 fixes both.**
 - **Reasoning.** The established invariant is the brief's own: round 1's Context says the log is read as untrusted input and that nothing read from it raises, and its acceptance criteria say so of `learned_limit`, which this increment rewrites. The threat model's outside input reaches both holes (the log is a file any run started in the checkout writes, a reviewer's included), and either breaks every `--limit auto` launch, the launcher's own safety mechanism; that they predate the increment does not make them tail, since the decide rule judges a security finding by whether untrusted input reaches it. Each fix was one line, the round below the ceiling by the guard's count.
 
