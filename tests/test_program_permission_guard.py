@@ -839,3 +839,170 @@ def test_r082_a_wrapper_the_flat_grammar_does_not_read_is_refused_as_unreadable(
 def test_r082_a_refused_command_is_refused_under_powershell(plain, command):
     rc, err = guard_tool(command, plain, "PowerShell")
     assert rc == 2 and "refused" in err, (command, rc, err)
+
+
+# ---------------------------------------------------------------- round 5's findings (Review A B1 to B20, the security audit S1 to S6)
+
+WRY = "git worktree remove y"
+FF = "\f"
+NBSP = "\u00a0"
+
+R6_UNREADABLE = [
+    ("compgen-running-a-command", "compgen -C '" + WRY + "' y"),
+    ("named-descriptor-before-input", "{fd}<x " + WRY),
+    ("named-descriptor-before-read-write", "{fd}<>x " + WRY),
+    ("substitution-later-in-a-redirection-target", "echo hi >x$({git,worktree,remove,y})"),
+    ("escaped-dollar-outside-quotes", "echo " + BS + "$x"),
+    ("builtin-before-let", "builtin let 'x=a[$(" + WRY + ")]'"),
+    ("command-before-declare", "command declare -i 'x=a[$(" + WRY + ")]'"),
+    ("builtin-before-printf-v", "builtin printf -v 'a[$(" + WRY + ")]' x"),
+    ("command-before-source", "echo x | command source /dev/stdin"),
+    ("env-before-xargs", "env xargs " + WRY),
+    ("nohup-before-winpty", "nohup winpty " + WRY),
+    ("nohup-before-strace", "nohup strace " + WRY),
+    ("env-before-wsl", "env wsl " + WRY),
+    ("nohup-before-busybox", "nohup busybox sh -c '" + WRY + "'"),
+    ("assignment-before-env-split-string", "A=1 env -S '" + WRY + "'"),
+    ("nohup-before-env-split-string", "nohup env -S '" + WRY + "'"),
+    ("bash-with-an-unknown-option", "nohup bash -o posix -c '" + WRY + "'"),
+    ("bash-with-rcfile", "nohup bash --rcfile x -c '" + WRY + "'"),
+    ("nohup-bash-reading-stdin", "echo x | nohup bash"),
+    ("bash-s-reading-stdin", "nohup bash -s"),
+    ("bash-reading-dev-stdin", "echo x | bash /dev/stdin"),
+    ("bash-reading-a-thread-descriptor", "echo x | bash /proc/thread-self/fd/0"),
+    ("bash-exe-reading-stdin", "echo '" + WRY + "' | bash.exe"),
+    ("nohup-before-a-glued-cmd-switch", "nohup cmd /cgit worktree remove y"),
+    ("glued-cmd-switch-after-another", "cmd /d /cgit worktree remove x"),
+    ("cmd-inner-winpty", "cmd /c winpty " + WRY),
+    ("cmd-inner-wsl", "cmd /c wsl " + WRY),
+    ("cmd-inner-move", "cmd /c move a b"),
+    ("cmd-inner-mkdir", "cmd /c mkdir x"),
+    ("cmd-inner-path", "cmd /c path x"),
+    ("env-before-git-config-variables", "env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null git commit -m x"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in R6_UNREADABLE], ids=[n for n, _ in R6_UNREADABLE])
+def test_r082_a_form_round_5_read_is_refused_as_unreadable(plain, command):
+    err = refused(command, plain)
+    assert "cannot read" in err.lower(), err
+
+
+R6_REFUSED = [
+    ("empty-single-quotes-then-hash", "echo ''# ; " + WRY),
+    ("empty-double-quotes-then-hash", 'echo ""#x ; ' + WRY),
+    ("empty-word-as-a-git-option-value", "git -C '' worktree remove x"),
+    ("empty-message-before-no-verify", "git commit --allow-empty-message -m '' --no-verify"),
+    ("backslash-then-two-new-lines", "echo x" + BS + NL + NL + WRY),
+    ("backslash-then-carriage-return-and-new-line", "echo x" + BS + CR + NL + WRY),
+    ("closed-descriptor-then-a-new-line", "git status >&-" + NL + WRY),
+    ("closed-descriptor-then-a-separator", "git status >&-;" + WRY),
+    ("double-quoted-target-part-then-a-word", '>"x"y ' + WRY),
+    ("single-quoted-target-part-then-a-word", ">'x'y " + WRY),
+    ("escaped-blank-in-a-target", ">a" + BS + " b " + WRY),
+    ("quoted-blank-in-a-target", "echo x >a'b c' ; " + WRY + NL + "echo '"),
+    ("closed-descriptor-glued-to-a-word", "git >&-C worktree remove y"),
+    ("duplicated-descriptor-glued-to-a-word", "git >&2C worktree remove y"),
+    ("closed-descriptor-before-the-subcommand", "git >&- worktree remove y"),
+    ("escaped-digit-before-a-redirection", "git -C " + BS + "2>x worktree remove y"),
+    ("cmd-inner-pipe", 'cmd /c "echo x|' + WRY + '"'),
+    ("cmd-inner-or", 'cmd /c "echo x||' + WRY + '"'),
+    ("cmd-inner-leading-redirection", 'cmd /c ">x ' + WRY + '"'),
+    ("cmd-inner-redirection-inside", 'cmd /c "git >x worktree remove y"'),
+    ("cmd-inner-numbered-redirection", 'cmd /c "git 2>x worktree remove y"'),
+    ("cmd-inner-appending-redirection", 'cmd /c "git >>x worktree remove y"'),
+    ("husky-behind-stdbuf-with-a-value", "stdbuf -o L env HUSKY=0 git commit -m x"),
+    ("program-name-with-exe-around-the-shim", "cursor-agent.exe -p x"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in R6_REFUSED], ids=[n for n, _ in R6_REFUSED])
+def test_r082_a_refused_command_round_5_let_through_is_refused(plain, command):
+    refused(command, plain)
+
+
+def test_r082_a_later_pipeline_stage_counts_in_a_chain_in_a_workspace(workspace):
+    refused("echo hi; git commit -m x | cat", workspace)
+
+
+def test_r082_a_chain_two_wrappers_deep_is_refused_in_a_workspace(workspace):
+    err = refused("bash -c \"bash -c 'git add -A && git commit -m x'\"", workspace)
+    assert "rule 8" in err or "chain" in err.lower(), err
+
+
+@pytest.mark.parametrize("command", [
+    "env",
+    "A=1",
+    "A=1 && git status",
+    "bash -c 'cd x'",
+], ids=["env-alone", "assignment-alone", "assignment-then-a-read", "cd-inside-a-wrapper"])
+def test_r082_a_readable_form_passes_in_a_workspace(workspace, command):
+    passes(command, workspace)
+
+
+@pytest.mark.parametrize("command", [
+    "find . -name '*.log' -exec rm {} ;",
+    "git commit -mcheckpoint" + BS + " before" + BS + " TASK-001 --no-verify",
+], ids=["find-exec-rm-kept", "checkpoint-message-glued-to-m"])
+def test_r082_a_readable_form_round_5_refused_passes(plain, command):
+    passes(command, plain)
+
+
+R6_POWERSHELL_REFUSED = [
+    ("cmd-pipe", 'cmd /c "echo x | ' + WRY + '"'),
+    ("numbered-redirection-three", "git 3>x worktree remove y"),
+    ("numbered-redirection-one", "git 1>x worktree remove y"),
+    ("merged-streams-before-the-subcommand", "git 2>&1 worktree remove y"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in R6_POWERSHELL_REFUSED], ids=[n for n, _ in R6_POWERSHELL_REFUSED])
+def test_r082_a_refused_command_round_5_let_through_is_refused_under_powershell(plain, command):
+    rc, err = guard_tool(command, plain, "PowerShell")
+    assert rc == 2 and "refused" in err, (command, rc, err)
+
+
+R6_POWERSHELL_UNREADABLE = [
+    ("form-feed-between-words", "git" + FF + "worktree remove x"),
+    ("non-breaking-space-in-a-redirection-target", "echo hi >x$(git" + NBSP + "worktree" + NBSP + "remove" + NBSP + "y)"),
+    ("module-qualified-start-process", "Microsoft.PowerShell.Management" + BS + "Start-Process git 'worktree remove x'"),
+    ("module-qualified-allowed-cmdlet", "Microsoft.PowerShell.Management" + BS + "Get-ChildItem"),
+    ("empty-word-before-the-subcommand", "git '' worktree remove x"),
+    ("empty-word-as-a-git-option-value", "git -C '' worktree remove x"),
+    ("powershell-left-running", "echo x | powershell -NoExit -Command Get-ChildItem"),
+]
+
+
+@pytest.mark.parametrize("command", [
+    "python x.py 2>&1",
+    "echo hi>x",
+    "C:" + BS + "tools" + BS + "git.exe status",
+], ids=["merged-streams", "redirection-glued-to-a-word", "native-program-path"])
+def test_r082_a_readable_form_passes_under_powershell(plain, command):
+    rc, err = guard_tool(command, plain, "PowerShell")
+    assert rc == 0, (command, rc, err)
+
+
+@pytest.mark.parametrize("command", [c for _, c in R6_POWERSHELL_UNREADABLE], ids=[n for n, _ in R6_POWERSHELL_UNREADABLE])
+def test_r082_a_powershell_form_round_5_read_is_refused_as_unreadable(plain, command):
+    rc, err = guard_tool(command, plain, "PowerShell")
+    assert rc == 2 and "cannot read" in err.lower(), (command, rc, err)
+
+
+def test_r082_a_long_run_of_digits_is_refused_within_the_hooks_time(plain):
+    started = time.monotonic()
+    refused("git worktree remove x " + "1" * 60000, plain)
+    assert time.monotonic() - started < HOOK_SECONDS
+
+
+def test_r082_a_long_run_of_brace_pairs_passes_within_the_hooks_time(plain):
+    started = time.monotonic()
+    passes("echo " + "{}" * 200000, plain)
+    assert time.monotonic() - started < HOOK_SECONDS
+
+
+def test_r082_a_long_run_of_at_words_passes_within_the_hooks_time_under_powershell(plain):
+    started = time.monotonic()
+    rc, err = guard_tool("echo " + "@h/ " * 25000, plain, "PowerShell")
+    assert rc == 0, (rc, err[:200])
+    assert time.monotonic() - started < HOOK_SECONDS
