@@ -98,8 +98,6 @@ HARMLESS = [
     ("double-quoted-substitution", 'echo "$(git status)"'),
     ("double-quoted-backtick", 'echo "' + BT + 'date' + BT + '"'),
     ("nested-substitutions", 'echo "$(echo "$(date)")"'),
-    ("here-string", 'cat <<< "$(date)"'),
-    ("parameter-expansion", 'echo "${x:-$(date)}"'),
     ("process-substitution", "diff <(git log -1) <(git status)"),
     ("single-quoted-substitution-is-text", "echo \"it's\" '$(" + WR + ")'"),
     ("escaped-dollar-inside-double-quotes", 'echo "' + BS + '$(' + WR + ')"'),
@@ -348,6 +346,185 @@ def guard_tool(command, cwd, tool):
     payload = {"tool_name": tool, "tool_input": {"command": command}, "permission_mode": "auto", "cwd": str(cwd)}
     p = subprocess.run([sys.executable, PROG], input=json.dumps(payload), capture_output=True, text=True, timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     return p.returncode, p.stderr
+
+
+# ---------------------------------------------------------------- after the resolution round: read a subset exactly, refuse the rest
+# (docs/CHANGES.md, 2026-11-15 TASK-063: resolution round; handoff/RESOLUTION-TASK-063.md)
+
+CR = "\r"
+PUSHF = "git push --force origin main"
+
+ROUND2_HOLES = [
+    ("double-quote-in-a-backtick-body", "echo " + BT + 'echo "x"' + BT + " ; " + WR),
+    ("single-quote-in-a-backtick-body", "echo " + BT + "echo 'x'" + BT + " ; " + WR),
+    ("substitution-in-a-backtick-body", "echo " + BT + "echo $(date +%Y)" + BT + " ; " + WR),
+    ("nested-backtick", "echo " + BT + "echo " + BS + BT + WR + BS + BT + BT),
+    ("escaped-substitution-in-a-backtick-body", 'echo "' + BT + "echo " + BS + "$(" + WR + ")" + BT + '"'),
+    ("separator-after-a-heredoc-delimiter", "cat <<'EOF' ; " + WR + NL + "x" + NL + "EOF"),
+    ("push-after-a-heredoc-delimiter", "cat <<'EOF' > m.txt && " + PUSHF + NL + "x" + NL + "EOF"),
+    ("and-after-an-unquoted-heredoc-delimiter", "cat <<EOF && " + WR + NL + "x" + NL + "EOF"),
+    ("apps-commit-form-with-an-apostrophe-then-a-push", "git commit -m \"$(cat <<'EOF'" + NL + "fix: don't crash" + NL + "EOF" + NL + ')"' + NL + PUSHF),
+    ("apps-commit-form-with-a-paren-then-a-push", "git commit -m \"$(cat <<'EOF'" + NL + "fix: thing (see notes" + NL + "EOF" + NL + ')"' + NL + PUSHF),
+    ("heredoc-operator-without-a-delimiter", WR + NL + "cat <<"),
+    ("assignment-of-an-ansi-c-word", "X=$'1' " + WR),
+    ("quoted-part-inside-a-flag", 'git push --fo"rce" origin $' + "'main'"),
+    ("escaped-letter-in-a-subcommand", "git " + BS + "push --force origin $'main'"),
+    ("quoted-part-inside-a-subcommand", 'git wo"rk"tree remove $' + "'../Worktrees/TASK-012'"),
+    ("ansi-c-word-cut-at-a-nul", "git push $'--force" + BS + "x00x' origin main"),
+    ("ansi-c-word-cut-at-an-octal-nul", "git push $'--force" + BS + "0x' origin main"),
+    ("husky-before-bash-c-with-a-first-command", 'HUSKY=0 bash -c "true; git commit -m x"'),
+    ("husky-before-eval-with-a-first-command", "HUSKY=0 eval 'true; git commit -m x'"),
+    ("husky-before-cmd-c", "HUSKY=0 cmd /c git commit -m x"),
+    ("husky-before-powershell-command", "HUSKY=0 powershell -Command git commit -m x"),
+    ("husky-before-find-exec", "HUSKY=0 find . -maxdepth 0 -exec git commit -m x " + BS + ";"),
+    ("husky-before-python-c", "HUSKY=0 python -c \"import os; os.system('git commit -m x')\""),
+    ("husky-before-npx", "HUSKY=0 npx git commit -m x"),
+    ("husky-before-coproc", "HUSKY=0 coproc git commit -m x"),
+    ("husky-before-watch", "HUSKY=0 watch git push origin main"),
+    ("lone-brace-in-a-parameter-expansion", "echo ${x:-{} ; " + WR),
+    ("nested-parameter-expansions", "echo ${x:-${y:-$(true)}} ; " + WR),
+    ("backtick-in-a-parameter-expansion", "echo ${x:-" + BT + WR + BT + "}"),
+    ("the-word-case-in-an-argument", 'git log -1 "$(echo upper case in titles)" ; ' + WR),
+    ("checkpoint-subject-from-another-command", "echo $(echo checkpoint before TASK-001) ; git commit --no-verify -F msg.txt"),
+    ("shift-in-arithmetic-expansion", "echo $((1<<2)) ; " + WR),
+    ("shift-in-an-arithmetic-command", "(( x = 1 << 2 )) ; " + WR),
+    ("partly-quoted-heredoc-delimiter", "cat <<'E'OF" + NL + "hi" + NL + "EOF" + NL + WR),
+    ("backslash-newline-in-a-quoted-heredoc-body", "cat <<'EOF'" + NL + "x " + BS + NL + "EOF" + NL + WR + NL + "EOF"),
+    ("backslash-newline-in-a-comment", "echo a # c " + BS + NL + WR),
+    ("backslash-newline-in-a-comment-inside-a-substitution", "echo $(echo a # c " + BS + NL + WR + ")"),
+    ("backslash-newline-in-an-unquoted-heredoc-body", "cat <<EOF" + NL + "x " + BS + NL + "EOF" + NL + "'$(" + WR + ")'" + NL + "EOF"),
+    ("comment-in-a-backtick-body-ends-at-its-line", "echo " + BT + "true # c" + NL + WR + BT),
+    ("body-line-beginning-with-the-delimiter", "cat <<'EOF'" + NL + "EOF " + NL + "it's" + NL + "EOF" + NL + WR),
+    ("shell-reading-a-heredoc-after-a-separator", "true ; bash <<'EOF'" + NL + WR + NL + "EOF"),
+    ("shell-reading-a-heredoc-inside-a-substitution", "echo $(bash <<'EOF'" + NL + WR + NL + "EOF" + NL + ")"),
+    ("heredoc-ending-at-a-delimiter-and-paren", "x=$(cat <<'EOF'" + NL + "hi" + NL + "EOF)" + NL + WR + NL + "EOF"),
+    ("comment-after-a-subshell-paren-in-a-substitution", 'echo "$( (# it' + "'s" + NL + "true) ; " + WR + ' )"'),
+    ("subshell-inside-a-double-quoted-substitution", 'echo "$( (true) ; ' + WR + ' )"'),
+    ("leading-input-redirection", "</dev/null " + WR),
+    ("leading-input-redirection-to-a-file", "<x " + WR),
+    ("leading-read-write-redirection", "<>x " + WR),
+    ("leading-output-redirection", ">out " + WR),
+    ("substitution-in-a-redirection-target", 'echo x > "$(' + WR + ')"'),
+    ("brace-expansion-of-a-flag", "git push origin main --{force,quiet}"),
+    ("comment-with-an-apostrophe-before-gh-api", "echo # it's" + NL + "gh api repos/o/r/pulls?state=all&per_page=1"),
+    ("many-unquoted-heredocs", WR + " ; " + NL.join("cat <<E%d" % k for k in range(1000)) + NL),
+    ("many-nested-shell-heredocs", WR + NL + NL.join("bash <<'E%d'" % k for k in range(1000)) + NL + NL.join("E%d" % k for k in reversed(range(1000)))),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in ROUND2_HOLES], ids=[n for n, _ in ROUND2_HOLES])
+def test_r082_a_form_round_2_let_through_is_refused_within_the_hooks_time(plain, command):
+    started = time.monotonic()
+    refused(command, plain)
+    assert time.monotonic() - started < HOOK_SECONDS
+
+
+TIMED = [
+    ("quoted-substitutions-in-parameter-expansions", "echo " + '${x:-"$(' * 3000 + "true" + ')"}' * 3000 + " ; " + WR),
+    ("forty-thousand-newlines-in-a-substitution", 'echo "$(echo "<<x"' + NL * 40000 + ')" ; ' + WR),
+    ("thirty-thousand-words-in-a-substitution", "echo $(echo" + " x" * 30000 + ") ; " + WR),
+    ("fifteen-thousand-subshells-in-a-substitution", "echo $(" + "( " * 15000 + "true" + " )" * 15000 + ") ; " + WR),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in TIMED], ids=[n for n, _ in TIMED])
+def test_r082_a_long_command_is_refused_within_the_hooks_time(plain, command):
+    started = time.monotonic()
+    refused(command, plain)
+    assert time.monotonic() - started < HOOK_SECONDS
+
+
+UNREADABLE = [
+    ("here-string", 'cat <<< "$(date)"'),
+    ("substitution-in-a-parameter-expansion", 'echo "${x:-$(date)}"'),
+    ("quote-in-a-parameter-expansion", 'echo ${x:-"a b"}'),
+    ("tab-stripping-heredoc", "cat <<-EOF" + NL + TAB + "x" + NL + TAB + "EOF"),
+    ("two-heredocs-on-one-line", "cat <<A <<B" + NL + "a" + NL + "A" + NL + "b" + NL + "B"),
+    ("heredoc-inside-backticks", "echo " + BT + "cat <<'EOF'" + NL + "x" + NL + "EOF" + NL + BT),
+    ("case-statement", "case x in x) echo y ;; esac"),
+    ("arithmetic-expansion", "echo $((1+1))"),
+    ("arithmetic-command", "(( x = 1 ))"),
+    ("ansi-c-part-of-a-word", "git $'work'tree list"),
+    ("locale-part-of-a-word", 'git $"work"tree list'),
+    ("brace-expansion-with-a-range", "echo file{1..3}.txt"),
+    ("named-descriptor-redirection", "exec {fd}>out.txt"),
+    ("unclosed-double-quote", 'echo "abc'),
+    ("unclosed-substitution", "echo $(git status"),
+    ("nesting-past-the-bound", "echo " + "$(echo " * 200 + "x" + ")" * 200),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in UNREADABLE], ids=[n for n, _ in UNREADABLE])
+def test_r082_a_form_outside_the_read_subset_is_refused_as_unreadable_with_its_remedy(plain, command):
+    """The guard reads a defined subset of the shell's grammar exactly; anything else it refuses, its reason
+    saying it cannot read the command and naming the form."""
+    err = refused(command, plain)
+    assert "cannot read" in err.lower(), err
+
+
+POWERSHELL_UNREADABLE = [
+    ("backslash-before-a-quote", 'Get-ChildItem "C:' + BS + 'dir' + BS + '" ; git add -A ; echo "x"'),
+    ("backtick-escaped-quote", 'echo "' + BT + '"" ; ' + WR),
+    ("here-string", "$m = @'" + NL + "it's" + NL + "'@" + NL + WR),
+    ("block-comment", "<# it's #> " + WR),
+    ("lone-carriage-return", "git status" + CR + WR),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in POWERSHELL_UNREADABLE], ids=[n for n, _ in POWERSHELL_UNREADABLE])
+def test_r082_a_powershell_form_neither_reading_models_is_refused_under_powershell(workspace, command):
+    rc, err = guard_tool(command, workspace, "PowerShell")
+    assert rc == 2 and "refused" in err, (command, rc, err)
+
+
+def test_r082_a_backtick_inside_a_word_is_refused_under_powershell(plain):
+    """PowerShell reads a backtick inside a word as an escape (git pu`s`h is push): outside single quotes and
+    not before a new line, the guard cannot read it."""
+    rc, err = guard_tool("git pu" + BT + "s" + BT + "h --force origin main", plain, "PowerShell")
+    assert rc == 2 and "refused" in err, (rc, err)
+
+
+def test_r082_a_backslash_before_a_newline_is_no_continuation_under_powershell(plain):
+    rc, err = guard_tool("Get-ChildItem C:" + BS + "temp" + BS + NL + WR, plain, "PowerShell")
+    assert rc == 2 and "refused" in err, (rc, err)
+
+
+def test_r082_a_powershell_wrapper_is_read_the_powershell_way_under_bash(plain):
+    rc, err = guard_tool("powershell -Command 'Get-ChildItem \"C:" + BS + "dir" + BS + "\" ; " + WR + " ; echo \"x\"'", plain, "Bash")
+    assert rc == 2 and "refused" in err, (rc, err)
+
+
+def test_r082_gh_api_with_an_option_before_api_and_an_unquoted_ampersand_is_refused_with_its_remedy(plain):
+    err = refused("gh -R o/r api repos/o/r/pulls?state=all&per_page=1", plain)
+    assert "quote" in err.lower(), err
+
+
+SUBSET_PASSES = [
+    ("stderr-to-stdout", "git status 2>&1"),
+    ("stdout-to-stderr", "echo error >&2"),
+    ("append-redirection", "echo x >> notes.txt"),
+    ("reflog-brace-word", "git log -1 HEAD@{1}"),
+    ("find-exec-braces", "find . -name x -exec echo {} +"),
+    ("brace-group", "{ git status; }"),
+    ("escaped-ampersand-in-gh-api", "gh api repos/o/r/pulls?state=all" + BS + "&per_page=1"),
+    ("graphql-then-another-substitution", "gh api graphql -f query='{viewer{login}}' ; echo $(date)"),
+    ("whole-word-ansi-c-string", "echo $'a" + BS + "tb'"),
+    ("redirection-before-the-command", "2>/dev/null git status"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in SUBSET_PASSES], ids=[n for n, _ in SUBSET_PASSES])
+def test_r082_a_form_inside_the_read_subset_passes(plain, command):
+    passes(command, plain)
+
+
+def test_r082_a_substitution_whose_body_chains_no_state_change_is_no_chain_in_a_workspace(workspace):
+    """Rule 8 reads each list (the top level and each substitution's body) on its own: never flattened."""
+    passes('git commit -m "$(echo a; echo b)"', workspace)
+
+
+def test_r082_the_continued_pr_create_with_a_heredoc_body_passes_in_a_workspace(workspace):
+    passes('gh pr create --title "TASK-063 guard" ' + BS + NL + "  --body \"$(cat <<'EOF'" + NL + "## Summary" + NL + "it's done" + NL + "EOF" + NL + ')"', workspace)
 
 
 def test_r082_a_backslash_before_a_quote_is_no_escape_under_powershell(plain):

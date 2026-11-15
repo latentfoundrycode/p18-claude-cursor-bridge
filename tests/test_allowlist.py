@@ -98,12 +98,16 @@ def test_ordinary_commands_are_not_denied(cmd):
 @pytest.mark.parametrize("src,cmd", collect_commands())
 def test_no_instructed_command_is_refused_by_the_guard(src, cmd, program, monkeypatch):
     """Review of 2026.10.06b, finding 8: the bridge's own texts never instruct a command its
-    hook refuses. A placeholder sha stands for a recorded one."""
+    hook refuses. A placeholder sha stands for a recorded one, and every other placeholder (a
+    `<...>` word beginning with a letter, prose that an agent replaces before it runs the command)
+    for a sample word: a placeholder may hold an apostrophe, which the guard reads as an open quote
+    (R-082, TASK-063's resolution round, docs/CHANGES.md)."""
     if any(cmd.startswith(k) for k in KNOWN_PROSE) or cmd in PROSE_EXACT:
         pytest.skip("prose, not a runnable command")
     guard = program("permission-guard")
     monkeypatch.setattr(guard, "premerge_recorded", lambda sha, cwd: True)
-    reason = guard.check(cmd.replace("<sha>", "0123456789abcdef0123456789abcdef01234567"), None)
+    runnable = re.sub(r"<[A-Za-z][^<>\n]*>", "placeholder", cmd.replace("<sha>", "0123456789abcdef0123456789abcdef01234567"))
+    reason = guard.check(runnable, None)
     assert reason is None, "%s instructs %r, which the guard refuses: %s" % (src, cmd, reason)
 
 
@@ -239,11 +243,12 @@ def test_r049_d4_the_guard_treats_the_stage_tag_as_it_treats_the_loop_s_state_co
     tag = "git tag stage-review/<name>-<n>"
     assert tag in documented, tag
     assert "commit" in guard.STATE_GIT and "push" in guard.STATE_GIT
+    sample = lambda c: re.sub(r"<[A-Za-z][^<>\n]*>", "placeholder", c)   # placeholders are prose (R-082, TASK-063)
     for cmd in (tag, "git tag stage-review/T1-1", "git commit -m x", "git push origin task-040"):
-        assert guard.state_changing(guard.words(cmd)), cmd
+        assert guard.state_changing(guard.words(sample(cmd))), cmd
     for cmd in ("git cat-file -p stage-review/<name>-<n>:<path>", "git branch -r", "git tag -l"):
         assert cmd in documented or cmd == "git tag -l", cmd
-        assert not guard.state_changing(guard.words(cmd)), cmd
+        assert not guard.state_changing(guard.words(sample(cmd))), cmd
 
 
 def test_r062_records_migrate_rule_in_allow():
