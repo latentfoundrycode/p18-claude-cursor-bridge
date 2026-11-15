@@ -550,3 +550,23 @@ def test_r082_a_command_of_ten_thousand_characters_is_read_within_the_hooks_time
     started = time.monotonic()
     passes(command, plain)
     assert time.monotonic() - started < HOOK_SECONDS
+
+
+# ---------------------------------------------------------------- round 4's pre-launch read: holes on round 3's tree
+# (handoff/TASK-063-r4.md, requirements 2 and 11)
+
+@pytest.mark.parametrize("command", [
+    "git push --force origin $(echo main)",
+    "gh pr merge 12 --squash --body $(cat x)",
+], ids=["force-push-with-a-substitution-argument", "merge-with-a-substitution-argument"])
+def test_r082_a_refused_command_with_an_unquoted_substitution_argument_is_still_refused(plain, command):
+    """A command's words come from the reading itself: a command whose text holds an unquoted `$(` is checked
+    like any other (the checkpoint fae0860 refuses both)."""
+    refused(command, plain)
+
+
+def test_r082_a_powershell_wrapper_leaves_the_rest_of_the_line_read_the_bash_way(plain):
+    """The PowerShell reading of a wrapper's inner command ends with it: under the Bash tool, a backslash after the
+    wrapper is still an escape, and `--fo\\rce` is `--force`."""
+    rc, err = guard_tool("pwsh -Command echo ; git push --fo" + BS + "rce origin main", plain, "Bash")
+    assert rc == 2 and "refused" in err, (rc, err)
