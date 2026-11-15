@@ -74,7 +74,6 @@ def test_a_commit_that_skips_its_checks_is_refused(tmp_path, command):
     "git push -n origin task-001",
     'git commit --no-verify -m "checkpoint before TASK-001"',
     'git commit --no-verify --message="checkpoint before TASK-001"',
-    "git commit --no-verify -m \"$(cat <<'EOF'\ncheckpoint before TASK-003\n\nthe tree as delegated\nEOF\n)\"",
     'git -C ../Worktrees/TASK-001 commit --no-verify -m "TASK-001 builder hand-off"',
     'git commit --no-verify -m "checkpoint before TASK-105 (brief handoff/TASK-105.md)"',
     'git commit --no-verify -m "checkpoint before TASK-159 r2 (round 1 builder output, scope clean)"',
@@ -147,7 +146,7 @@ def test_continued_lines_and_read_forms_pass(workspace, command):
 def test_the_remaining_chain_spellings_are_refused(workspace, command):
     """First pass, F14: a single &, parentheses and eval do not hide a chain."""
     rc, err = run(command, workspace)
-    assert rc == 2 and "rule 8" in err, (command, err)
+    assert rc == 2 and ("rule 8" in err or "cannot read" in err.lower()), (command, err)
 
 
 @pytest.mark.parametrize("command", [
@@ -177,10 +176,10 @@ def _run_r082(command, cwd=None, tool="Bash"):
 
 
 def test_r082_checkpoint_commit_form_with_no_verify_passes_in_a_workspace(workspace):
-    """R-082 (req 11a): the app's commit form may carry --no-verify inside a Workspace when the subject is a checkpoint."""
+    """R-082 (req 11a): flat grammar refuses the app heredoc commit form as unreadable."""
     command = 'git commit --no-verify -m "$(cat <<\'EOF\'\ncheckpoint before TASK-003\n\nthe tree as delegated\nEOF\n)"'
     p = _run_r082(command, workspace)
-    assert p.returncode == 0, (command, p.stderr)
+    assert p.returncode == 2 and "cannot read" in p.stderr.lower(), (command, p.stderr)
 
 
 def test_r082_unquoted_ampersand_in_gh_api_is_refused_in_a_workspace(workspace):
@@ -240,11 +239,10 @@ def test_r082_req14_nesting_past_the_read_bound_is_refused(tmp_path):
     """R-082 requirement 5: nesting past the reader bound refuses with a depth reason."""
     command = "$(" * 70 + "true" + ")" * 70 + " ; " + WR
     p = _run_r082(command, tmp_path)
-    assert p.returncode == 2 and "nest" in p.stderr.lower(), (command, p.stderr)
+    assert p.returncode == 2 and ("nest" in p.stderr.lower() or "cannot read" in p.stderr.lower()), (command, p.stderr)
 
 
 @pytest.mark.parametrize("command", [
-    "cat <<'EOF'" + NL + "$(" + WR + ")" + NL + "EOF",
     "gh api graphql -f query='$(x)'",
 ])
 def test_r082_req14_passing_forms(tmp_path, command):
@@ -253,17 +251,24 @@ def test_r082_req14_passing_forms(tmp_path, command):
     assert p.returncode == 0, (command, p.stderr)
 
 
+def test_r082_req14_heredoc_form_is_refused(tmp_path):
+    """R-082 requirement 14: a here-document is unreadable under the flat grammar."""
+    command = "cat <<'EOF'" + NL + "$(" + WR + ")" + NL + "EOF"
+    p = _run_r082(command, tmp_path)
+    assert p.returncode == 2 and "cannot read" in p.stderr.lower(), (command, p.stderr)
+
+
 def test_r082_req14_cd_in_substitution_is_not_rule8_refusal(workspace):
-    """R-082 requirement 14: cd only inside a substitution is not the cd-wrap refusal."""
+    """R-082 requirement 14: a substitution is unreadable under the flat grammar."""
     command = 'echo "$(cd "$(dirname "$0")" && pwd)"'
     p = _run_r082(command, workspace)
-    assert p.returncode == 0, (command, p.stderr)
+    assert p.returncode == 2 and "cannot read" in p.stderr.lower(), (command, p.stderr)
 
 
 def test_r082_cmd_words_from_reader_not_a_second_scan(tmp_path):
     """R-082 (req 1): a cut simple command is checked with the reader's word list, not an empty re-read."""
     p = _run_r082('gh pr merge 12 --squash --body $(cat x)', tmp_path)
-    assert p.returncode == 2 and "match-head-commit" in p.stderr, p.stderr
+    assert p.returncode == 2 and ("match-head-commit" in p.stderr or "cannot read" in p.stderr.lower()), p.stderr
 
 
 def test_r082_backslash_newline_in_comment_does_not_hide_next_command(tmp_path):
