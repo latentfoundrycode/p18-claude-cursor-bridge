@@ -2,6 +2,12 @@
 
 Newest first. Each entry records a call the supervisor made on the record of a reviewers' split or a resolution round (Merge-Verification-Policy, Resolution round), and the reasoning that settled it.
 
+## 2026-11-15 TASK-062: the security audit's round-1 advisories taken into round 2, beyond the plan's file list
+
+- **Question:** whether round 2 takes three of the security audit's round-1 advisories that widen what TASK-062's Done when names (the common folder's `config` and `info/attributes`, the worktree's `config.worktree` and the hooks folders' entries, each compared by content): a hooks entry that is not a regular file (a folder, a FIFO, a link, a junction) is never opened and reads `unreadable`, where round 1 skipped a sub-folder and opened the rest; a hooks folder that is a link or junction at a read is never listed through it; and a linked worktree's `.git` file and its `commondir` are read too. Review A's round-1 reply named the first as a should-fix (a FIFO blocks the after-read on POSIX).
+- **Decision: round 2 takes all three, recorded here; R-081's text is not reworded.**
+- **Reasoning.** The decide rule judges a security finding by whether untrusted input reaches it on an ordinary layout. A test run reaches each one: a junction needs no privilege on Windows, so a swapped hooks folder would have had the after-read hash every file of System32 and name each one `new`, and a rewritten `gitdir:` line or `commondir` steers the session's next git command in that worktree to a git folder the run made, with none of the listed files changed. Each fix is a few lines beside round 1's, below the ceiling (the second round), and keeps the line a detection: nothing refused, restored or changed in the run's exit or row. The requirement's words ("every entry of the hooks folders by name and content", "git's configuration") hold them, so the register keeps its text; the plan's Done when stands as the floor the acceptance file asserts, these three cases added to it.
+
 ## 2026-11-14 TASK-061: round 2's split (Review A APPROVE, the security audit FAIL)
 
 - **Question:** whether round 2 merges, Review A approving it and the security audit failing it on two inputs of `run/launcher/runs.jsonl` that make `learned_limit` raise: a healthy row of the learned kind whose `seconds` is NaN or infinite, and a line nested too deep for json. Review A's round-2 reply named both under NOTED as older than the increment, for docs/HARDENING.md or a later brief.
