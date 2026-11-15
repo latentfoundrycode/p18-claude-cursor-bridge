@@ -480,8 +480,25 @@ BLOCKING_CLASS_RE = re.compile(
     r"^\s*(?:[-*]\s+)?Blocking class:\s*([^-\n]+?)\s*-\s*(.+?)\s*$",
 )
 
+MERGE_UNIT_ID_FORM = "[A-Z][A-Za-z0-9-]*"
+MERGE_UNIT_BULLET_CLASS = "[-*]"
+
 MERGE_UNIT_RE = re.compile(
-    r"^\s*(?:[-*]\s+)?Merge unit:\s*((?:[A-Z][A-Za-z0-9-]*\s+)+[A-Z][A-Za-z0-9-]*)?\s*$",
+    r"^\s*(?:"
+    + MERGE_UNIT_BULLET_CLASS
+    + r"\s+)?Merge unit:\s*((?:"
+    + MERGE_UNIT_ID_FORM
+    + r"\s+)+"
+    + MERGE_UNIT_ID_FORM
+    + r")?\s*$",
+)
+
+MERGE_UNIT_ONE_LINE_RE = re.compile(
+    r"^\s*(?:"
+    + MERGE_UNIT_BULLET_CLASS
+    + r"\s+)?Merge unit:\s*"
+    + MERGE_UNIT_ID_FORM
+    + r"\s*$",
 )
 
 DESIGN_PATH_NORM = re.compile(r"[/\\]+(?:\.[/\\]+)*")
@@ -969,6 +986,54 @@ def plan_increment_ids(folder):
                 for inc in st["increments"]:
                     ids.add(inc["id"])
     return ids
+
+
+def _merge_unit_field_line_words(stripped):
+    s = stripped.lstrip()
+    if s and s[0] in "-*" and len(s) > 1 and s[1] == " ":
+        s = s[2:].lstrip()
+    if not s.startswith("Merge unit:"):
+        return None
+    rest = s[len("Merge unit:") :].lstrip()
+    if not rest:
+        return []
+    return rest.split()
+
+
+def brief_merge_unit_one_side(text):
+    """When a brief names a merge unit of one increment on a side and neither names two or more as written,
+    return which side; else None. The launcher is the sole caller."""
+    if not text:
+        return None
+    rec = read_brief_record(text, "")
+    if rec.refusal is not None:
+        return None
+    src = rec.body if rec.header is not None else text
+    line_one = False
+    line_two = False
+    for line in src.splitlines():
+        stripped = line.strip()
+        if MERGE_UNIT_ONE_LINE_RE.match(stripped):
+            line_one = True
+        words = _merge_unit_field_line_words(stripped)
+        if words is not None and len(words) >= 2:
+            line_two = True
+    header_one = False
+    header_two = False
+    if rec.header is not None:
+        mu = rec.header.get("merge_unit")
+        if isinstance(mu, list):
+            if len(mu) == 1:
+                header_one = True
+            elif len(mu) >= 2:
+                header_two = True
+    if not (line_one or header_one) or line_two or header_two:
+        return None
+    if line_one and header_one:
+        return "(the line and the header)"
+    if line_one:
+        return "(the line)"
+    return "(the header)"
 
 
 def merge_unit_line_present(text):

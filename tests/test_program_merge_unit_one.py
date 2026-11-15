@@ -76,12 +76,14 @@ BRIEFS = {
     "the-word-none": header() + body("Merge unit: None\n"),
     "bullet-dash": header() + body("- " + ONE),
     "bullet-star": header() + body("* " + ONE),
+    "bullet-tab": header() + body("-\t" + ONE),
     # kept as header: disagrees merge_unit
     "two-line-one-header": header(("TASK-001",)) + body(TWO),
     "one-line-two-header": header(("TASK-001", "TASK-002")) + body(ONE),
     "line-second-not-id-form": header(("TASK-001",)) + body("Merge unit: TASK-001 task-002\n"),
     "line-second-rejected": header(("TASK-001",)) + body("Merge unit: TASK-001 TASK-002-r2\n"),
     "header-second-rejected": header(("TASK-001", "TASK-002-r2")) + body(ONE),
+    "two-line-tab-bullet-one-header": header(("TASK-001",)) + body("*\t" + TWO),
     # pass the brief rules as on the checkpoint
     "word-not-id-null": header() + body("Merge unit: task-001\n"),
     "unit-of-two": header(("TASK-001", "TASK-002")) + body(TWO),
@@ -154,6 +156,7 @@ REFUSED = [
     ("the-word-none", "(the line)"),
     ("bullet-dash", "(the line)"),
     ("bullet-star", "(the line)"),
+    ("bullet-tab", "(the line)"),
 ]
 
 
@@ -165,7 +168,7 @@ def test_r105_the_rule_refuses_the_form_and_names_its_side(tmp_path, name, side)
 # ---------------------------------------------------------------- the refusals kept
 
 KEPT = ["two-line-one-header", "one-line-two-header", "line-second-not-id-form", "line-second-rejected",
-        "header-second-rejected"]
+        "header-second-rejected", "two-line-tab-bullet-one-header"]
 
 
 @pytest.mark.parametrize("name", KEPT, ids=KEPT)
@@ -298,6 +301,14 @@ RECORDED = json.loads(r"""
   "None"
  ],
  "bullet-star": [
+  "None",
+  "None",
+  "None",
+  "False",
+  "[]",
+  "None"
+ ],
+ "bullet-tab": [
   "None",
   "None",
   "None",
@@ -466,6 +477,14 @@ RECORDED = json.loads(r"""
   "None"
  ],
  "two-line-one-header": [
+  "('TASK-001', 'TASK-002')",
+  "('TASK-001',)",
+  "('TASK-001',)",
+  "True",
+  "['merge_unit']",
+  "'header: disagrees merge_unit'"
+ ],
+ "two-line-tab-bullet-one-header": [
   "('TASK-001', 'TASK-002')",
   "('TASK-001',)",
   "('TASK-001',)",
