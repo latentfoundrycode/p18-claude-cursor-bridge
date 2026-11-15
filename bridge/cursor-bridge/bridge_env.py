@@ -1298,6 +1298,14 @@ def row_start_utc(row):
         return None
 
 
+def log_seconds(sec):
+    if isinstance(sec, bool) or not isinstance(sec, (int, float)):
+        return None
+    if not (-10**9 < sec < 10**9):
+        return None
+    return sec
+
+
 def review_run_interval(row):
     """(start, end) inclusive in whole seconds for a review row with a valid end, or None."""
     if row.get("kind") != "review":
@@ -1305,12 +1313,10 @@ def review_run_interval(row):
     start = row_start_utc(row)
     if start is None:
         return None
-    sec = row.get("seconds")
-    if isinstance(sec, bool) or not isinstance(sec, (int, float)) or sec < 0:
+    length = log_seconds(row.get("seconds"))
+    if length is None or length < 0:
         return None
-    if not math.isfinite(sec):
-        return None
-    return start, start + int(sec)
+    return start, start + int(length)
 
 
 def review_run_intervals(rows):
