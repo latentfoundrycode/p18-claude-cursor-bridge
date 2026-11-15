@@ -2,6 +2,12 @@
 
 Newest first. Each entry records a call the supervisor made on the record of a reviewers' split or a resolution round (Merge-Verification-Policy, Resolution round), and the reasoning that settled it.
 
+## 2026-11-14 TASK-061: round 2's split (Review A APPROVE, the security audit FAIL)
+
+- **Question:** whether round 2 merges, Review A approving it and the security audit failing it on two inputs of `run/launcher/runs.jsonl` that make `learned_limit` raise: a healthy row of the learned kind whose `seconds` is NaN or infinite, and a line nested too deep for json. Review A recorded both as older than the increment, for docs/HARDENING.md.
+- **Decision: round 3 fixes both.**
+- **Reasoning.** The established invariant is the brief's own: round 1's Context says the log is read as untrusted input and that nothing read from it raises, and its acceptance criteria say so of `learned_limit`, which this increment rewrites. The threat model's outside input reaches both holes (the log is a file any run started in the checkout writes, a reviewer's included), and either breaks every `--limit auto` launch, the launcher's own safety mechanism; that they predate the increment does not make them tail, since the decide rule judges a security finding by whether untrusted input reaches it. Each fix was one line, the round below the ceiling by the guard's count.
+
 ## 2026-11-14 TASK-059: resolution round on round 6's regression (R1)
 
 - **Question** (handoff/RESOLUTION-TASK-059.md): how round 7 removes R1, the behaviour regression round 6 caused, while keeping round 5's trailing-dot hole closed. Round 6 handed an npm, pnpm or yarn runner the absolute folder the rule checked; on Windows a `.cmd` runner is started through cmd.exe, so (a) with npm under a folder holding a space a launch folder with a space never ran its suite, and (b) a launch folder holding a cmd.exe character was refused.
