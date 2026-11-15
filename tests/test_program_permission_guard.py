@@ -330,6 +330,20 @@ def test_r082_a_state_change_inside_a_substitution_of_a_chain_is_refused_in_a_wo
     assert "chain" in err, err
 
 
+BACKTICK_ENDS = [
+    ("double-quote-inside-a-backtick-pair", "echo " + BT + 'echo "' + BT + " ; " + WR + " ; " + BT + 'echo "' + BT),
+    ("single-quote-inside-a-backtick-pair", "echo " + BT + "echo '" + BT + " ; " + WR + " ; " + BT + "echo '" + BT),
+    ("comment-inside-a-backtick-pair", "echo " + BT + "# c" + BT + " ; " + WR),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in BACKTICK_ENDS], ids=[n for n, _ in BACKTICK_ENDS])
+def test_r082_a_backtick_pair_ends_at_its_first_unescaped_backtick(plain, command):
+    """bash ends a backtick substitution at the first unescaped backtick, whatever quote or # stands before it
+    (the supervisor's test after round 2, the brief's own forms)."""
+    refused(command, plain)
+
+
 def guard_tool(command, cwd, tool):
     payload = {"tool_name": tool, "tool_input": {"command": command}, "permission_mode": "auto", "cwd": str(cwd)}
     p = subprocess.run([sys.executable, PROG], input=json.dumps(payload), capture_output=True, text=True, timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))

@@ -129,319 +129,652 @@ def program_behind(w):
     return None
 
 
-def _slashes_before(text, i):
-    """Count consecutive backslashes immediately before index i."""
-    n = 0
-    j = i - 1
-    while j >= 0 and text[j] == "\\":
-        n += 1
-        j -= 1
-    return n
+READ_DEPTH_BOUND = 64
+_READ_ESCAPES = True
 
 
-def _double_quote_ends(text, i):
-    """Inside a double-quoted string: True when the quote at i closes the string (bash rules)."""
-    return _slashes_before(text, i) % 2 == 0
-
-
-def _substitution_opens(text, i, in_single):
-    """At i: whether $(`, backtick, <( or >( starts a substitution (not escaped, not in single quotes)."""
-    if in_single:
-        return None
-    if _slashes_before(text, i) % 2 == 1:
-        return None
-    if text.startswith("$(", i):
-        return "dollar", i + 2
-    if text.startswith("<(", i):
-        return "process", i + 2
-    if text.startswith(">(", i):
-        return "process", i + 2
-    if text[i] == "`":
-        return "backtick", i + 1
-    return None
-
-
-def _matching_paren(text, open_paren):
-    """Index after the closing paren matching the '(' at open_paren (quotes respected)."""
-    depth = 1
-    i = open_paren + 1
-    quote = None
-    n = len(text)
-    while i < n and depth:
-        if quote == "'":
-            if text[i] == "'":
-                quote = None
-            i += 1
-            continue
-        if quote == '"':
-            if text[i] == '"' and _double_quote_ends(text, i):
-                quote = None
-            i += 1
-            continue
-        if quote == "ansi":
-            if text[i] == "\\" and i + 1 < n:
-                i += 2
-                continue
-            if text[i] == "'":
-                quote = None
-            i += 1
-            continue
-        if text[i] == "'":
-            quote = "'"
-            i += 1
-            continue
-        if text[i] == '"':
-            quote = '"'
-            i += 1
-            continue
-        if text.startswith("$'", i):
-            quote = "ansi"
-            i += 2
-            continue
-        kind, start = _substitution_opens(text, i, False) or (None, 0)
-        if kind in ("dollar", "process"):
-            inner_end = _matching_paren(text, start - 1)
-            i = inner_end
-            continue
-        if kind == "backtick":
-            j = start
-            while j < n:
-                if text[j] == "\\" and j + 1 < n:
-                    j += 2
-                    continue
-                if text[j] == "`" and _slashes_before(text, j) % 2 == 0:
-                    i = j + 1
-                    break
-                j += 1
-            else:
-                i = n
-            continue
-        if text.startswith("${", i):
-            j = i + 2
-            bd = 1
-            while j < n and bd:
-                if quote:
-                    break
-                if text[j] == "{":
-                    bd += 1
-                elif text[j] == "}":
-                    bd -= 1
-                j += 1
-            i = j
-            continue
-        if text[i] == "(":
-            depth += 1
-        elif text[i] == ")":
-            depth -= 1
-        i += 1
-    return i
-
-
-def _substitution_inners(text):
-    """Yield the inner command text of every command or process substitution (nested, quote-aware)."""
-    i = 0
-    n = len(text)
-    quote = None
+def _ansi_c_decode(s):
+    out, i, n = [], 0, len(s)
     while i < n:
-        if quote == "'":
-            if text[i] == "'":
-                quote = None
-            i += 1
-            continue
-        if quote == '"':
-            kind, start = _substitution_opens(text, i, False) or (None, 0)
-            if kind in ("dollar", "backtick", "process"):
-                if kind == "backtick":
-                    j = start
-                    while j < n:
-                        if text[j] == "\\" and j + 1 < n:
-                            j += 2
-                            continue
-                        if text[j] == "`" and _slashes_before(text, j) % 2 == 0:
-                            yield text[start:j]
-                            for inner in _substitution_inners(text[start:j]):
-                                yield inner
-                            i = j + 1
-                            break
-                        j += 1
-                    else:
-                        i = n
-                    continue
-                inner_end = _matching_paren(text, start - 1)
-                yield text[start:inner_end - 1]
-                for inner in _substitution_inners(text[start:inner_end - 1]):
-                    yield inner
-                i = inner_end
-                continue
-            if text.startswith("${", i):
-                j = i + 2
-                bd = 1
-                while j < n and bd:
-                    if text[j] == "{":
-                        bd += 1
-                    elif text[j] == "}":
-                        bd -= 1
-                    j += 1
-                body = text[i + 2:j - 1] if bd == 0 else text[i + 2:]
-                for inner in _substitution_inners(body):
-                    yield inner
-                i = j
-                continue
-            if text[i] == '"' and _double_quote_ends(text, i):
-                quote = None
-            i += 1
-            continue
-        if quote == "ansi":
-            if text[i] == "\\" and i + 1 < n:
-                i += 2
-                continue
-            if text[i] == "'":
-                quote = None
-            i += 1
-            continue
-        if text[i] == "'":
-            quote = "'"
-            i += 1
-            continue
-        if text[i] == '"':
-            quote = '"'
-            i += 1
-            continue
-        if text.startswith("$'", i):
-            quote = "ansi"
-            i += 2
-            continue
-        kind, start = _substitution_opens(text, i, False) or (None, 0)
-        if kind in ("dollar", "process"):
-            inner_end = _matching_paren(text, start - 1)
-            yield text[start:inner_end - 1]
-            for inner in _substitution_inners(text[start:inner_end - 1]):
-                yield inner
-            i = inner_end
-            continue
-        if kind == "backtick":
-            j = start
-            while j < n:
-                if text[j] == "\\" and j + 1 < n:
-                    j += 2
-                    continue
-                if text[j] == "`" and _slashes_before(text, j) % 2 == 0:
-                    yield text[start:j]
-                    for inner in _substitution_inners(text[start:j]):
-                        yield inner
-                    i = j + 1
-                    break
-                j += 1
-            else:
-                i = n
-            continue
-        if text.startswith("${", i):
-            j = i + 2
-            bd = 1
-            while j < n and bd:
-                if text[j] == "{":
-                    bd += 1
-                elif text[j] == "}":
-                    bd -= 1
-                j += 1
-            body = text[i + 2:j - 1] if bd == 0 else text[i + 2:]
-            for inner in _substitution_inners(body):
-                yield inner
+        c = s[i]
+        if c != "\\" or i + 1 >= n:
+            out.append(c); i += 1; continue
+        e = s[i + 1]; i += 2
+        if e == "a": out.append("\a")
+        elif e == "b": out.append("\b")
+        elif e == "e": out.append("\x1b")
+        elif e == "E": out.append("\x1b")
+        elif e == "f": out.append("\f")
+        elif e == "n": out.append("\n")
+        elif e == "r": out.append("\r")
+        elif e == "t": out.append("\t")
+        elif e == "v": out.append("\v")
+        elif e in ("'", '"', "\\", "?"): out.append(e)
+        elif e == "c" and i < n: out.append(""); i += 1
+        elif e in "01234567":
+            j, o = i, 0
+            while j < n and j < i + 3 and s[j] in "01234567":
+                o = o * 8 + int(s[j]); j += 1
+            if o: out.append(chr(o % 256))
             i = j
-            continue
-        i += 1
+        elif e == "x":
+            j, hx = i, ""
+            while j < n and j < i + 2 and s[j] in "0123456789abcdefABCDEF":
+                hx += s[j]; j += 1
+            out.append(chr(int(hx or "0", 16) % 256)); i = j
+        elif e == "u":
+            j, hx = i, ""
+            while j < n and j < i + 4 and s[j] in "0123456789abcdefABCDEF":
+                hx += s[j]; j += 1
+            out.append(chr(int(hx or "0", 16) % 0x110000)); i = j
+        elif e == "U":
+            j, hx = i, ""
+            while j < n and j < i + 8 and s[j] in "0123456789abcdefABCDEF":
+                hx += s[j]; j += 1
+            out.append(chr(int(hx or "0", 16) % 0x110000)); i = j
+        else: out.append(e)
+    return "".join(out)
 
 
-def _amp_is_command_separator(text, i):
-    """A bare & that separates commands, not 2>&1 or an embedded query ampersand in gh api."""
-    if text[i] != "&":
-        return False
-    if i > 0 and text[i - 1] in "<>":
-        return False
-    if i + 1 < len(text) and text[i + 1] == ">":
-        return False
-    left = text[i - 1] if i > 0 else " "
-    right = text[i + 1] if i + 1 < len(text) else " "
-    if not left.isspace() and not right.isspace():
-        return False
-    return True
+def _strip_outer_parens(s):
+    while s.startswith("("):
+        d, k = 1, 1
+        while k < len(s) and d:
+            if s[k] == "(":
+                d += 1
+            elif s[k] == ")":
+                d -= 1
+            k += 1
+        if d == 0 and k == len(s) and s.endswith(")"):
+            s = s[1:-1].strip()
+        else:
+            break
+    while s.endswith(")") and s.count("(") < s.count(")"):
+        s = s[:-1].strip()
+    while s.startswith("(") and not s.endswith(")"):
+        s = s[1:].strip()
+    return s
 
 
-def _split_on_separators(text, chain_only):
-    """Split a line on shell separators; chain_only omits |, ( ), ` and does not split on embedded &-in-URL."""
-    parts, buf, quote, i = [], "", None, 0
+def read_shell(text, backslash_escapes=True):
+    """One iterative read: quoting, separators, substitutions, here-documents (R-082)."""
     n = len(text)
+    full_cmds, subst_inners, heredocs = [], [], []
+    depth_exceeded, saw_subst = False, False
+    stack = [{"k": "spl", "buf": [], "cbuf": [], "chain_segs": [], "top": True, "nest": 0, "pd": 0, "cs": 0, "cmt": False, "inh": 0}]
+    i, bs_run = 0, 0
+
+    def active_split():
+        for fr in reversed(stack):
+            if fr["k"] == "spl":
+                return fr
+        return None
+
+    def heredoc_op_at(i):
+        if not text.startswith("<<", i) or text.startswith("<<<", i):
+            return False
+        return i == 0 or text[i - 1] != "<"
+
+    def flush_spl(fr, chain_too=True):
+        seg = "".join(fr["buf"]).strip()
+        fr["buf"] = []
+        if seg and fr.get("top"):
+            full_cmds.append(seg)
+        if chain_too:
+            cseg = "".join(fr["cbuf"]).strip()
+            fr["cbuf"] = []
+            if cseg:
+                fr["chain_segs"].append(cseg)
+
+    def append_ch(fr, ch):
+        fr["buf"].append(ch)
+        fr["cbuf"].append(ch)
+
+    def spl_emit(ch):
+        sp = active_split()
+        if sp:
+            append_ch(sp, ch)
+
+    def push_split(top, nest):
+        if nest > READ_DEPTH_BOUND:
+            nonlocal depth_exceeded
+            depth_exceeded = True
+        stack.append({"k": "spl", "buf": [], "cbuf": [], "chain_segs": [], "top": top, "nest": nest, "pd": 0, "cs": 0, "cmt": False, "inh": nest})
+
+    def bare_amp(i):
+        if i >= n or text[i] != "&":
+            return False
+        if i > 0 and text[i - 1] in "<>":
+            return False
+        if i + 1 < n and text[i + 1] in ">&":
+            return False
+        if i + 1 < n and text[i + 1] == "&":
+            return False
+        return True
+
+    def try_sep(i, fr, subst=False):
+        chain_hit = full_hit = None
+        if i + 1 < n and text[i:i + 2] in ("&&", "||"):
+            chain_hit = full_hit = i + 2
+        elif text[i] in (";", "\n"):
+            bb = "".join(fr["buf"])
+            heredoc_op = re.search(r"(?<!<)<<-?(?![<-])", bb)
+            if not (subst and text[i] == "\n" and heredoc_op):
+                chain_hit = full_hit = i + 1
+        elif bare_amp(i):
+            chain_hit = full_hit = i + 1
+        elif text[i] == "|":
+            full_hit = i + 1
+        elif not subst and text[i] in "()":
+            full_hit = i + 1
+        if full_hit is not None:
+            flush_spl(fr, chain_too=chain_hit is not None)
+            return full_hit
+        return None
+
+    def skip_heredoc_body(i, delim, strip_tabs):
+        j = i
+        while j < n:
+            line_end = text.find("\n", j)
+            if line_end < 0:
+                return n
+            line = text[j:line_end]
+            if strip_tabs:
+                line = line.lstrip("\t")
+            if line.lstrip("\t").rstrip(" \t") == delim:
+                return line_end + 1
+            j = line_end + 1
+        return n
+
+    def parse_heredoc_delim(i):
+        j = i
+        quoted = None
+        while j < n and text[j] in " \t":
+            j += 1
+        if j >= n:
+            return None
+        if text[j] in ("'", '"'):
+            quoted, q = text[j], j + 1
+            while q < n and text[q] != quoted:
+                q += 1
+            return text[j + 1:q], quoted, q + 1
+        start = j
+        while j < n and text[j] not in " \t\n;|&":
+            j += 1
+        return text[start:j], None, j
+
+    def in_dq():
+        return any(fr["k"] == "dq" for fr in stack)
+
+    def absorb_expanded_heredoc(hd_start, body_end, dj, delim, quoted, strip_tabs):
+        nonlocal saw_subst
+        if quoted is not None:
+            return
+        blob = text[hd_start:body_end]
+        if "\n" not in blob:
+            return
+        body = blob.split("\n", 1)[1]
+        lines = body.splitlines()
+        if lines:
+            last = lines[-1]
+            if strip_tabs:
+                last = last.lstrip("\t")
+            if last.rstrip(" \t") == delim:
+                body = "\n".join(lines[:-1])
+        if not body.strip():
+            return
+        inn = read_shell(body, backslash_escapes=backslash_escapes)
+        saw_subst = saw_subst or inn["hassub"]
+        for s in inn["subs"]:
+            if s.strip():
+                subst_inners.append(s.strip())
+        for c in inn["full"]:
+            if c.strip():
+                subst_inners.append(c.strip())
+
     while i < n:
-        c = text[i]
-        if quote == "'":
-            buf += c
-            if c == "'":
-                quote = None
+        if depth_exceeded:
+            break
+        fr = active_split()
+        if fr and fr["cmt"]:
+            if text[i] == "\n":
+                fr["cmt"] = False
+                fr["inh"] = max(0, fr["inh"] - 1)
+                flush_spl(fr)
             i += 1
             continue
-        if quote == '"':
-            buf += c
-            if c == '"' and _double_quote_ends(text, i):
-                quote = None
+        topk = stack[-1]["k"] if stack else ""
+        if topk == "sq":
+            fr = stack[-1]
+            fr["buf"].append(text[i])
+            spl_emit(text[i])
+            if text[i] == "'":
+                stack.pop()
             i += 1
+            bs_run = 0
             continue
-        if quote == "ansi":
+        if topk == "dq":
+            fr = stack[-1]
+            c = text[i]
+            esc = backslash_escapes and bs_run % 2 == 1
+            if c == "\\" and backslash_escapes and not esc:
+                fr["buf"].append(c); spl_emit(c); bs_run += 1; i += 1; continue
+            if c == '"' and not esc:
+                spl_emit(c); stack.pop(); bs_run = 0; i += 1; continue
+            if not esc and text.startswith("$(", i):
+                fr["buf"].append("$("); spl_emit("$("); i += 2; bs_run = 0
+                saw_subst = True
+                push_split(False, fr.get("nest", 0) + 1)
+                stack.append({"k": "sub", "start": i, "pd": 1, "cs": 0})
+                continue
+            if not esc and c == "`":
+                fr["buf"].append(c); spl_emit(c); i += 1; bs_run = 0
+                saw_subst = True
+                stack.append({"k": "btf", "buf": [], "nest": fr.get("nest", 0)})
+                continue
+            fr["buf"].append(c); spl_emit(c); bs_run = 0; i += 1
+            continue
+        if topk == "ansi":
+            fr = stack[-1]
+            c = text[i]
             if c == "\\" and i + 1 < n:
-                buf += text[i:i + 2]
-                i += 2
-                continue
-            buf += c
+                fr["buf"].append(text[i:i + 2])
+                spl_emit(text[i:i + 2])
+                i += 2; continue
+            fr["buf"].append(c)
+            spl_emit(c)
             if c == "'":
-                quote = None
+                stack.pop()
             i += 1
+            bs_run = 0
             continue
+        if topk == "loc":
+            fr = stack[-1]
+            c = text[i]
+            esc = backslash_escapes and bs_run % 2 == 1
+            if c == "\\" and backslash_escapes and not esc:
+                fr["buf"].append(c); spl_emit(c); bs_run += 1; i += 1; continue
+            if c == '"' and not esc:
+                spl_emit(c); stack.pop(); bs_run = 0; i += 1; continue
+            fr["buf"].append(c); spl_emit(c); bs_run = 0; i += 1
+            continue
+        if topk == "br":
+            fr = stack[-1]
+            if fr["bd"] <= 0:
+                stack.pop()
+                continue
+            c = text[i]
+            if c == "'":
+                stack.append({"k": "sq", "buf": ["'"]}); i += 1; bs_run = 0; continue
+            if c == '"':
+                stack.append({"k": "dq", "buf": ['"'], "nest": 0}); i += 1; bs_run = 0; continue
+            if text.startswith("$'", i):
+                stack.append({"k": "ansi", "buf": list("$'")}); i += 2; bs_run = 0; continue
+            if text.startswith('$"', i):
+                stack.append({"k": "loc", "buf": list('$"')}); i += 2; bs_run = 0; continue
+            if text.startswith("${", i):
+                stack.append({"k": "br", "bd": 1, "buf": []}); i += 2; bs_run = 0; continue
+            if not in_dq() and text.startswith("$(", i) and bs_run % 2 == 0:
+                saw_subst = True
+                push_split(False, fr["nest"] + 1)
+                stack.append({"k": "sub", "start": i + 2, "pd": 1, "cs": 0})
+                i += 2; bs_run = 0; continue
+            if text[i] == "{":
+                fr["bd"] += 1
+            elif text[i] == "}":
+                fr["bd"] -= 1
+                if fr["bd"] == 0:
+                    stack.pop(); i += 1; bs_run = 0; continue
+            i += 1; bs_run = 0
+            continue
+        if topk == "btf":
+            fr = stack[-1]
+            c = text[i]
+            if c == "\\" and i + 1 < n and backslash_escapes:
+                fr["buf"].append(text[i:i + 2]); i += 2; continue
+            if c == "`" and (not backslash_escapes or bs_run % 2 == 0):
+                body = "".join(fr["buf"])
+                stack.pop()
+                spl = active_split()
+                if spl:
+                    spl["buf"].append("`")
+                subst_inners.append(body)
+                saw_subst = True
+                push_split(False, fr["nest"] + 1)
+                bi, bn = 0, len(body)
+                bt_bs = 0
+                while bi < bn:
+                    bc = body[bi]
+                    sp = active_split()
+                    if not sp:
+                        break
+                    if sp["cmt"]:
+                        if bc == "\n":
+                            sp["cmt"] = False
+                        bi += 1; continue
+                    if bc == "#" and sp["inh"] == 0 and (not sp["buf"] or sp["buf"][-1].isspace()):
+                        sp["cmt"] = True; bi += 1; continue
+                    if bc == "\\" and backslash_escapes:
+                        sp["buf"].append(bc); bt_bs += 1; bi += 1; continue
+                    escd = backslash_escapes and bt_bs % 2 == 1
+                    bt_bs = 0
+                    if not escd and body.startswith("$(", bi):
+                        saw_subst = True
+                        flush_spl(sp)
+                        push_split(False, fr["nest"] + 2)
+                        stack.append({"k": "sub", "start": bi + 2, "pd": 1, "cs": 0})
+                        bi += 2; continue
+                    ns = try_sep(bi, sp, subst=True)
+                    if ns is not None:
+                        bi = ns; continue
+                    if not escd and bc == "`":
+                        stack.append({"k": "btf", "buf": [], "nest": fr["nest"] + 1})
+                        bi += 1; continue
+                    if not escd and bc == "'":
+                        stack.append({"k": "sq", "buf": ["'"]}); bi += 1; continue
+                    if not escd and bc == '"':
+                        stack.append({"k": "dq", "buf": ['"'], "nest": 0}); bi += 1; continue
+                    sp["buf"].append(bc); bi += 1
+                flush_spl(active_split())
+                while stack and stack[-1]["k"] == "spl" and stack[-1]["nest"] > fr["nest"]:
+                    stack.pop()
+                if spl:
+                    spl["buf"].append("`")
+                i += 1; bs_run = 0
+                continue
+            fr["buf"].append(c); i += 1
+            if c == "\\" and backslash_escapes:
+                bs_run += 1
+            else:
+                bs_run = 0
+            continue
+        if topk == "sub":
+            fr = stack[-1]
+            sp = active_split()
+            if not sp:
+                i += 1; continue
+            c = text[i]
+            if sp["cmt"]:
+                if c == "\n":
+                    sp["cmt"] = False
+                i += 1; continue
+            if c == "\\" and backslash_escapes:
+                append_ch(sp, c); bs_run += 1; i += 1; continue
+            escd = backslash_escapes and bs_run % 2 == 0 and False
+            escd = backslash_escapes and (bs_run % 2 == 1)
+            bs_run = 0
+            if escd:
+                append_ch(sp, c); i += 1; continue
+            if c == "#" and (not sp["buf"] or sp["buf"][-1].isspace() or sp["buf"][-1] in ";|&"):
+                sp["cmt"] = True; i += 1; continue
+            if c == "'":
+                append_ch(sp, c); stack.append({"k": "sq", "buf": ["'"]}); i += 1; continue
+            if c == '"':
+                append_ch(sp, c); stack.append({"k": "dq", "buf": ['"'], "nest": sp["nest"]}); i += 1; continue
+            if text.startswith("$'", i):
+                append_ch(sp, "$'"); stack.append({"k": "ansi", "buf": list("$'")}); i += 2; continue
+            if text.startswith('$"', i):
+                append_ch(sp, '$"'); stack.append({"k": "loc", "buf": list('$"')}); i += 2; continue
+            if text.startswith("${", i):
+                append_ch(sp, "${"); stack.append({"k": "br", "bd": 1, "buf": [], "nest": sp["nest"]}); i += 2; continue
+            if text.startswith("$(", i):
+                saw_subst = True
+                append_ch(sp, "$(")
+                push_split(False, sp["nest"] + 1)
+                stack.append({"k": "sub", "start": i + 2, "pd": 1, "cs": 0})
+                i += 2; continue
+            if not in_dq() and text.startswith("<(", i):
+                saw_subst = True
+                append_ch(sp, text[i:i + 2])
+                push_split(False, sp["nest"] + 1)
+                stack.append({"k": "sub", "start": i + 2, "pd": 1, "cs": 0, "proc": 1})
+                i += 2; continue
+            if not in_dq() and text.startswith(">(", i):
+                saw_subst = True
+                append_ch(sp, text[i:i + 2])
+                push_split(False, sp["nest"] + 1)
+                stack.append({"k": "sub", "start": i + 2, "pd": 1, "cs": 0, "proc": 1})
+                i += 2; continue
+            if c == "`":
+                saw_subst = True
+                append_ch(sp, c)
+                stack.append({"k": "btf", "buf": [], "nest": sp["nest"]})
+                i += 1; continue
+            if not in_dq() and heredoc_op_at(i):
+                strip_tabs = text.startswith("<<-", i)
+                adj = 3 if strip_tabs else 2
+                delim, quoted, dj = parse_heredoc_delim(i + adj)
+                if delim:
+                    body_end = skip_heredoc_body(dj, delim, strip_tabs)
+                    line_start = text[:i].rfind("\n") + 1
+                    heredocs.append({"start": i, "end": body_end, "delim": delim, "quoted": quoted, "strip": strip_tabs, "line": text[line_start:dj]})
+                    for ch in text[i:dj]:
+                        append_ch(sp, ch)
+                    absorb_expanded_heredoc(i, body_end, dj, delim, quoted, strip_tabs)
+                    i = body_end
+                    continue
+            if c == "(":
+                fr["pd"] += 1; append_ch(sp, c); i += 1; continue
+            if c == ")":
+                buf_s = "".join(sp["buf"])
+                in_case_pat = fr.get("cs") >= 2 if fr.get("cs") else False
+                if not in_case_pat and fr.get("cs") == 1 and re.search(r"\sin\s", buf_s) and re.search(r"(?:^|[\s(])case", buf_s):
+                    in_case_pat = True
+                    fr["cs"] = 3
+                elif in_case_pat and fr.get("cs") == 2:
+                    fr["cs"] = 3
+                if in_case_pat:
+                    append_ch(sp, c); i += 1; continue
+                fr["pd"] -= 1
+                if fr["pd"] == 0:
+                    body = text[fr["start"]:i].strip()
+                    if body:
+                        subst_inners.append(body)
+                    flush_spl(sp)
+                    stack.pop()
+                    while stack and stack[-1]["k"] == "spl" and not stack[-1].get("top"):
+                        stack.pop()
+                    if stack and stack[-1]["k"] == "dq":
+                        stack[-1]["buf"].append(")")
+                        spl_emit(")")
+                    i += 1; continue
+                append_ch(sp, c); i += 1; continue
+            ns = try_sep(i, sp, subst=True)
+            if ns is not None:
+                i = ns; continue
+            if text.startswith(";;", i):
+                append_ch(sp, ";;"); i += 2
+                if fr.get("cs") == 3:
+                    fr["cs"] = 2
+                continue
+            if c.isspace():
+                tail = "".join(sp["buf"])
+                if re.search(r"(?:^|[\s(])case(?:\s|$)", tail):
+                    fr["cs"] = 1
+                elif fr.get("cs") == 1 and re.search(r"\sin\s", tail + c):
+                    fr["cs"] = 2
+                if re.search(r"\sesac(?:\s|$)", tail + c):
+                    fr["cs"] = 0
+            append_ch(sp, c); i += 1; continue
+        if not fr:
+            i += 1; continue
+        c = text[i]
+        if c == "\\" and backslash_escapes:
+            append_ch(fr, c); bs_run += 1; i += 1; continue
+        escd = backslash_escapes and (bs_run % 2 == 1)
+        bs_run = 0
+        if escd:
+            append_ch(fr, c); i += 1; continue
+        if c == "#" and (not fr["buf"] or fr["buf"][-1].isspace() or fr["buf"][-1] in ";|&("):
+            fr["cmt"] = True; i += 1; continue
         if c == "'":
-            quote = "'"
-            buf += c
-            i += 1
-            continue
+            append_ch(fr, c); stack.append({"k": "sq", "buf": ["'"]}); i += 1; continue
         if c == '"':
-            quote = '"'
-            buf += c
-            i += 1
-            continue
+            append_ch(fr, c); stack.append({"k": "dq", "buf": ['"'], "nest": fr["nest"]}); i += 1; continue
         if text.startswith("$'", i):
-            quote = "ansi"
-            buf += text[i:i + 2]
-            i += 2
-            continue
-        if text.startswith("&&", i) or text.startswith("||", i):
-            parts.append(buf); buf = ""; i += 1
-            continue
-        if c in (";", "\n") or (not chain_only and c in ("|", "(", ")")):
-            parts.append(buf); buf = ""
-            i += 1
-            continue
-        if c == "&" and _amp_is_command_separator(text, i):
-            parts.append(buf); buf = ""
-            i += 1
-            continue
-        buf += c
-        i += 1
-    parts.append(buf)
-    return parts
+            append_ch(fr, "$'"); stack.append({"k": "ansi", "buf": list("$'")}); i += 2; continue
+        if text.startswith('$"', i):
+            append_ch(fr, '$"'); stack.append({"k": "loc", "buf": list('$"')}); i += 2; continue
+        if text.startswith("${", i):
+            append_ch(fr, "${"); stack.append({"k": "br", "bd": 1, "buf": [], "nest": fr["nest"]}); i += 2; continue
+        if text.startswith("$(", i):
+            saw_subst = True
+            append_ch(fr, "$(")
+            push_split(False, fr["nest"] + 1)
+            stack.append({"k": "sub", "start": i + 2, "pd": 1, "cs": 0})
+            i += 2; continue
+        if not in_dq() and text.startswith("<(", i):
+            saw_subst = True
+            append_ch(fr, text[i:i + 2])
+            push_split(False, fr["nest"] + 1)
+            stack.append({"k": "sub", "start": i + 2, "pd": 1, "cs": 0, "proc": 1})
+            i += 2; continue
+        if not in_dq() and text.startswith(">(", i):
+            saw_subst = True
+            append_ch(fr, text[i:i + 2])
+            push_split(False, fr["nest"] + 1)
+            stack.append({"k": "sub", "start": i + 2, "pd": 1, "cs": 0, "proc": 1})
+            i += 2; continue
+        if c == "`":
+            saw_subst = True
+            append_ch(fr, c)
+            stack.append({"k": "btf", "buf": [], "nest": fr["nest"]})
+            i += 1; continue
+        if not in_dq() and heredoc_op_at(i):
+            strip_tabs = text.startswith("<<-", i)
+            adj = 3 if strip_tabs else 2
+            delim, quoted, dj = parse_heredoc_delim(i + adj)
+            if delim:
+                body_end = skip_heredoc_body(dj, delim, strip_tabs)
+                prefix = text[:i]
+                line_start = prefix.rfind("\n") + 1
+                heredocs.append({"start": i, "end": body_end, "delim": delim, "quoted": quoted, "strip": strip_tabs, "line": text[line_start:dj]})
+                for ch in text[i:dj]:
+                    append_ch(fr, ch)
+                absorb_expanded_heredoc(i, body_end, dj, delim, quoted, strip_tabs)
+                i = body_end
+                if fr.get("top"):
+                    flush_spl(fr, chain_too=False)
+                continue
+        ns = try_sep(i, fr)
+        if ns is not None:
+            i = ns; continue
+        append_ch(fr, c); i += 1
+    flush_spl(stack[0]) if stack else None
+    chain_cmds = stack[0]["chain_segs"] if stack else []
+    return {"full": full_cmds, "chain": chain_cmds, "subs": subst_inners, "heredocs": heredocs,
+            "deep": depth_exceeded, "hassub": saw_subst, "text": text}
+
+
+def _parsed_snapshot(text, backslash_escapes=True):
+    if not hasattr(_parsed_snapshot, "_cache"):
+        _parsed_snapshot._cache = {}
+    key = (text, backslash_escapes)
+    if key not in _parsed_snapshot._cache:
+        _parsed_snapshot._cache[key] = read_shell(text, backslash_escapes=backslash_escapes)
+        if len(_parsed_snapshot._cache) > 8:
+            _parsed_snapshot._cache.pop(next(iter(_parsed_snapshot._cache)))
+    return _parsed_snapshot._cache[key]
+
+
+def _apply_heredocs(text, parsed):
+    if not parsed["heredocs"]:
+        return text
+    out, pos = [], 0
+    for hd in sorted(parsed["heredocs"], key=lambda h: h["start"]):
+        out.append(text[pos:hd["start"]])
+        line = hd["line"]
+        head = strip_prefix(words(line.split("<<", 1)[0]))
+        blob = text[hd["start"]:hd["end"]]
+        first = blob.split("\n", 1)[0]
+        if len(blob.split("\n", 1)) > 1:
+            body = blob.split("\n", 1)[1]
+        else:
+            body = ""
+        shell_reads = head and base(head[0]) in WRAPPER_SHELLS
+        if "|" in first:
+            parts = first.split("|")
+            for p in parts[1:]:
+                if strip_prefix(words(p.strip())) and base(words(p.strip())[0]) in WRAPPER_SHELLS:
+                    shell_reads = True
+                    break
+        if shell_reads and body:
+            out.append("\n" + body)
+        else:
+            out.append(line.split("<<", 1)[0].rstrip() + "\n")
+        pos = hd["end"]
+    out.append(text[pos:])
+    return "".join(out)
+
+
+def strip_heredocs(text):
+    """A here-document's body is data unless a shell reads it: then its lines are checked."""
+    parsed = _parsed_snapshot(text, backslash_escapes=_READ_ESCAPES)
+    return _apply_heredocs(text, parsed)
+
+
+def _heredoc_shell_reads(hd, text):
+    line = hd["line"]
+    first = text[hd["start"]:hd["end"]].split("\n", 1)[0]
+    head = strip_prefix(words(line.split("<<", 1)[0]))
+    shell_reads = head and base(head[0]) in WRAPPER_SHELLS
+    if "|" in first:
+        for part in first.split("|")[1:]:
+            if strip_prefix(words(part.strip())) and base(words(part.strip())[0]) in WRAPPER_SHELLS:
+                return True
+    return shell_reads
+
+
+def _heredoc_body(text, hd):
+    blob = text[hd["start"]:hd["end"]]
+    if "\n" not in blob:
+        return ""
+    body = blob.split("\n", 1)[1]
+    lines = body.splitlines()
+    if lines:
+        last = lines[-1]
+        if hd["strip"]:
+            last = last.lstrip("\t")
+        if last.rstrip(" \t") == hd["delim"]:
+            body = "\n".join(lines[:-1])
+    return body
 
 
 def split_commands(text):
-    """Break a shell command line into its simple commands: on &&, ||, ;, |, newlines and
-    subshell parentheses. Quotes are respected. Good enough for commands a model writes."""
-    result = []
-
-    def absorb(segment):
-        for piece in _split_on_separators(segment, chain_only=False):
-            piece = piece.strip()
-            if piece:
-                result.append(piece)
-            for inner in _substitution_inners(piece):
-                absorb(inner)
-
-    absorb(text)
-    return result
+    """Break a shell command line into simple commands (one read_shell pass)."""
+    p = _parsed_snapshot(text, backslash_escapes=_READ_ESCAPES)
+    if p["deep"]:
+        return []
+    seen, out = set(), []
+    for c in p["full"]:
+        cs = c.strip()
+        if cs and cs not in seen:
+            seen.add(cs)
+            out.append(cs)
+    for s in p["subs"]:
+        ss = s.strip()
+        if not ss:
+            continue
+        inner = _parsed_snapshot(ss, backslash_escapes=_READ_ESCAPES)
+        for c in inner["full"]:
+            cs = c.strip()
+            if cs and cs not in seen:
+                seen.add(cs)
+                out.append(cs)
+        for b in inner["subs"]:
+            bs = b.strip()
+            if bs and bs not in seen:
+                seen.add(bs)
+                out.append(bs)
+    for hd in p["heredocs"]:
+        if not _heredoc_shell_reads(hd, text):
+            continue
+        body = _heredoc_body(text, hd)
+        for sc in split_commands(body):
+            if sc not in seen:
+                seen.add(sc)
+                out.append(sc)
+    return out
 
 
 def in_workspace(cwd):
@@ -450,166 +783,185 @@ def in_workspace(cwd):
 
 
 def chain_parts(text):
-    """The commands a line chains with &&, ||, ; or a new line (quotes respected); a pipe is one command."""
-    text = strip_heredocs(text)
-    parts = []
-    for piece in _split_on_separators(text, chain_only=True):
-        piece = piece.strip()
-        if piece:
-            parts.append(re.sub(r"^\(+|\)+$", "", piece).strip())
-    return [p for p in parts if p]
+    """Commands chained with &&, ||, ; or newline (quotes respected); a pipe stays one command."""
+    p = _parsed_snapshot(text, backslash_escapes=_READ_ESCAPES)
+    return [_strip_outer_parens(x) for x in p["chain"] if x.strip()]
 
 
 def chain_parts_with_substitutions(text):
-    """Top-level chain parts, plus any substitution whose interior chains on its own."""
-    parts = chain_parts(text)
+    p = _parsed_snapshot(text)
+    parts = [_strip_outer_parens(x) for x in p["chain"] if x.strip()]
     expanded = list(parts)
-    for piece in parts:
-        for inner in _substitution_inners(piece):
-            inner_parts = chain_parts(strip_heredocs(inner))
-            if len(inner_parts) >= 2:
-                expanded.extend(inner_parts)
+    for sub in p["subs"]:
+        sp = _parsed_snapshot(sub)
+        sub_parts = [_strip_outer_parens(x) for x in sp["chain"] if x.strip()]
+        if len(sub_parts) >= 2:
+            expanded.extend(sub_parts)
     return expanded
 
 
 def contains_command_substitution(text):
-    """True when text holds an unescaped $( or backtick pair outside single quotes."""
-    for _ in _substitution_inners(text):
-        return True
-    return False
+    return _parsed_snapshot(text, backslash_escapes=_READ_ESCAPES)["hassub"]
 
 
-def leading_husky_zero(simple):
-    """True when HUSKY=0 is a leading shell assignment, not text inside a quoted argument."""
-    w = words(simple)
-    i = 0
-    while i < len(w):
-        tok = w[i]
-        if tok == "HUSKY=0":
-            return True
-        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tok):
-            i += 1
+def gh_api_unquoted_ampersand_reason(command):
+    """Unquoted & glued into a gh api argument (checked on parsed commands)."""
+    text = strip_heredocs(command)
+    i, n = 0, len(text)
+    in_sq = in_dq = False
+    at_cmd = True
+    in_gh = False
+
+    def cmd_head(j):
+        t = text[j:].lstrip()
+        return t.startswith("gh api") or t.startswith("gh.exe api")
+
+    while i < n:
+        c = text[i]
+        if in_sq:
+            in_sq = c != "'"
+            i += 1; continue
+        if in_dq:
+            if c == "\\" and i + 1 < n:
+                i += 2; continue
+            if c == '"':
+                in_dq = False
+            i += 1; continue
+        if c == "'":
+            in_sq = True; i += 1; continue
+        if c == '"':
+            in_dq = True; i += 1; continue
+        if text.startswith("$'", i):
+            j = i + 2
+            while j < n and text[j] != "'":
+                j += 2 if text[j] == "\\" and j + 1 < n else 1
+            i = j + 1; continue
+        if not in_sq and not in_dq and not c.isspace():
+            if at_cmd:
+                in_gh = cmd_head(i)
+                at_cmd = False
+        if in_gh and c == "&" and (i == 0 or text[i - 1] not in "<>") and (i + 1 >= n or text[i + 1] not in ">&"):
+            if i + 1 < n and text[i + 1] == "&":
+                in_gh = False; at_cmd = True; i += 2; continue
+            prev = text[i - 1] if i > 0 else " "
+            nxt = text[i + 1] if i + 1 < n else " "
+            if (not prev.isspace() and prev not in ";|&") or (not nxt.isspace() and nxt not in ";|&\n"):
+                return "gh api with an unquoted & in an argument (quote the endpoint or URL so the shell does not split on &)"
+        if c in (";", "\n") or text.startswith("&&", i) or text.startswith("||", i):
+            in_gh = False; at_cmd = True
+            i += 2 if text.startswith("&&", i) or text.startswith("||", i) else 1
             continue
-        if tok in ("&", ".", "{", "}", "then", "do", "else", "elif", "if", "while", "until", "!"):
-            i += 1
+        if c == "&":
+            if i > 0 and text[i - 1] in "<>":
+                i += 1; continue
+            if i + 1 < n and text[i + 1] in ">&":
+                i += 1; continue
+            if i + 1 < n and text[i + 1] == "&":
+                in_gh = False; at_cmd = True; i += 2; continue
+            in_gh = False; at_cmd = True
+            i += 1; continue
+        i += 1
+    return None
+
+
+def _shell_words(command):
+    parsed = _parsed_snapshot(command)
+    return _tokenize_parsed(command, parsed)
+
+
+def _tokenize_parsed(text, parsed):
+    words, buf, i, n = [], [], 0, len(text)
+    bs_run = 0
+
+    def flush():
+        if buf:
+            s = "".join(buf)
+            if s.startswith("$'") and s.endswith("'"):
+                words.append(_ansi_c_decode(s[2:-1]))
+            elif s.startswith('$"') and s.endswith('"'):
+                words.append(s[2:-1])
+            else:
+                words.append(s)
+            buf[:] = []
+
+    while i < n:
+        c = text[i]
+        if c.isspace() and not buf:
+            i += 1; continue
+        if c == "\\" and not buf and i + 1 < n:
+            buf.append(text[i:i + 2]); i += 2; continue
+        if c in ("'", '"') and not buf:
+            q, j = c, i + 1
+            while j < n and text[j] != q:
+                if q == '"' and text[j] == "\\" and j + 1 < n:
+                    j += 2; continue
+                j += 1
+            words.append(text[i + 1:j] if j < n else text[i + 1:])
+            i = j + 1 if j < n else n
             continue
-        name = tok.replace(".exe", "")
-        if name in ("xargs", "env", "nice", "nohup", "stdbuf", "time", "sudo", "command", "builtin", "exec", "timeout"):
-            i += 1
-            if name == "env":
-                while i < len(w):
-                    if w[i] == "HUSKY=0":
-                        return True
-                    if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w[i]):
-                        i += 1
-                        continue
-                    if w[i].startswith("-"):
-                        i += 1
-                        continue
+        if text.startswith("$'", i):
+            j = i + 2
+            while j < n:
+                if text[j] == "\\" and j + 1 < n:
+                    j += 2; continue
+                if text[j] == "'":
                     break
-                continue
-            vals = VALUE_OPTIONS.get(name, ())
-            while i < len(w) and (w[i].startswith("-") or (name == "xargs" and (w[i].isdigit() or w[i] == "{}"))):
-                opt = w[i]
-                i += 1
-                if opt in vals and i < len(w):
-                    i += 1
-            if name == "timeout" and i < len(w):
-                i += 1
-            continue
-        break
-    return False
+                j += 1
+            words.append(_ansi_c_decode(text[i + 2:j])); i = j + 1; continue
+        if text.startswith('$"', i):
+            j = i + 2
+            while j < n:
+                if text[j] == "\\" and j + 1 < n:
+                    j += 2; continue
+                if text[j] == '"':
+                    break
+                j += 1
+            words.append(text[i + 2:j]); i = j + 1; continue
+        if c in " \t\n" and buf:
+            flush(); i += 1; continue
+        buf.append(c); i += 1
+    flush()
+    return words
+
+
+def words(command):
+    if "$'" in command or '$"' in command:
+        toks = _shell_words(command)
+    else:
+        try:
+            toks = shlex.split(command, posix=True)
+        except ValueError:
+            toks = command.split()
+    out = []
+    for t in toks:
+        if t.startswith("$'") and t.endswith("'") and len(t) > 2:
+            out.append(_ansi_c_decode(t[2:-1]))
+        elif t.startswith('$"') and t.endswith('"') and len(t) > 2:
+            out.append(t[2:-1])
+        else:
+            out.append(t)
+    return out
 
 
 def hook_skipper_option(sub, args, snapshot):
     """--no-verify or commit's -n as a git option, never another option's value."""
-    skip_value = {"-m", "--message", "-F", "--file", "--author", "-e", "--edit", "--cleanup",
-                  "--date", "--pathspec-from-file", "-p", "--patch", "-c", "-C", "--amend"}
+    skip_m = sub in ("commit", "merge", "cherry-pick", "revert")
     i = 0
     while i < len(args):
         a = args[i]
-        if a in ("-m", "--message", "-F", "--file") and i + 1 < len(args):
+        if skip_m and a in ("-m", "--message", "-F", "--file") and i + 1 < len(args):
             i += 2
             continue
-        if a.startswith("--message=") or a.startswith("--file="):
+        if skip_m and (a.startswith("--message=") or a.startswith("--file=")):
             i += 1
             continue
         if a.startswith("-") and "=" in a:
             i += 1
             continue
-        if a in skip_value and i + 1 < len(args) and not args[i + 1].startswith("-"):
-            i += 2
-            continue
         if a == "--no-verify" and not snapshot:
             return a
         if sub == "commit" and re.match(r"^-[A-Za-z]*n[A-Za-z]*$", a) and not snapshot:
             return a
-        i += 1
-    return None
-
-
-def gh_api_unquoted_ampersand_reason(command):
-    """An unquoted & glued into a gh api endpoint is not a separator; quote the argument."""
-    i = 0
-    n = len(command)
-    quote = None
-    while i < n:
-        if quote == "'":
-            if command[i] == "'":
-                quote = None
-            i += 1
-            continue
-        if quote == '"':
-            if command[i] == '"' and _double_quote_ends(command, i):
-                quote = None
-            i += 1
-            continue
-        if quote == "ansi":
-            if command[i] == "\\" and i + 1 < n:
-                i += 2
-                continue
-            if command[i] == "'":
-                quote = None
-            i += 1
-            continue
-        if command[i] == "'":
-            quote = "'"
-            i += 1
-            continue
-        if command[i] == '"':
-            quote = '"'
-            i += 1
-            continue
-        if command.startswith("$'", i):
-            quote = "ansi"
-            i += 2
-            continue
-        if re.match(r"\bgh\s+api\b", command[i:]):
-            j = re.search(r"\bgh\s+api\b", command[i:]).end() + i
-            while j < n:
-                if quote:
-                    break
-                if command[j] == "'":
-                    quote = "'"
-                    j += 1
-                    continue
-                if command[j] == '"':
-                    quote = '"'
-                    j += 1
-                    continue
-                if command.startswith("$'", j):
-                    quote = "ansi"
-                    j += 2
-                    continue
-                if command[j] == "&" and not _amp_is_command_separator(command, j):
-                    return "gh api with an unquoted & in an argument (quote the endpoint or URL so the shell does not split on &)"
-                if command[j] in (";", "\n") or command.startswith("&&", j) or command.startswith("||", j):
-                    break
-                if command[j] == "&" and _amp_is_command_separator(command, j):
-                    break
-                j += 1
-            i = j
-            continue
         i += 1
     return None
 
@@ -639,44 +991,99 @@ def state_changing(w):
     return False
 
 
+def _part_state_change(part, parsed):
+    w = strip_prefix(words(part))
+    if w and state_changing(w):
+        return w
+    pp = _parsed_snapshot(part)
+    for sub in pp["subs"]:
+        for cmd in pp["full"] + (_parsed_snapshot(sub)["full"] if sub else []):
+            sw = strip_prefix(words(cmd))
+            if sw and state_changing(sw):
+                return sw
+    for sub in pp["subs"]:
+        sw = strip_prefix(words(sub))
+        if sw and state_changing(sw):
+            return sw
+    return None
+
+
 def chain_reason(command, cwd):
     """Inside a Workspace, a chain carrying a state change or wrapped in cd is refused (rule 8)."""
     if not in_workspace(cwd):
         return None
+    parsed_full = _parsed_snapshot(command)
     parts = chain_parts_with_substitutions(command)
     if len(parts) < 2:
-        return None
+        top = [_strip_outer_parens(x) for x in parsed_full["chain"] if x.strip()]
+        if len(top) < 2:
+            return None
+        parts = top
     heads = [strip_prefix(words(p)) for p in parts]
     heads = [h for h in heads if h]
     for h in list(heads):
-        if base(h[0]) == "eval" and len(h) > 1:            # eval "git add -A && git commit": the string is the chain
+        if base(h[0]) == "eval" and len(h) > 1:
             heads += [strip_prefix(words(p)) for p in chain_parts(" ".join(h[1:]))]
     if heads and base(heads[0][0]) == "cd":
         return "a command wrapped in cd (rule 8: never wrap a command in cd; run it with the path it needs, or git -C)"
+    for i, p in enumerate(parts):
+        w = _part_state_change(p, None)
+        if w:
+            return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (len(parts), " ".join(w[:2]))
+    if len(parts) >= 2:
+        for sub in parsed_full["subs"]:
+            sw = strip_prefix(words(sub))
+            if sw and state_changing(sw):
+                return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (len(parts), " ".join(sw[:2]))
     for w in heads:
         if state_changing(w):
             return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (len(parts), " ".join(w[:2]))
     return None
 
 
-def strip_heredocs(text):
-    """A here-document's body is data (a commit message) unless a shell reads it: then it is
-    that shell's script, and its lines are checked as commands."""
-    def repl(m):
-        first, body = m.group(0).split("\n", 1)
-        line = text[:m.start()].rsplit("\n", 1)[-1] + first
-        head = strip_prefix(words(line.split("<<", 1)[0]))
-        if head and base(head[0]) in WRAPPER_SHELLS:
-            return "\n" + body
-        return first
-    return HEREDOC_RX.sub(repl, text)
-
-
-def words(command):
-    try:
-        return shlex.split(command, posix=True)
-    except ValueError:
-        return command.split()
+def leading_husky_zero(simple):
+    """True when HUSKY=0 is a leading shell assignment, not text inside a quoted argument."""
+    w = words(simple)
+    i = 0
+    while i < len(w):
+        tok = w[i]
+        if tok == "HUSKY=0":
+            return True
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tok):
+            i += 1
+            continue
+        if tok in ("&", ".", "{", "}", "then", "do", "else", "elif", "if", "while", "until", "!"):
+            i += 1
+            continue
+        name = tok.replace(".exe", "")
+        if name in ("xargs", "env", "nice", "nohup", "stdbuf", "time", "sudo", "command", "builtin", "exec", "timeout", "setsid", "winpty"):
+            i += 1
+            if name == "env":
+                vals = VALUE_OPTIONS.get("env", ())
+                while i < len(w):
+                    if w[i] == "HUSKY=0":
+                        return True
+                    if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w[i]):
+                        i += 1
+                        continue
+                    if w[i].startswith("-"):
+                        opt = w[i]; i += 1
+                        if opt in vals and i < len(w):
+                            i += 1
+                        continue
+                    break
+                continue
+            vals = VALUE_OPTIONS.get(name, ())
+            while i < len(w) and (w[i].startswith("-") or (name == "xargs" and (w[i].isdigit() or w[i] == "{}"))):
+                opt = w[i]
+                i += 1
+                if opt in vals and i < len(w):
+                    i += 1
+            if name == "timeout" and i < len(w):
+                i += 1
+            continue
+        break
+    return False
 
 
 def shell_inner(w):
@@ -737,7 +1144,7 @@ def strip_prefix(w):
             i += 1
             continue
         name = tok.replace(".exe", "")
-        if name in ("xargs", "env", "nice", "nohup", "stdbuf", "time", "sudo", "command", "builtin", "exec", "timeout"):
+        if name in ("xargs", "env", "nice", "nohup", "stdbuf", "time", "sudo", "command", "builtin", "exec", "timeout", "setsid", "winpty"):
             vals = VALUE_OPTIONS.get(name, ())
             i += 1
             while i < len(w) and (w[i].startswith("-") or (name == "xargs" and (w[i].isdigit() or w[i] == "{}"))):
@@ -844,12 +1251,68 @@ def commit_message(args, command):
     if msg is None:
         msg = ""
     if not msg.strip() or "<<" in msg or "$(" in msg:
-        for m in HEREDOC_RX.finditer(command):
-            body = m.group(0).split("\n", 1)[1]
-            lines = [l for l in body.splitlines() if l.strip() and not re.match(r"^\w+\s*$", l)]
-            if lines:
-                return lines[0].strip()
+        p = _parsed_snapshot(command)
+
+        def first_heredoc_subject(parsed, src):
+            for hd in parsed["heredocs"]:
+                blob = src[hd["start"]:hd["end"]]
+                if "\n" not in blob:
+                    continue
+                body = blob.split("\n", 1)[1]
+                lines = [l for l in body.splitlines() if l.strip() and not re.match(r"^\w+\s*$", l) and l.rstrip(" \t") != hd["delim"]]
+                if lines:
+                    return lines[0].strip()
+            return None
+
+        subj = first_heredoc_subject(p, command)
+        if subj:
+            return subj
+        for sub in p["subs"]:
+            subj = first_heredoc_subject(_parsed_snapshot(sub), sub)
+            if subj:
+                return subj
+            for line in sub.splitlines():
+                t = line.strip()
+                if t and not re.match(r"^\w+\s*<<", t):
+                    return t
     return msg.strip()
+
+
+def _join_continuations(command, tool):
+    out, i, n, bs = [], 0, len(command), 0
+    while i < n:
+        if command[i] == "\\":
+            bs += 1
+            out.append(command[i])
+            i += 1
+            if i < n and command[i] in "\r\n":
+                if tool == "PowerShell" or bs % 2 == 1:
+                    while i < n and command[i] in "\r\n":
+                        i += 1
+                    if tool == "PowerShell":
+                        out.append(" ")
+                else:
+                    out.append(command[i]); i += 1
+                bs = 0
+                continue
+            continue
+        if tool == "PowerShell" and command[i] == "`" and i + 1 < n and command[i + 1] in "\r\n":
+            while i + 1 < n and command[i + 1] in "\r\n":
+                i += 1
+            out.append(" ")
+            i += 1
+            bs = 0
+            continue
+        if tool == "Bash" and command[i] == "`" and i + 1 < n and command[i + 1] in "\r\n":
+            out.append(command[i]); i += 1
+            while i < n and command[i] in "\r\n":
+                out.append(command[i]); i += 1
+            bs = 0
+            continue
+        out.append(command[i])
+        bs = 0
+        i += 1
+    return "".join(out)
 
 
 def in_worktree(w, cwd):
@@ -858,28 +1321,53 @@ def in_worktree(w, cwd):
     return any(re.search(r"[\\/]Worktrees[\\/]", p) for p in paths)
 
 
-def check(command, cwd=None):
+def check(command, cwd=None, tool="Bash", _depth=0):
     """Return the reason to refuse, or None."""
-    command = re.sub(r"\\\r?\n|`\r?\n", " ", command)                     # a line continued with \ or a PowerShell backtick is one line
+    if tool == "PowerShell":
+        r1 = _check_one(command, cwd, "Bash", _depth, backslash_escapes=True)
+        r2 = _check_one(command, cwd, "PowerShell", _depth, backslash_escapes=False)
+        return r1 or r2
+    return _check_one(command, cwd, tool, _depth, backslash_escapes=True)
+
+
+def _check_one(command, cwd, tool, depth, backslash_escapes=True):
+    if depth > READ_DEPTH_BOUND:
+        return "command nests too deeply to read"
+    command = _join_continuations(command, tool)
+    global _READ_ESCAPES
+    _parsed_snapshot._cache = {}
+    _READ_ESCAPES = backslash_escapes
+    parsed = _parsed_snapshot(command, backslash_escapes=backslash_escapes)
+    if parsed["deep"]:
+        return "command nests too deeply to read"
     r = gh_api_unquoted_ampersand_reason(command)
     if r:
         return r
     r = chain_reason(command, cwd)
     if r:
         return r
-    for simple in split_commands(strip_heredocs(command)):
+    for simple in split_commands(command):
         w = strip_prefix(words(simple))
         if not w:
             continue
         head = base(w[0])
-        if leading_husky_zero(simple):
+        husky = leading_husky_zero(simple)
+        if husky:
             wgit = strip_prefix(words(simple))
             if wgit and is_git(wgit):
                 sub, _ = git_subcommand(wgit)
                 if sub in ("commit", "push", "merge"):
                     return "HUSKY=0 switches the hook runner off (a commit that skips its checks; rule 4)"
+            if head in ("eval", "bash", "bash.exe", "sh", "sh.exe", "setsid", "winpty"):
+                inner = shell_inner(w) if head not in ("eval", "setsid", "winpty") else " ".join(w[1:])
+                if inner:
+                    iw = strip_prefix(words(inner))
+                    if iw and is_git(iw):
+                        sub, _ = git_subcommand(iw)
+                        if sub in ("commit", "push", "merge"):
+                            return "HUSKY=0 switches the hook runner off (a commit that skips its checks; rule 4)"
         if head == "eval" and len(w) > 1:
-            r = check(" ".join(w[1:]), cwd)
+            r = _check_one(" ".join(w[1:]), cwd, tool, depth + 1, backslash_escapes=backslash_escapes)
             if r:
                 return r
         if head in WRAPPER_SHELLS:
@@ -887,13 +1375,14 @@ def check(command, cwd=None):
             if inner is ENCODED:
                 return "an encoded PowerShell command, which the guard cannot read"
             if inner:
-                r = check(inner, cwd)
+                ps_tool = tool if base(w[0]).replace(".exe", "") in ("powershell", "pwsh") else tool
+                r = check(inner, cwd, tool=ps_tool, _depth=depth + 1)
                 if r:
                     return r
         if head in ("find", "find.exe") and any(t in ("-exec", "-execdir", "-ok") for t in w):
             j = next(k for k, t in enumerate(w) if t in ("-exec", "-execdir", "-ok"))
             inner = " ".join(t for t in w[j + 1:] if t not in (";", "+", "{}"))
-            r = check(inner, cwd) if inner else None
+            r = _check_one(inner, cwd, tool, depth + 1, backslash_escapes=backslash_escapes) if inner else None
             if r:
                 return r
         if base(w[0]) == "cursor-agent" and _names_bridge_review_paths(w):
@@ -935,7 +1424,7 @@ def check(command, cwd=None):
             if group == "api" and any(m in tok for tok in w for m in MERGE_MUTATIONS):
                 return "gh api with a merge mutation (merging outside the gate)"
             if group == "api" and sub == "graphql":
-                if any(contains_command_substitution(t) for t in args) or contains_command_substitution(simple):
+                if parsed["hassub"]:
                     return "gh api graphql with a query built by a command substitution, which the guard cannot read (write the query on the command line)"
                 if any(t == "--input" or t.startswith("--input=") or t.startswith("@") or "=@" in t for t in args):
                     return "gh api graphql with a query read from a file, which the guard cannot read (write the query on the command line)"
@@ -970,7 +1459,7 @@ def main():
     command = ((data.get("tool_input") or {}).get("command") or "")
     if not isinstance(command, str) or not command.strip():
         return 0
-    reason = check(command, data.get("cwd") or os.getcwd())
+    reason = check(command, data.get("cwd") or os.getcwd(), tool=tool)
     if reason:
         sys.stderr.write("permission-guard (Claude-Cursor Bridge): refused - %s. The loop merges only through the "
                          "verified gate and never force-pushes; if the branch rules refuse a merge, fix the cause, "

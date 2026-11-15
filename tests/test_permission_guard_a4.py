@@ -204,3 +204,57 @@ def test_r082_env_husky_zero_before_git_push_is_refused(tmp_path):
     """R-082 (req 11d): env HUSKY=0 git push is refused like a leading HUSKY=0 assignment."""
     p = _run_r082("env HUSKY=0 git push origin task-012", tmp_path)
     assert p.returncode == 2 and "HUSKY" in p.stderr, p.stderr
+
+
+WR = "git worktree remove ../Worktrees/TASK-012"
+BT = "`"
+NL = "\n"
+
+
+@pytest.mark.parametrize("command", [
+    "git cherry-pick -m 1 --no-verify 0123abc",
+    "git commit -F msg.txt --no-verify",
+    "git push $'\\x2d\\x2dforce' origin main",
+    "git push $'\\055\\055force' origin main",
+    "echo " + BT + WR + BT,
+    "echo " + BT + "# c` ; " + WR + BT,
+    'echo "$( (true) ; ' + WR + ')"',
+    "echo ${x:- #} ; " + WR,
+    "cat <<EOF" + NL + "$(" + WR + ")" + NL + "EOF",
+    "HUSKY=0 setsid git commit -m x",
+])
+def test_r082_req14_refused_forms(tmp_path, command):
+    """R-082 requirement 14: builder refusal cases the acceptance file does not name."""
+    p = _run_r082(command, tmp_path)
+    assert p.returncode == 2, (command, p.returncode, p.stderr)
+
+
+def test_r082_req14_powershell_wrapper_refuses_worktree(tmp_path):
+    """R-082 requirement 14: a powershell -Command string is read under the PowerShell tool."""
+    command = 'powershell -Command \'Get-ChildItem "C:\\dir\\" ; ' + WR + ' ; echo "x"\''
+    p = _run_r082(command, tmp_path, tool="PowerShell")
+    assert p.returncode == 2, (command, p.returncode, p.stderr)
+
+
+def test_r082_req14_nesting_past_the_read_bound_is_refused(tmp_path):
+    """R-082 requirement 5: nesting past the reader bound refuses with a depth reason."""
+    command = "$(" * 70 + "true" + ")" * 70 + " ; " + WR
+    p = _run_r082(command, tmp_path)
+    assert p.returncode == 2 and "nest" in p.stderr.lower(), (command, p.stderr)
+
+
+@pytest.mark.parametrize("command", [
+    "cat <<'EOF'" + NL + "$(" + WR + ")" + NL + "EOF",
+    "gh api graphql -f query='$(x)'",
+])
+def test_r082_req14_passing_forms(tmp_path, command):
+    """R-082 requirement 14: deliberate passes called out in the brief."""
+    p = _run_r082(command, tmp_path)
+    assert p.returncode == 0, (command, p.stderr)
+
+
+def test_r082_req14_cd_in_substitution_is_not_rule8_refusal(workspace):
+    """R-082 requirement 14: cd only inside a substitution is not the cd-wrap refusal."""
+    command = 'echo "$(cd "$(dirname "$0")" && pwd)"'
+    p = _run_r082(command, workspace)
+    assert p.returncode == 0, (command, p.stderr)
