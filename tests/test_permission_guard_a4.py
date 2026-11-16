@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 
 import pytest
 
@@ -300,7 +301,7 @@ _R6_WRAPPERS = [
     ("eval", "eval git status", "eval \"git worktree remove y\""),
     ("bash", "bash -c 'git status'", "bash --foo -c 'git status'"),
     ("sh", "sh -c 'git status'", "sh -i -c 'git status'"),
-    ("cmd", "cmd /c git status", "cmd /v git status"),
+    ("cmd", "cmd //c git status", "cmd /v git status"),
     ("powershell", "powershell -NoProfile -Command git status", "powershell -Foo -Command git status"),
     ("find", "find . -exec echo hi {} ;", "find . -exec git worktree remove z \\;"),
 ]
@@ -377,7 +378,7 @@ def test_r082_req9_escaped_dollar_is_unreadable():
 
 def test_r082_req10_cmd_reads_every_switch_and_redirection():
     """R-082 (req 10): /q then /c is the command switch, and >out is not a git argument."""
-    p = _run_r6('cmd /q /c "git >out worktree remove z"')
+    p = _run_r6("cmd //q //c git '>out' worktree remove z")
     assert p.returncode == 2 and "worktree" in p.stderr, p.stderr
 
 
@@ -411,3 +412,130 @@ def test_r082_req13_glued_message_checkpoint_passes(workspace):
     """R-082 (req 13): --message=<text> is the checkpoint subject, and a hyphen is a word boundary."""
     p = _run_r6("git commit --message=checkpoint-before-TASK-002 --no-verify", workspace)
     assert p.returncode == 0, p.stderr
+
+
+def test_r082_r7_req1_find_clause_keeps_an_empty_word(tmp_path):
+    """R-082 round 7 req 1: a find clause is the word list, so git -C keeps the empty word."""
+    p = _run_r6("find . -maxdepth 0 -exec git -C '' worktree remove y ';'", tmp_path)
+    assert p.returncode == 2 and "worktree" in p.stderr, p.stderr
+
+
+def test_r082_r7_req1_long_find_is_refused_for_worktree_quickly(tmp_path):
+    """R-082 round 7 req 1: the acceptance file's long find form is refused for the removal, inside two seconds."""
+    command = "find . " + "-exec true ';' " * 3000 + "; git worktree remove y"
+    started = time.monotonic()
+    p = _run_r6(command, tmp_path)
+    assert p.returncode == 2 and "worktree" in p.stderr and "too long" not in p.stderr.lower(), p.stderr
+    assert time.monotonic() - started < 2
+
+
+def test_r082_r7_req1_nested_find_is_refused_for_worktree_quickly(workspace):
+    """R-082 round 7 req 1: the acceptance file's nested find form is refused for the removal, inside two seconds."""
+    command = "find . " + ("-exec find . " * 18) + "-exec true " + "'\\;'" + " | git worktree remove y"
+    started = time.monotonic()
+    p = _run_r6(command, workspace)
+    assert p.returncode == 2 and "worktree" in p.stderr and "too long" not in p.stderr.lower(), p.stderr
+    assert time.monotonic() - started < 2
+
+
+def test_r082_r7_req2_cmd_ends_a_command_name_at_a_semicolon(tmp_path):
+    """R-082 round 7 req 2: cmd ends a command name at a semicolon."""
+    p = _run_r6("cmd //c 'call;git worktree remove y'", tmp_path)
+    assert p.returncode == 2 and "cannot read" in p.stderr.lower(), p.stderr
+
+
+def test_r082_r7_req3_cmd_refuses_a_word_that_holds_a_blank(tmp_path):
+    """R-082 round 7 req 3: a cmd word that holds a blank does not survive the join."""
+    p = _run_r6("cmd //c git -C 'a b' worktree remove y", tmp_path)
+    assert p.returncode == 2 and "cannot read" in p.stderr.lower(), p.stderr
+
+
+def test_r082_r7_req4_powershell_word_continuing_after_its_quote(tmp_path):
+    """R-082 round 7 req 4: a PowerShell word that continues after its closing quote is unreadable."""
+    p = _run_r6("git 'worktree'remove y", tmp_path, tool="PowerShell")
+    assert p.returncode == 2 and "cannot read" in p.stderr.lower(), p.stderr
+
+
+def test_r082_r7_req5_powershell_switch_with_a_glued_value(tmp_path):
+    """R-082 round 7 req 5: a PowerShell switch holding = is outside the table."""
+    p = _run_r6("powershell -NoProfile -ep=Bypass '; git worktree remove y'", tmp_path)
+    assert p.returncode == 2 and "cannot read" in p.stderr.lower(), p.stderr
+
+
+def test_r082_r7_req6_single_slash_cmd_under_bash_is_unreadable(tmp_path):
+    """R-082 round 7 req 6: a single-slash cmd switch under Bash is unreadable."""
+    p = _run_r6("cmd /c echo agent", tmp_path)
+    assert p.returncode == 2 and "cannot read" in p.stderr.lower(), p.stderr
+
+
+def test_r082_r7_req7_bash_plus_c_is_unreadable(tmp_path):
+    """R-082 round 7 req 7: a plus flag holding c is unreadable."""
+    p = _run_r6("bash +c 'git worktree remove y'", tmp_path)
+    assert p.returncode == 2 and "cannot read" in p.stderr.lower(), p.stderr
+
+
+def test_r082_r7_req8_stdin_path_with_a_dot_segment(tmp_path):
+    """R-082 round 7 req 8: a script path with a dot segment into dev reads standard input."""
+    p = _run_r6("echo x | bash /./dev/stdin", tmp_path)
+    assert p.returncode == 2 and "cannot read" in p.stderr.lower(), p.stderr
+
+
+def test_r082_r7_req9_carriage_return_before_a_hash(tmp_path):
+    """R-082 round 7 req 9: a carriage return outside quotes is unreadable."""
+    p = _run_r6("echo x\r#; git worktree remove y", tmp_path)
+    assert p.returncode == 2 and "cannot read" in p.stderr.lower(), p.stderr
+
+
+def test_r082_r7_req10_eval_changes_state_in_a_chain(workspace):
+    """R-082 round 7 req 10: rule 8 sees a state change inside eval."""
+    p = _run_r6("echo hi; eval git commit -m x", workspace)
+    assert p.returncode == 2 and ("rule 8" in p.stderr or "chain" in p.stderr.lower()), p.stderr
+
+
+def test_r082_r7_req11_sudo_keeps_a_husky_assignment(tmp_path):
+    """R-082 round 7 req 11: an assignment after sudo is still an assignment."""
+    p = _run_r6("sudo HUSKY=0 git commit -m x", tmp_path)
+    assert p.returncode == 2 and "HUSKY" in p.stderr, p.stderr
+
+
+def test_r082_r7_req12_conhost_is_a_launcher(tmp_path):
+    """R-082 round 7 req 12: conhost is refused as a launcher."""
+    p = _run_r6("conhost git worktree remove y", tmp_path)
+    assert p.returncode == 2 and "cannot read" in p.stderr.lower(), p.stderr
+
+
+def test_r082_r7_req13_a_clock_past_the_deadline_refuses():
+    """R-082 round 7 req 13: check refuses when the module clock passes eight seconds."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("permission_guard_r7_deadline", PROG)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    real = mod._clock
+    base = {"t": None}
+
+    def clock():
+        if base["t"] is None:
+            base["t"] = real()
+            return base["t"]
+        return base["t"] + 9
+
+    mod._clock = clock
+    reason = mod.check("echo hi")
+    assert reason and "cannot read" in reason.lower() and "too long" in reason.lower(), reason
+
+
+def test_r082_r7_req13_premerge_with_no_time_left_refuses(tmp_path):
+    """R-082 round 7 req 13: a git call with no time left refuses instead of passing."""
+    import importlib.util
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True, timeout=30, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    sha = "0123456789abcdef"
+    folder = repo / ".git" / "bridge" / "premerge"
+    folder.mkdir(parents=True)
+    (folder / sha).write_text("ok", encoding="utf-8")
+    spec = importlib.util.spec_from_file_location("permission_guard_r7_premerge", PROG)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod._read_started = mod._clock() - 9
+    assert mod.premerge_recorded(sha, str(repo)) is False

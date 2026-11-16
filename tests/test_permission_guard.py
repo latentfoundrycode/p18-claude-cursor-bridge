@@ -157,13 +157,12 @@ def test_refused(tool, cmd):
     "gh pr merge 12 --disable-auto",
     "gh pr merge --help",
     "gh pr view 12",
-    "gh api graphql -f query='query { repository(owner: \"o\", name: \"r\") { pullRequest(number: 12) { mergeable } } }'",
     "git push origin HEAD",
     "bash -c 'git status'",
     "gh pr merge 12 --squash --help",
     'echo "a & b"',
     "python x.py 2>&1",
-    "cmd /c echo agent",
+    "cmd //c echo agent",
     "powershell -NoProfile -Command Get-ChildItem",
     "powershell Get-ChildItem",
     "nice -n 10 python x.py",
@@ -171,7 +170,7 @@ def test_refused(tool, cmd):
     "find . -name '*.pyc' -delete",
     "gh alias set co 'pr checkout'",
     "dist/agent.exe --version",
-    "cmd /c dir agent",
+    "cmd //c dir agent",
     "pwsh -File build.ps1 agent",
     "echo agent",
     "git push -u origin task-012",
@@ -246,3 +245,23 @@ def test_here_document_commit_messages_are_unreadable(tool, command):
     """R-082 (req 17): a here-document on a commit message is unreadable under both tools."""
     rc, err = run(tool, command)
     assert rc == 2 and "cannot read" in err.lower(), (tool, err)
+
+
+_GRAPHQL_READ = "gh api graphql -f query='query { repository(owner: \"o\", name: \"r\") { pullRequest(number: 12) { mergeable } } }'"
+
+
+def test_r082_graphql_query_with_literal_quotes_passes_under_bash_only():
+    """R-082 round 7 req 4: a literal double quote inside a PowerShell word is unreadable; Bash keeps the pass."""
+    rc, err = run("Bash", _GRAPHQL_READ)
+    assert rc == 0, err
+    rc, err = run("PowerShell", _GRAPHQL_READ)
+    assert rc == 2 and "cannot read" in err.lower(), err
+
+
+@pytest.mark.parametrize("command", ["cmd /c echo agent", "cmd /c dir agent"])
+def test_r082_cmd_single_slash_passes_under_powershell_and_is_unreadable_under_bash(command):
+    """R-082 round 7 req 6: Git Bash rewrites a single-slash cmd switch; PowerShell does not."""
+    rc, err = run("PowerShell", command)
+    assert rc == 0, (command, err)
+    rc, err = run("Bash", command)
+    assert rc == 2 and "cannot read" in err.lower(), (command, err)
