@@ -103,6 +103,10 @@ def snapshot_subject(message):
     return bool(re.search(r"\bcheckpoint\b", message, re.I)) and bool(INCREMENT_RX.search(message)) and not NOT_A_SNAPSHOT_RX.search(clause)   # starts with checkpoint, names the increment, no accept/merge/release word (second pass, N2)
 GH_READ = ("view", "list", "checks", "status", "diff", "search", "download", "auth", "--version", "version")
 HOOK_SKIPPERS = ("commit", "push", "merge", "rebase", "am", "cherry-pick", "revert")
+_GIT_UNREADABLE = object()
+_GIT_TAKES_VALUE = ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix", "--attr-source")
+_GIT_TAKES_EQUALS = ("--git-dir=", "--work-tree=", "--namespace=", "--super-prefix=", "--attr-source=", "--exec-path=", "--list-cmds=", "--config-env=")
+_GIT_FLAGS = ("-p", "--paginate", "-P", "--no-pager", "--bare", "--no-replace-objects", "--no-lazy-fetch", "--literal-pathspecs", "--glob-pathspecs", "--noglob-pathspecs", "--icase-pathspecs", "--no-optional-locks", "--no-advice", "--exec-path", "--html-path", "--man-path", "--info-path", "-v", "--version", "-h", "--help")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
@@ -2008,7 +2012,7 @@ def _alias_key_char(ch):
 
 
 def _alias_value_prefix(a):
-    """The value after =, blanks and one optional quote stripped, then a refused prefix."""
+    """The value after =, blanks and one optional quote: a refused prefix, or a hook-skipping subcommand."""
     if len(a) < 7 or a[:6].lower() != "alias.":
         return False
     i, n = 6, len(a)
@@ -2030,6 +2034,11 @@ def _alias_value_prefix(a):
             end = i + len(pref)
             if end >= n or not (a[end].isalnum() or a[end] == "_"):
                 return True
+    end = i
+    while end < n and not a[end].isspace():
+        end += 1
+    if a[i:end].lower() in ("commit", "merge", "rebase", "am", "cherry-pick", "revert"):
+        return True
     return False
 
 
@@ -2319,6 +2328,8 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
             if _too_long():
                 return _cannot("too long to read in time")
         sub, args = git_subcommand(w)
+        if sub is _GIT_UNREADABLE:
+            return _cannot("a git option %s before the subcommand" % args[:60])
         helpful = (len(args) == 1 and args[0] in ("-h", "--help")) or (sub == "worktree" and len(args) == 2 and args[0] == "remove" and args[1] in ("-h", "--help"))
         if any(re.match(r"^core\.hookspath=", a, re.I) for a in w) and not helpful:
             return "git -c core.hooksPath=... (the checks a commit runs are switched off; rule 4)"
@@ -2399,6 +2410,8 @@ def state_changing(w):
     `git stash list`, `git worktree list`, `git tag -l`, `git fetch` and `git remote` are reads)."""
     if is_git(w):
         sub, args = git_subcommand(w)
+        if sub is _GIT_UNREADABLE:
+            return True
         if sub == "branch":
             reads = ("--list", "-l", "--contains", "--no-contains", "--merged", "--no-merged", "--points-at", "--show-current", "-r", "-a", "-v", "-vv", "--sort", "--format")
             if any(a in BRANCH_WRITES for a in args):
@@ -2422,16 +2435,21 @@ def is_git(w):
 
 
 def git_subcommand(w):
-    """The git subcommand and its arguments, skipping global options such as -C <dir>."""
+    """The git subcommand and its arguments, skipping known global options. An unknown dash word before the subcommand is unreadable: (_GIT_UNREADABLE, word)."""
     i = 1
     while i < len(w):
         tok = w[i]
-        if tok in ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"):
+        if tok in _GIT_TAKES_VALUE:
             i += 2
             continue
-        if tok.startswith("-"):
+        if tok.startswith(_GIT_TAKES_EQUALS):
             i += 1
             continue
+        if tok in _GIT_FLAGS:
+            i += 1
+            continue
+        if tok.startswith("-"):
+            return _GIT_UNREADABLE, tok
         return tok, w[i + 1:]
     return None, []
 

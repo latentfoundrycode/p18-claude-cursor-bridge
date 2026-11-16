@@ -1179,10 +1179,12 @@ def test_r082_a_command_round_7_misread_is_refused_for_its_removal(plain, comman
     "git commit -" + "n" * 64000 + "1 -m x; " + WRY,
 ], ids=["alias-value-with-a-long-run-of-blanks", "short-flag-with-a-long-run-of-letters"])
 def test_r082_a_long_word_is_refused_for_its_removal_within_the_hooks_time(plain, command):
+    """Since BUG-045 round 3 every alias defined in the command is refused on its word alone, so the alias case may be
+    refused for its alias before the removal is reached: either refusal, within the hook's time, holds the case."""
     started = time.monotonic()
     err = refused(command, plain)
     assert time.monotonic() - started < HOOK_SECONDS
-    assert "worktree" in err, err[:200]
+    assert "worktree" in err or "alias" in err, err[:200]
 
 
 @pytest.mark.parametrize("command", [c for _, c in R8_UNREADABLE], ids=[n for n, _ in R8_UNREADABLE])

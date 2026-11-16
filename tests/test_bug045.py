@@ -143,12 +143,90 @@ GLOBAL_OPTIONS_PASSING = [
     ("paginate-log", "git -p log -1"),
     ("no-optional-locks-status", "git --no-optional-locks status"),
     ("attr-source-status", "git --attr-source HEAD status"),
-    ("alias-for-status", 'git -c "alias.st=status" st'),
 ]
 
 
 @pytest.mark.parametrize("command", [c for _, c in GLOBAL_OPTIONS_PASSING], ids=[n for n, _ in GLOBAL_OPTIONS_PASSING])
 def test_bug045_a_known_global_option_or_a_harmless_alias_still_passes(plain, command):
+    rc, err = guard(command, plain)
+    assert rc == 0, (command, rc, err)
+
+
+# ---------------------------------------------------------------- round 2's findings (the supervisor's probe and the security audit), red on round 2's tree
+# Each family a second time, so each reading is made whole (docs/debug/BUG-045.md, round 2's findings): every alias defined
+# in the command is refused, whatever its value (git reads options at the start of an alias value, and the guard does not
+# expand aliases; round 2's alias-for-status case, which passed, now stands here refused); a refused long option is read as
+# git reads it, by any prefix git accepts as its abbreviation; and a git config command that names core.hooksPath passes
+# only in its read forms.
+
+INLINE_ALIASES_REFUSED = [
+    ("alias-with-a-hookspath-option-before-commit", 'git -c "alias.cm=-c core.hooksPath=/dev/null commit" cm -a -m x'),
+    ("alias-with-a-no-pager-option-before-commit", 'git -c "alias.cm=--no-pager commit -n" cm -a -m x'),
+    ("alias-for-status", 'git -c "alias.st=status" st'),
+    ("alias-for-log", "git -c alias.lg=log lg"),
+    ("alias-key-in-upper-case", 'git -c "ALIAS.cm=status" cm'),
+    ("alias-value-in-single-quotes", "git -c \"alias.cm='commit' -n -am\" cm x"),
+    ("alias-value-in-double-quotes", "git -c 'alias.cm=\"commit\" -n -am' cm x"),
+    ("alias-value-partly-quoted", "git -c 'alias.cm=c\"ommit\" -n -am' cm x"),
+    ("alias-with-a-dotted-key", "git -c alias.v.x=commit v.x -am x"),
+    ("shell-alias-with-a-dotted-key", "git -c 'alias.v.x=!echo hi' v.x"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in INLINE_ALIASES_REFUSED], ids=[n for n, _ in INLINE_ALIASES_REFUSED])
+def test_bug045_every_alias_defined_in_the_command_is_refused(plain, command):
+    rc, err = guard(command, plain)
+    assert rc == 2 and "refused" in err and "alias" in err, (command, rc, err)
+
+
+ABBREVIATIONS_REFUSED = [
+    ("commit-no-verif", "git commit -a --no-verif -m x", "skips its checks"),
+    ("commit-no-veri", "git commit -a --no-veri -m x", "skips its checks"),
+    ("push-no-verif", "git push --no-verif origin HEAD", "skips its checks"),
+    ("merge-no-verif", "git merge --no-verif topic", "skips its checks"),
+    ("rebase-no-verif", "git rebase --no-verif main", "skips its checks"),
+    ("push-mirr", "git push --mirr origin", "push"),
+    ("push-force-w", "git push --force-w origin main", "push"),
+    ("push-force-with-equals", "git push --force-with=main origin main", "push"),
+    ("push-force-if", "git push --force-if origin main", "push"),
+]
+
+
+@pytest.mark.parametrize("command,reason", [(c, r) for _, c, r in ABBREVIATIONS_REFUSED], ids=[n for n, _, _ in ABBREVIATIONS_REFUSED])
+def test_bug045_an_abbreviation_git_accepts_for_a_refused_option_is_refused(plain, command, reason):
+    rc, err = guard(command, plain)
+    assert rc == 2 and "refused" in err and reason in err, (command, rc, err)
+
+
+CONFIG_HOOKSPATH_REFUSED = [
+    ("comment-value-decoy-get", "git config --comment --get core.hooksPath /dev/null"),
+    ("relative-folder-that-holds-no-hooks", "git config core.hooksPath nohooks"),
+    ("set-subcommand", "git config set core.hooksPath /dev/null"),
+    ("add", "git config --add core.hooksPath /dev/null"),
+    ("local-scope-write", "git config --local core.hooksPath nohooks"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in CONFIG_HOOKSPATH_REFUSED], ids=[n for n, _ in CONFIG_HOOKSPATH_REFUSED])
+def test_bug045_a_git_config_write_of_core_hookspath_is_refused(plain, command):
+    rc, err = guard(command, plain)
+    assert rc == 2 and "refused" in err and "core.hooksPath" in err, (command, rc, err)
+
+
+PASSING_AFTER_ROUND_2 = [
+    ("config-read-bare", "git config core.hooksPath"),
+    ("config-read-get", "git config --get core.hooksPath"),
+    ("config-read-get-subcommand", "git config get core.hooksPath"),
+    ("config-instructed-write-of-the-bridge-hooks-folder", "git config core.hooksPath .githooks"),
+    ("merge-no-verify-signatures", "git merge --no-verify-signatures topic"),
+    ("push-follow-tags", "git push --follow-tags origin task-012"),
+    ("push-no-force-with-lease-word", "git push origin task-012"),
+    ("commit-no-edit", "git commit --amend --no-edit"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in PASSING_AFTER_ROUND_2], ids=[n for n, _ in PASSING_AFTER_ROUND_2])
+def test_bug045_a_read_or_an_ordinary_option_still_passes(plain, command):
     rc, err = guard(command, plain)
     assert rc == 0, (command, rc, err)
 
@@ -172,3 +250,116 @@ def test_bug045_a_config_hookspath_with_a_trailing_help_word_is_refused(plain):
     """BUG-045 (R-082): `git config core.hooksPath /dev/null -h` is refused. args are the key, the value and -h, not a lone help word, so the config refusal stands."""
     rc, err = guard("git config core.hooksPath /dev/null -h", plain)
     assert rc == 2 and "refused" in err and "core.hooksPath" in err, (rc, err)
+
+
+# BUG-045 (R-082), F3. Each known global option before `status` passes, and the same option before
+# `commit --no-verify -m x` is refused. -c's value is neither core.hooksPath nor an alias key.
+# -h, --help, -v, --version, --exec-path, --html-path, --man-path, --info-path and --list-cmds=
+# make git print help, a version, a path or a command list and run nothing, so refusing
+# `commit --no-verify` behind them is a safe over-refusal. --config-env= is left out: it is refused earlier.
+KNOWN_GIT_GLOBAL = [
+    ("dash-C", "-C sub"),
+    ("dash-c", "-c color.ui=never"),
+    ("git-dir", "--git-dir .git"),
+    ("work-tree", "--work-tree ."),
+    ("namespace", "--namespace ns"),
+    ("super-prefix", "--super-prefix x/"),
+    ("attr-source", "--attr-source HEAD"),
+    ("git-dir-equals", "--git-dir=.git"),
+    ("work-tree-equals", "--work-tree=."),
+    ("namespace-equals", "--namespace=ns"),
+    ("super-prefix-equals", "--super-prefix=x/"),
+    ("attr-source-equals", "--attr-source=HEAD"),
+    ("exec-path-equals", "--exec-path=/usr/bin"),
+    ("list-cmds-equals", "--list-cmds=main"),
+    ("dash-p", "-p"),
+    ("paginate", "--paginate"),
+    ("dash-P", "-P"),
+    ("no-pager", "--no-pager"),
+    ("bare", "--bare"),
+    ("no-replace-objects", "--no-replace-objects"),
+    ("no-lazy-fetch", "--no-lazy-fetch"),
+    ("literal-pathspecs", "--literal-pathspecs"),
+    ("glob-pathspecs", "--glob-pathspecs"),
+    ("noglob-pathspecs", "--noglob-pathspecs"),
+    ("icase-pathspecs", "--icase-pathspecs"),
+    ("no-optional-locks", "--no-optional-locks"),
+    ("no-advice", "--no-advice"),
+    ("exec-path", "--exec-path"),
+    ("html-path", "--html-path"),
+    ("man-path", "--man-path"),
+    ("info-path", "--info-path"),
+    ("dash-v", "-v"),
+    ("version", "--version"),
+    ("dash-h", "-h"),
+    ("help", "--help"),
+]
+
+
+@pytest.mark.parametrize("option", [opt for _, opt in KNOWN_GIT_GLOBAL], ids=[name for name, _ in KNOWN_GIT_GLOBAL])
+def test_bug045_a_known_git_global_option_is_read(plain, option):
+    """BUG-045 (R-082): a known git global option before status passes, and the same option before commit --no-verify is refused."""
+    rc, err = guard("git %s status" % option, plain)
+    assert rc == 0, (option, rc, err)
+    rc, err = guard("git %s commit --no-verify -m x" % option, plain)
+    assert rc == 2 and "refused" in err and "--no-verify" in err, (option, rc, err)
+
+
+# -C and -c take the next word. A value glued onto the same word is not that option, not an equals-form, and not a flag.
+GLUED_SHORT = [
+    ("glued-C", "git -Csub status", "-Csub"),
+    ("glued-c", "git -ccolor.ui=never status", "-ccolor.ui=never"),
+]
+
+
+@pytest.mark.parametrize("command,option", [(c, o) for _, c, o in GLUED_SHORT], ids=[name for name, _, _ in GLUED_SHORT])
+def test_bug045_a_glued_short_option_value_is_unreadable(plain, command, option):
+    """BUG-045 (R-082): F3 names -C and -c as whole words, so a glued value is an unknown option and unreadable."""
+    rc, err = guard(command, plain)
+    assert rc == 2 and "refused" in err and "cannot read" in err and option in err, (command, rc, err)
+
+
+HOOK_ALIAS = [
+    ("commit", 'git -c "alias.co=commit -m x" co'),
+    ("merge", 'git -c "alias.mg=merge topic" mg'),
+    ("rebase", 'git -c "alias.rb=rebase main" rb'),
+    ("am", 'git -c "alias.box=am mbox" box'),
+    ("cherry-pick", 'git -c "alias.pick=cherry-pick abc" pick'),
+    ("revert", 'git -c "alias.undo=revert HEAD" undo'),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in HOOK_ALIAS], ids=[name for name, _ in HOOK_ALIAS])
+def test_bug045_an_alias_for_each_hook_skipper_is_refused(plain, command):
+    """BUG-045 (R-082): an alias whose value starts with commit, merge, rebase, am, cherry-pick or revert is refused."""
+    rc, err = guard(command, plain)
+    assert rc == 2 and "refused" in err and "alias" in err, (command, rc, err)
+
+
+READ_ALIAS = [
+    ("status", 'git -c "alias.ss=status" ss'),
+    ("log", 'git -c "alias.lg=log -1" lg'),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in READ_ALIAS], ids=[name for name, _ in READ_ALIAS])
+def test_bug045_an_alias_for_status_or_log_still_passes(plain, command):
+    """BUG-045 (R-082): an alias whose value starts with status or log still passes."""
+    rc, err = guard(command, plain)
+    assert rc == 0, (command, rc, err)
+
+
+@pytest.fixture
+def bridge_workspace(tmp_path):
+    """A bridge Workspace: a folder under tmp_path holding docs/PROJECT_STATUS.md."""
+    d = tmp_path / "ws"
+    os.makedirs(os.path.join(str(d), "docs"))
+    with open(os.path.join(str(d), "docs", "PROJECT_STATUS.md"), "w", newline="\n") as fh:
+        fh.write("# Project Status\n")
+    return d
+
+
+def test_bug045_an_unreadable_option_is_state_changing_in_a_workspace_chain(bridge_workspace):
+    """BUG-045 (R-082): chain_reason runs before the word checks, so this chain is refused with `a chain of` only because state_changing read the unreadable git command as state-changing; read as a read, the refusal would be the `cannot read` one instead."""
+    rc, err = guard("git status && git --bogus-new-option x commit --no-verify -m x", bridge_workspace)
+    assert rc == 2 and "refused" in err and "a chain of" in err, (rc, err)

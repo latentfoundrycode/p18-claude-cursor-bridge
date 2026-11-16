@@ -48,3 +48,5 @@
 2026-11-15 TASK-063-r3: subagent pass extended `read_shell` with `unreadable`, `cmd_words`, `sub_chains`, and `gh_amp` hooks and updated `check`/`chain_reason`/`commit_message`, but quote-aware `cmd_words` (merged `"a b"`, `--fo"rce"`) remain wrong; 45 failures still in `tests/test_program_permission_guard.py`; a full positive-grammar replacement is still required.
 
 2026-11-16 TASK-063-r9: an empty or edge-whitespace argument of powershell.exe has to be refused in the switch walk before those words are joined into the inner command, because the join re-reads the real command and a dangerous one is then refused for the action rather than as unreadable.
+
+2026-11-16 BUG-045-r2: `git --help` on this host prints a short usage line that omits `--attr-source`, `--super-prefix`, `--literal-pathspecs`, `--glob-pathspecs`, `--noglob-pathspecs`, `--icase-pathspecs` and `--list-cmds=`, which the ruled known list keeps; the usage line showed no option the list lacked.
