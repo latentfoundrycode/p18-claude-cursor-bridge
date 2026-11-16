@@ -1237,3 +1237,93 @@ def test_r082_a_colon_switch_commit_in_a_chain_is_refused_under_powershell(works
 def test_r082_a_readable_form_passes_under_powershell_round_8(plain, command):
     rc, err = guard_tool(command, plain, "PowerShell")
     assert rc == 0, (command, rc, err)
+
+
+# ---------------------------------------------------------------- round 8's findings (the security audit B1 to B7; Review A approved)
+
+R9_UNREADABLE = [
+    ("powershell-inner-word-handed-to-env-with-braces", "powershell -Command \"env git '{worktree,remove}' y\""),
+    ("powershell-empty-word-before-a-switch", "powershell '' -Command " + WRY),
+    ("powershell-switch-with-a-leading-blank", "powershell ' -Command' " + WRY),
+    ("powershell-blank-word-before-c", "powershell ' ' -c git push origin main --force"),
+    ("powershell-blank-word-before-a-merge", "powershell -NoProfile ' ' -Command gh pr merge 12 --admin"),
+    ("powershell-blank-word-reading-stdin", "echo '" + WRY + "' | powershell ' '"),
+    ("powershell-command-with-an-empty-word", "echo '" + WRY + "' | powershell -Command ''"),
+    ("env-assignment-with-a-dotted-name", "env X.Y=1 " + WRY),
+    ("env-assignment-with-a-blank-in-its-name", "env 'a b=1' git push origin main --force"),
+    ("env-dotted-assignment-behind-nohup", "nohup env X.Y=1 gh pr merge 12 --admin"),
+    ("bash-env-from-stdin", "echo '" + WRY + "' | BASH_ENV=/dev/stdin bash -c true"),
+    ("ps4-run-by-xtrace", "PS4='$(" + WRY + ")' bash -xc true"),
+    ("shellopts-and-ps4-behind-env", "env SHELLOPTS=xtrace PS4='$(" + WRY + ")' bash -c true"),
+    ("ps4-assigned-inside-a-bash-string", "bash -xc 'PS4='\"'\"'$(" + WRY + ")'\"'\"'; true'"),
+    ("exported-function-behind-env", "env 'BASH_FUNC_echo%%=() { " + WRY + "; }' bash -c 'echo hi'"),
+    ("msys-path-list-in-a-powershell-inner-command", "powershell -Command echo /tmp:/c/Windows/System32/cmd //c " + WRY),
+    ("find-clause-whose-program-is-the-found-file", "find '/c/Program Files/Git/cmd' -maxdepth 1 -name git.exe -exec {} worktree remove y ';'"),
+    ("find-clause-whose-program-is-the-found-file-behind-env", "find /c/PROGRA~1/Git/cmd -name gh.exe -exec env {} pr merge 12 --admin ';'"),
+    ("launcher-ssh-agent", "ssh-agent " + WRY),
+    ("launcher-gpg-agent", "gpg-agent --daemon " + WRY),
+    ("find-braces-inside-a-bash-string", "find /c/PROGRA~1/Git/cmd -name git.exe -exec bash -c '{} worktree remove y' ';'"),
+    ("git-native-bash-launcher-reparses", "/c/PROGRA~1/Git/bin/bash.exe -c 'echo " + BS * 3 + "; " + WRY + "'"),
+    ("locale-with-a-multibyte-charset", "LC_ALL=zh_TW.BIG5 bash -c 'echo hi'"),
+    ("locale-with-a-multibyte-charset-behind-env", "env LANG=ja_JP.SJIS bash -c 'echo hi'"),
+    ("dotted-assignment-behind-sudo", "sudo X.Y=1 " + WRY),
+    ("launcher-gpg-connect-agent", "gpg-connect-agent -E " + WRY),
+    ("launcher-rundll32", "rundll32 shell32.dll,ShellExec_RunDLL " + WRY),
+    ("launcher-pcalua", "pcalua -a git -c worktree remove y"),
+    ("launcher-runas", "runas /trustlevel:0x20000 '" + WRY + "'"),
+    ("launcher-wmic", "wmic process call create '" + WRY + "'"),
+    ("ssh-proxy-command", "ssh -o ProxyCommand='" + WRY + "' x"),
+    ("ssh-local-command-glued", "ssh -oLocalCommand=x -o PermitLocalCommand=yes x"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in R9_UNREADABLE], ids=[n for n, _ in R9_UNREADABLE])
+def test_r082_a_form_round_8_read_is_refused_as_unreadable(plain, command):
+    err = refused(command, plain)
+    assert "cannot read" in err.lower(), err
+
+
+def test_r082_a_dotted_env_assignment_in_a_chain_is_refused_in_a_workspace(workspace):
+    refused("echo hi; env X.Y=1 git commit -m x", workspace)
+
+
+R9_POWERSHELL_UNREADABLE = [
+    ("doubled-quote-handed-to-env", "env git worktree \"re''move\" y"),
+    ("braces-handed-to-env", 'env git "{worktree,remove}" y'),
+    ("doubled-quote-handed-to-nohup", "nohup git push origin main \"--for''ce\""),
+    ("braces-handed-to-a-find-clause", 'find . -maxdepth 0 -exec git "{worktree,remove}" y \';\''),
+    ("single-quote-handed-to-bash", "bash -c \"a';git\" worktree remove \"y'\""),
+    ("backslash-and-blank-handed-to-bash", 'bash -c "echo ' + BS * 3 + '; ' + WRY + '"'),
+    ("powershell-blank-word-before-a-switch", "powershell ' ' -Command " + WRY),
+    ("env-assignment-with-a-dotted-name", "env X.Y=1 " + WRY),
+    ("bash-env-from-stdin-behind-env", "echo '" + WRY + "' | env BASH_ENV=/dev/stdin bash -c true"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in R9_POWERSHELL_UNREADABLE], ids=[n for n, _ in R9_POWERSHELL_UNREADABLE])
+def test_r082_a_powershell_form_round_8_read_is_refused_as_unreadable(plain, command):
+    rc, err = guard_tool(command, plain, "PowerShell")
+    assert rc == 2 and "cannot read" in err.lower(), (command, rc, err)
+
+
+@pytest.mark.parametrize("command", [
+    "env git status",
+    "bash -c 'git status'",
+    "nohup git fetch origin",
+], ids=["env-plain-words", "bash-string-without-quotes-inside", "nohup-plain-words"])
+def test_r082_a_readable_form_passes_under_powershell_round_9(plain, command):
+    rc, err = guard_tool(command, plain, "PowerShell")
+    assert rc == 0, (command, rc, err)
+
+
+@pytest.mark.parametrize("command", [
+    "env FOO=bar git status",
+    "GIT_TRACE=1 git status",
+    "find . -name '*.md' -exec echo {} ';'",
+    "ssh-agent -s",
+    "LANG=C git log --oneline",
+    "LC_ALL=en_US.UTF-8 git status",
+    "ssh -o BatchMode=yes git@github.com",
+], ids=["env-identifier-assignment", "leading-identifier-assignment", "find-braces-as-an-argument", "ssh-agent-with-options-only", "locale-c", "locale-utf-8", "ssh-harmless-option"])
+def test_r082_a_readable_form_passes_round_9(plain, command):
+    passes(command, plain)
