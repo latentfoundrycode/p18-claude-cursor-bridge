@@ -838,3 +838,91 @@ def test_r083_r3_the_reply_the_cases_change_reads_as_a_value_unchanged(be, craft
     crafted({CHECKS: _checks_body(checks), STATUS: _status_body(statuses), RUNS: _runs_body(runs)})
     r = be.head_state("OWNER/REPO", SHA)
     assert r["answer"] == "value" and len(r["runs"]) == 2 and len(r["checks"]) == 1 and len(r["statuses"]) == 1, r
+
+
+# ---------------------------------------------------------------- round 4 (Review B of PR #174, its second round): one view
+# A list read in pages whose count changed between its pages was taken whole at the first page's count: a run created between the
+# two reads was never seen, and an older success stood for its workflow, a false pass. The design rule: a list is one view of
+# GitHub; every page states the same count and the pages hold exactly that many distinct entries, or the head is cannot read.
+
+
+def _entry(source, i):
+    if source == "runs":
+        return run(i, i, 1, 10000 + i)
+    if source == "checks":
+        return check(i, "check %d" % i, 10000 + i)
+    return {"id": i, "context": "context %d" % i, "state": "success", "updated_at": "2026-11-16T10:00:00Z"}
+
+
+def _paged(source, pages):
+    """Routes for the three lists of the head: `source` answered by `pages`, a list of (total_count, entries), page by page; the
+    two others empty."""
+    key = {"runs": "workflow_runs", "checks": "check_runs", "statuses": "statuses"}[source]
+    path = {"runs": RUNS, "checks": CHECKS, "statuses": STATUS}[source]
+    routes = {CHECKS: _checks_body([]), STATUS: _status_body([]), RUNS: _runs_body([])}
+    del routes[path]
+    for n, (total, entries) in enumerate(pages, start=1):
+        body = {"total_count": total, key: entries}
+        if source == "statuses":
+            body.update({"state": "success", "sha": SHA})
+        routes["%s#%d" % (path, n)] = body
+    return routes
+
+
+SOURCES = ["runs", "checks", "statuses"]
+
+
+@pytest.mark.parametrize("source", SOURCES)
+def test_r083_r4_a_count_that_grows_between_pages_is_cannot_read(be, crafted, source):
+    """Review B's shape: page 1 states 101 and holds the first hundred; one entry is created before page 2 is read, which states
+    102 and holds the hundredth again (shifted down) and the 101st. Round 3 kept the first count and answered a value of 101."""
+    e = [_entry(source, i) for i in range(1, 102)]
+    crafted(_paged(source, [(101, e[:100]), (102, e[99:101])]))
+    r = be.head_state("OWNER/REPO", SHA)
+    assert r["answer"] == "cannot read" and r["source"] == source and r["reason"], r
+
+
+@pytest.mark.parametrize("source", SOURCES)
+def test_r083_r4_a_count_that_shrinks_between_pages_is_cannot_read(be, crafted, source):
+    e = [_entry(source, i) for i in range(1, 102)]
+    crafted(_paged(source, [(101, e[:100]), (100, e[100:101])]))
+    r = be.head_state("OWNER/REPO", SHA)
+    assert r["answer"] == "cannot read" and r["source"] == source and r["reason"], r
+
+
+@pytest.mark.parametrize("pages", ["one-page", "two-pages"])
+@pytest.mark.parametrize("source", SOURCES)
+def test_r083_r4_more_distinct_entries_than_the_count_states_is_cannot_read(be, crafted, source, pages):
+    """The pages hold exactly the count they state: an entry beyond it is a list that changed, never a value."""
+    e = [_entry(source, i) for i in range(1, 103)]
+    if pages == "one-page":
+        crafted(_paged(source, [(1, e[:2])]))
+    else:
+        crafted(_paged(source, [(101, e[:100]), (101, e[100:102])]))
+    r = be.head_state("OWNER/REPO", SHA)
+    assert r["answer"] == "cannot read" and r["source"] == source and r["reason"], r
+
+
+def test_r083_r4_review_b_s_case_a_run_created_between_the_pages_is_never_dropped_for_an_older_success(be, crafted):
+    """Review B's reproduction on round 3's tree: 101 passed runs of one workflow, newest first; a new run of it (in progress) is
+    created before page 2 is read. Round 3 answered a value without the new run, whose latest was the older passed run."""
+    older = [run(i, i, 1, 10000 + i) for i in range(101, 0, -1)]
+    newer = [run(999, 102, 1, 20000, status="in_progress", conclusion=None)] + older
+    crafted(_paged("runs", [(101, older[:100]), (102, newer[100:200])]))
+    r = be.head_state("OWNER/REPO", SHA)
+    assert r["answer"] == "cannot read" and r["source"] == "runs", r
+    kept = be.latest_of_each(r)
+    assert not any(be.ci_class(x, "run") == "passed" for x in kept["runs"]), kept
+
+
+@pytest.mark.parametrize("source", SOURCES)
+def test_r083_r4_pages_that_agree_read_as_a_value(be, crafted, source):
+    """The positive control of the section: three pages each stating 201, holding 100, 100 and 1 distinct entries: a value of 201,
+    and no fourth page asked."""
+    e = [_entry(source, i) for i in range(1, 202)]
+    crafted(_paged(source, [(201, e[:100]), (201, e[100:200]), (201, e[200:])]))
+    r = be.head_state("OWNER/REPO", SHA)
+    assert r["answer"] == "value" and len(r[source]) == 201, r
+    path = {"runs": RUNS, "checks": CHECKS, "statuses": STATUS}[source].split("?")[0]
+    asked = [c for c in crafted.calls() if path in c[c.index("api") + 1]]
+    assert len(asked) == 3, asked
