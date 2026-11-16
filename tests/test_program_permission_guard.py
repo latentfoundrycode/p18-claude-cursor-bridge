@@ -1388,3 +1388,23 @@ def test_r082_a_long_chain_of_prefixes_in_a_powershell_inner_command_is_refused_
     err = refused("powershell -Command " + "nohup " * 10000 + WRY, workspace)
     assert "worktree" in err, err[:200]
     assert time.monotonic() - started < HOOK_SECONDS
+
+
+
+R10_APPEND_NAMES = [
+    ("git-config-appended", "GIT_CONFIG+=1 git status", "GIT_CONFIG"),
+    ("exported-function-appended", "BASH_FUNC_x+=y git status", "run code"),
+    ("append-after-sudo-stays-strict", "sudo X+=1 git status", "identifier"),
+]
+
+
+@pytest.mark.parametrize("command,words", [(c, w) for _, c, w in R10_APPEND_NAMES], ids=[n for n, _, _ in R10_APPEND_NAMES])
+def test_r082_an_append_assignment_meets_each_name_rule(plain, command, words):
+    """Review A's round-10 note: the append form under the GIT_CONFIG and BASH_FUNC_ rules, and sudo's strict reading."""
+    err = refused(command, plain)
+    assert words in err, err[:200]
+
+
+def test_r082_a_lower_case_husky_append_passes(plain):
+    """The hook-runner test compares the whole word exactly: husky+=0 is another variable."""
+    passes("husky+=0 git commit -m x", plain)

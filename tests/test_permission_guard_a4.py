@@ -649,3 +649,34 @@ def test_r082_r9_req7_ssh_agent_runs_the_words_after_its_options(tmp_path):
     """R-082 round 9 req 7: ssh-agent runs a command when one follows its options."""
     rc, err = run("ssh-agent echo hi", tmp_path)
     assert rc == 2 and "cannot read" in err.lower() and "ssh-agent" in err.lower(), err
+
+
+def _load_guard(name):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(name, PROG)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_r082_r10_req1_a_long_prefix_chain_is_refused_for_the_removal(workspace):
+    """R-082 round 10 req 1: one re-parse scan per walk, so a long nohup chain is the removal."""
+    mod = _load_guard("permission_guard_r10_reparse")
+    command = "nohup " * 10000 + "git worktree remove y"
+    started = time.monotonic()
+    reason = mod.check(command, cwd=str(workspace), tool="PowerShell")
+    elapsed = time.monotonic() - started
+    assert reason and "worktree" in reason and "too long" not in reason.lower(), reason
+    assert elapsed < 2
+
+
+def test_r082_r10_req2_an_append_assignment_is_not_the_command_word(tmp_path):
+    """R-082 round 10 req 2: NAME+=value is an assignment, so the command is the removal."""
+    rc, err = run("X+=1 git worktree remove y", tmp_path)
+    assert rc == 2 and "worktree" in err, err
+
+
+def test_r082_r10_req2_an_append_to_a_locale_is_unreadable(tmp_path):
+    """R-082 round 10 req 2: appending to LANG joins a locale the guard does not see."""
+    rc, err = run("LANG+=.UTF-8 git status", tmp_path)
+    assert rc == 2 and "cannot read" in err.lower() and "appends to the inherited locale" in err, err

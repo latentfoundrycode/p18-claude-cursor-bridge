@@ -254,11 +254,18 @@ def _locale_value_ok(value):
 
 
 def _apply_assignment(tok, husky, strict):
-    """One NAME=value word. strict is env's words and the words after sudo: any word that holds = is an assignment."""
+    """One NAME=value word, or NAME+=value outside env's and sudo's strict reading."""
     if not tok or tok[:1] == "-" or "=" not in tok:
         return None, husky, False
     name, value = tok.split("=", 1)
     an = _assignment_name(tok)
+    append = False
+    if an is None and not strict and len(name) >= 2 and name[-1] == "+":
+        stem = name[:-1]
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", stem):
+            an = stem
+            name = stem
+            append = True
     up = name.upper()
     if up.startswith("BASH_FUNC_") and (strict or an is not None):
         return _cannot("an assignment that makes a shell run code"), husky, True
@@ -270,9 +277,11 @@ def _apply_assignment(tok, husky, strict):
         return _cannot("an assignment whose name begins GIT_CONFIG"), husky, True
     if up in _SHELL_CODE_NAMES:
         return _cannot("an assignment that makes a shell run code"), husky, True
+    if append and up in _LOCALE_NAMES:
+        return _cannot("an assignment that appends to the inherited locale"), husky, True
     if up in _LOCALE_NAMES and not _locale_value_ok(value):
         return _cannot("a locale assignment whose charset is not C, POSIX or UTF-8"), husky, True
-    if tok == "HUSKY=0":
+    if tok == "HUSKY=0" or tok == "HUSKY+=0":
         husky = True
     return None, husky, True
 
@@ -313,10 +322,11 @@ def _words_reparse_refusal(words):
     return None
 
 
-def _reparse_after(words, i, mode):
-    if i < len(words) and _reparse_applies(words[i], mode):
-        return _words_reparse_refusal(words[i + 1:])
-    return None
+def _reparse_after(words, i, mode, scanned):
+    """The words after i, scanned once: the first position of this walk that re-parses."""
+    if scanned or i >= len(words) or not _reparse_applies(words[i], mode):
+        return None, scanned
+    return _words_reparse_refusal(words[i + 1:]), True
 
 
 def _ssh_o_key(val):
@@ -653,7 +663,7 @@ def _take_assignments(words, i, n, husky, strict=False):
 
 def _walk_to_command(words, mode="bash", slash_ok=False, fed=False):
     """One prefix walk. Returns (index of the command word or None, error or None, saw HUSKY=0, saw a prefix)."""
-    husky, saw_prefix = False, False
+    husky, saw_prefix, scanned = False, False, False
     i, n = 0, len(words)
     for t in words:
         if t == "--config-env" or t.startswith("--config-env="):
@@ -665,7 +675,7 @@ def _walk_to_command(words, mode="bash", slash_ok=False, fed=False):
     while mode != "cmd" and i < n:
         head = _exe_stem(words[i])
         if head in _MSYS_PREFIX:
-            err = _reparse_after(words, i, mode)
+            err, scanned = _reparse_after(words, i, mode, scanned)
             if err:
                 return None, err, husky, saw_prefix
         if head == "env":
@@ -735,7 +745,7 @@ def _walk_to_command(words, mode="bash", slash_ok=False, fed=False):
         break
     if i >= n:
         return None, None, husky, saw_prefix
-    err = _reparse_after(words, i, mode)
+    err, scanned = _reparse_after(words, i, mode, scanned)
     if err:
         return i, err, husky, saw_prefix
     head = _exe_stem(words[i])
