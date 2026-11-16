@@ -98,4 +98,77 @@ def test_bug045_premise_git_takes_a_help_word_as_the_message_and_skips_the_hooks
     assert git("log", "-1", "--format=%s").stdout.strip() == "-h"
 
 
+# ---------------------------------------------------------------- round 1's findings (the security audit and Review A), red on round 1's tree
+# The same subsystem a second time, so the design changes (docs/debug/BUG-045.md, round 2): git's global options before the
+# subcommand are read from a known list, and any other one is refused as unreadable; an alias defined in the command for
+# a hook-skipping subcommand is refused as the aliases for the other refused actions are.
+
+GLOBAL_OPTIONS_REFUSED = [
+    ("attr-source-before-a-no-verify-commit", "git --attr-source HEAD commit --no-verify -m x", "--no-verify"),
+    ("attr-source-before-a-force-push", "git --attr-source HEAD push --force origin main", "--force"),
+    ("attr-source-before-worktree-remove", "git --attr-source HEAD worktree remove wt", "worktree remove"),
+    ("super-prefix-before-a-no-verify-commit", "git --super-prefix x/ commit --no-verify -m x", "--no-verify"),
+    ("unknown-global-option-before-a-no-verify-commit", "git --bogus-new-option x commit --no-verify -m x", "cannot read"),
+    ("unknown-global-option-before-a-force-push", "git --some-future-flag push --force origin main", "cannot read"),
+    ("no-lazy-fetch-before-a-force-push", "git --no-lazy-fetch push --force origin main", "--force"),
+]
+
+
+@pytest.mark.parametrize("command,reason", [(c, r) for _, c, r in GLOBAL_OPTIONS_REFUSED], ids=[n for n, _, _ in GLOBAL_OPTIONS_REFUSED])
+def test_bug045_a_refused_action_behind_a_git_global_option_is_refused(plain, command, reason):
+    rc, err = guard(command, plain)
+    assert rc == 2 and "refused" in err and reason in err, (command, rc, err)
+
+
+ALIASES_REFUSED = [
+    ("alias-for-a-no-verify-commit", 'git -c "alias.cm=commit --no-verify -am" cm x'),
+    ("alias-for-an-n-commit", 'git -c "alias.cm=commit -n -am" cm x'),
+    ("alias-for-a-commit-before-a-lone-h-with-hooks-off", 'git -c core.hooksPath=nohooks -c "alias.cm=commit -am" cm -h'),
+    ("alias-for-a-no-verify-rebase", 'git -c "alias.r=rebase --no-verify" r main'),
+    ("alias-for-a-merge", 'git -c "alias.m=merge --no-verify" m topic'),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in ALIASES_REFUSED], ids=[n for n, _ in ALIASES_REFUSED])
+def test_bug045_an_alias_defined_in_the_command_for_a_hook_skipper_is_refused(plain, command):
+    rc, err = guard(command, plain)
+    assert rc == 2 and "refused" in err and "alias" in err, (command, rc, err)
+
+
+GLOBAL_OPTIONS_PASSING = [
+    ("no-pager-log", "git --no-pager log -1"),
+    ("dash-capital-c-status", "git -C sub status"),
+    ("dash-c-config-status", "git -c color.ui=never status"),
+    ("git-dir-equals-status", "git --git-dir=.git status"),
+    ("paginate-log", "git -p log -1"),
+    ("no-optional-locks-status", "git --no-optional-locks status"),
+    ("attr-source-status", "git --attr-source HEAD status"),
+    ("alias-for-status", 'git -c "alias.st=status" st'),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in GLOBAL_OPTIONS_PASSING], ids=[n for n, _ in GLOBAL_OPTIONS_PASSING])
+def test_bug045_a_known_global_option_or_a_harmless_alias_still_passes(plain, command):
+    rc, err = guard(command, plain)
+    assert rc == 0, (command, rc, err)
+
+
 # ---------------------------------------------------------------- the builder adds its cases below this line and edits nothing above it
+
+
+def test_bug045_a_help_word_as_the_file_of_F_is_refused(plain):
+    """BUG-045 (R-082): -h as the file of -F is an option value, so --no-verify is still refused."""
+    rc, err = guard("git commit --no-verify -F -h", plain)
+    assert rc == 2 and "refused" in err and "--no-verify" in err, (rc, err)
+
+
+def test_bug045_a_help_word_beside_other_arguments_is_the_ruled_over_refusal(plain):
+    """BUG-045 (R-082): `git commit --no-verify -a -h -m x` is refused. git would print its help and run nothing, because -h stands as its own option beside other arguments; the refusal is the ruled, safe over-refusal."""
+    rc, err = guard("git commit --no-verify -a -h -m x", plain)
+    assert rc == 2 and "refused" in err and "--no-verify" in err, (rc, err)
+
+
+def test_bug045_a_config_hookspath_with_a_trailing_help_word_is_refused(plain):
+    """BUG-045 (R-082): `git config core.hooksPath /dev/null -h` is refused. args are the key, the value and -h, not a lone help word, so the config refusal stands."""
+    rc, err = guard("git config core.hooksPath /dev/null -h", plain)
+    assert rc == 2 and "refused" in err and "core.hooksPath" in err, (rc, err)

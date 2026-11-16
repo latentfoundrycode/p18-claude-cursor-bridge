@@ -2313,13 +2313,13 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
     if started and around_the_shim(started):
         return "starting the Cursor agent as %s, around the bridge's shim (KP-038); start it as cursor-agent, or through bridge-run.py" % started
     if is_git(w):
-        helpful = "--help" in w[1:] or "-h" in w[1:]
         for a in w:
             if _alias_names_refused(a):
                 return "a git alias that defines a refused command (%s)" % a[:60]
             if _too_long():
                 return _cannot("too long to read in time")
         sub, args = git_subcommand(w)
+        helpful = (len(args) == 1 and args[0] in ("-h", "--help")) or (sub == "worktree" and len(args) == 2 and args[0] == "remove" and args[1] in ("-h", "--help"))
         if any(re.match(r"^core\.hookspath=", a, re.I) for a in w) and not helpful:
             return "git -c core.hooksPath=... (the checks a commit runs are switched off; rule 4)"
         if sub == "config" and not helpful and any(a.lower() == "core.hookspath" for a in args) and not any(a.startswith("--get") for a in args):
