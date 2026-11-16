@@ -1006,3 +1006,136 @@ def test_r082_a_long_run_of_at_words_passes_within_the_hooks_time_under_powershe
     rc, err = guard_tool("echo " + "@h/ " * 25000, plain, "PowerShell")
     assert rc == 0, (rc, err[:200])
     assert time.monotonic() - started < HOOK_SECONDS
+
+
+# ---------------------------------------------------------------- round 6's findings (Review A B1 to B8, the security audit B1 to B8)
+
+R7_UNREADABLE = [
+    ("bash-plus-c-runs-its-string", "bash +c '" + WRY + "'"),
+    ("stdin-path-with-a-dot-segment", "echo x | bash /./dev/stdin"),
+    ("stdin-path-with-repeated-slashes", "echo x | bash ///dev/stdin"),
+    ("stdin-path-with-a-parent-segment", "echo x | sh /usr/../dev/stdin"),
+    ("carriage-return-before-a-hash", "echo x" + CR + "#; " + WRY),
+    ("cmd-name-ended-by-a-semicolon", "cmd //c 'call;" + WRY + "'"),
+    ("cmd-name-ended-by-an-equals-sign", "cmd //c call=" + WRY),
+    ("cmd-if-ended-by-a-semicolon", "cmd //c 'if;1==1 " + WRY + "'"),
+    ("cmd-at-sign-before-the-name", "cmd //c @" + WRY),
+    ("cmd-comma-before-the-name", "cmd //c ,git push --force"),
+    ("cmd-builtin-ended-by-a-slash", "cmd //c start/b " + WRY),
+    ("cmd-builtin-ended-by-a-comma", "cmd //c start,/b " + WRY),
+    ("cmd-at-sign-before-the-agent", "cmd //c @agent"),
+    ("cmd-empty-word-after-the-switch", "cmd //c git -C '' worktree remove y"),
+    ("cmd-word-with-a-blank-after-the-switch", "cmd //c git -C 'a b' worktree remove y"),
+    ("cmd-single-slash-switch-under-bash-reads-stdin", "echo '" + WRY + "' | cmd /c echo hi"),
+    ("powershell-switch-with-a-glued-value", "powershell -NoProfile -ep=Bypass '; " + WRY + "'"),
+    ("powershell-working-directory-glued", "powershell -wd=. '; git push --force origin main'"),
+    ("powershell-word-continuing-after-its-quote", "powershell \"git 'worktree'remove y\""),
+    ("powershell-single-slash-switch-under-bash", "powershell -NoProfile /ep '; " + WRY + "'"),
+    ("powershell-switch-only-beginning-with-file", "powershell -NoProfile -filex '; " + WRY + "'"),
+    ("powershell-switch-only-beginning-with-command", "powershell -NoProfile -commandx '; " + WRY + "'"),
+    ("cmd-single-slash-switch-in-a-find-clause", "echo hi | find . -maxdepth 0 -exec cmd /c echo hi ';'"),
+    ("cmd-name-ended-by-a-plus", "cmd //c 'call+" + WRY + "'"),
+    ("cmd-name-ended-by-a-bracket", "cmd //c 'call[" + WRY + "'"),
+    ("find-exec-word-inside-a-clause", "find . -maxdepth 0 -exec git -C x -exec " + WRY + " ';'"),
+    ("launcher-conhost", "conhost " + WRY),
+    ("launcher-schtasks", "schtasks /run /tn x"),
+    ("launcher-forfiles", "forfiles /p . /c x"),
+    ("launcher-windows-terminal", "wt " + WRY),
+    ("launcher-chroot", "chroot / " + WRY),
+    ("launcher-git-bash", "git-bash -c x"),
+    ("launcher-git-cmd", "git-cmd " + WRY),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in R7_UNREADABLE], ids=[n for n, _ in R7_UNREADABLE])
+def test_r082_a_form_round_6_read_is_refused_as_unreadable(plain, command):
+    err = refused(command, plain)
+    assert "cannot read" in err.lower(), err
+
+
+R7_REFUSED = [
+    ("find-clause-with-an-empty-word", "find . -maxdepth 0 -exec git -C '' worktree remove y ';'"),
+    ("find-clause-with-a-quoted-semicolon", "find . -maxdepth 0 -exec git -c 'a.b=x;y' worktree remove y ';'"),
+    ("find-clause-with-a-quoted-blank", "find . -maxdepth 0 -exec git -C 'a b' worktree remove y ';'"),
+    ("find-clause-with-a-quoted-hash", "find . -maxdepth 0 -exec git -C '#x' worktree remove y ';'"),
+    ("husky-behind-sudo", "sudo HUSKY=0 git commit -m x"),
+    ("find-clause-keeping-its-file-name-word", "find . -maxdepth 0 -exec git -C {} worktree remove y ';'"),
+    ("find-clause-with-a-plus-not-after-braces", "find . -maxdepth 0 -exec git --namespace + worktree remove y ';'"),
+    ("find-exec-as-an-option-value", "find . -maxdepth 0 -name -exec -o -exec " + WRY + " ';'"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in R7_REFUSED], ids=[n for n, _ in R7_REFUSED])
+def test_r082_a_refused_command_round_6_let_through_is_refused(plain, command):
+    refused(command, plain)
+
+
+@pytest.mark.parametrize("command", [
+    "echo hi; eval git commit -m x",
+    "echo hi; bash -c 'git commit -m x'",
+    "echo hi; find . -exec git commit -m x " + BS + ";",
+    "echo hi; cmd //c git commit -m x",
+    "echo hi; powershell -Command git commit -m x",
+], ids=["eval", "bash-c", "find-exec", "cmd", "powershell"])
+def test_r082_a_chain_whose_wrapper_changes_state_is_refused_in_a_workspace(workspace, command):
+    err = refused(command, workspace)
+    assert "rule 8" in err or "chain" in err.lower(), err
+
+
+@pytest.mark.parametrize("command", [
+    "cd x",
+    "cmd //c echo agent",
+    "cmd //c dir",
+    "bash +x -c 'git status'",
+    "bash tools/dev/setup.sh",
+    "find . -name '*.md' -exec echo {} +",
+], ids=["lone-cd", "cmd-double-slash-echo", "cmd-double-slash-dir", "bash-plus-x", "script-in-a-dev-folder", "find-exec-plus"])
+def test_r082_a_readable_form_passes_in_a_workspace_round_7(workspace, command):
+    passes(command, workspace)
+
+
+R7_POWERSHELL_UNREADABLE = [
+    ("word-continuing-after-a-single-quote", "git 'worktree'remove y"),
+    ("word-continuing-after-a-double-quote", 'git "worktree"remove y'),
+    ("comment-glued-to-a-quoted-word", "echo 'x'#y"),
+    ("literal-double-quotes-inside-single-quotes", "git 'worktree" + '""' + "' remove y"),
+    ("double-quote-split-across-words", "git -c 'a.b=1" + '"' + "' '" + '"' + "2' worktree remove y"),
+    ("backslash-quote-inside-single-quotes", "git -c 'a.b=x" + BS + '"' + " worktree remove y'"),
+    ("single-dash-word-holding-a-dot", "git push -f.." + BS + "r main"),
+    ("ampersand-inside-a-word", "echo a&" + WRY),
+    ("cmd-name-ended-by-a-comma", "cmd /c 'call," + WRY + "'"),
+    ("cmd-builtin-ended-by-a-slash", "cmd /c start/b " + WRY),
+    ("cmd-word-with-a-blank", "cmd /c git -C 'a b' worktree remove y"),
+    ("powershell-switch-with-a-glued-value", "powershell -NoProfile -ep=Bypass '; " + WRY + "'"),
+    ("cmdlet-outside-the-list", "ConvertTo-Html x"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in R7_POWERSHELL_UNREADABLE], ids=[n for n, _ in R7_POWERSHELL_UNREADABLE])
+def test_r082_a_powershell_form_round_6_read_is_refused_as_unreadable(plain, command):
+    rc, err = guard_tool(command, plain, "PowerShell")
+    assert rc == 2 and "cannot read" in err.lower(), (command, rc, err)
+
+
+@pytest.mark.parametrize("command", [
+    "cmd /c echo agent",
+    "cmd /c dir",
+    "ConvertTo-Json x",
+    "echo a'b c'",
+    'echo "a & b"',
+], ids=["cmd-echo", "cmd-dir", "listed-cmdlet", "quoted-part-after-a-plain-start", "quoted-ampersand"])
+def test_r082_a_readable_form_passes_under_powershell_round_7(plain, command):
+    rc, err = guard_tool(command, plain, "PowerShell")
+    assert rc == 0, (command, rc, err)
+
+
+def test_r082_a_nested_find_clauses_are_refused_within_the_hooks_time(workspace):
+    started = time.monotonic()
+    refused("find . " + "-exec find . " * 18 + "-exec true '" + BS + ";' | " + WRY, workspace)
+    assert time.monotonic() - started < HOOK_SECONDS
+
+
+def test_r082_a_long_run_of_find_clauses_is_refused_within_the_hooks_time(plain):
+    started = time.monotonic()
+    refused("find . " + "-exec true ';' " * 3000 + "; " + WRY, plain)
+    assert time.monotonic() - started < HOOK_SECONDS
