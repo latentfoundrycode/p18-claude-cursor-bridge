@@ -1121,9 +1121,8 @@ def test_r082_a_powershell_form_round_6_read_is_refused_as_unreadable(plain, com
     "cmd /c echo agent",
     "cmd /c dir",
     "ConvertTo-Json x",
-    "echo a'b c'",
     'echo "a & b"',
-], ids=["cmd-echo", "cmd-dir", "listed-cmdlet", "quoted-part-after-a-plain-start", "quoted-ampersand"])
+], ids=["cmd-echo", "cmd-dir", "listed-cmdlet", "quoted-ampersand"])
 def test_r082_a_readable_form_passes_under_powershell_round_7(plain, command):
     rc, err = guard_tool(command, plain, "PowerShell")
     assert rc == 0, (command, rc, err)
@@ -1139,3 +1138,102 @@ def test_r082_a_long_run_of_find_clauses_is_refused_within_the_hooks_time(plain)
     started = time.monotonic()
     refused("find . " + "-exec true ';' " * 3000 + "; " + WRY, plain)
     assert time.monotonic() - started < HOOK_SECONDS
+
+
+# ---------------------------------------------------------------- round 7's findings (Review A B1 to B8, the security audit B1 to B8)
+
+R8_UNREADABLE = [
+    ("cmd-name-with-a-slash-taken-as-a-prefix", "cmd //c powershell/command git 'worktree$null' remove y"),
+    ("powershell-settingsfile-not-a-switch", "powershell -settingsfile 'x; " + WRY + ";' echo"),
+    ("powershell-settings-not-a-switch", "powershell -settings '; " + WRY + "'"),
+    ("powershell-psc-not-a-switch", "powershell -psc '; " + WRY + "'"),
+    ("powershell-version-not-a-switch", "powershell -v '; " + WRY + "'"),
+    ("powershell-command-from-stdin", "echo '" + WRY + "' | powershell -Command -"),
+    ("powershell-c-from-stdin", "echo '" + WRY + "' | powershell -c -"),
+    ("powershell-file-from-stdin", "echo '" + WRY + "' | powershell -File -"),
+    ("powershell-with-no-command", "echo '" + WRY + "' | powershell -NoProfile"),
+    ("cmd-k-stays-reading-stdin", "echo '" + WRY + "' | cmd //k echo hi"),
+    ("relative-stdin-path-after-env-chdir", "echo '" + WRY + "' | env -C / bash dev/stdin"),
+    ("descriptor-number-after-env-chdir", "echo '" + WRY + "' | env --chdir=/proc/self/fd bash 0"),
+    ("shell-script-with-an-input-redirection", "bash x.sh < cmds.txt"),
+    ("shell-script-in-a-bash-string-fed-by-a-pipe", "echo '" + WRY + "' | bash -c 'env -C / bash dev/stdin'"),
+    ("shell-script-in-a-find-clause-fed-by-a-pipe", "echo '" + WRY + "' | find / -maxdepth 0 -execdir bash dev/stdin ';'"),
+    ("powershell-command-with-nothing-after-it", "echo '" + WRY + "' | powershell -Command"),
+]
+
+
+R8_REFUSED_FOR_THE_REMOVAL = [
+    ("find-fprintf-takes-two-words", "find . -maxdepth 0 -fprintf out.txt -name -exec " + WRY + " ';'"),
+    ("cmd-behind-env-still-checked", "cmd //c env " + WRY),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in R8_REFUSED_FOR_THE_REMOVAL], ids=[n for n, _ in R8_REFUSED_FOR_THE_REMOVAL])
+def test_r082_a_command_round_7_misread_is_refused_for_its_removal(plain, command):
+    err = refused(command, plain)
+    assert "worktree" in err, err[:200]
+
+
+@pytest.mark.parametrize("command", [
+    "git -c 'alias.x=" + " " * 32000 + "z' status; " + WRY,
+    "git commit -" + "n" * 64000 + "1 -m x; " + WRY,
+], ids=["alias-value-with-a-long-run-of-blanks", "short-flag-with-a-long-run-of-letters"])
+def test_r082_a_long_word_is_refused_for_its_removal_within_the_hooks_time(plain, command):
+    started = time.monotonic()
+    err = refused(command, plain)
+    assert time.monotonic() - started < HOOK_SECONDS
+    assert "worktree" in err, err[:200]
+
+
+@pytest.mark.parametrize("command", [c for _, c in R8_UNREADABLE], ids=[n for n, _ in R8_UNREADABLE])
+def test_r082_a_form_round_7_read_is_refused_as_unreadable(plain, command):
+    err = refused(command, plain)
+    assert "cannot read" in err.lower(), err
+
+
+def test_r082_a_long_husky_command_is_refused_for_its_removal_within_the_hooks_time(plain):
+    started = time.monotonic()
+    err = refused("HUSKY=0 echo " + "git " * 32000 + "; " + WRY, plain)
+    assert time.monotonic() - started < HOOK_SECONDS
+    assert "worktree" in err, err[:200]
+
+
+R8_POWERSHELL_UNREADABLE = [
+    ("trailing-backslash-in-a-word-with-a-blank", "git push origin 'x " + BS + "' 'y --force z'"),
+    ("backslash-in-a-word-with-a-blank", "git -c 'a.b=c d" + BS + "' ' worktree remove y'"),
+    ("colon-switch-continuing-into-a-quote", "git --namespace -x:'n'worktree remove y"),
+    ("dot-before-a-single-quote", "git -C .'worktree' remove y"),
+    ("dot-before-a-double-quote", 'git -C ."worktree" remove y'),
+    ("plain-start-continuing-into-a-quote", "echo a'b c'"),
+    ("comma-before-a-word", "git --no-pager ,worktree remove y"),
+    ("comma-before-a-quoted-word", "git push origin main ,'--force'"),
+    ("single-slash-behind-env", "echo '" + WRY + "' | env powershell -c cmd /c echo hi"),
+    ("single-slash-behind-a-bash-string", "echo '" + WRY + "' | bash -c 'powershell -Command cmd /c echo hi'"),
+    ("single-slash-in-a-find-clause", "find . -exec powershell -c cmd /c git status ';'"),
+    ("cmd-name-with-a-slash-taken-as-a-prefix", "cmd /c powershell/command git status"),
+    ("relative-stdin-path-after-env-chdir", "echo '" + WRY + "' | env -C / bash dev/stdin"),
+    ("cmd-k-stays-reading-stdin", "echo '" + WRY + "' | cmd /k echo hi"),
+    ("powershell-command-from-stdin", "echo '" + WRY + "' | powershell -Command -"),
+    ("single-slash-in-powershell-beneath-cmd", "cmd /c powershell -Command cmd /c echo hi"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in R8_POWERSHELL_UNREADABLE], ids=[n for n, _ in R8_POWERSHELL_UNREADABLE])
+def test_r082_a_powershell_form_round_7_read_is_refused_as_unreadable(plain, command):
+    rc, err = guard_tool(command, plain, "PowerShell")
+    assert rc == 2 and "cannot read" in err.lower(), (command, rc, err)
+
+
+def test_r082_a_colon_switch_commit_in_a_chain_is_refused_under_powershell(workspace):
+    rc, err = guard_tool("echo hi; git --namespace -x:'n'commit -m x", workspace, "PowerShell")
+    assert rc == 2 and "refused" in err, (rc, err)
+
+
+@pytest.mark.parametrize("command", [
+    "git -C 'a b' status",
+    "Get-ChildItem 'C:" + BS + "dir'",
+    "powershell -ExecutionPolicy Bypass -Command Get-ChildItem",
+], ids=["whole-quoted-word-with-a-blank", "whole-quoted-path", "execution-policy-switch"])
+def test_r082_a_readable_form_passes_under_powershell_round_8(plain, command):
+    rc, err = guard_tool(command, plain, "PowerShell")
+    assert rc == 0, (command, rc, err)
