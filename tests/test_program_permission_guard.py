@@ -1327,3 +1327,64 @@ def test_r082_a_readable_form_passes_under_powershell_round_9(plain, command):
 ], ids=["env-identifier-assignment", "leading-identifier-assignment", "find-braces-as-an-argument", "ssh-agent-with-options-only", "locale-c", "locale-utf-8", "ssh-harmless-option"])
 def test_r082_a_readable_form_passes_round_9(plain, command):
     passes(command, plain)
+
+
+# ---------------------------------------------------------------- round 9's findings (Review A B1 and B2; the rest outside the guard's threat model)
+
+R10_REFUSED_FOR_THE_REMOVAL = [
+    ("append-assignment-before-the-command", "X+=1 " + WRY),
+    ("append-assignment-inside-a-bash-string", "bash -c 'X+=1 " + WRY + "'"),
+    ("append-assignment-after-another-assignment", "A=1 X+=1 " + WRY),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in R10_REFUSED_FOR_THE_REMOVAL], ids=[n for n, _ in R10_REFUSED_FOR_THE_REMOVAL])
+def test_r082_an_append_assignment_is_read_as_an_assignment_and_the_removal_refused(plain, command):
+    err = refused(command, plain)
+    assert "worktree" in err, err[:200]
+
+
+def test_r082_husky_appended_switches_the_hook_runner_off_as_husky_set_does(plain):
+    err = refused("HUSKY+=0 git commit -m x", plain)
+    assert "HUSKY" in err, err[:200]
+
+
+R10_UNREADABLE = [
+    ("bash-env-appended", "BASH_ENV+='$(" + WRY + ")' bash -c true"),
+    ("ps4-appended-inside-a-bash-string", "bash -xc 'PS4+=x; true'"),
+    ("locale-appended", "LC_ALL+=zh_TW.BIG5 bash -c 'echo hi'"),
+    ("locale-appended-with-a-utf8-value", "LANG+=.UTF-8 git status"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in R10_UNREADABLE], ids=[n for n, _ in R10_UNREADABLE])
+def test_r082_an_append_assignment_meets_the_assignment_rules(plain, command):
+    err = refused(command, plain)
+    assert "cannot read" in err.lower(), err[:200]
+
+
+def test_r082_an_append_assignment_before_a_plain_command_passes(plain):
+    passes("X+=1 git status", plain)
+
+
+def test_r082_an_append_word_in_envs_words_stays_unreadable_for_its_name(plain):
+    """env sets a variable named `X+`; env's strict reading (round 9) keeps refusing a name that is no identifier."""
+    err = refused("env X+=1 git status", plain)
+    assert "identifier" in err, err[:200]
+
+
+def test_r082_a_long_chain_of_prefixes_is_refused_for_its_removal_within_the_hooks_time_under_powershell(workspace):
+    """Round 9's re-parse scan ran at every prefix over the rest of the words: 10,000 prefixes ran into the deadline
+    (refused as too long, after about 8 seconds, and once more for rule 8's reading in a Workspace), where a linear walk
+    reads to the removal at once."""
+    started = time.monotonic()
+    rc, err = guard_tool("nohup " * 10000 + WRY, workspace, "PowerShell")
+    assert rc == 2 and "worktree" in err, (rc, err[:200])
+    assert time.monotonic() - started < HOOK_SECONDS
+
+
+def test_r082_a_long_chain_of_prefixes_in_a_powershell_inner_command_is_refused_for_its_removal_within_the_hooks_time(workspace):
+    started = time.monotonic()
+    err = refused("powershell -Command " + "nohup " * 10000 + WRY, workspace)
+    assert "worktree" in err, err[:200]
+    assert time.monotonic() - started < HOOK_SECONDS
