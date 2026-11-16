@@ -1,7 +1,7 @@
 ---
 record: inventory
 header: 1
-reflected_through: "2026-11-16 TASK-063: the guard's threat model drawn after round 9, its deliberate reaches recorded (R-082)"
+reflected_through: "2026-11-16 BUG-045: the help exemption read by position, and the line drawn on the guard's git reading after round 4 (R-082)"
 development_data: "Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet (§15 condition 1, A1a condition 1)"
 tables:
   features:
@@ -18,7 +18,7 @@ tables:
     key: Item
 ---
 # Inventory — Claude-Cursor Bridge
-Reflected through: 2026-11-16 TASK-063: the guard's threat model drawn after round 9, its deliberate reaches recorded (R-082)
+Reflected through: 2026-11-16 BUG-045: the help exemption read by position, and the line drawn on the guard's git reading after round 4 (R-082)
 Updated: 2026-11-15
 
 The bridge already exists (releases 0, A1a–A5). This inventory is opened as the bridge becomes a supervised project (release B). Features accrue to the register as release B's increments merge; the rows below record the decisions and resources release B rests on.
