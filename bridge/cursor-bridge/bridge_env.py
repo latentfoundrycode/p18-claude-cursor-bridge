@@ -4187,25 +4187,42 @@ def _parse_time(text):
 
 
 def _rank_reason(source, entries):
-    """A reason naming the field whose order cannot be read, or None when every entry can be ordered."""
-    if source == "runs":
-        fields = ("run_number", "run_attempt", "id")
-    elif source == "checks":
-        fields = ("id",)
-    else:
-        fields = ()
+    """A reason naming the field that is not of its type, or None when every entry can be grouped and ranked."""
     for item in entries:
         if source == "statuses":
-            stamp = item.get("updated_at") if isinstance(item, dict) else None
-            if _parse_time(stamp) is None:
+            if not isinstance(item, dict) or _parse_time(item.get("updated_at")) is None:
                 return "updated_at cannot be read"
+            context = item.get("context")
+            if not isinstance(context, str) or not context:
+                return "context is not a non-empty string"
+            ident = item.get("id")
+            if isinstance(ident, bool) or not isinstance(ident, int):
+                return "id is not an integer"
             continue
         if not isinstance(item, dict):
-            return "%s is not an integer" % fields[0]
-        for field in fields:
-            value = item.get(field)
+            return "%s is not an integer" % ("id" if source == "checks" else "run_number")
+        if source == "runs":
+            for field in ("run_number", "run_attempt", "id", "workflow_id", "check_suite_id"):
+                value = item.get(field)
+                if isinstance(value, bool) or not isinstance(value, int):
+                    return "%s is not an integer" % field
+            event = item.get("event")
+            if not isinstance(event, str) or not event:
+                return "event is not a non-empty string"
+            continue
+        ident = item.get("id")
+        if isinstance(ident, bool) or not isinstance(ident, int):
+            return "id is not an integer"
+        name = item.get("name")
+        if not isinstance(name, str) or not name:
+            return "name is not a non-empty string"
+        for outer in ("check_suite", "app"):
+            obj = item.get(outer)
+            if not isinstance(obj, dict):
+                return "%s is not an object" % outer
+            value = obj.get("id")
             if isinstance(value, bool) or not isinstance(value, int):
-                return "%s is not an integer" % field
+                return "%s.id is not an integer" % outer
     return None
 
 

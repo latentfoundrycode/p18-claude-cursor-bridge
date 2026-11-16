@@ -786,13 +786,15 @@ def _fieldless(source, field):
     ("checks", "name"), ("checks", "check_suite.id"), ("checks", "app.id"),
     ("statuses", "context"), ("statuses", "id"),
 ])
-@pytest.mark.parametrize("how", ["missing", "null", "wrong-type"])
+@pytest.mark.parametrize("how", ["missing", "null", "wrong-type", "a-bool"])
 def test_r083_r3_an_entry_whose_grouping_field_cannot_be_read_is_cannot_read(be, crafted, source, field, how):
     runs, checks, statuses, holder, key = _fieldless(source, field)
     if how == "missing":
         del holder[key]
     elif how == "null":
         holder[key] = None
+    elif how == "a-bool":
+        holder[key] = True
     else:
         holder[key] = ["not", "a", "scalar"] if key in ("event", "name", "context") else "7"
     crafted({CHECKS: _checks_body(checks), STATUS: _status_body(statuses), RUNS: _runs_body(runs)})
@@ -828,3 +830,11 @@ def test_r083_r3_review_b_s_case_a_failed_run_is_never_dropped_for_a_later_succe
     crafted({CHECKS: _checks_body([]), STATUS: _status_body([]), RUNS: _runs_body(runs)})
     r = be.head_state("OWNER/REPO", SHA)
     assert r["answer"] == "cannot read" and r["source"] == "runs" and "workflow_id" in r["reason"], r
+
+
+def test_r083_r3_the_reply_the_cases_change_reads_as_a_value_unchanged(be, crafted):
+    """Review A of round 3: the positive control of the section: the reply each case above breaks, left whole, is a value."""
+    runs, checks, statuses, _, _ = _fieldless("runs", "workflow_id")
+    crafted({CHECKS: _checks_body(checks), STATUS: _status_body(statuses), RUNS: _runs_body(runs)})
+    r = be.head_state("OWNER/REPO", SHA)
+    assert r["answer"] == "value" and len(r["runs"]) == 2 and len(r["checks"]) == 1 and len(r["statuses"]) == 1, r
