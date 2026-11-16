@@ -2,6 +2,12 @@
 
 Newest first. Each entry records a call the supervisor made on the record of a reviewers' split or a resolution round (Merge-Verification-Policy, Resolution round), and the reasoning that settled it.
 
+## 2026-11-16 TASK-063: Review B's round-3 rejection resolved for Review A's approval (R-082)
+
+- **Question:** whether Review B's one finding on round 10's whole increment sends the work back. Review B (gpt-5.6-sol-high, round 3) confirmed the SCOPE file's class line against 805c766 and rejected on `git worktree remove -- --help`, graded a defeated safety mechanism: the guard exempts a `--help` word, where git takes the word after `--` as the worktree's path. Review A and the security audit had approved round 10.
+- **Decision: recorded, not blocking; the split resolved for Review A's approval and the increment merged (PR #171).** The lead goes to docs/HARDENING.md under TASK-063: the `--help` exemption should end at `--`.
+- **Reasoning.** The form passes on round 8's guard and at fae0860 alike (`-- -h` and `git push --force -- --help` too), so it is no regression of the increment and no fix it made failed. It removes a worktree only where one is named `--help` (or pushes to a remote so named), and no bridge layout makes one: worktrees are `<root>/Worktrees/<ID>` (rule 39). At the ceiling a finding of the five blocks where it reproduces on an ordinary, realistic layout, and one that needs a contrived setup is recorded with the increment (decide.md, the brake); before `--`, `--help` makes git print its help and remove nothing. The head that merged was read again in round 4 after a CI fix (docs/HARDENING.md, TASK-063); both reviewers approved it.
+
 ## 2026-11-16 TASK-063: the guard's threat model drawn after round 9, its deliberate reaches recorded (R-082)
 
 - **Question:** whether round 9's findings that reach a refused action by a program that runs what it is handed send the work back. The security audit failed round 9 on ssh's `-o` rule stepped round (a getopt cluster, a leading blank, a quoted key, scp's and sftp's `-o`) and a locale value with a modifier ending `.utf8`; Review A named the same ssh forms and a `/bin/../` path to Git's launcher, beside two findings of another kind (B1, a regression of round 9 in the walk's time; B2, `NAME+=value` read as the command word). Rounds 5 to 9 had each graded such reaches blocking, and each round's audit had found the next program.
