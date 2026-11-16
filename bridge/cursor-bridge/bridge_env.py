@@ -3885,7 +3885,7 @@ def _answer(answer, reason="", source="", **extra):
 
 
 def _gh_get(path, cwd=None):
-    """One GET: GH_COMMAND + ["api", path]. ('ok', body) or ('fail', reason, body). Nothing raises."""
+    """One GET: GH_COMMAND + ["api", path]. (True, "", body) or (False, reason, body or None). Nothing raises."""
     command = list(GH_COMMAND) + ["api", path]
     try:
         proc = subprocess.run(
@@ -3977,15 +3977,14 @@ def _rules_contexts(body):
     for rule in body:
         if not isinstance(rule, dict):
             return None, "a rule cannot be read"
-        if rule.get("type") != "required_status_checks":
+        rule_type = rule.get("type")
+        if not isinstance(rule_type, str):
+            return None, "a rule cannot be read"
+        if rule_type != "required_status_checks":
             continue
         params = rule.get("parameters")
-        if params is None:
-            continue
         if not isinstance(params, dict):
             return None, "rule parameters cannot be read"
-        if "required_status_checks" not in params or params.get("required_status_checks") is None:
-            continue
         required = params.get("required_status_checks")
         if not isinstance(required, list):
             return None, "required status checks cannot be read"
@@ -4022,12 +4021,20 @@ def branch_rule(repo, branch, cwd=None):
         prot_contexts, err = _protection_contexts(protection[2])
         if err:
             return _answer(ANSWER_CANNOT, err, "protection", contexts=[])
-    rules = _gh_get("repos/%s/rules/branches/%s" % (repo, encoded), cwd)
-    if not rules[0]:
-        return _answer(ANSWER_CANNOT, rules[1], "rules", contexts=[])
-    rules_contexts, err = _rules_contexts(rules[2])
-    if err:
-        return _answer(ANSWER_CANNOT, err, "rules", contexts=[])
+    rules_contexts = []
+    rules_path = "repos/%s/rules/branches/%s" % (repo, encoded)
+    for page in range(1, _GH_MAX_PAGES + 1):
+        rules = _gh_get(_page_path(rules_path, page), cwd)
+        if not rules[0]:
+            return _answer(ANSWER_CANNOT, rules[1], "rules", contexts=[])
+        page_contexts, err = _rules_contexts(rules[2])
+        if err:
+            return _answer(ANSWER_CANNOT, err, "rules", contexts=[])
+        rules_contexts.extend(page_contexts)
+        if len(rules[2]) < _GH_PER_PAGE:
+            break
+    else:
+        return _answer(ANSWER_CANNOT, "the list was not read whole", "rules", contexts=[])
     merged = []
     seen = set()
     for item in prot_contexts + rules_contexts:
@@ -4059,9 +4066,9 @@ def repo_settings(repo, cwd=None):
 
 def pull_refs(repo, number, cwd=None):
     """The pull request's base ref name and its head commit sha."""
-    if not isinstance(repo, str) or isinstance(number, bool) or not isinstance(number, (int, str)):
-        return _answer(ANSWER_CANNOT, "the pull request cannot be read", "pull")
-    if isinstance(number, str) and (not number or not number.isdigit()):
+    whole = isinstance(number, int) and not isinstance(number, bool) and number >= 1
+    ascii_digits = isinstance(number, str) and len(number) > 0 and all("0" <= char <= "9" for char in number)
+    if not isinstance(repo, str) or not (whole or ascii_digits):
         return _answer(ANSWER_CANNOT, "the pull request cannot be read", "pull")
     got = _gh_get("repos/%s/pulls/%s" % (repo, urllib.parse.quote(str(number), safe="")), cwd)
     if not got[0] or not isinstance(got[2], dict):
@@ -4130,7 +4137,8 @@ def _read_list(path, key, cwd):
 
 def head_state(repo, sha, cwd=None):
     """A head's check runs, commit statuses and workflow runs, each read to the count its reply states."""
-    if not isinstance(repo, str) or not isinstance(sha, str) or not sha:
+    sha_ok = isinstance(sha, str) and len(sha) in (40, 64) and all(char in "0123456789abcdef" for char in sha)
+    if not isinstance(repo, str) or not sha_ok:
         return _answer(ANSWER_CANNOT, "the head cannot be read", "checks", checks=[], statuses=[], runs=[])
     enc = urllib.parse.quote(sha, safe="")
     specs = (
@@ -4143,6 +4151,9 @@ def head_state(repo, sha, cwd=None):
         entries, err = _read_list(path, key, cwd)
         if err:
             return _answer(ANSWER_CANNOT, err, source, checks=[], statuses=[], runs=[])
+        rank = _rank_reason(source, entries)
+        if rank:
+            return _answer(ANSWER_CANNOT, rank, source, checks=[], statuses=[], runs=[])
         found[source] = entries
     return _answer(ANSWER_VALUE, checks=found["checks"], statuses=found["statuses"], runs=found["runs"])
 
@@ -4167,26 +4178,57 @@ def _parse_time(text):
         return None
     raw = text[:-1] + "+00:00" if text.endswith("Z") else text
     try:
-        return datetime.datetime.fromisoformat(raw)
+        parsed = datetime.datetime.fromisoformat(raw)
     except ValueError:
         return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed
+
+
+def _rank_reason(source, entries):
+    """A reason naming the field whose order cannot be read, or None when every entry can be ordered."""
+    if source == "runs":
+        fields = ("run_number", "run_attempt", "id")
+    elif source == "checks":
+        fields = ("id",)
+    else:
+        fields = ()
+    for item in entries:
+        if source == "statuses":
+            stamp = item.get("updated_at") if isinstance(item, dict) else None
+            if _parse_time(stamp) is None:
+                return "updated_at cannot be read"
+            continue
+        if not isinstance(item, dict):
+            return "%s is not an integer" % fields[0]
+        for field in fields:
+            value = item.get(field)
+            if isinstance(value, bool) or not isinstance(value, int):
+                return "%s is not an integer" % field
+    return None
 
 
 def _last_by(group, time_key, id_only_when_any_time_missing):
-    times = [item.get(time_key) if isinstance(item, dict) else None for item in group]
-    by_id = id_only_when_any_time_missing and any(not isinstance(text, str) or not text or _parse_time(text) is None for text in times)
     best = None
     best_key = None
+    if time_key == "started_at":
+        completed = [item for item in group if isinstance(item, dict) and item.get("status") == "completed"]
+        missing = any(_parse_time(item.get(time_key)) is None for item in completed)
+        by_id = bool(id_only_when_any_time_missing and missing)
+    else:
+        by_id = False
     for index, item in enumerate(group):
         ident = _int_rank(item.get("id") if isinstance(item, dict) else None)
-        if by_id:
-            key = (ident, index)
-        elif time_key == "started_at":
-            incomplete = 0 if item.get("status") == "completed" else 1
-            when = _parse_time(item.get("started_at"))
-            key = (incomplete, when, ident, index)
+        if time_key == "started_at":
+            incomplete = 0 if isinstance(item, dict) and item.get("status") == "completed" else 1
+            if incomplete or by_id:
+                key = (incomplete, ident, index)
+            else:
+                when = _parse_time(item.get(time_key)) if isinstance(item, dict) else None
+                key = (incomplete, when, ident, index)
         else:
-            when = _parse_time(item.get(time_key)) if isinstance(item.get(time_key), str) else None
+            when = _parse_time(item.get(time_key)) if isinstance(item, dict) and isinstance(item.get(time_key), str) else None
             key = ((1, when) if when is not None else (0, ""), ident, index)
         if best_key is None or key > best_key:
             best, best_key = item, key

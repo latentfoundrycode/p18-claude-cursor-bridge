@@ -930,7 +930,7 @@ def main():
                                 names.append(str(item))
                         add("OK", "Required check on the default branch (%s)" % ", ".join(names))
                     elif answer == getattr(bridge_env, "ANSWER_NONE", "none"):
-                        add("MISSING", "Required check on the default branch", "branch protection exists but requires no status check; N6 needs the gate job required")
+                        add("MISSING", "Required check on the default branch", "no required status check on %s; N6 needs the gate job required" % branch)
                     else:
                         source = rule.get("source") if isinstance(rule, dict) else ""
                         reply = rule.get("reason") if isinstance(rule, dict) else ""

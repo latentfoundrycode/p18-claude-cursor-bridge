@@ -585,6 +585,17 @@ def test_r083_r2_a_full_page_of_rules_whose_next_page_cannot_be_read_is_cannot_r
     assert r["answer"] == "cannot read" and "rules" in r["source"], r
 
 
+def test_r083_r2_a_full_page_at_the_page_bound_is_cannot_read_never_the_rules_read_so_far(be, crafted, monkeypatch):
+    """Review A of round 2: the bound's own answer. With the bound at two pages, two full pages (a required check on the first)
+    are not the whole list: cannot read, never the contexts gathered so far, and no third page is asked."""
+    first = _other_rules(99) + [{"type": RSC, "parameters": {RSC: [{"context": "early check", "integration_id": 15368}]}}]
+    crafted({PROT_MAIN: UNPROTECTED, RULES_MAIN + "#1": first, RULES_MAIN + "#2": _other_rules(100)})
+    monkeypatch.setattr(be, "_GH_MAX_PAGES", 2)
+    r = be.branch_rule("OWNER/REPO", "main")
+    assert r["answer"] == "cannot read" and "rules" in r["source"] and r["contexts"] == [], r
+    assert sum(1 for c in crafted.calls() if "/rules/branches/" in c[c.index("api") + 1]) == 2, crafted.calls()
+
+
 def test_r083_r2_a_pending_check_ranks_after_every_completed_one_whatever_their_start_times(be):
     """R7: the not-completed rank comes first in every case; only the completed fall back to id alone, where one of them carries
     no start time (Review A's cases A and B: round 1 kept the passed check and dropped the pending one)."""
@@ -652,7 +663,10 @@ def test_r083_r2_an_entry_without_the_fields_its_order_needs_is_cannot_read(be, 
         statuses[1]["updated_at"] = "later"
     crafted({CHECKS: _checks_body(checks), STATUS: _status_body(statuses), RUNS: _runs_body(runs)})
     r = be.head_state("OWNER/REPO", SHA)
-    assert r["answer"] == "cannot read" and r["reason"] and r["source"] in ("checks", "statuses", "runs"), r
+    source = {"run": "runs", "check": "checks", "status": "statuses"}[bad.split("-")[0]]
+    field = {"run-number-missing": "run_number", "run-number-a-string": "run_number", "run-attempt-missing": "run_attempt",
+             "run-id-null": "id", "check-id-missing": "id"}.get(bad, "updated_at")
+    assert r["answer"] == "cannot read" and r["source"] == source and field in r["reason"], r
 
 
 def test_r083_r2_the_well_formed_entries_still_read_as_a_value(be, crafted):
@@ -703,3 +717,48 @@ def test_r083_r2_the_none_row_is_true_for_both_causes_of_none(tmp_path, monkeypa
     name, line = TCC.verdict(out, "Required check on the default branch")
     assert rc == 1 and name == "MISSING", out
     assert "no required status check on main; N6 needs the gate job required" in line and "protection exists" not in line, line
+
+
+# ---------------------------------------------------------------- orders and shapes the first cases left to the list's order
+# (the supervisor's mutation run on round 2: each case below tells a mutant from the code where the earlier cases could not)
+
+
+def test_r083_r2_a_later_attempt_wins_wherever_it_stands_in_the_list(be):
+    runs = [run(2, 801, 2, 200), run(1, 801, 1, 100, conclusion="failure")]
+    kept = be.latest_of_each({"checks": [], "statuses": [], "runs": runs})
+    assert [r["id"] for r in kept["runs"]] == [2], "run_attempt orders the runs, not their place in the reply"
+    runs = [run(5, 801, 1, 100), run(4, 801, 3, 300, conclusion="failure")]
+    kept = be.latest_of_each({"checks": [], "statuses": [], "runs": runs})
+    assert [r["id"] for r in kept["runs"]] == [4], "the higher attempt wins over the higher id"
+
+
+def test_r083_r2_a_status_is_ordered_by_its_update_not_by_its_id(be):
+    statuses = [{"id": 9, "context": "ci/legacy", "state": "success", "updated_at": "2026-11-16T10:00:00Z"},
+                {"id": 3, "context": "ci/legacy", "state": "failure", "updated_at": "2026-11-16T10:10:00Z"}]
+    kept = be.latest_of_each({"checks": [], "statuses": statuses, "runs": []})
+    assert [s["id"] for s in kept["statuses"]] == [3], kept
+
+
+@pytest.mark.parametrize("body", [
+    {"default_branch": "main"},
+    {"allow_auto_merge": "true", "default_branch": "main"},
+    {"allow_auto_merge": None, "default_branch": "main"},
+    {"allow_auto_merge": 1, "default_branch": "main"},
+], ids=["missing", "a-string", "null", "a-number"])
+def test_r084_r2_an_auto_merge_setting_that_is_not_a_boolean_is_cannot_read(be, crafted, body):
+    crafted({"repos/OWNER/REPO": body})
+    r = be.repo_settings("OWNER/REPO")
+    assert r["answer"] == "cannot read" and r["source"] == "repo" and r["reason"], r
+
+
+def test_r083_r2_pending_checks_are_ordered_among_themselves_by_id(be):
+    """G3: the not-completed members by id (then their place), never by their start times, and never by comparing a missing
+    time with a present one."""
+    a = [check(9, "lint", 900, started="2026-11-16T10:00:00Z", status="in_progress", conclusion=None),
+         check(8, "lint", 900, started="2026-11-16T11:00:00Z", status="queued", conclusion=None)]
+    kept = be.latest_of_each({"checks": a, "statuses": [], "runs": []})
+    assert [c["id"] for c in kept["checks"]] == [9], kept
+    b = [check(6, "lint", 900, started=None, status="queued", conclusion=None),
+         check(7, "lint", 900, started="2026-11-16T11:00:00Z", status="in_progress", conclusion=None)]
+    kept = be.latest_of_each({"checks": b, "statuses": [], "runs": []})
+    assert [c["id"] for c in kept["checks"]] == [7], kept
