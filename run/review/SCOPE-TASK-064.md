@@ -6,7 +6,9 @@ TASK-064 ran four builder rounds; this review reads the whole increment against 
 
 ## The class line of the round above the ceiling
 
-- The re-review (the supervisor's fix, no builder run; the head the previous round's CI ran on, c03e165): `Blocking class: failing test - CI red on PR #174 at c03e165 (bridge programs, ubuntu-latest: 1 failed, 6465 passed, 66 skipped; windows-latest: 1 failed, 6493 passed, 38 skipped): tests/test_bug042.py::test_bug042_the_guard_s_docstrings_name_the_deleted_snapshot asserts snapshot_rewritten's docstring holds "or the file is gone while the copy stands", the phrase round 1 replaced with "'deleted' when the snapshot file is gone while the copy stands"`
+The re-review is the supervisor's fix, with no builder run; its line is confirmed against the head the previous round's CI ran on, c03e165:
+
+Blocking class: failing test - CI red on PR #174 at c03e165 (bridge programs, ubuntu-latest: 1 failed, 6465 passed, 66 skipped; windows-latest: 1 failed, 6493 passed, 38 skipped): tests/test_bug042.py::test_bug042_the_guard_s_docstrings_name_the_deleted_snapshot asserts snapshot_rewritten's docstring holds "or the file is gone while the copy stands", the phrase round 1 replaced with "'deleted' when the snapshot file is gone while the copy stands"
 
 Confirm or deny it against c03e165 (`git show c03e165:tests/test_bug042.py` and `git show c03e165:bridge/cursor-bridge/review-guard.py`, run in a temporary folder), never against the fixed code: the case fails there and passes after the one-line change, and what it guards (the function's docstring names the deleted snapshot) still holds.
 
