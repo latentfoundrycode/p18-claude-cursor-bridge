@@ -151,7 +151,7 @@ def test_bug042_the_guard_s_docstrings_name_the_deleted_snapshot():
     assert "2 = cannot verify (no copy of the snapshot's hash," in module
     assert "from `verify` voids a qualifying Review B launch" in module
     assert "`premerge` voids nothing" in module
-    assert "or the file is gone while the copy stands" in fn
+    assert "'deleted' when the snapshot file is gone while the copy stands" in fn
 
 
 def test_bug042_intake_records_the_layout_as_the_core_does():
