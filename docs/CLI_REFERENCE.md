@@ -614,19 +614,16 @@ refuses the two actions the loop must never take, in every permission mode (KP-0
     `<git common dir>/bridge/premerge/<sha>` for that sha when it printed OK; `--disable-auto`
     and `--help` pass; a `gh api graphql` call carrying a merge mutation is refused.
 
-A command behind a wrapper shell (`bash -c`, `bash -lc`, `sh -c`, `cmd /c`, `cmd /k`,
-`powershell -Command`), quoted or not, is checked as the command it is; a single `&` and the
-PowerShell call operator `&`, joined or not, separate commands; `{`, `if`, `then`, `xargs` and
-its options are dropped like `env` and `timeout`; a here-document's body is data (a commit
-message that quotes a forbidden command is not a command); a `git -c alias.<x>=...` whose
+A command behind a wrapper shell (`bash -c`, `cmd /c`, `powershell -Command`), quoted or not, is
+checked as the command it is when the guard can read that wrapper's options; a single `&` and the
+PowerShell call operator `&` separate commands; nested shell forms (`$(`, backticks,
+here-documents, subshells, globs) are refused as unreadable; a `git -c alias.<x>=...` whose
 value starts with `worktree`, `pr`, `push`, `api` or `!` is refused, and so is a `gh alias set`
 for a merge; an abbreviated `--forc` counts as `--force`, as it does for git; `--help` exempts a
-`gh pr merge` only when it is not the value of a flag such as `--subject`. A here-document
-read by a shell (`bash <<EOF`) is that shell's script and is checked; one read by any other
-program (a commit message) is data. `powershell` without `-Command` runs the rest of its line,
+`gh pr merge` only when it is not the value of a flag such as `--subject`. A here-document is unreadable. `powershell` without `-Command` runs the rest of its line,
 `-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command,
 and `-XPUT` is a method: all read as what they run. An encoded PowerShell command and a
-GraphQL query built by a command substitution are refused unread.
+GraphQL query read from a file are refused unread.
   - inside a bridge Workspace (one holding docs/PROJECT_STATUS.md), a chain of commands
     (`&&`, `;`, `||`, a new line) carrying a state-changing git or gh command, or a command
     wrapped in `cd …` (rule 8: one command per call; a chain once built an increment on a
@@ -642,15 +639,17 @@ GraphQL query built by a command substitution are refused unread.
     `powershell`), which would run it with the owner's real home and identity (KP-038): the
     agent is started as `cursor-agent`, or through bridge-run.py.
 
-It parses the command rather than matching a pattern, so chains, wrappers and quoting do
-not hide the action, and `git commit -m "never use --force"` is not refused. Deny rules in
+It reads one flat grammar (plain words, quotes, redirections, wrappers with option tables)
+and refuses every other form as unreadable; within that grammar, chains, wrappers and quoting
+do not hide the action, and `git commit -m "never use --force"` is not refused. Deny rules in
 settings.bridge.json cover the common spellings as a second layer; this hook is the one
 that reads the whole command.
 
 Registered by bridge-install.py from settings.bridge.json (hooks.PreToolUse, matcher
 "Bash|PowerShell"). Reads the hook's JSON on stdin; exit 2 with the reason on stderr blocks
-the call (documented), exit 0 lets it through. Fails open on anything unexpected: a guard
-that cannot read its input never blocks the loop. ASCII-only on purpose. Never writes.
+the call (documented), exit 0 lets it through. An exception raised while checking a command
+refuses it (exit 2) with an internal-error reason; input that is not the hook's JSON still
+passes. ASCII-only on purpose. Never writes.
 ```
 
 ## plan-check.py

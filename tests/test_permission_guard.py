@@ -18,7 +18,7 @@ def run(tool, command, cwd=None):
     payload = {"tool_name": tool, "tool_input": {"command": command}, "permission_mode": "auto"}
     if cwd:
         payload["cwd"] = str(cwd)
-    p = subprocess.run([sys.executable, PROG], input=json.dumps(payload), capture_output=True, text=True)
+    p = subprocess.run([sys.executable, PROG], input=json.dumps(payload), capture_output=True, text=True, timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     return p.returncode, p.stderr
 
 
@@ -157,24 +157,19 @@ def test_refused(tool, cmd):
     "gh pr merge 12 --disable-auto",
     "gh pr merge --help",
     "gh pr view 12",
-    "gh api graphql -f query='query { repository(owner: \"o\", name: \"r\") { pullRequest(number: 12) { mergeable } } }'",
     "git push origin HEAD",
     "bash -c 'git status'",
     "gh pr merge 12 --squash --help",
-    "git commit -F - <<'EOF'\nfix the guard\n\ngh pr merge 12 --squash is refused without the record\nEOF",
     'echo "a & b"',
     "python x.py 2>&1",
-    "cmd /c echo agent",
+    "cmd //c echo agent",
     "powershell -NoProfile -Command Get-ChildItem",
     "powershell Get-ChildItem",
     "nice -n 10 python x.py",
     "timeout -s KILL 60 python x.py",
-    "find . -name '*.pyc' -delete",
-    "find . -name '*.log' -exec rm {} ;",
     "gh alias set co 'pr checkout'",
-    "git commit -F - <<'EOF'\nfix\n\nbash <<EOF2 is not what this message runs\nEOF",
     "dist/agent.exe --version",
-    "cmd /c dir agent",
+    "cmd //c dir agent",
     "pwsh -File build.ps1 agent",
     "echo agent",
     "git push -u origin task-012",
@@ -217,3 +212,64 @@ def test_other_tools_and_bad_input_pass():
     assert p.returncode == 0
     p = subprocess.run([sys.executable, PROG], input="not json", capture_output=True, text=True)
     assert p.returncode == 0
+
+
+def test_r082_force_push_with_unquoted_substitution_argument_is_refused():
+    """R-082 (req 1): command words come from the reader; a force-push in $(...) is not skipped."""
+    rc, err = run("Bash", "git push --force origin $(echo main)")
+    assert rc == 2 and ("force" in err.lower() or "cannot read" in err.lower()), err
+
+
+def test_r082_graphql_substitution_on_its_own_command_is_refused():
+    """R-082 (req 8): gh api graphql is refused when its own words hold a substitution."""
+    rc, err = run("Bash", 'gh api graphql -f query="$(echo mergePullRequest)"')
+    assert rc == 2 and ("graphql" in err.lower() or "cannot read" in err.lower()), err
+
+
+def test_r082_r9_find_name_glob_passes_under_bash_and_is_unreadable_under_powershell():
+    """R-082 round 9 req 1: '*.pyc' reaches find's MSYS runtime under PowerShell, which globs it."""
+    cmd = "find . -name '*.pyc' -delete"
+    rc, err = run("Bash", cmd)
+    assert rc == 0, err
+    rc, err = run("PowerShell", cmd)
+    assert rc == 2 and "cannot read" in err.lower(), err
+
+
+def test_find_exec_rm_braces_passes_under_bash_and_is_unreadable_under_powershell():
+    """R-082 (req 17): find -exec rm {} ; is readable under Bash and unreadable braces under PowerShell."""
+    bash = "find . -name '*.log' -exec rm {} ;"
+    rc, err = run("Bash", bash)
+    assert rc == 0, err
+    rc, err = run("PowerShell", bash)
+    assert rc == 2 and "cannot read" in err.lower(), err
+
+
+@pytest.mark.parametrize("tool", ["Bash", "PowerShell"])
+@pytest.mark.parametrize("command", [
+    "git commit -F - <<'EOF'\nfix the guard\n\ngh pr merge 12 --squash is refused without the record\nEOF",
+    "git commit -F - <<'EOF'\nfix\n\nbash <<EOF2 is not what this message runs\nEOF",
+])
+def test_here_document_commit_messages_are_unreadable(tool, command):
+    """R-082 (req 17): a here-document on a commit message is unreadable under both tools."""
+    rc, err = run(tool, command)
+    assert rc == 2 and "cannot read" in err.lower(), (tool, err)
+
+
+_GRAPHQL_READ = "gh api graphql -f query='query { repository(owner: \"o\", name: \"r\") { pullRequest(number: 12) { mergeable } } }'"
+
+
+def test_r082_graphql_query_with_literal_quotes_passes_under_bash_only():
+    """R-082 round 7 req 4: a literal double quote inside a PowerShell word is unreadable; Bash keeps the pass."""
+    rc, err = run("Bash", _GRAPHQL_READ)
+    assert rc == 0, err
+    rc, err = run("PowerShell", _GRAPHQL_READ)
+    assert rc == 2 and "cannot read" in err.lower(), err
+
+
+@pytest.mark.parametrize("command", ["cmd /c echo agent", "cmd /c dir agent"])
+def test_r082_cmd_single_slash_passes_under_powershell_and_is_unreadable_under_bash(command):
+    """R-082 round 7 req 6: Git Bash rewrites a single-slash cmd switch; PowerShell does not."""
+    rc, err = run("PowerShell", command)
+    assert rc == 0, (command, err)
+    rc, err = run("Bash", command)
+    assert rc == 2 and "cannot read" in err.lower(), (command, err)
