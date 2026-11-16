@@ -17,7 +17,7 @@ def run(command, cwd=None, tool="Bash"):
     payload = {"tool_name": tool, "tool_input": {"command": command}, "permission_mode": "auto"}
     if cwd:
         payload["cwd"] = str(cwd)
-    p = subprocess.run([sys.executable, PROG], input=json.dumps(payload), capture_output=True, text=True)
+    p = subprocess.run([sys.executable, PROG], input=json.dumps(payload), capture_output=True, text=True, timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     return p.returncode, p.stderr
 
 
@@ -539,3 +539,71 @@ def test_r082_r7_req13_premerge_with_no_time_left_refuses(tmp_path):
     spec.loader.exec_module(mod)
     mod._read_started = mod._clock() - 9
     assert mod.premerge_recorded(sha, str(repo)) is False
+
+
+def test_r082_r8_req1_a_script_fed_by_a_pipe_is_unreadable(tmp_path):
+    """R-082 round 8 req 1: a bash script in a later pipeline stage reads standard input."""
+    rc, err = run("echo x | env -C / bash dev/stdin", tmp_path)
+    assert rc == 2 and "cannot read" in err.lower(), err
+
+
+def test_r082_r8_req2_single_slash_behind_a_prefix_is_unreadable(tmp_path):
+    """R-082 round 8 req 2: slash_ok becomes false once a prefix wrapper is crossed."""
+    rc, err = run("echo x | env powershell -c cmd /c echo hi", tmp_path, tool="PowerShell")
+    assert rc == 2 and "cannot read" in err.lower(), err
+
+
+def test_r082_r8_req3_a_quote_not_at_the_start_of_a_word_is_unreadable(tmp_path):
+    """R-082 round 8 req 3: PowerShell reads a quoted part only as the whole word."""
+    rc, err = run("echo a'b c'", tmp_path, tool="PowerShell")
+    assert rc == 2 and "cannot read" in err.lower(), err
+
+
+def test_r082_r8_req4_settingsfile_is_not_a_value_switch(tmp_path):
+    """R-082 round 8 req 4: powershell.exe 5.1 does not take -settingsfile."""
+    rc, err = run("powershell -settingsfile 'x; git worktree remove y;' echo", tmp_path)
+    assert rc == 2 and "cannot read" in err.lower(), err
+
+
+def test_r082_r8_req5_cmd_takes_no_prefix(tmp_path):
+    """R-082 round 8 req 5: in the cmd mode the first word is the command word."""
+    rc, err = run("cmd //c powershell/command git status", tmp_path)
+    assert rc == 2 and "cannot read" in err.lower(), err
+
+
+def test_r082_r8_req6_fprintf_takes_two_words(tmp_path):
+    """R-082 round 8 req 6: -fprintf takes two words, so the -exec clause is the removal."""
+    rc, err = run("find . -maxdepth 0 -fprintf out.txt -name -exec git worktree remove y ';'", tmp_path)
+    assert rc == 2 and "worktree" in err, err
+
+
+def test_r082_r8_req7_a_long_husky_command_is_the_removal(tmp_path):
+    """R-082 round 8 req 7: the HUSKY search is two linear searches, then the removal is refused."""
+    started = time.monotonic()
+    rc, err = run("HUSKY=0 echo " + "git " * 32000 + "; git worktree remove y", tmp_path)
+    assert time.monotonic() - started < 2
+    assert rc == 2 and "worktree" in err, err[:200]
+
+
+def test_r082_r8_req8_a_two_character_step_still_meets_the_deadline():
+    """R-082 round 8 req 8: a step of two characters still tests the deadline at the mark."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("permission_guard_r8_deadline", PROG)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    real = mod._clock
+    state = {"n": 0, "t0": None}
+
+    def clock():
+        state["n"] += 1
+        if state["t0"] is None:
+            state["t0"] = real()
+        if state["n"] >= 3:
+            return state["t0"] + 9
+        return state["t0"]
+
+    mod._clock = clock
+    mod._read_started = clock()
+    parsed = mod._read_bash("echo " + ("\\x" * 2100), False, False)
+    err = parsed.get("unreadable") or ""
+    assert "cannot read" in err.lower() and "too long" in err.lower(), err

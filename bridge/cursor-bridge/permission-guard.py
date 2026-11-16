@@ -66,12 +66,11 @@ PROGRAM_AFTER = ("/c", "/k", "-c", "-command", "-file")
 WRAPPER_SHELLS = SHELLS + ("bash", "bash.exe", "sh", "sh.exe", "zsh", "dash")
 MERGE_MUTATIONS = ("mergePullRequest", "enablePullRequestAutoMerge", "enqueuePullRequest")
 GH_VALUE_FLAGS = ("-t", "--subject", "-b", "--body", "-F", "--body-file", "-A", "--author-email", "-R", "--repo", "--match-head-commit", "--hostname")
-ALIAS_RX = re.compile(r"^alias\.[\w-]+=\s*['\"]?\s*(!|worktree\b|pr\b|push\b|api\b)", re.I)
+_ALIAS_PREFIXES = ("worktree", "pr", "push", "api")
 VALUE_OPTIONS = {"xargs": ("-I", "-n", "-L", "-s", "-d", "-P", "-E", "-a", "--max-args", "--max-lines", "--delimiter", "--max-procs", "--arg-file", "--replace"),
                  "nice": ("-n", "--adjustment"), "timeout": ("-s", "--signal", "-k", "--kill-after"), "sudo": ("-u", "-g", "--user", "--group"),
                  "env": ("-u", "--unset", "-C", "--chdir", "-S", "--split-string")}
-PS_VALUE_SWITCHES = ("-executionpolicy", "-ep", "-ex", "-version", "-v", "-windowstyle", "-w", "-workingdirectory", "-wd", "-inputformat", "-if",
-                     "-outputformat", "-of", "-psconsolefile", "-psc", "-configurationname", "-config", "-settingsfile", "-settings")
+PS_VALUE_SWITCHES = ("-executionpolicy", "-ep", "-ex", "-windowstyle", "-w", "-inputformat", "-if", "-outputformat", "-of")
 ENCODED = object()
 INNER_UNREADABLE = object()
 PREMERGE_DIR = os.path.join("bridge", "premerge")
@@ -84,7 +83,7 @@ _FIND_TAKES_ARG = frozenset((
     "-lname", "-ilname", "-type", "-xtype", "-perm", "-user", "-group", "-uid", "-gid",
     "-size", "-amin", "-atime", "-cmin", "-ctime", "-mmin", "-mtime", "-used", "-links",
     "-inum", "-samefile", "-fstype", "-context", "-newer", "-anewer", "-cnewer",
-    "-maxdepth", "-mindepth", "-regextype", "-printf", "-fprint", "-fprint0", "-fls", "-fprintf", "-D", "-O",
+    "-maxdepth", "-mindepth", "-regextype", "-printf", "-fprint", "-fprint0", "-fls", "-D",
 ))
 STATE_GIT = ("add", "commit", "push", "pull", "merge", "rebase", "switch", "checkout", "reset", "rm", "mv", "cherry-pick", "revert",
              "am", "apply", "clean", "restore", "stash", "worktree", "branch", "tag", "submodule", "config")
@@ -178,6 +177,18 @@ def _too_long():
     return (_clock() - _read_started) >= _READ_LIMIT
 
 
+def _deadline_at(i, next_check):
+    """Test the clock when the position reaches the mark, then move the mark 4096 on."""
+    if i < next_check:
+        return False, next_check
+    if _too_long():
+        return True, next_check
+    next_check += 4096
+    if next_check <= i:
+        next_check = i + 4096
+    return False, next_check
+
+
 def _time_left():
     if _read_started is None:
         return _READ_LIMIT
@@ -188,14 +199,14 @@ def _mode_name(tool):
     return "powershell" if tool == "PowerShell" else "bash"
 
 
-def read_commands(text, mode="bash", slash_ok=False):
+def read_commands(text, mode="bash", slash_ok=False, fed=False):
     """One flat read of a command line (R-082 round 5); never raises."""
     try:
         if mode == "cmd":
-            return _read_cmd(text)
+            return _read_cmd(text, fed)
         if mode == "powershell":
-            return _read_powershell(text, slash_ok)
-        return _read_bash(text, slash_ok)
+            return _read_powershell(text, slash_ok, fed)
+        return _read_bash(text, slash_ok, fed)
     except Exception as ex:
         return {"unreadable": _cannot("internal error (%s)" % type(ex).__name__), "commands": [], "chain": [], "chain_wds": [], "parts": [], "gh_amp": None}
 
@@ -227,19 +238,6 @@ def _assignment_name(tok):
     return m.group(1) if m else None
 
 
-def _skip_assignments(words):
-    i = 0
-    while i < len(words):
-        name = _assignment_name(words[i])
-        if name:
-            if name.upper().startswith("GIT_CONFIG"):
-                return _cannot("an assignment whose name begins GIT_CONFIG"), i
-            i += 1
-            continue
-        break
-    return None, i
-
-
 def _exe_stem(tok):
     """Command, shell, wrapper, prefix, launcher and builtin names, without a trailing .exe."""
     name = base(tok)
@@ -248,8 +246,12 @@ def _exe_stem(tok):
     return name
 
 
-def _cmd_word_refusal(words, mode="bash", slash_ok=False):
-    _idx, err, _husky, _saw = _walk_to_command(words, mode, slash_ok)
+def _cmd_word_refusal(words, mode="bash", slash_ok=False, fed=False):
+    if mode == "cmd" and words:
+        bad_name = _cmd_name_refusal(words[0])
+        if bad_name:
+            return _cannot(bad_name)
+    _idx, err, _husky, _saw = _walk_to_command(words, mode, slash_ok, fed)
     return err
 
 
@@ -296,13 +298,15 @@ def _parse_bash_sh_words(words):
     return opts, rest, False, rest[0] if rest else None
 
 
-def _bash_reads_stdin(words, i):
+def _bash_reads_stdin(words, i, fed=False):
     _opts, _rest, has_c, script = _parse_bash_sh_words(words[i + 1:])
     if isinstance(script, str) and script.startswith("the guard cannot read"):
         return False
     if has_c:
         return False
     if script is None:
+        return True
+    if fed:
         return True
     return _stdin_script(script)
 
@@ -333,11 +337,6 @@ def _stdin_script(script):
         if p.lower() in ("dev", "proc"):
             return True
     return False
-
-
-def _bash_interactive(words, i):
-    _opts, _rest, _has_c, script = _parse_bash_sh_words(words[i + 1:])
-    return isinstance(script, str) and "interactive bash" in script
 
 
 def _bash_inner_string(words):
@@ -514,7 +513,7 @@ def _take_assignments(words, i, n, husky):
     return None, i, husky
 
 
-def _walk_to_command(words, mode="bash", slash_ok=False):
+def _walk_to_command(words, mode="bash", slash_ok=False, fed=False):
     """One prefix walk. Returns (index of the command word or None, error or None, saw HUSKY=0, saw a prefix)."""
     husky, saw_prefix = False, False
     i, n = 0, len(words)
@@ -525,7 +524,7 @@ def _walk_to_command(words, mode="bash", slash_ok=False):
         err, i, husky = _take_assignments(words, i, n, husky)
         if err:
             return None, err, husky, saw_prefix
-    while i < n:
+    while mode != "cmd" and i < n:
         head = _exe_stem(words[i])
         if head == "env":
             err, i, husky = _walk_env(words, i, husky)
@@ -609,7 +608,7 @@ def _walk_to_command(words, mode="bash", slash_ok=False):
         err = _parse_bash_sh_words(words[i + 1:])[3]
         if isinstance(err, str) and err.startswith("the guard cannot read"):
             return i, err, husky, saw_prefix
-        if _bash_reads_stdin(words, i):
+        if _bash_reads_stdin(words, i, fed):
             return i, _cannot("a shell that reads commands from standard input"), husky, saw_prefix
     if head == "cmd":
         err = _parse_cmd_wrapper(words[i:], use_slash)
@@ -620,11 +619,6 @@ def _walk_to_command(words, mode="bash", slash_ok=False):
         if err:
             return i, err, husky, saw_prefix
     return i, None, husky, saw_prefix
-
-
-def _wrapper_opt_refusal(words, depth):
-    _idx, err, _husky, _saw = _walk_to_command(words, "bash")
-    return err
 
 
 def _cmd_switch_key(tl):
@@ -649,7 +643,9 @@ def _cmd_switch_walk(words, slash_ok=False):
         tl = words[i].lower()
         if tl.startswith("/") and not tl.startswith("//") and not slash_ok:
             return _cannot("a single-slash cmd switch"), None
-        if tl in ("/c", "/k", "/r", "//c", "//k", "//r"):
+        if tl in ("/k", "//k"):
+            return _cannot("a shell that reads commands from standard input"), None
+        if tl in ("/c", "/r", "//c", "//r"):
             return None, i + 1
         if tl in ("/d", "/s", "/q", "//d", "//s", "//q"):
             i += 1
@@ -689,8 +685,12 @@ def _ps_switch_walk(words, slash_ok=False):
         if t in ("-e", "-ec") or t.startswith("-en") or t.startswith("-encodedcommand"):
             return "an encoded PowerShell command, which the guard cannot read", None
         if len(t) >= 2 and "-command".startswith(t):
+            if i + 1 >= n or words[i + 1] == "-":
+                return _cannot("a shell that reads commands from standard input"), None
             return None, i + 1
         if t in ("-f", "-file"):
+            if i + 1 >= n or words[i + 1] == "-":
+                return _cannot("a shell that reads commands from standard input"), None
             return None, None
         if t in ("-noprofile", "-nop", "-noninteractive", "-noni", "-nologo", "-sta", "-mta"):
             i += 1
@@ -701,7 +701,7 @@ def _ps_switch_walk(words, slash_ok=False):
         if t.startswith("-"):
             return _cannot("an unknown PowerShell switch"), None
         return None, i
-    return None, None
+    return _cannot("a shell that reads commands from standard input"), None
 
 
 def _parse_ps_wrapper(words, slash_ok=False):
@@ -735,7 +735,7 @@ def _note(refuse, err):
     refuse(err[len(prefix):] if err.startswith(prefix) else err)
 
 
-def _read_bash(text, slash_ok=False):
+def _read_bash(text, slash_ok=False, fed=False):
     unreadable, gh_amp = None, None
     n = len(text)
 
@@ -753,10 +753,11 @@ def _read_bash(text, slash_ok=False):
     pending = False
     words = []
     commands, chain, chain_wds, parts = [], [], [], []
-    seg_words, piped = [], False
+    seg_words, piped, saw_input = [], False, False
     last_amp_glued = False
     i = 0
     in_comment = False
+    next_check = 0
 
     def reset_word():
         nonlocal wbuf, word_started, word_quoted, word_backslash, brace_only
@@ -779,21 +780,24 @@ def _read_bash(text, slash_ok=False):
         reset_word()
 
     def finish_cmd(sep):
-        nonlocal piped, seg_words, last_amp_glued, gh_amp, words, commands
+        nonlocal piped, saw_input, seg_words, last_amp_glued, gh_amp, words, commands
         emit_word()
         if pending:
             refuse("a redirection with no target")
             return
         if not words:
+            saw_input = False
             return
         cw = list(words)
-        commands.append({"words": cw, "sep": sep, "pipe": piped, "last_amp": last_amp_glued})
+        this_input = saw_input
+        commands.append({"words": cw, "sep": sep, "pipe": piped, "input": this_input, "last_amp": last_amp_glued})
         seg_words.append(cw)
         if _gh_api_head(cw) and last_amp_glued:
             gh_amp = "an unquoted & in a gh api argument (quote the URL or put each query field in its own quoted argument)"
-        _note(refuse, _cmd_word_refusal(cw, "bash", slash_ok))
+        _note(refuse, _cmd_word_refusal(cw, "bash", slash_ok, fed or piped or this_input))
         words[:] = []
         piped = False
+        saw_input = False
         last_amp_glued = False
 
     def finish_chain(sep):
@@ -828,7 +832,9 @@ def _read_bash(text, slash_ok=False):
             finish_chain(kind)
 
     def start_redirect(at):
-        nonlocal pending, i
+        nonlocal pending, i, saw_input
+        if at == "<":
+            saw_input = True
         if at in "<>" and brace_only:
             refuse("a named file descriptor redirection")
             return False
@@ -864,7 +870,8 @@ def _read_bash(text, slash_ok=False):
     while i < n:
         if unreadable:
             break
-        if (i & 4095) == 0 and _too_long():
+        late, next_check = _deadline_at(i, next_check)
+        if late:
             refuse("too long to read in time")
             break
         if in_comment:
@@ -1116,7 +1123,14 @@ def _ps_shape_refusal(cw):
     return None
 
 
-def _read_powershell(text, slash_ok=False):
+def _ps_holds_blank(word):
+    for ch in word:
+        if ch in " \t\r\n":
+            return True
+    return False
+
+
+def _read_powershell(text, slash_ok=False, fed=False):
     unreadable, gh_amp = None, None
     n = len(text)
 
@@ -1134,7 +1148,9 @@ def _read_powershell(text, slash_ok=False):
     pending = False
     words = []
     commands, chain, chain_wds, seg_words, parts = [], [], [], [], []
+    piped, saw_input = False, False
     i = 0
+    next_check = 0
 
     def reset_word():
         nonlocal wbuf, word_started, word_quoted, began_quoted, lead_closed
@@ -1150,6 +1166,11 @@ def _read_powershell(text, slash_ok=False):
             word = "".join(wbuf)
             if '"' in word:
                 refuse("a literal double quote")
+                reset_word()
+                pending = False
+                return
+            if word[-1:] == "\\" and _ps_holds_blank(word):
+                refuse("a trailing backslash in a word that holds a blank")
                 reset_word()
                 pending = False
                 return
@@ -1178,27 +1199,31 @@ def _read_powershell(text, slash_ok=False):
         words.append("".join(wbuf))
         reset_word()
 
-    def ps_command_shape(cw):
+    def ps_command_shape(cw, this_fed):
         if unreadable is not None:
             return
-        _note(refuse, _cmd_word_refusal(cw, "powershell", slash_ok))
+        _note(refuse, _cmd_word_refusal(cw, "powershell", slash_ok, this_fed))
         if unreadable is not None:
             return
         _note(refuse, _ps_shape_refusal(cw))
 
     def finish_cmd(sep):
-        nonlocal words, commands, seg_words
+        nonlocal words, commands, seg_words, piped, saw_input
         emit_word()
         if pending:
             refuse("a redirection with no target")
             return
         if not words:
+            saw_input = False
             return
         cw = list(words)
-        commands.append({"words": cw, "sep": sep, "pipe": False, "last_amp": False})
+        this_input = saw_input
+        commands.append({"words": cw, "sep": sep, "pipe": piped, "input": this_input, "last_amp": False})
         seg_words.append(cw)
-        ps_command_shape(cw)
+        ps_command_shape(cw, fed or piped or this_input)
         words[:] = []
+        piped = False
+        saw_input = False
 
     def finish_chain(sep):
         nonlocal chain, chain_wds, seg_words, parts
@@ -1242,16 +1267,19 @@ def _read_powershell(text, slash_ok=False):
         return True
 
     def boundary(kind):
+        nonlocal piped
         if pending and not word_started:
             refuse("a redirection with no target")
             return
         if kind == "pipe":
             finish_cmd("|")
+            piped = True
         else:
             finish_chain(kind)
 
     while i < n and unreadable is None:
-        if (i & 4095) == 0 and _too_long():
+        late, next_check = _deadline_at(i, next_check)
+        if late:
             refuse("too long to read in time")
             break
         c = text[i]
@@ -1303,12 +1331,30 @@ def _read_powershell(text, slash_ok=False):
         if c == "<" and nxt == "<":
             refuse("a here-document")
             break
+        if c == "<":
+            if pending and not word_started:
+                refuse("a redirection with no target")
+                break
+            desc = word_started and not word_quoted and bool(wbuf) and all(ch.isdigit() for ch in wbuf)
+            if pending and word_started:
+                pending = False
+                reset_word()
+            elif desc:
+                reset_word()
+            elif word_started:
+                emit_word()
+            saw_input = True
+            i += 2 if nxt in ">&" else 1
+            pending = True
+            continue
         if c == "'" or c == '"':
             if lead_closed:
                 refuse("a word continuing after its quote")
                 break
-            if not word_started:
-                began_quoted = True
+            if word_started:
+                refuse("a quote not at the start of a word")
+                break
+            began_quoted = True
             quote = "s" if c == "'" else "d"
             word_started = True
             word_quoted = True
@@ -1366,6 +1412,9 @@ def _read_powershell(text, slash_ok=False):
         if c == "&":
             refuse("an unquoted &")
             break
+        if c == ",":
+            refuse("a comma")
+            break
         if c == "\r":
             if pending and not word_started:
                 i += 1
@@ -1380,7 +1429,7 @@ def _read_powershell(text, slash_ok=False):
             emit_word()
             i += 1
             continue
-        if c == "." and not word_started and not words:
+        if c == "." and not word_started and not words and (not nxt or nxt in " \t\r\n;|&"):
             i += 1
             continue
         if c == "-" and not word_started and nxt == "-" and i + 2 < n and text[i + 2] == "%":
@@ -1417,10 +1466,12 @@ def _cmd_name_refusal(word):
     return None
 
 
-def _read_cmd(text):
+def _read_cmd(text, fed=False):
     bad = "\"'\\^%!()\r\n@;,=" + "`"
+    next_check = 0
     for nch, ch in enumerate(text):
-        if (nch & 4095) == 0 and _too_long():
+        late, next_check = _deadline_at(nch, next_check)
+        if late:
             return {"unreadable": _cannot("too long to read in time"), "commands": [], "chain": [], "chain_wds": [], "parts": [], "gh_amp": None}
         if ch in bad:
             return {"unreadable": _cannot("cmd inner command character %s" % ch), "commands": [], "chain": [], "chain_wds": [], "parts": [], "gh_amp": None}
@@ -1430,7 +1481,9 @@ def _read_cmd(text):
     word_started = False
     pending = False
     commands, chain, chain_wds, seg, parts = [], [], [], [], []
+    piped, saw_input = False, False
     i = 0
+    next_check = 0
 
     def refuse(msg):
         nonlocal unreadable
@@ -1457,22 +1510,22 @@ def _read_cmd(text):
         return word_started and len(wbuf) == 1 and wbuf[0].isdigit()
 
     def close_cmd():
+        nonlocal piped, saw_input
         emit_word()
         if pending:
             refuse("a redirection with no target")
             return
         if not words:
+            saw_input = False
             return
         cw = list(words)
-        _note(refuse, _cmd_word_refusal(cw, "cmd", False))
-        idx, _err, _husky, _saw = _walk_to_command(cw, "cmd", False)
-        if idx is not None and unreadable is None:
-            bad_name = _cmd_name_refusal(cw[idx])
-            if bad_name:
-                refuse(bad_name)
-        commands.append({"words": cw, "sep": None, "pipe": False, "last_amp": False})
+        this_input = saw_input
+        _note(refuse, _cmd_word_refusal(cw, "cmd", False, fed or piped or this_input))
+        commands.append({"words": cw, "sep": None, "pipe": piped, "input": this_input, "last_amp": False})
         seg.append(cw)
         words[:] = []
+        piped = False
+        saw_input = False
 
     def close_part():
         close_cmd()
@@ -1483,7 +1536,8 @@ def _read_cmd(text):
             seg[:] = []
 
     while i < n and unreadable is None:
-        if (i & 4095) == 0 and _too_long():
+        late, next_check = _deadline_at(i, next_check)
+        if late:
             refuse("too long to read in time")
             break
         c = text[i]
@@ -1493,6 +1547,8 @@ def _read_cmd(text):
                 refuse("a redirection with no target")
                 break
             digit = one_digit()
+            if c == "<":
+                saw_input = True
             if pending and word_started:
                 pending = False
                 reset_word()
@@ -1523,6 +1579,7 @@ def _read_cmd(text):
                 i += 2
             else:
                 close_cmd()
+                piped = True
                 i += 1
             continue
         if c == "&":
@@ -1578,6 +1635,21 @@ def in_workspace(cwd):
     return bool(cwd) and os.path.isfile(os.path.join(cwd, "docs", "PROJECT_STATUS.md"))
 
 
+def _find_arg_count(tok):
+    """How many following words a find option takes. A bare -O takes none."""
+    if tok == "-fprintf":
+        return 2
+    if tok == "-files0-from":
+        return 1
+    if len(tok) == 8 and tok.startswith("-newer"):
+        a, b = tok[6], tok[7]
+        if (("A" <= a <= "Z") or ("a" <= a <= "z")) and (("A" <= b <= "Z") or ("a" <= b <= "z")):
+            return 1
+    if tok in _FIND_TAKES_ARG:
+        return 1
+    return 0
+
+
 def _find_clauses(words):
     """Each find -exec, -execdir, -ok or -okdir clause as its own word list. Never joined back into text."""
     clauses = []
@@ -1604,119 +1676,138 @@ def _find_clauses(words):
                 clauses.append(words[start:])
                 i = n
             continue
-        if t in _FIND_TAKES_ARG and i + 1 < n:
-            i += 2
+        ntake = _find_arg_count(t)
+        if ntake:
+            if i + ntake >= n:
+                i = n
+                continue
+            for v in words[i + 1:i + 1 + ntake]:
+                if v in _FIND_ACTIONS:
+                    return _cannot("an -exec word taken as an option value"), None
+            i += 1 + ntake
             continue
         i += 1
     return None, clauses
 
 
-def _command_changes(words, mode, depth, tool):
+def _command_changes(words, mode, depth, tool, slash_ok=False, fed=False):
     """Words that change state, including a wrapper or find clause this command re-reads."""
     if not words or depth > READ_DEPTH_BOUND or _too_long():
         return None
+    _idx, _err, _husky, saw_prefix = _walk_to_command(words, mode, slash_ok, fed)
     sp = strip_prefix(words)
     if sp and state_changing(sp):
         return sp
     if not sp:
         return None
     head = _exe_stem(sp[0])
-    slash = tool == "PowerShell" and mode == "powershell"
-    inner, inner_mode = None, mode
+    base_slash = False if saw_prefix else slash_ok
+    inner, inner_mode, child_slash = None, mode, base_slash
     if head == "eval" and len(sp) > 1:
-        inner = " ".join(sp[1:])
+        inner, child_slash = " ".join(sp[1:]), False
     elif head in ("bash", "sh"):
-        inner, inner_mode, slash = _bash_inner_string(sp), "bash", False
+        inner, inner_mode, child_slash = _bash_inner_string(sp), "bash", False
     elif head in ("powershell", "pwsh"):
-        got = shell_inner(sp, slash)
+        got = shell_inner(sp, base_slash)
         if isinstance(got, str):
-            inner, inner_mode, slash = got, "powershell", tool == "PowerShell"
+            inner, inner_mode, child_slash = got, "powershell", base_slash
     elif head == "cmd":
-        got = shell_inner(sp, slash)
+        got = shell_inner(sp, base_slash)
         if isinstance(got, str):
-            inner, inner_mode, slash = got, "cmd", False
+            inner, inner_mode, child_slash = got, "cmd", False
     elif head == "find":
         err, clauses = _find_clauses(sp)
         if err or not clauses:
             return None
         for clause in clauses:
-            hit = _command_changes(clause, mode, depth + 1, tool)
+            hit = _command_changes(clause, mode, depth + 1, tool, False, fed)
             if hit:
                 return hit
         return None
     if not isinstance(inner, str):
         return None
-    parsed = read_commands(inner, mode=inner_mode, slash_ok=slash)
+    parsed = read_commands(inner, mode=inner_mode, slash_ok=child_slash, fed=fed)
     if parsed.get("unreadable"):
         return None
     for cmd in parsed.get("commands") or []:
-        hit = _command_changes(cmd.get("words") or [], inner_mode, depth + 1, tool)
+        cfed = fed or cmd.get("pipe") or cmd.get("input")
+        hit = _command_changes(cmd.get("words") or [], inner_mode, depth + 1, tool, child_slash, cfed)
         if hit:
             return hit
     return None
 
 
-def _stage_changes(parts, mode="bash", tool="Bash"):
+def _stage_changes(parts, mode="bash", tool="Bash", slash_ok=False, fed=False):
     for part in parts:
+        later = False
         for stage in part:
-            hit = _command_changes(stage, mode, 0, tool)
+            hit = _command_changes(stage, mode, 0, tool, slash_ok, fed or later)
             if hit:
                 return hit
+            later = True
     return None
 
 
-def _chain_from_words(words, mode, depth, lists, tool):
+def _chain_from_words(words, mode, depth, lists, tool, slash_ok=False, fed=False):
     if not words or depth > READ_DEPTH_BOUND:
         return
+    _idx, _err, _husky, saw_prefix = _walk_to_command(words, mode, slash_ok, fed)
     w = strip_prefix(words)
     if not w:
         return
     head = _exe_stem(w[0])
-    slash = tool == "PowerShell" and mode == "powershell"
-    inner, inner_mode = None, mode
+    base_slash = False if saw_prefix else slash_ok
+    inner, inner_mode, child_slash = None, mode, base_slash
     if head == "eval" and len(w) > 1:
-        inner = " ".join(w[1:])
+        inner, child_slash = " ".join(w[1:]), False
     elif head in WRAPPER_SHELLS or base(w[0]) in WRAPPER_SHELLS:
-        got = shell_inner(w, slash)
+        if head in ("bash", "sh"):
+            child_slash = False
+        elif head == "cmd":
+            child_slash = False
+        got = shell_inner(w, base_slash)
         if isinstance(got, str):
             inner = got
             if head in ("powershell", "pwsh"):
-                inner_mode, slash = "powershell", tool == "PowerShell"
+                inner_mode = "powershell"
             elif head == "cmd":
-                inner_mode, slash = "cmd", False
+                inner_mode = "cmd"
             elif head in ("bash", "sh"):
-                inner_mode, slash = "bash", False
+                inner_mode = "bash"
     if isinstance(inner, str):
-        sp = read_commands(inner, mode=inner_mode, slash_ok=slash)
+        sp = read_commands(inner, mode=inner_mode, slash_ok=child_slash, fed=fed)
         ip = sp.get("parts") or []
         if not sp.get("unreadable") and len(ip) >= 2:
-            lists.append(ip)
+            lists.append((ip, inner_mode, child_slash, fed))
         if not sp.get("unreadable"):
             for cmd in sp.get("commands") or []:
-                _chain_from_words(cmd.get("words") or [], inner_mode, depth + 1, lists, tool)
+                cfed = fed or cmd.get("pipe") or cmd.get("input")
+                _chain_from_words(cmd.get("words") or [], inner_mode, depth + 1, lists, tool, child_slash, cfed)
     if head == "find":
         err, clauses = _find_clauses(w)
         if not err:
             for clause in clauses:
-                _chain_from_words(clause, mode, depth + 1, lists, tool)
+                _chain_from_words(clause, mode, depth + 1, lists, tool, False, fed)
 
 
-def _chain_lists(parsed, command, mode, depth, tool="Bash"):
+def _chain_lists(parsed, command, mode, depth, tool="Bash", slash_ok=False, fed=False):
     lists = []
     parts = parsed.get("parts") or []
     if len(parts) >= 2:
-        lists.append(parts)
+        lists.append((parts, mode, slash_ok, fed))
     for cmd in parsed.get("commands", []):
-        _chain_from_words(cmd.get("words") or [], mode, depth, lists, tool)
+        cfed = fed or cmd.get("pipe") or cmd.get("input")
+        _chain_from_words(cmd.get("words") or [], mode, depth, lists, tool, slash_ok, cfed)
     return lists
 
 
-def chain_reason(command, cwd, tool="Bash", outermost=True):
+def chain_reason(command, cwd, tool="Bash", outermost=True, slash_ok=None):
     if not in_workspace(cwd):
         return None
     mode = _mode_name(tool)
-    slash = tool == "PowerShell" and mode == "powershell"
-    parsed = read_commands(command, mode=mode, slash_ok=slash)
+    if slash_ok is None:
+        slash_ok = tool == "PowerShell" and mode == "powershell"
+    parsed = read_commands(command, mode=mode, slash_ok=slash_ok)
     if parsed.get("unreadable"):
         return None
     top = parsed.get("parts") or []
@@ -1724,13 +1815,77 @@ def chain_reason(command, cwd, tool="Bash", outermost=True):
         sp = strip_prefix(top[0][0])
         if sp and base(sp[0]) == "cd":
             return "a command wrapped in cd (rule 8: never wrap a command in cd; run it with the path it needs, or git -C)"
-    for parts in _chain_lists(parsed, command, mode, 0, tool):
+    for parts, part_mode, part_slash, part_fed in _chain_lists(parsed, command, mode, 0, tool, slash_ok, False):
         if len(parts) < 2:
             continue
-        hit = _stage_changes(parts, mode, tool)
+        hit = _stage_changes(parts, part_mode, tool, part_slash, part_fed)
         if hit:
             return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (len(parts), " ".join(hit[:2]))
     return None
+
+
+def _husky_git_mutation(simple):
+    """git, then commit, push or merge, each as its own word. Two linear searches, no .*."""
+    found = re.search(r"\bgit\b", simple, re.I)
+    if not found:
+        return False
+    return re.search(r"\b(commit|push|merge)\b", simple[found.end():], re.I) is not None
+
+
+def _alias_key_char(ch):
+    return ch.isalnum() or ch == "_" or ch == "-"
+
+
+def _alias_value_prefix(a):
+    """The value after =, blanks and one optional quote stripped, then a refused prefix."""
+    if len(a) < 7 or a[:6].lower() != "alias.":
+        return False
+    i, n = 6, len(a)
+    while i < n and _alias_key_char(a[i]):
+        i += 1
+    if i >= n or a[i] != "=":
+        return False
+    i += 1
+    while i < n and a[i].isspace():
+        i += 1
+    if i < n and a[i] in "'\"":
+        i += 1
+        while i < n and a[i].isspace():
+            i += 1
+    if i < n and a[i] == "!":
+        return True
+    for pref in _ALIAS_PREFIXES:
+        if a[i:i + len(pref)].lower() == pref:
+            end = i + len(pref)
+            if end >= n or not (a[end].isalnum() or a[end] == "_"):
+                return True
+    return False
+
+
+def _alias_names_refused(a):
+    if _alias_value_prefix(a):
+        return True
+    if not a.lower().startswith("alias."):
+        return False
+    if re.search(r"worktree\s+remove|pr\s+merge", a, re.I):
+        return True
+    found = re.search(r"push\b", a, re.I)
+    if found and re.search(r"--forc|-f\b|\+", a[found.end():], re.I):
+        return True
+    return False
+
+
+def _short_letters_hold(a, letter):
+    """A single-dash word whose other characters are ASCII letters, one of them letter."""
+    if len(a) < 2 or a[0] != "-" or a[1] == "-":
+        return False
+    has = False
+    for ch in a[1:]:
+        if not (("A" <= ch <= "Z") or ("a" <= ch <= "z")):
+            return False
+        if ch == letter:
+            has = True
+    return has
 
 
 def leading_husky_zero(words_or_text, tool="Bash"):
@@ -1822,42 +1977,42 @@ def check(command, cwd=None, tool="Bash", _depth=0):
         _read_started = _clock()
     mode = _mode_name(tool)
     try:
-        return _check_one(command, cwd, tool, mode, _depth)
+        return _check_one(command, cwd, tool, mode, _depth, tool == "PowerShell", False)
     finally:
         if own:
             _read_started = None
 
 
-def _check_one(command, cwd, tool, mode, depth):
+def _check_one(command, cwd, tool, mode, depth, slash_ok, fed):
     if _too_long():
         return _cannot("too long to read in time")
     if depth > READ_DEPTH_BOUND:
         return _cannot("nesting past the bound")
-    slash_ok = tool == "PowerShell" and mode == "powershell"
-    parsed = read_commands(command, mode=mode, slash_ok=slash_ok)
+    parsed = read_commands(command, mode=mode, slash_ok=slash_ok, fed=fed)
     if parsed.get("unreadable"):
         return parsed["unreadable"]
     if parsed.get("gh_amp"):
         return parsed["gh_amp"]
-    r = chain_reason(command, cwd, tool=tool, outermost=(depth == 0))
+    r = chain_reason(command, cwd, tool=tool, outermost=(depth == 0), slash_ok=slash_ok)
     if r:
         return r
     for cmd in parsed.get("commands", []):
         if _too_long():
             return _cannot("too long to read in time")
-        r = _check_word_list(cmd["words"], command, cwd, tool, mode, depth, slash_ok)
+        cfed = fed or cmd.get("pipe") or cmd.get("input")
+        r = _check_word_list(cmd["words"], command, cwd, tool, mode, depth, slash_ok, cfed)
         if r:
             return r
     return None
 
 
-def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok):
+def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=False):
     """Every check of one command, on the word list the reader produced or a find clause."""
     if _too_long():
         return _cannot("too long to read in time")
     if depth > READ_DEPTH_BOUND:
         return _cannot("nesting past the bound")
-    err = _cmd_word_refusal(cmd_wds, mode, slash_ok)
+    err = _cmd_word_refusal(cmd_wds, mode, slash_ok, fed)
     if err:
         return err
     if mode == "powershell":
@@ -1865,9 +2020,17 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok):
         if err:
             return err
     simple = " ".join(cmd_wds)
-    if leading_husky_zero(cmd_wds, tool) and re.search(r"\bgit\b.*\b(commit|push|merge)\b", simple, re.I):
+    if leading_husky_zero(cmd_wds, tool) and _husky_git_mutation(simple):
         return "HUSKY=0 switches the hook runner off (a commit that skips its checks; rule 4)"
-    w = strip_prefix(cmd_wds)
+    if _too_long():
+        return _cannot("too long to read in time")
+    if mode == "cmd":
+        bidx, berr, _bh, _bs = _walk_to_command(cmd_wds, "bash", False, fed)
+        if berr and "a builtin (" not in berr and "a reserved word (" not in berr:
+            return berr
+        w = list(cmd_wds[bidx:]) if bidx is not None else []
+    else:
+        w = strip_prefix(cmd_wds)
     if tool == "PowerShell" and w:
         j = 0
         while j < len(w) and w[j] in BASH_RESERVED:
@@ -1877,12 +2040,13 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok):
         return None
     head = base(w[0])
     if head == "eval" and len(w) > 1:
-        r = _check_one(" ".join(w[1:]), cwd, tool, mode, depth + 1)
+        r = _check_one(" ".join(w[1:]), cwd, tool, mode, depth + 1, False, fed)
         if r:
             return r
     if head in WRAPPER_SHELLS:
-        _idx, _err, _husky, saw_prefix = _walk_to_command(cmd_wds, mode, slash_ok)
-        inner = shell_inner(w, slash_ok and not saw_prefix)
+        _idx, _err, _husky, saw_prefix = _walk_to_command(cmd_wds, mode, slash_ok, fed)
+        base_slash = slash_ok and not saw_prefix
+        inner = shell_inner(w, base_slash)
         if inner is ENCODED:
             return "an encoded PowerShell command, which the guard cannot read"
         if inner is INNER_UNREADABLE:
@@ -1890,14 +2054,14 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok):
         if inner:
             bh = base(w[0]).replace(".exe", "")
             if bh in ("powershell", "pwsh"):
-                im = "powershell"
+                im, child_slash = "powershell", base_slash
             elif bh in ("cmd", "cmd.exe"):
-                im = "cmd"
+                im, child_slash = "cmd", False
             elif bh in ("bash", "sh"):
-                im = "bash"
+                im, child_slash = "bash", False
             else:
-                im = mode
-            r = _check_one(inner, cwd, tool, im, depth + 1)
+                im, child_slash = mode, False
+            r = _check_one(inner, cwd, tool, im, depth + 1, child_slash, fed)
             if r:
                 return r
     if head in ("find", "find.exe"):
@@ -1908,7 +2072,7 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok):
             if _too_long():
                 return _cannot("too long to read in time")
             if clause:
-                r = _check_word_list(clause, command, cwd, tool, mode, depth + 1, False)
+                r = _check_word_list(clause, command, cwd, tool, mode, depth + 1, False, fed)
                 if r:
                     return r
     if base(w[0]) == "cursor-agent" and _names_bridge_review_paths(w):
@@ -1919,8 +2083,10 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok):
     if is_git(w):
         helpful = "--help" in w[1:] or "-h" in w[1:]
         for a in w:
-            if ALIAS_RX.match(a) or (a.lower().startswith("alias.") and re.search(r"worktree\s+remove|pr\s+merge|push\b.*(--force|--forc|-f\b|\+)", a, re.I)):
+            if _alias_names_refused(a):
                 return "a git alias that defines a refused command (%s)" % a[:60]
+            if _too_long():
+                return _cannot("too long to read in time")
         sub, args = git_subcommand(w)
         if any(re.match(r"^core\.hookspath=", a, re.I) for a in w) and not helpful:
             return "git -c core.hooksPath=... (the checks a commit runs are switched off; rule 4)"
@@ -1933,10 +2099,14 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok):
             message = commit_message(args, command)
             snapshot = snapshot_subject(message) or (bool(re.search(r"\bhand-off\b", message, re.I)) and in_worktree(w, cwd))
             skipper = hook_skipper_option(sub, args, snapshot)
+            if _too_long():
+                return _cannot("too long to read in time")
             if skipper:
                 return "git %s %s (a commit that skips its checks; the merge policy allows it only for the checkpoint commit, whose subject says `checkpoint` and names the increment before any parenthesis without an accept, merge or release word, and for a builder's hand-off snapshot inside a worktree)" % (sub, skipper)
         if sub == "push" and not helpful:
             r = force_push_reason(args)
+            if _too_long():
+                return _cannot("too long to read in time")
             if r:
                 return r
         if sub == "worktree" and args and args[0] == "remove" and not helpful:
@@ -1986,7 +2156,7 @@ def hook_skipper_option(sub, args, snapshot):
             continue
         if a == "--no-verify" and not snapshot:
             return a
-        if sub == "commit" and re.match(r"^-[A-Za-z]*n[A-Za-z]*$", a) and not snapshot:
+        if sub == "commit" and _short_letters_hold(a, "n") and not snapshot:
             return a
         i += 1
     return None
@@ -2040,7 +2210,7 @@ def force_push_reason(args):
             return "git push with %s" % a
         if len(a) >= 4 and "--force".startswith(a):      # git accepts an unambiguous abbreviation
             return "git push with %s (an abbreviation of --force)" % a
-        if re.match(r"^-[A-Za-z]*f[A-Za-z]*$", a):
+        if _short_letters_hold(a, "f"):
             return "git push with the short flag %s" % a
         if a.startswith("+") and len(a) > 1:
             return "git push with a forcing refspec %s" % a

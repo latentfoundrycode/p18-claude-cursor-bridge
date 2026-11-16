@@ -18,7 +18,7 @@ def run(tool, command, cwd=None):
     payload = {"tool_name": tool, "tool_input": {"command": command}, "permission_mode": "auto"}
     if cwd:
         payload["cwd"] = str(cwd)
-    p = subprocess.run([sys.executable, PROG], input=json.dumps(payload), capture_output=True, text=True)
+    p = subprocess.run([sys.executable, PROG], input=json.dumps(payload), capture_output=True, text=True, timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     return p.returncode, p.stderr
 
 
