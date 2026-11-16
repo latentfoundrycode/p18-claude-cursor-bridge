@@ -64,10 +64,11 @@ def test_outside_a_workspace_chains_are_not_the_guards_business(tmp_path):
     "git -c core.hooksPath=/dev/null commit -m x",
     "git push --no-verify origin task-001",
     "powershell -Command \"git commit --no-verify -m x\"",
+    "git commit --no-verify -m \"$(cat <<'EOF'\ncheckpoint before TASK-003\n\nthe tree as delegated\nEOF\n)\"",
 ])
 def test_a_commit_that_skips_its_checks_is_refused(tmp_path, command):
     rc, err = run(command, tmp_path)
-    assert rc == 2 and ("skips its checks" in err or "hooksPath" in err), (command, err)
+    assert rc == 2 and ("skips its checks" in err or "hooksPath" in err or "cannot read" in err.lower()), (command, err)
 
 
 @pytest.mark.parametrize("command", [
@@ -275,3 +276,138 @@ def test_r082_backslash_newline_in_comment_does_not_hide_next_command(tmp_path):
     """R-082 (req 2): backslash-newline in a comment leaves the next physical line as its own command."""
     p = _run_r082("echo a # c \\\n" + WR, tmp_path)
     assert p.returncode == 2, (p.returncode, p.stderr)
+
+
+def _run_r6(command, cwd=None, tool="Bash"):
+    """R-082 round 6 cases: one subprocess line, windowless, bounded wait."""
+    payload = {"tool_name": tool, "tool_input": {"command": command}, "permission_mode": "auto"}
+    if cwd:
+        payload["cwd"] = str(cwd)
+    return subprocess.run([sys.executable, PROG], input=json.dumps(payload), capture_output=True, text=True, timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+
+_R6_WRAPPERS = [
+    ("env", "env FOO=bar git status", "env --foo git status"),
+    ("nice", "nice -n 5 git status", "nice --foo git status"),
+    ("nohup", "nohup git status", "nohup --foo git status"),
+    ("stdbuf", "stdbuf -o0 git status", "stdbuf --foo git status"),
+    ("timeout", "timeout 5 git status", "timeout --foo 5 git status"),
+    ("setsid", "setsid git status", "setsid --foo git status"),
+    ("sudo", "sudo -u root git status", "sudo --foo git status"),
+    ("exec", "exec git status", "exec --foo git status"),
+    ("command", "command git status", "command --foo git status"),
+    ("builtin", "builtin echo hi", "builtin let x=1"),
+    ("eval", "eval git status", "eval \"git worktree remove y\""),
+    ("bash", "bash -c 'git status'", "bash --foo -c 'git status'"),
+    ("sh", "sh -c 'git status'", "sh -i -c 'git status'"),
+    ("cmd", "cmd /c git status", "cmd /v git status"),
+    ("powershell", "powershell -NoProfile -Command git status", "powershell -Foo -Command git status"),
+    ("find", "find . -exec echo hi {} ;", "find . -exec git worktree remove z \\;"),
+]
+
+
+@pytest.mark.parametrize("label,ok,bad", _R6_WRAPPERS, ids=[row[0] for row in _R6_WRAPPERS])
+def test_r082_wrapper_one_pass_and_one_refusal(label, ok, bad):
+    """R-082 (req 16): each prefix wrapper has one command that passes and one that is refused."""
+    passed = _run_r6(ok)
+    assert passed.returncode == 0, (label, ok, passed.stderr)
+    refused = _run_r6(bad)
+    assert refused.returncode == 2, (label, bad, refused.stderr)
+
+
+def test_r082_req1_empty_quotes_are_a_word():
+    """R-082 (req 1): '' is a word, so a hash after it is not a comment and an empty -C value is kept."""
+    hidden = _run_r6("printf ''#x ; git worktree remove z")
+    assert hidden.returncode == 2 and "worktree" in hidden.stderr, hidden.stderr
+    empty = _run_r6("git -C '' status")
+    assert empty.returncode == 0, empty.stderr
+
+
+def test_r082_req2_backslash_newline_removes_one_newline():
+    """R-082 (req 2): a backslash and one newline join; the next newline is a separator."""
+    p = _run_r6("printf ab\\\n\ngit worktree remove z")
+    assert p.returncode == 2 and "worktree" in p.stderr, p.stderr
+
+
+def test_r082_req3_redirection_target_is_the_next_word():
+    """R-082 (req 3): a quoted redirection target is one word and is taken out."""
+    p = _run_r6("git >'a b' worktree remove z")
+    assert p.returncode == 2 and "worktree" in p.stderr, p.stderr
+
+
+def test_r082_req4_named_descriptor_is_unreadable():
+    """R-082 (req 4): a word that is only {name} directly before < or > is unreadable."""
+    p = _run_r6("{out}>file git worktree remove z")
+    assert p.returncode == 2 and "cannot read" in p.stderr.lower(), p.stderr
+
+
+def test_r082_req5_prefix_chain_reaches_the_command_word():
+    """R-082 (req 5): nice then env are prefixes; the command word is still git."""
+    p = _run_r6("nice -n 1 env git worktree remove z")
+    assert p.returncode == 2 and "worktree" in p.stderr, p.stderr
+
+
+def test_r082_req6_exe_stem_keeps_the_shim_name():
+    """R-082 (req 6): strace.exe is the launcher strace; cursor-agent.exe is still the shim name."""
+    launcher = _run_r6("strace.exe git status")
+    assert launcher.returncode == 2 and "cannot read" in launcher.stderr.lower(), launcher.stderr
+    shim = _run_r6("cursor-agent.exe")
+    assert shim.returncode == 2 and "shim" in shim.stderr, shim.stderr
+
+
+def test_r082_req7_complete_and_proc_stdin_are_unreadable():
+    """R-082 (req 7): complete is a refused builtin and sh /proc/... reads a descriptor."""
+    complete = _run_r6("complete -p")
+    assert complete.returncode == 2 and "cannot read" in complete.stderr.lower(), complete.stderr
+    proc = _run_r6("sh /proc/self/fd/0")
+    assert proc.returncode == 2 and "cannot read" in proc.stderr.lower(), proc.stderr
+
+
+def test_r082_req8_a_short_brace_run_passes():
+    """R-082 (req 8): a modest run of {} is read in the main loop and passes."""
+    p = _run_r6("echo " + ("{}" * 100))
+    assert p.returncode == 0, p.stderr
+
+
+def test_r082_req9_escaped_dollar_is_unreadable():
+    """R-082 (req 9): a backslash before $ does not make the dollar literal."""
+    p = _run_r6("printf \\$x")
+    assert p.returncode == 2 and "cannot read" in p.stderr.lower(), p.stderr
+
+
+def test_r082_req10_cmd_reads_every_switch_and_redirection():
+    """R-082 (req 10): /q then /c is the command switch, and >out is not a git argument."""
+    p = _run_r6('cmd /q /c "git >out worktree remove z"')
+    assert p.returncode == 2 and "worktree" in p.stderr, p.stderr
+
+
+def test_r082_req11_powershell_descriptor_module_and_vertical_tab():
+    """R-082 (req 11): PowerShell descriptors 4 and *, a module-qualified cmdlet, and a vertical tab."""
+    numbered = _run_r6("git 4>out worktree remove z", tool="PowerShell")
+    assert numbered.returncode == 2 and "worktree" in numbered.stderr, numbered.stderr
+    star = _run_r6("git *>&2 worktree remove z", tool="PowerShell")
+    assert star.returncode == 2 and "worktree" in star.stderr, star.stderr
+    module = _run_r6("Mod\\Format-Table", tool="PowerShell")
+    assert module.returncode == 2 and "cannot read" in module.stderr.lower(), module.stderr
+    vertical = _run_r6("echo hi\v", tool="PowerShell")
+    assert vertical.returncode == 2 and "cannot read" in vertical.stderr.lower(), vertical.stderr
+
+
+def test_r082_req12_pipeline_stage_changes_state_in_a_workspace(workspace):
+    """R-082 (req 12): a pipeline is one part, and that part changes state when any stage does."""
+    alone = _run_r6("git status", workspace)
+    assert alone.returncode == 0, alone.stderr
+    chained = _run_r6("git status; echo a | git add -A", workspace)
+    assert chained.returncode == 2 and "rule 8" in chained.stderr, chained.stderr
+
+
+def test_r082_req12a_husky_after_a_prefix_walk(workspace):
+    """R-082 (req 12a): HUSKY=0 is seen after nice and env options."""
+    p = _run_r6("nice -n 1 env HUSKY=0 git push origin t", workspace)
+    assert p.returncode == 2 and "HUSKY" in p.stderr, p.stderr
+
+
+def test_r082_req13_glued_message_checkpoint_passes(workspace):
+    """R-082 (req 13): --message=<text> is the checkpoint subject, and a hyphen is a word boundary."""
+    p = _run_r6("git commit --message=checkpoint-before-TASK-002 --no-verify", workspace)
+    assert p.returncode == 0, p.stderr

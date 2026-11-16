@@ -21,9 +21,7 @@ PowerShell call operator `&` separate commands; nested shell forms (`$(`, backti
 here-documents, subshells, globs) are refused as unreadable; a `git -c alias.<x>=...` whose
 value starts with `worktree`, `pr`, `push`, `api` or `!` is refused, and so is a `gh alias set`
 for a merge; an abbreviated `--forc` counts as `--force`, as it does for git; `--help` exempts a
-`gh pr merge` only when it is not the value of a flag such as `--subject`. A here-document
-read by a shell (`bash <<EOF`) is that shell's script and is checked; one read by any other
-program (a commit message) is data. `powershell` without `-Command` runs the rest of its line,
+`gh pr merge` only when it is not the value of a flag such as `--subject`. A here-document is unreadable. `powershell` without `-Command` runs the rest of its line,
 `-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command,
 and `-XPUT` is a method: all read as what they run. An encoded PowerShell command and a
 GraphQL query read from a file are refused unread.
@@ -130,16 +128,12 @@ def program_behind(w):
 
 READ_DEPTH_BOUND = 64
 
-
-
-READ_CACHE = {}
-
 BASH_RESERVED = frozenset("if then else elif fi case esac for select while until do done in function time coproc".split() + ["{", "}", "!", "[[", "]]"])
 BASH_OK_BUILTINS = frozenset(("cd", "echo", "pwd", "true", "false", ":", "exit", "type", "printf"))
 BASH_WRAPPER_CMDS = frozenset(("eval", "exec", "command", "builtin"))
 REFUSED_CMD_WORDS = frozenset(("xargs", "start", "wsl", "mintty", "winpty", "strace", "dash", "zsh", "ksh", "fish", "csh", "tcsh", "ash", "busybox"))
 REFUSED_BUILTINS = frozenset(
-    ". : [ alias bg bind break builtin caller declare dirs disown enable eval exec export fc fg getopts hash help history jobs kill let local logout mapfile popd pushd read readarray readonly return set shift shopt source suspend test times trap typeset ulimit umask unalias unset wait".split()
+    ". : [ alias bg bind break builtin caller cd command compgen complete compopt continue declare dirs disown echo enable eval exec exit export false fc fg getopts hash help history jobs kill let local logout mapfile popd printf pushd pwd read readarray readonly return set shift shopt source suspend test times trap true type typeset ulimit umask unalias unset wait".split()
 ) - BASH_OK_BUILTINS - BASH_WRAPPER_CMDS
 ENV_OPTS = frozenset(("-i", "-0", "--ignore-environment", "--null", "-u", "--unset", "-C", "--chdir"))
 ENV_BAD = frozenset(("-S", "--split-string"))
@@ -153,7 +147,7 @@ COMMAND_OPTS = frozenset(("-p", "-v", "-V"))
 BASH_SH_OPTS = frozenset(("-c", "--login", "--noprofile", "--norc", "--"))
 BASH_SH_FLAGS = frozenset("lexuvc")
 CMD_OK_SWITCH = frozenset(("/c", "/k", "/r", "/d", "/s", "/q", "//c", "//k", "//r", "//d", "//s", "//q"))
-CMD_BAD_BUILTIN = frozenset(b.lower() for b in "assoc break call chdir cls color copy date del endlocal erase exit for ftype goto if md mklink pause popd prompt pushd rd rem ren rename rmdir set setlocal shift start time title verify vol".split()) - frozenset(("dir", "echo", "type", "cd", "ver", "chdir", "mkdir"))
+CMD_BAD_BUILTIN = frozenset(b.lower() for b in "assoc break call cd chdir cls color copy date del dir echo endlocal erase exit for ftype goto if md mkdir mklink move path pause popd prompt pushd rd rem ren rename rmdir set setlocal shift start time title type ver verify vol".split()) - frozenset(("dir", "echo", "type", "cd", "ver"))
 PS_VERBS = frozenset(v.lower() for v in "Add Approve Assert Backup Block Checkpoint Clear Close Compare Complete Compress Confirm Connect Convert Copy Debug Deny Disable Disconnect Dismount Edit Enable Enter Exit Expand Export Find Format Get Grant Group Hide Import Initialize Install Invoke Join Limit Lock Measure Merge Mount Move New Open Optimize Out Ping Pop Protect Publish Push Read Receive Redo Register Remove Rename Repair Request Reset Resize Resolve Restart Restore Resume Revoke Save Search Select Send Set Show Skip Split Start Step Stop Submit Suspend Switch Sync Test Trace Unblock Undo Uninstall Unlock Unprotect Unpublish Unregister Update Use Wait Watch Write".split())
 PS_CMDLETS = frozenset(x.lower() for x in "Get-ChildItem Get-Content Get-Item Get-ItemProperty Get-Location Get-Command Get-Help Get-Process Get-Service Get-Date Get-FileHash Test-Path Select-String Select-Object Sort-Object Measure-Object Format-List Format-Table Out-String Out-Host Write-Output Write-Host Compare-Object Resolve-Path Join-Path Split-Path ConvertTo-Json ConvertFrom-Json Set-Location Push-Location Pop-Location".split())
 PS_ALIASES_OK = frozenset(x.lower() for x in "cat cd chdir compare diff dir echo fl ft gc gci gcm gi gl gp gps gsv help ls man measure oh popd ps pushd pwd rvpa select sl sls sort type write".split())
@@ -169,13 +163,6 @@ def _mode_name(tool):
     return "powershell" if tool == "PowerShell" else "bash"
 
 
-def _snapshot(text, mode="bash"):
-    key = (text, mode)
-    if key not in READ_CACHE:
-        READ_CACHE[key] = read_commands(text, mode=mode)
-    return READ_CACHE[key]
-
-
 def read_commands(text, mode="bash"):
     """One flat read of a command line (R-082 round 5); never raises."""
     try:
@@ -185,7 +172,7 @@ def read_commands(text, mode="bash"):
             return _read_powershell(text)
         return _read_bash(text)
     except Exception as ex:
-        return {"unreadable": _cannot("internal error (%s)" % type(ex).__name__), "commands": [], "chain": [], "chain_wds": [], "gh_amp": None}
+        return {"unreadable": _cannot("internal error (%s)" % type(ex).__name__), "commands": [], "chain": [], "chain_wds": [], "parts": [], "gh_amp": None}
 
 
 def _ps_norm_switch(tok):
@@ -228,236 +215,389 @@ def _skip_assignments(words):
     return None, i
 
 
+def _exe_stem(tok):
+    """Command, shell, wrapper, prefix, launcher and builtin names, without a trailing .exe."""
+    name = base(tok)
+    if name.endswith(".exe"):
+        return name[:-4]
+    return name
+
+
 def _cmd_word_refusal(words, mode="bash"):
-    bad, i = _skip_assignments(words)
-    if bad:
-        return bad
-    if i >= len(words):
-        return None
-    w = words[i]
-    lw = base(w)
-    if any(w == x or w.startswith(x + "=") for x in ("--config-env",)):
-        return _cannot("an option --config-env")
-    if lw.replace(".exe", "") in REFUSED_CMD_WORDS:
-        return _cannot("a launcher or shell (%s)" % lw)
-    if mode == "bash":
-        if lw in BASH_RESERVED:
-            return _cannot("a reserved word (%s)" % lw)
-        if lw == "printf" and any(words[j] == "-v" or words[j].startswith("-v") for j in range(i + 1, len(words))):
-            return _cannot("a builtin (printf -v)")
-        if lw in REFUSED_BUILTINS:
-            return _cannot("a builtin (%s)" % lw)
-        if lw in ("bash", "sh") and _bash_reads_stdin(words, i):
-            return _cannot("a shell that reads commands from standard input")
-        if lw in ("bash", "sh") and _bash_interactive(words, i):
-            return _cannot("interactive bash")
-    return None
-
-
-def _bash_reads_stdin(words, i):
-    opts, rest, has_c, script = _parse_bash_sh_words(words[i + 1:])
-    if has_c:
-        return False
-    return script is None
-
-
-def _bash_interactive(words, i):
-    opts, rest, has_c, script = _parse_bash_sh_words(words[i + 1:])
-    for o in opts:
-        if o == "-i" or (o.startswith("-") and not o.startswith("--") and "i" in o[1:]):
-            return True
-    return False
+    _idx, err, _husky = _walk_to_command(words, mode)
+    return err
 
 
 def _parse_bash_sh_words(words):
-    opts, i, has_c, script = [], 0, False, False
+    """Options of bash or sh, before and after -c. The fourth value is an error, or the script word."""
+    opts, i, has_c = [], 0, False
     while i < len(words):
         t = words[i]
         if t == "--":
             i += 1
             break
+        if t == "-":
+            break
         if t.startswith("+"):
-            if t in ("+x", "+e") or all(c in BASH_SH_FLAGS for c in t[1:]):
-                opts.append(t); i += 1; continue
-            return [], None, False, _cannot("an unknown bash option")
-        if t.startswith("-"):
-            if t == "-c":
-                has_c = True; opts.append(t); i += 1; break
-            if len(t) > 1 and not t.startswith("--") and all(c in BASH_SH_FLAGS for c in t[1:]):
-                if "c" in t[1:]:
-                    has_c = True; opts.append(t); i += 1; break
-                opts.append(t); i += 1; continue
+            body = t[1:]
+            if body and all(c in BASH_SH_FLAGS for c in body):
+                opts.append(t)
+                i += 1
+                continue
+            return [], [], False, _cannot("an unknown bash option")
+        if t.startswith("--"):
             if t in BASH_SH_OPTS:
-                opts.append(t); i += 1; continue
-            return [], None, False, _cannot("an unknown bash option")
+                opts.append(t)
+                i += 1
+                continue
+            return [], [], False, _cannot("an unknown bash option")
+        if t.startswith("-"):
+            body = t[1:]
+            if "i" in body:
+                return [], [], False, _cannot("interactive bash")
+            if body and all(c in BASH_SH_FLAGS for c in body):
+                if "c" in body:
+                    has_c = True
+                opts.append(t)
+                i += 1
+                continue
+            return [], [], False, _cannot("an unknown bash option")
         break
     rest = words[i:] if i < len(words) else []
     if has_c:
-        return opts, rest, has_c, None
-    return opts, rest, has_c, rest[0] if rest else None
+        return opts, rest, True, None
+    return opts, rest, False, rest[0] if rest else None
+
+
+def _bash_reads_stdin(words, i):
+    _opts, _rest, has_c, script = _parse_bash_sh_words(words[i + 1:])
+    if isinstance(script, str) and script.startswith("the guard cannot read"):
+        return False
+    if has_c:
+        return False
+    if script is None:
+        return True
+    return script == "-" or script.startswith("/dev/") or script.startswith("/proc/")
+
+
+def _bash_interactive(words, i):
+    _opts, _rest, _has_c, script = _parse_bash_sh_words(words[i + 1:])
+    return isinstance(script, str) and "interactive bash" in script
 
 
 def _bash_inner_string(words):
-    i, has_c = 1, False
-    while i < len(words):
-        t = words[i]
-        if t == "--":
-            i += 1
-            break
-        if t.startswith("+"):
-            if t in ("+x", "+e") or all(c in BASH_SH_FLAGS for c in t[1:]):
-                i += 1
-                continue
-            return None
-        if t.startswith("-"):
-            if t == "-c":
-                has_c = True
-                i += 1
-                continue
-            if len(t) > 1 and not t.startswith("--") and all(c in BASH_SH_FLAGS for c in t[1:]):
-                if "c" in t[1:]:
-                    has_c = True
-                i += 1
-                continue
-            if t in BASH_SH_OPTS:
-                i += 1
-                continue
-            return None
-        break
-    if not has_c or i >= len(words):
+    _opts, rest, has_c, script = _parse_bash_sh_words(words[1:])
+    if isinstance(script, str) and script.startswith("the guard cannot read"):
         return None
-    return " ".join(words[i:])
+    if not has_c or not rest:
+        return None
+    return " ".join(rest)
 
 
-def _parse_env_words(words):
-    i, opts = 1, []
-    vals = ENV_OPTS
-    while i < len(words):
+def _opt_err(msg):
+    return _cannot(msg)
+
+
+def _take_separate(words, i, n):
+    if i + 1 >= n:
+        return _opt_err("an unknown wrapper option"), i
+    return None, i + 2
+
+
+def _walk_env(words, i, husky):
+    i += 1
+    n = len(words)
+    while i < n:
         t = words[i]
-        if t in ENV_BAD:
-            return _cannot("env -S or --split-string")
-        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", t):
-            i += 1; continue
+        if t in ENV_BAD or t.startswith("--split-string") or (t.startswith("-S") and not t.startswith("--")):
+            return _opt_err("env -S or --split-string"), i, husky
+        an = _assignment_name(t)
+        if an:
+            if an.upper().startswith("GIT_CONFIG"):
+                return _opt_err("an assignment whose name begins GIT_CONFIG"), i, husky
+            if t == "HUSKY=0":
+                husky = True
+            i += 1
+            continue
         if not t.startswith("-"):
             break
-        eq = t.split("=", 1)
-        opt = eq[0]
-        if opt in ENV_OPTS:
-            opts.append(opt)
-            if "=" in t:
+        bare = t.split("=", 1)[0]
+        glued_short = (t.startswith("-u") and t != "-u" and not t.startswith("--")) or (t.startswith("-C") and t != "-C" and not t.startswith("--"))
+        if t in ("-i", "-0", "--ignore-environment", "--null"):
+            i += 1
+            continue
+        if bare in ("-u", "--unset", "-C", "--chdir") or glued_short:
+            if "=" in t or glued_short:
                 i += 1
-            elif opt in ("-u", "--unset", "-C", "--chdir") and i + 1 < len(words):
-                i += 2
+                continue
+            err, i = _take_separate(words, i, n)
+            if err:
+                return err, i, husky
+            continue
+        return _opt_err("an unknown env option"), i, husky
+    return None, i, husky
+
+
+def _walk_nice(words, i):
+    i += 1
+    n = len(words)
+    while i < n and words[i].startswith("-"):
+        t = words[i]
+        if t == "-n" or (t.startswith("-n") and not t.startswith("--")):
+            if t == "-n":
+                err, i = _take_separate(words, i, n)
+                if err:
+                    return err, i
             else:
                 i += 1
             continue
-        return _cannot("an unknown env option")
-    return None
+        if t == "--adjustment" or t.startswith("--adjustment="):
+            if t == "--adjustment":
+                err, i = _take_separate(words, i, n)
+                if err:
+                    return err, i
+            else:
+                i += 1
+            continue
+        return _opt_err("an unknown wrapper option"), i
+    return None, i
+
+
+def _walk_stdbuf(words, i):
+    i += 1
+    n = len(words)
+    while i < n and words[i].startswith("-"):
+        t = words[i]
+        if t in ("-i", "-o", "-e"):
+            err, i = _take_separate(words, i, n)
+            if err:
+                return err, i
+            continue
+        if len(t) > 2 and t[1] in "ioe" and not t.startswith("--"):
+            i += 1
+            continue
+        if t.startswith("--input=") or t.startswith("--output=") or t.startswith("--error="):
+            i += 1
+            continue
+        return _opt_err("an unknown wrapper option"), i
+    return None, i
+
+
+def _walk_timeout(words, i):
+    i += 1
+    n = len(words)
+    while i < n and words[i].startswith("-"):
+        t = words[i]
+        bare = t.split("=", 1)[0]
+        short_glue = len(t) > 2 and not t.startswith("--") and t[1] in "sk" and "=" not in t
+        if bare in ("-s", "--signal", "-k", "--kill-after") or short_glue:
+            glued = ("=" in t) or short_glue or (not t.startswith("--") and t not in ("-s", "-k") and len(t) > 2)
+            if glued:
+                i += 1
+                continue
+            err, i = _take_separate(words, i, n)
+            if err:
+                return err, i
+            continue
+        if t in ("--preserve-status", "--foreground", "-v", "--verbose"):
+            i += 1
+            continue
+        return _opt_err("an unknown wrapper option"), i
+    if i < n:
+        i += 1
+    return None, i
+
+
+def _walk_flags(words, i, flags):
+    i += 1
+    n = len(words)
+    while i < n and words[i].startswith("-"):
+        if words[i] not in flags:
+            return _opt_err("an unknown wrapper option"), i
+        i += 1
+    return None, i
+
+
+def _walk_valued(words, i, flags, valued):
+    i += 1
+    n = len(words)
+    while i < n and words[i].startswith("-"):
+        t = words[i]
+        bare = t.split("=", 1)[0]
+        if bare not in flags and not any(t.startswith(v) and t != v and not t.startswith("--") for v in valued if len(v) == 2):
+            return _opt_err("an unknown wrapper option"), i
+        short = bare if bare in valued else None
+        if short is None:
+            for v in valued:
+                if len(v) == 2 and t.startswith(v) and t != v and not t.startswith("--"):
+                    short = v
+                    break
+        glued = ("=" in t) or (short is not None and t != short)
+        if bare in valued or short is not None:
+            if glued:
+                i += 1
+                continue
+            err, i = _take_separate(words, i, n)
+            if err:
+                return err, i
+            continue
+        i += 1
+    return None, i
+
+
+def _walk_to_command(words, mode="bash"):
+    """One prefix walk. Returns (index of the command word or None, error or None, saw HUSKY=0)."""
+    husky = False
+    i, n = 0, len(words)
+    for t in words:
+        if t == "--config-env" or t.startswith("--config-env="):
+            return None, _cannot("an option --config-env"), husky
+    while i < n:
+        an = _assignment_name(words[i])
+        if not an:
+            break
+        if an.upper().startswith("GIT_CONFIG"):
+            return None, _cannot("an assignment whose name begins GIT_CONFIG"), husky
+        if words[i] == "HUSKY=0":
+            husky = True
+        i += 1
+    while i < n:
+        head = _exe_stem(words[i])
+        if head == "env":
+            err, i, husky = _walk_env(words, i, husky)
+            if err:
+                return None, err, husky
+            continue
+        if head == "nice":
+            err, i = _walk_nice(words, i)
+            if err:
+                return None, err, husky
+            continue
+        if head == "nohup":
+            err, i = _walk_flags(words, i, ())
+            if err:
+                return None, err, husky
+            continue
+        if head == "stdbuf":
+            err, i = _walk_stdbuf(words, i)
+            if err:
+                return None, err, husky
+            continue
+        if head == "timeout":
+            err, i = _walk_timeout(words, i)
+            if err:
+                return None, err, husky
+            continue
+        if head == "setsid":
+            err, i = _walk_flags(words, i, SETSID_OPTS)
+            if err:
+                return None, err, husky
+            continue
+        if head == "sudo":
+            err, i = _walk_valued(words, i, SUDO_OPTS, ("-u", "-g", "--user", "--group"))
+            if err:
+                return None, err, husky
+            continue
+        if head == "exec":
+            err, i = _walk_valued(words, i, EXEC_OPTS, ("-a",))
+            if err:
+                return None, err, husky
+            continue
+        if head == "command":
+            err, i = _walk_flags(words, i, COMMAND_OPTS)
+            if err:
+                return None, err, husky
+            continue
+        if head == "builtin":
+            err, i = _walk_flags(words, i, ())
+            if err:
+                return None, err, husky
+            continue
+        break
+    if i >= n:
+        return None, None, husky
+    head = _exe_stem(words[i])
+    if head in REFUSED_CMD_WORDS:
+        return i, _cannot("a launcher or shell (%s)" % base(words[i])), husky
+    if mode == "bash":
+        if head in BASH_RESERVED:
+            return i, _cannot("a reserved word (%s)" % head), husky
+        if head == "printf" and any(a == "-v" or (a.startswith("-v") and not a.startswith("--")) for a in words[i + 1:]):
+            return i, _cannot("a builtin (printf -v)"), husky
+        if head in REFUSED_BUILTINS:
+            return i, _cannot("a builtin (%s)" % head), husky
+    if head in ("bash", "sh"):
+        err = _parse_bash_sh_words(words[i + 1:])[3]
+        if isinstance(err, str) and err.startswith("the guard cannot read"):
+            return i, err, husky
+        if _bash_reads_stdin(words, i):
+            return i, _cannot("a shell that reads commands from standard input"), husky
+    if head == "cmd":
+        err = _parse_cmd_wrapper(words[i:])
+        if err:
+            return i, err, husky
+    if head in ("powershell", "pwsh"):
+        err = _parse_ps_wrapper(words[i:])
+        if err:
+            return i, err, husky
+    return i, None, husky
+
+
+def _parse_env_words(words):
+    err, _i, _h = _walk_env(words, 0, False)
+    return err
 
 
 def _wrapper_opt_refusal(words, depth):
-    if not words:
-        return None
-    head = base(words[0]).replace(".exe", "")
-    if head == "env":
-        return _parse_env_words(words)
-    if head == "xargs":
-        return _cannot("xargs")
-    if head == "nice":
-        return _scan_simple_opts(words, NICE_OPTS, ("-n", "--adjustment"))
-    if head == "stdbuf":
-        return _scan_glue_opts(words, STDBUF_OPTS)
-    if head == "timeout":
-        return _scan_simple_opts(words, TIMEOUT_OPTS, ("-s", "--signal", "-k", "--kill-after"))
-    if head == "setsid":
-        return _scan_simple_opts(words, SETSID_OPTS, ())
-    if head == "sudo":
-        return _scan_simple_opts(words, SUDO_OPTS, ("-u", "-g", "--user", "--group"))
-    if head == "exec":
-        return _scan_simple_opts(words, EXEC_OPTS, ("-a",))
-    if head == "command":
-        return _scan_simple_opts(words, COMMAND_OPTS, ())
-    if head in ("bash", "sh"):
-        opts, rest, has_c, err = _parse_bash_sh_words(words[1:])
-        if isinstance(err, str) and err.startswith("the guard cannot read"):
-            return err
-    if head in ("cmd", "cmd.exe"):
-        return _parse_cmd_wrapper(words)
-    if head in ("powershell", "pwsh", "powershell.exe", "pwsh.exe"):
-        return _parse_ps_wrapper(words)
-    return None
+    _idx, err, _husky = _walk_to_command(words, "bash")
+    return err
 
 
-def _scan_simple_opts(words, allowed, with_val):
-    i = 1
-    while i < len(words):
-        t = words[i]
-        if not t.startswith("-"):
-            break
-        opt = t.split("=", 1)[0]
-        if opt not in allowed:
-            return _cannot("an unknown wrapper option")
-        if opt in with_val and "=" not in t and i + 1 < len(words):
-            i += 2
-        else:
-            i += 1
-    return None
-
-
-def _scan_glue_opts(words, prefixes):
-    i = 1
-    while i < len(words):
-        t = words[i]
-        if not t.startswith("-"):
-            break
-        if not any(t == p or t.startswith(p) for p in prefixes):
-            return _cannot("an unknown wrapper option")
-        if not any(t.startswith(p) for p in prefixes if p.endswith("=")) and "=" not in t and i + 1 < len(words):
-            i += 2
-        else:
-            i += 1
-    return None
+def _cmd_switch_key(tl):
+    """The letter of a /x or //x switch, and the text glued after it."""
+    if tl.startswith("//"):
+        return tl[2:3], tl[3:]
+    if tl.startswith("/"):
+        return tl[1:2], tl[2:]
+    return "", tl
 
 
 def _parse_cmd_wrapper(words):
-    i = 1
-    inner_start = None
+    """Every switch before the inner command. /d /cgit is the glued switch /cgit."""
+    i, seen = 1, False
     while i < len(words):
-        t = words[i]
-        tl = t.lower()
-        if tl in CMD_OK_SWITCH:
-            inner_start = i + 1
-            i += 1
+        tl = words[i].lower()
+        if tl in ("/c", "/k", "/r", "//c", "//k", "//r"):
+            seen = True
             break
-        if tl.startswith("/") or tl.startswith("//"):
-            if tl in ("/v", "//v", "/e", "/f", "/a", "/u", "/t") or tl.startswith("/v:") or tl.startswith("//v:"):
-                return _cannot("an unknown cmd switch")
-            if len(t) >= 3 and tl[:3] in ("/c", "//c", "/k", "//k", "/r", "//r") and len(t) > 3:
+        if tl in ("/d", "/s", "/q", "//d", "//s", "//q"):
+            i += 1
+            continue
+        if tl.startswith("/"):
+            key, rest = _cmd_switch_key(tl)
+            if key in "ckr" and rest:
                 return _cannot("a switch glued to its command")
             return _cannot("an unknown cmd switch")
         return _cannot("an unknown cmd switch")
-    if inner_start is None:
+    if not seen:
         return _cannot("cmd without /c, /k or /r")
     return None
 
 
 def _parse_ps_wrapper(words):
-    i, seen_cmd, seen_file = 1, False, False
+    i = 1
     while i < len(words):
         raw = words[i]
         t = _ps_norm_switch(raw)
-        if t in ("-e", "-ec") or t.startswith("-en") or t.startswith("-encodedcommand") or (t.startswith("//") and _ps_norm_switch(raw).startswith("-en")):
+        if t in ("-e", "-ec") or t.startswith("-en") or t.startswith("-encodedcommand"):
             return "an encoded PowerShell command, which the guard cannot read"
-        if len(t) >= 2 and "-command".startswith(t) or t.startswith("-command"):
-            seen_cmd = True
-            i += 1
+        if (len(t) >= 2 and "-command".startswith(t)) or t.startswith("-command"):
             break
         if t.startswith("-file") or t == "-f":
-            seen_file = True
-            i += 1
             break
-        if t in ("-noprofile", "-nop", "-noninteractive", "-noni", "-nologo", "-sta", "-mta", "-noexit"):
-            i += 1; continue
+        if t in ("-noprofile", "-nop", "-noninteractive", "-noni", "-nologo", "-sta", "-mta"):
+            i += 1
+            continue
         if t in PS_VALUE_SWITCHES or any(t == x or t.startswith(x + "=") for x in PS_VALUE_SWITCHES):
             i += 2 if "=" not in raw and i + 1 < len(words) else 1
             continue
@@ -492,6 +632,16 @@ def _brace_in_word_ok(prefix, c, nxt):
     return True
 
 
+_BRACE_NAME = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+
+
+def _note(refuse, err):
+    if not err:
+        return
+    prefix = "the guard cannot read the command: "
+    refuse(err[len(prefix):] if err.startswith(prefix) else err)
+
+
 def _read_bash(text):
     unreadable, gh_amp = None, None
     n = len(text)
@@ -501,60 +651,122 @@ def _read_bash(text):
         if unreadable is None:
             unreadable = _cannot(msg)
 
-    quote, wbuf = None, []
-    words, raw_parts = [], []
-    commands, chain, chain_wds = [], [], []
+    quote = None
+    wbuf = []
+    word_started = False
+    word_quoted = False
+    word_backslash = False
+    brace_only = False
+    pending = False
+    words = []
+    commands, chain, chain_wds, parts = [], [], [], []
     seg_words, piped = [], False
     last_amp_glued = False
-    i, bs_run = 0, 0
+    i = 0
     in_comment = False
-    chain_buf = []
 
-    def in_sq():
-        return quote == "s"
+    def reset_word():
+        nonlocal wbuf, word_started, word_quoted, word_backslash, brace_only
+        wbuf = []
+        word_started = False
+        word_quoted = False
+        word_backslash = False
+        brace_only = False
 
-    def in_dq():
-        return quote == "d"
-
-    def flush_word():
-        nonlocal wbuf, last_amp_glued, words
-        if not wbuf:
+    def emit_word():
+        nonlocal pending
+        if pending:
+            if word_started:
+                pending = False
+                reset_word()
+            return
+        if not word_started:
             return
         words.append("".join(wbuf))
-        wbuf = []
+        reset_word()
 
     def finish_cmd(sep):
         nonlocal piped, seg_words, last_amp_glued, gh_amp, words, commands
-        flush_word()
+        emit_word()
+        if pending:
+            refuse("a redirection with no target")
+            return
         if not words:
             return
-        for w in words:
-            if w in ("--config-env",) or w.startswith("--config-env="):
-                refuse("an option --config-env")
-                return
         cw = list(words)
         commands.append({"words": cw, "sep": sep, "pipe": piped, "last_amp": last_amp_glued})
         seg_words.append(cw)
         if _gh_api_head(cw) and last_amp_glued:
             gh_amp = "an unquoted & in a gh api argument (quote the URL or put each query field in its own quoted argument)"
-        wr = _wrapper_opt_refusal(cw, 0)
-        if wr:
-            refuse(wr.split(": ", 1)[-1] if ": " in wr else wr)
-        cr = _cmd_word_refusal(cw, "bash")
-        if cr:
-            refuse(cr.split(": ", 1)[-1] if ": " in cr else cr)
+        _note(refuse, _cmd_word_refusal(cw, "bash"))
         words[:] = []
         piped = False
         last_amp_glued = False
 
     def finish_chain(sep):
-        nonlocal seg_words, chain_buf, chain, chain_wds
+        nonlocal seg_words, chain, chain_wds, parts
         finish_cmd(sep)
         if seg_words:
-            chain.append("".join(chain_buf).strip() or " ".join(" ".join(x) for x in seg_words))
+            chain.append(" ".join(" ".join(s) for s in seg_words))
             chain_wds.append(list(seg_words[0]))
+            parts.append([list(s) for s in seg_words])
             seg_words = []
-            chain_buf = []
+
+    def digits_held():
+        if not word_started or word_quoted or word_backslash or not wbuf:
+            return False
+        for ch in wbuf:
+            if not ch.isdigit():
+                return False
+        return True
+
+    def boundary(kind, glued_amp=False):
+        nonlocal last_amp_glued, piped
+        if glued_amp:
+            last_amp_glued = word_started and not pending
+        if pending and not word_started:
+            refuse("a redirection with no target")
+            return
+        emit_word()
+        if kind == "pipe":
+            finish_cmd("|")
+            piped = True
+        else:
+            finish_chain(kind)
+
+    def start_redirect(at):
+        nonlocal pending, i
+        if at in "<>" and brace_only:
+            refuse("a named file descriptor redirection")
+            return False
+        if pending and not word_started:
+            refuse("a redirection with no target")
+            return False
+        if pending and word_started:
+            pending = False
+            reset_word()
+        elif word_started:
+            if at in "<>" and digits_held():
+                reset_word()
+            else:
+                emit_word()
+        c1 = text[i + 1] if i + 1 < n else ""
+        c2 = text[i + 2] if i + 2 < n else ""
+        if at == "&":
+            i += 3 if c1 == ">" and c2 == ">" else 2
+        elif at == "<":
+            i += 2 if c1 in ">&" else 1
+        elif c1 in ">&|":
+            i += 2
+        else:
+            i += 1
+        pending = True
+        return True
+
+    def mark():
+        nonlocal word_started, brace_only
+        word_started = True
+        brace_only = False
 
     while i < n:
         if unreadable:
@@ -566,64 +778,175 @@ def _read_bash(text):
             i += 1
             continue
         c = text[i]
-        chain_buf.append(c)
-        raw_parts.append(c)
         if quote == "s":
             if c == "'":
                 quote = None
             else:
                 wbuf.append(c)
+                mark()
             i += 1
             continue
         if quote == "d":
             if c == "\\" and i + 1 < n:
                 nxt = text[i + 1]
                 if nxt in '"\\':
-                    wbuf.append(nxt); i += 2; continue
+                    wbuf.append(nxt)
+                    mark()
+                    i += 2
+                    continue
                 if nxt == "\n":
-                    i += 2; continue
-                wbuf.append(c); i += 1; continue
+                    i += 2
+                    continue
+                wbuf.append(c)
+                mark()
+                i += 1
+                continue
             if c in "$`":
                 refuse("a substitution inside double quotes")
                 break
             if c == '"':
-                quote = None; i += 1; continue
-            wbuf.append(c); i += 1; continue
+                quote = None
+                i += 1
+                continue
+            wbuf.append(c)
+            mark()
+            i += 1
+            continue
         if c == "\\" and i + 1 < n:
             nxt = text[i + 1]
+            if nxt == "$":
+                refuse("a command substitution")
+                break
             if nxt == "`":
                 refuse("a backtick command")
                 break
-            if nxt in "\r\n":
-                j = i
-                while j < n and text[j] == "\\":
-                    j += 1
-                if (j - i) % 2 == 1:
-                    while j < n and text[j] in "\r\n":
-                        j += 1
-                    i = j
-                    continue
-            wbuf.append(nxt); i += 2; continue
+            if nxt == "\n":
+                i += 2
+                continue
+            if nxt == "\r":
+                wbuf.append("\r")
+                word_started = True
+                word_backslash = True
+                brace_only = False
+                i += 2
+                continue
+            wbuf.append(nxt)
+            word_started = True
+            word_backslash = True
+            brace_only = False
+            i += 2
+            continue
+        if c == "\\":
+            wbuf.append(c)
+            word_started = True
+            word_backslash = True
+            brace_only = False
+            i += 1
+            continue
         if c == "`":
             refuse("a backtick command")
             break
-        if c == "#" and not wbuf:
-            in_comment = True; i += 1; continue
-        if c == "'":
-            quote = "s"; i += 1; continue
-        if c == '"':
-            quote = "d"; i += 1; continue
-        if text.startswith("$(", i) or c == "$":
+        if c == "$":
             refuse("a command substitution")
             break
-        if text.startswith("<<", i):
+        if c == "<" and i + 1 < n and text[i + 1] == "(":
+            refuse("process substitution")
+            break
+        if c == ">" and i + 1 < n and text[i + 1] == "(":
+            refuse("process substitution")
+            break
+        if c == "<" and i + 1 < n and text[i + 1] == "<":
             refuse("a here-document")
             break
-        if not in_dq() and text.startswith("<(", i):
-            refuse("process substitution")
+        if c == "&" and i + 1 < n and text[i + 1] == ">":
+            if not start_redirect("&"):
+                break
+            continue
+        if c == "<" or c == ">":
+            if not start_redirect(c):
+                break
+            continue
+        if c == "|":
+            if i + 1 < n and text[i + 1] == "|":
+                boundary("||")
+                i += 2
+            elif i + 1 < n and text[i + 1] == "&":
+                boundary("pipe")
+                i += 2
+            else:
+                boundary("pipe")
+                i += 1
+            continue
+        if c == "&":
+            if i + 1 < n and text[i + 1] == "&":
+                boundary("&&")
+                i += 2
+            else:
+                boundary("&", glued_amp=True)
+                i += 1
+            continue
+        if c in (";", "\n"):
+            boundary(c)
+            i += 1
+            continue
+        if c in " \t\r":
+            if pending and not word_started:
+                i += 1
+                continue
+            emit_word()
+            i += 1
+            continue
+        if c == "#" and not word_started:
+            if pending:
+                refuse("a redirection with no target")
+                break
+            in_comment = True
+            i += 1
+            continue
+        if c == "'":
+            quote = "s"
+            word_started = True
+            word_quoted = True
+            brace_only = False
+            i += 1
+            continue
+        if c == '"':
+            quote = "d"
+            word_started = True
+            word_quoted = True
+            brace_only = False
+            i += 1
+            continue
+        if c == "{":
+            if i + 1 >= n:
+                refuse("brace expansion (quote it)")
+                break
+            nxt = text[i + 1]
+            if nxt == "}":
+                wbuf.append("{")
+                wbuf.append("}")
+                word_started = True
+                brace_only = False
+                i += 2
+                continue
+            if nxt in _BRACE_NAME:
+                j = i + 1
+                while j < n and text[j] in _BRACE_NAME:
+                    j += 1
+                if j < n and text[j] == "}":
+                    wholly = not word_started
+                    k = i
+                    while k <= j:
+                        wbuf.append(text[k])
+                        k += 1
+                    word_started = True
+                    brace_only = wholly
+                    i = j + 1
+                    continue
+            refuse("brace expansion (quote it)")
             break
-        if not in_dq() and text.startswith(">(", i):
-            refuse("process substitution")
+        if c == "}":
+            refuse("brace expansion (quote it)")
             break
         if c in "()":
             refuse("parentheses")
@@ -631,119 +954,48 @@ def _read_bash(text):
         if c in "*?[":
             refuse("a glob character (quote it)")
             break
-        if c in "{}":
-            rest = text[i:]
-            if c == "{" and re.match(r"^\{[A-Za-z_][A-Za-z0-9_]*\}>", rest):
-                refuse("a named file descriptor redirection")
-                break
-            if c == "{" and not (rest.startswith("{}") or re.match(r"^\{[A-Za-z0-9_-]+\}", rest)):
-                refuse("brace expansion")
-                break
-            if c == "}" and "}" not in "".join(wbuf) and wbuf:
-                pass
-        rr = _try_redirect_bash(text, i, refuse)
-        if rr is not None:
-            flush_word()
-            i = rr
-            continue
-        if i + 1 < n and text[i:i + 2] in ("&&", "||"):
-            finish_chain(text[i:i + 2]); i += 2; continue
-        if c in (";", "\n"):
-            finish_chain(c); i += 1; continue
-        if c == "|" or text.startswith("|&", i):
-            finish_cmd("|")
-            piped = True
-            i += 2 if text.startswith("|&", i) else 1
-            continue
-        if c == "&" and (i + 1 >= n or text[i + 1] not in ">&"):
-            glued = bool(wbuf)
-            last_amp_glued = glued
-            finish_chain("&")
-            i += 1
-            continue
-        if c in " \t\r":
-            flush_word(); i += 1; continue
-        wbuf.append(c); i += 1
+        wbuf.append(c)
+        mark()
+        i += 1
     if unreadable is None and quote:
         refuse("an unclosed quote")
+    if unreadable is None and pending and not word_started:
+        refuse("a redirection with no target")
     if unreadable is None:
-        flush_word()
+        emit_word()
         if words:
             finish_cmd(None)
         if seg_words:
-            chain.append("".join(chain_buf).strip() or " ".join(" ".join(x) for x in seg_words))
+            chain.append(" ".join(" ".join(s) for s in seg_words))
             chain_wds.append(list(seg_words[-1]))
+            parts.append([list(s) for s in seg_words])
     if not chain and commands:
         chain = [" ".join(" ".join(c["words"]) for c in commands)]
         chain_wds = [commands[0]["words"]]
-    return {"unreadable": unreadable, "commands": commands, "chain": chain, "chain_wds": chain_wds, "gh_amp": gh_amp, "text": text}
+        if not parts:
+            parts = [[c["words"]] for c in commands]
+    return {"unreadable": unreadable, "commands": commands, "chain": chain, "chain_wds": chain_wds, "parts": parts, "gh_amp": gh_amp, "text": text}
 
 
-def _skip_redirect_target_bash(text, j, n, refuse):
-    if j >= n:
-        refuse("a redirection with no target")
-        return n
-    while j < n and text[j] in " \t":
-        j += 1
-    if j >= n:
-        refuse("a redirection with no target")
-        return n
-    if text[j] in "'\"":
-        q = text[j]
-        j += 1
-        while j < n and text[j] != q:
-            if q == '"' and text[j] in "$`":
-                refuse("a substitution in a redirection target")
-                return n
-            if q == '"' and text.startswith("$(", j):
-                refuse("a substitution in a redirection target")
-                return n
-            j += 1
-        return j + 1 if j < n else n
-    if text[j] in "$`(":
-        refuse("a redirection target")
-        return n
-    if text.startswith("<&", j) or text.startswith(">&", j):
-        k = j + 2
-        if k < n and (text[k].isdigit() or text[k] == "-"):
-            while k < n and text[k].isdigit():
-                k += 1
-            return k
-    while j < n and text[j] not in " \t\n\r;|&":
-        j += 1
-    return j
+def _ps_char_ok(c, nxt):
+    if c in "\t\n":
+        return True
+    if c == "\r":
+        return nxt == "\n"
+    return 32 <= ord(c) <= 126
 
 
-def _try_redirect_bash(text, i, refuse):
-    n = len(text)
-    m, k = 0, i
-    while k < n and text[k].isdigit():
+def _ps_splat_word(word):
+    if len(word) < 2 or word[0] != "@":
+        return False
+    if word[1] not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_":
+        return False
+    k = 2
+    while k < len(word):
+        if word[k] not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_":
+            return False
         k += 1
-    start = k
-    if text.startswith(">&-", start):
-        m = 4
-    elif text.startswith("&>>", start):
-        m = 3
-    elif text.startswith(">>", start):
-        m = 2
-    elif text.startswith("<<", start):
-        return None
-    elif text.startswith("<&", start) or text.startswith(">&", start):
-        m = 2
-    elif text.startswith("<>", start) or text.startswith(">|", start):
-        m = 2
-    elif text.startswith("&>", start):
-        m = 2
-    elif text.startswith("2>&1", start):
-        m = 4
-    elif text.startswith("2>", start):
-        m = 2
-    elif start < n and text[start] in "<>":
-        m = 1
-    else:
-        return None
-    j = _skip_redirect_target_bash(text, start + m, n, refuse)
-    return j
+    return True
 
 
 def _read_powershell(text):
@@ -755,85 +1007,197 @@ def _read_powershell(text):
         if unreadable is None:
             unreadable = _cannot(msg)
 
-    quote, wbuf, words = None, [], []
-    commands, chain, chain_wds, seg_words = [], [], [], []
+    quote = None
+    wbuf = []
+    word_started = False
+    word_quoted = False
+    pending = False
+    words = []
+    commands, chain, chain_wds, seg_words, parts = [], [], [], [], []
     i = 0
 
-    def flush_word():
-        nonlocal wbuf, words
-        if wbuf:
-            words.append("".join(wbuf))
-            wbuf.clear()
+    def reset_word():
+        nonlocal wbuf, word_started, word_quoted
+        wbuf = []
+        word_started = False
+        word_quoted = False
+
+    def emit_word():
+        nonlocal pending
+        if word_started:
+            word = "".join(wbuf)
+            if not word:
+                refuse("an empty quoted word")
+                reset_word()
+                pending = False
+                return
+            if _ps_splat_word(word):
+                refuse("splatting")
+                reset_word()
+                pending = False
+                return
+        if pending:
+            if word_started:
+                pending = False
+                reset_word()
+            return
+        if not word_started:
+            return
+        words.append("".join(wbuf))
+        reset_word()
+
+    def ps_command_shape(cw):
+        if unreadable is not None:
+            return
+        _note(refuse, _cmd_word_refusal(cw, "powershell"))
+        if unreadable is not None:
+            return
+        wp = strip_prefix(cw)
+        if not wp:
+            return
+        tok = wp[0]
+        tl = tok.lower()
+        if tl in PS_ALIASES_BAD or tl in ("iex", "invoke-expression", "start", "set-alias"):
+            refuse("a cmdlet or alias (%s)" % tok)
+            return
+        if "\\" in tok:
+            tail = tok[tok.rfind("\\") + 1:]
+            low = tail.lower()
+            if _verb_noun(tail) or low in PS_ALIASES_OK or low in PS_ALIASES_BAD:
+                refuse("a module-qualified cmdlet (%s)" % tok)
+                return
+        elif _verb_noun(tok) and tl not in PS_CMDLETS and tl not in PS_ALIASES_OK:
+            refuse("a cmdlet (%s)" % tok)
 
     def finish_cmd(sep):
-        nonlocal words, commands, seg_words, unreadable
-        flush_word()
+        nonlocal words, commands, seg_words
+        emit_word()
+        if pending:
+            refuse("a redirection with no target")
+            return
         if not words:
             return
         cw = list(words)
         commands.append({"words": cw, "sep": sep, "pipe": False, "last_amp": False})
         seg_words.append(cw)
-        wr = _wrapper_opt_refusal(cw, 0)
-        if wr and unreadable is None:
-            unreadable = wr
-        cr = _cmd_word_refusal(cw, "powershell")
-        if cr and unreadable is None:
-            unreadable = cr
-        elif unreadable is None:
-            wp = strip_prefix(cw)
-            if wp:
-                tl = wp[0].lower()
-                if tl in PS_ALIASES_BAD or tl in ("iex", "invoke-expression", "start", "set-alias"):
-                    unreadable = _cannot("a cmdlet or alias (%s)" % wp[0])
-                elif "\\" in wp[0]:
-                    tail = wp[0].split("\\")[-1].lower()
-                    if tail in PS_ALIASES_BAD or tail == "invoke-expression":
-                        unreadable = _cannot("a module-qualified cmdlet (%s)" % wp[0])
-                elif _verb_noun(wp[0]) and tl not in PS_CMDLETS and tl not in PS_ALIASES_OK:
-                    unreadable = _cannot("a cmdlet (%s)" % wp[0])
-        words.clear()
+        ps_command_shape(cw)
+        words[:] = []
 
     def finish_chain(sep):
-        nonlocal chain, chain_wds, seg_words
+        nonlocal chain, chain_wds, seg_words, parts
         finish_cmd(sep)
         if seg_words:
             chain.append(" ".join(" ".join(x) for x in seg_words))
             chain_wds.append(list(seg_words[0]))
-            seg_words.clear()
+            parts.append([list(s) for s in seg_words])
+            seg_words = []
+
+    def ps_desc():
+        return word_started and not word_quoted and len(wbuf) == 1 and wbuf[0] in "123456*"
+
+    def start_ps_redirect():
+        nonlocal pending, i
+        if pending and not word_started:
+            refuse("a redirection with no target")
+            return False
+        desc = ps_desc()
+        if pending and word_started:
+            pending = False
+            reset_word()
+        elif desc:
+            reset_word()
+        elif word_started:
+            emit_word()
+        c1 = text[i + 1] if i + 1 < n else ""
+        c2 = text[i + 2] if i + 2 < n else ""
+        if c1 == ">":
+            pending = True
+            i += 2
+            return True
+        if c1 == "&":
+            if desc and c2 in "12":
+                i += 3
+                return True
+            refuse("a redirection")
+            return False
+        pending = True
+        i += 1
+        return True
+
+    def boundary(kind):
+        if pending and not word_started:
+            refuse("a redirection with no target")
+            return
+        if kind == "pipe":
+            finish_cmd("|")
+        else:
+            finish_chain(kind)
 
     while i < n and unreadable is None:
         c = text[i]
-        if ord(c) > 127 and c not in "\t\n":
-            refuse("a non-ASCII character")
+        nxt = text[i + 1] if i + 1 < n else ""
+        if c == "\r" and nxt != "\n":
+            refuse("a lone carriage return")
+            break
+        if not _ps_char_ok(c, nxt):
+            refuse("a character outside printable ASCII")
             break
         if quote == "s":
-            if c == "'" and i + 1 < n and text[i + 1] == "'":
-                wbuf.append("'"); i += 2; continue
+            if c == "'" and nxt == "'":
+                wbuf.append("'")
+                word_started = True
+                i += 2
+                continue
             if c == "'":
-                quote = None; i += 1; continue
-            wbuf.append(c); i += 1; continue
+                quote = None
+                i += 1
+                continue
+            wbuf.append(c)
+            word_started = True
+            i += 1
+            continue
         if quote == "d":
+            if c == '"' and nxt == '"':
+                wbuf.append('"')
+                word_started = True
+                i += 2
+                continue
             if c == '"':
-                if i + 1 < n and text[i + 1] == '"':
-                    wbuf.append('"'); i += 2; continue
-                quote = None; i += 1; continue
+                quote = None
+                i += 1
+                continue
             if c in "$`":
                 refuse("a substitution")
                 break
-            wbuf.append(c); i += 1; continue
-        if text.startswith("<#", i):
+            wbuf.append(c)
+            word_started = True
+            i += 1
+            continue
+        if c == "<" and nxt == "#":
             refuse("a block comment")
             break
+        if c == "<" and nxt == "<":
+            refuse("a here-document")
+            break
         if c == "'" or c == '"':
-            quote = "s" if c == "'" else "d"; i += 1; continue
-        if c == "#" and not wbuf:
+            quote = "s" if c == "'" else "d"
+            word_started = True
+            word_quoted = True
+            i += 1
+            continue
+        if c == "#" and not word_started:
+            if pending:
+                refuse("a redirection with no target")
+                break
             while i < n and text[i] != "\n":
                 i += 1
             continue
         if c == "`":
-            if i + 1 < n and text[i + 1] in "\r\n":
-                while i < n and text[i] in "`\r\n":
-                    i += 1
+            if nxt == "\n":
+                i += 2
+                continue
+            if nxt == "\r" and i + 2 < n and text[i + 2] == "\n":
+                i += 3
                 continue
             refuse("a backtick")
             break
@@ -843,94 +1207,191 @@ def _read_powershell(text):
         if c in "(){}[]":
             refuse("parentheses or braces")
             break
-        if c == "@" and i + 1 < n:
-            nxt = text[i + 1]
-            if nxt in "({'\"":
-                refuse("splatting")
+        if c == "@" and nxt in "({'\"":
+            refuse("splatting")
+            break
+        if c == ">" :
+            if not start_ps_redirect():
                 break
-            if re.match(r"@[A-Za-z_][A-Za-z0-9_]*$", text[i:].split()[0] if text[i:].split() else ""):
-                refuse("splatting")
-                break
-        if i + 1 < n and text[i:i + 2] in ("&&", "||"):
-            finish_chain(text[i:i + 2]); i += 2; continue
+            continue
+        if c == "&" and nxt == "&":
+            boundary("&&")
+            i += 2
+            continue
+        if c == "|" and nxt == "|":
+            boundary("||")
+            i += 2
+            continue
         if c in (";", "\n"):
-            finish_chain(c); i += 1; continue
+            boundary(c)
+            i += 1
+            continue
         if c == "|":
-            finish_cmd("|"); i += 1; continue
-        if c == "&" and not wbuf:
-            finish_chain("&")
+            boundary("pipe")
+            i += 1
+            continue
+        if c == "&" and not word_started:
+            boundary("&")
             i += 1
             continue
         if c == "\r":
-            if i + 1 >= n or text[i + 1] != "\n":
-                refuse("a lone carriage return")
-                break
-            flush_word(); i += 1; continue
+            if pending and not word_started:
+                i += 1
+                continue
+            emit_word()
+            i += 1
+            continue
         if c in " \t":
-            flush_word(); i += 1; continue
-        if c in "&." and not wbuf and not words:
-            i += 1; continue
-        if text.startswith("--%", i):
+            if pending and not word_started:
+                i += 1
+                continue
+            emit_word()
+            i += 1
+            continue
+        if c == "." and not word_started and not words:
+            i += 1
+            continue
+        if c == "-" and not word_started and nxt == "-" and i + 2 < n and text[i + 2] == "%":
             refuse("stop-parsing")
             break
-        if i + 1 < n and text[i:i + 2] in (">>", "2>", "2>&1", "*>"):
-            i = _try_redirect_ps(text, i) or i + 2
-            continue
-        if c in ">" :
-            i = _try_redirect_ps(text, i) or i + 1
-            continue
-        wbuf.append(c); i += 1
+        wbuf.append(c)
+        word_started = True
+        i += 1
     if unreadable is None and quote:
         refuse("an unclosed quote")
+    if unreadable is None and pending and not word_started:
+        refuse("a redirection with no target")
     if unreadable is None:
         finish_chain(None)
     if not chain and commands:
         chain = [" ".join(" ".join(c["words"]) for c in commands)]
         chain_wds = [commands[0]["words"]]
-    return {"unreadable": unreadable, "commands": commands, "chain": chain, "chain_wds": chain_wds, "gh_amp": gh_amp, "text": text}
-
-
-def _try_redirect_ps(text, i):
-    for op in (">>", "2>&1", "2>", "*>", ">"):
-        if text.startswith(op, i):
-            j = i + len(op)
-            while j < len(text) and text[j] in " \t":
-                j += 1
-            while j < len(text) and text[j] not in " \t\n\r;|":
-                j += 1
-            return j
-    return None
+        if not parts:
+            parts = [[c["words"]] for c in commands]
+    return {"unreadable": unreadable, "commands": commands, "chain": chain, "chain_wds": chain_wds, "parts": parts, "gh_amp": gh_amp, "text": text}
 
 
 def _read_cmd(text):
-    for ch in "\"'\\^%!`()\r\n":
-        if ch in text:
-            return {"unreadable": _cannot("cmd inner command character %s" % ch), "commands": [], "chain": [], "chain_wds": [], "gh_amp": None}
-    parts, buf, commands = [], [], []
-    i, n = 0, len(text)
-    while i <= n:
-        if i == n or text[i] in "&":
-            if buf:
-                parts.append("".join(buf).strip())
-                buf = []
-            if i < n and text[i] == "&":
-                i += 2 if i + 1 < n and text[i + 1] == "&" else 1
-                continue
-        if i < n:
-            buf.append(text[i])
-        i += 1
-    for part in parts:
-        if not part:
-            continue
-        words = part.split()
+    bad = "\"'\\^%!()\r\n" + "`"
+    for ch in text:
+        if ch in bad:
+            return {"unreadable": _cannot("cmd inner command character %s" % ch), "commands": [], "chain": [], "chain_wds": [], "parts": [], "gh_amp": None}
+    unreadable = None
+    n = len(text)
+    wbuf, words = [], []
+    word_started = False
+    pending = False
+    commands, chain, chain_wds, seg, parts = [], [], [], [], []
+    i = 0
+
+    def refuse(msg):
+        nonlocal unreadable
+        if unreadable is None:
+            unreadable = _cannot(msg)
+
+    def reset_word():
+        nonlocal wbuf, word_started
+        wbuf = []
+        word_started = False
+
+    def emit_word():
+        nonlocal pending
+        if pending:
+            if word_started:
+                pending = False
+                reset_word()
+            return
+        if word_started:
+            words.append("".join(wbuf))
+            reset_word()
+
+    def one_digit():
+        return word_started and len(wbuf) == 1 and wbuf[0].isdigit()
+
+    def close_cmd():
+        emit_word()
+        if pending:
+            refuse("a redirection with no target")
+            return
         if not words:
+            return
+        cw = list(words)
+        _note(refuse, _cmd_word_refusal(cw, "cmd"))
+        idx, _err, _husky = _walk_to_command(cw, "cmd")
+        if idx is not None and _exe_stem(cw[idx]) in CMD_BAD_BUILTIN:
+            refuse("a cmd builtin (%s)" % _exe_stem(cw[idx]))
+        commands.append({"words": cw, "sep": None, "pipe": False, "last_amp": False})
+        seg.append(cw)
+        words[:] = []
+
+    def close_part():
+        close_cmd()
+        if seg:
+            chain.append(" ".join(" ".join(s) for s in seg))
+            chain_wds.append(list(seg[0]))
+            parts.append([list(s) for s in seg])
+            seg[:] = []
+
+    while i < n and unreadable is None:
+        c = text[i]
+        nxt = text[i + 1] if i + 1 < n else ""
+        if c in "<>":
+            if pending and not word_started:
+                refuse("a redirection with no target")
+                break
+            digit = one_digit()
+            if pending and word_started:
+                pending = False
+                reset_word()
+            elif digit:
+                reset_word()
+            elif word_started:
+                emit_word()
+            c2 = text[i + 2] if i + 2 < n else ""
+            if c == ">" and nxt == ">":
+                pending = True
+                i += 2
+                continue
+            if nxt == "&" and c2.isdigit():
+                i += 3
+                continue
+            if nxt == "&":
+                refuse("a redirection")
+                break
+            pending = True
+            i += 1
             continue
-        bw = base(words[0]).lower()
-        if bw in CMD_BAD_BUILTIN:
-            return {"unreadable": _cannot("a cmd builtin (%s)" % bw), "commands": [], "chain": [], "chain_wds": [], "gh_amp": None}
-        commands.append({"words": words, "sep": None, "pipe": False, "last_amp": False})
-    chain_wds = [c["words"] for c in commands]
-    return {"unreadable": None, "commands": commands, "chain": parts if len(parts) > 1 else ([text.strip()] if parts else []), "chain_wds": chain_wds if chain_wds else [], "gh_amp": None, "text": text}
+        if c == "|":
+            if pending and not word_started:
+                refuse("a redirection with no target")
+                break
+            if nxt == "|":
+                close_part()
+                i += 2
+            else:
+                close_cmd()
+                i += 1
+            continue
+        if c == "&":
+            if pending and not word_started:
+                refuse("a redirection with no target")
+                break
+            close_part()
+            i += 2 if nxt == "&" else 1
+            continue
+        if c in " \t":
+            if not (pending and not word_started):
+                emit_word()
+            i += 1
+            continue
+        wbuf.append(c)
+        word_started = True
+        i += 1
+    if unreadable is None and pending and not word_started:
+        refuse("a redirection with no target")
+    if unreadable is None:
+        close_part()
+    return {"unreadable": unreadable, "commands": commands, "chain": chain, "chain_wds": chain_wds, "parts": parts, "gh_amp": None, "text": text}
 
 
 def chain_parts(text, mode="bash"):
@@ -964,97 +1425,83 @@ def in_workspace(cwd):
     return bool(cwd) and os.path.isfile(os.path.join(cwd, "docs", "PROJECT_STATUS.md"))
 
 
+def _stage_changes(parts):
+    for part in parts:
+        for stage in part:
+            w = strip_prefix(stage) if stage else []
+            if w and state_changing(w):
+                return w
+    return None
+
+
 def _chain_lists(parsed, command, mode, depth):
     lists = []
-    ch, cw = parsed.get("chain", []), parsed.get("chain_wds", [])
-    if len(ch) >= 2:
-        lists.append((ch, cw))
+    parts = parsed.get("parts") or []
+    if len(parts) >= 2:
+        lists.append(parts)
     for cmd in parsed.get("commands", []):
         w = strip_prefix(cmd["words"])
         if not w:
             continue
-        head = base(w[0]).replace(".exe", "")
+        head = _exe_stem(w[0])
         inner = None
         inner_mode = mode
         if head == "eval" and len(w) > 1:
             inner = " ".join(w[1:])
-        elif head in WRAPPER_SHELLS:
+        elif head in WRAPPER_SHELLS or base(w[0]) in WRAPPER_SHELLS:
             inner = shell_inner(w)
             if inner is ENCODED:
                 continue
-            if head in ("powershell", "pwsh", "powershell.exe", "pwsh.exe"):
+            if head in ("powershell", "pwsh"):
                 inner_mode = "powershell"
-            elif head in ("cmd", "cmd.exe"):
+            elif head == "cmd":
                 inner_mode = "cmd"
         if inner and depth < READ_DEPTH_BOUND:
             sp = read_commands(inner, mode=inner_mode)
-            if not sp.get("unreadable") and len(sp.get("chain", [])) >= 2:
-                lists.append((sp["chain"], sp.get("chain_wds", [])))
+            ip = sp.get("parts") or []
+            if not sp.get("unreadable") and len(ip) >= 2:
+                lists.append(ip)
         if head == "find" and any(x in w for x in ("-exec", "-execdir", "-ok", "-okdir")):
             for j, t in enumerate(w):
                 if t in ("-exec", "-execdir", "-ok", "-okdir"):
                     clip = [x for x in w[j + 1:] if x not in (";", "+", "{}")]
                     if clip:
                         ip = read_commands(" ".join(clip), mode=mode)
-                        if not ip.get("unreadable") and len(ip.get("chain", [])) >= 2:
-                            lists.append((ip["chain"], ip.get("chain_wds", [])))
+                        fp = ip.get("parts") or []
+                        if not ip.get("unreadable") and len(fp) >= 2:
+                            lists.append(fp)
     return lists
 
 
-def chain_reason(command, cwd, tool="Bash"):
+def chain_reason(command, cwd, tool="Bash", outermost=True):
     if not in_workspace(cwd):
         return None
     mode = _mode_name(tool)
     parsed = read_commands(command, mode=mode)
     if parsed.get("unreadable"):
         return None
-    heads = [strip_prefix(w) for w in (parsed.get("chain_wds") or []) if w]
-    if heads and base(heads[0][0]) == "cd":
-        return "a command wrapped in cd (rule 8: never wrap a command in cd; run it with the path it needs, or git -C)"
-    for ch, cw in _chain_lists(parsed, command, mode, 0):
-        if len(ch) < 2:
+    cwds = parsed.get("chain_wds") or []
+    if outermost and cwds and cwds[0]:
+        sp = strip_prefix(cwds[0])
+        if sp and base(sp[0]) == "cd":
+            return "a command wrapped in cd (rule 8: never wrap a command in cd; run it with the path it needs, or git -C)"
+    for parts in _chain_lists(parsed, command, mode, 0):
+        if len(parts) < 2:
             continue
-        for pi, wds in enumerate(cw):
-            w = strip_prefix(wds) if wds else []
-            if w and state_changing(w):
-                return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (len(ch), " ".join(w[:2]))
+        hit = _stage_changes(parts)
+        if hit:
+            return "a chain of %d commands carrying %s (rule 8: one command per call, never chained with &&, ; or ||; the allowlist and the guard read one command, and a chain once built an increment on a merged branch)" % (len(parts), " ".join(hit[:2]))
     return None
 
 
 def leading_husky_zero(words_or_text, tool="Bash"):
     w = list(words_or_text) if isinstance(words_or_text, (list, tuple)) else words(words_or_text, mode=_mode_name(tool))
-    i = 0
-    while i < len(w):
-        if w[i] == "HUSKY=0":
-            return True
-        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w[i]):
-            i += 1; continue
-        name = base(w[i]).replace(".exe", "")
-        if name in ("env", "nice", "nohup", "stdbuf", "sudo", "command", "builtin", "exec", "timeout", "setsid"):
-            i += 1
-            vals = VALUE_OPTIONS.get(name, ())
-            while i < len(w) and w[i].startswith("-"):
-                opt = w[i]; i += 1
-                if opt in vals and i < len(w):
-                    i += 1
-            if name == "timeout" and i < len(w):
-                i += 1
-            if name == "env":
-                while i < len(w):
-                    if w[i] == "HUSKY=0":
-                        return True
-                    if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w[i]):
-                        i += 1; continue
-                    if w[i].startswith("-"):
-                        i += 1; continue
-                    break
-            continue
-        break
-    return False
+    _idx, _err, husky = _walk_to_command(w, _mode_name(tool))
+    return husky
 
 
 def shell_inner(w):
-    bh = base(w[0]).replace(".exe", "")
+    bh = _exe_stem(w[0])
     if bh in ("bash", "sh"):
         return _bash_inner_string(w) or None
     ps = bh in ("powershell", "pwsh")
@@ -1069,7 +1516,7 @@ def shell_inner(w):
                 return " ".join(w[i + 1:]) or None
             if tn.startswith("-file") or tn == "-f":
                 return None
-            if tn in ("-noprofile", "-nop", "-noninteractive", "-noni", "-nologo", "-sta", "-mta", "-noexit"):
+            if tn in ("-noprofile", "-nop", "-noninteractive", "-noni", "-nologo", "-sta", "-mta"):
                 i += 1
                 continue
             if tn.startswith("-"):
@@ -1117,56 +1564,26 @@ def gh_words(w):
 
 
 def strip_prefix(w):
-    i = 0
-    while i < len(w):
-        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w[i]):
-            i += 1; continue
-        if w[i] in ("&", "."):
-            i += 1; continue
-        name = base(w[i]).replace(".exe", "")
-        if name == "exec":
-            i += 1
-            while i < len(w) and w[i].startswith("-"):
-                opt = w[i].split("=", 1)[0]
-                if opt in EXEC_OPTS:
-                    i += 2 if "=" not in w[i] and opt in ("-a",) and i + 1 < len(w) else 1
-                else:
-                    break
-            continue
-        if name == "stdbuf":
-            i += 1
-            while i < len(w) and w[i].startswith("-"):
-                tok = w[i]
-                ok = tok in STDBUF_OPTS or any(tok.startswith(p) for p in ("-i", "-o", "-e", "--input=", "--output=", "--error="))
-                if ok:
-                    if "=" not in tok and tok in ("-i", "-o", "-e") and i + 1 < len(w):
-                        i += 2
-                    else:
-                        i += 1
-                else:
-                    break
-            continue
-        if name in ("env", "nice", "nohup", "sudo", "command", "builtin", "timeout", "setsid"):
-            i += 1
-            vals = VALUE_OPTIONS.get(name, ())
-            while i < len(w) and w[i].startswith("-"):
-                opt = w[i]; i += 1
-                if opt in vals and i < len(w):
-                    i += 1
-            if name == "timeout" and i < len(w):
-                i += 1
-            continue
-        break
-    return w[i:]
+    if not w:
+        return []
+    idx, _err, _husky = _walk_to_command(list(w), "bash")
+    if idx is None:
+        return []
+    return list(w[idx:])
 
 
 def commit_message(args, command):
     msg = None
     for i, a in enumerate(args):
         if a in ("-m", "--message") and i + 1 < len(args):
-            msg = args[i + 1]; break
+            msg = args[i + 1]
+            break
         if a.startswith("--message="):
-            msg = a.split("=", 1)[1]; break
+            msg = a.split("=", 1)[1]
+            break
+        if a.startswith("-m") and not a.startswith("--") and len(a) > 2:
+            msg = a[2:]
+            break
     return (msg or "").strip()
 
 
@@ -1178,14 +1595,12 @@ def check(command, cwd=None, tool="Bash", _depth=0):
 def _check_one(command, cwd, tool, mode, depth):
     if depth > READ_DEPTH_BOUND:
         return _cannot("nesting past the bound")
-    if depth == 0:
-        READ_CACHE.clear()
     parsed = read_commands(command, mode=mode)
     if parsed.get("unreadable"):
         return parsed["unreadable"]
     if parsed.get("gh_amp"):
         return parsed["gh_amp"]
-    r = chain_reason(command, cwd, tool=tool)
+    r = chain_reason(command, cwd, tool=tool, outermost=(depth == 0))
     if r:
         return r
     for cmd in parsed.get("commands", []):

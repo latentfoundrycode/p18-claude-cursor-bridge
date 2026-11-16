@@ -620,9 +620,7 @@ PowerShell call operator `&` separate commands; nested shell forms (`$(`, backti
 here-documents, subshells, globs) are refused as unreadable; a `git -c alias.<x>=...` whose
 value starts with `worktree`, `pr`, `push`, `api` or `!` is refused, and so is a `gh alias set`
 for a merge; an abbreviated `--forc` counts as `--force`, as it does for git; `--help` exempts a
-`gh pr merge` only when it is not the value of a flag such as `--subject`. A here-document
-read by a shell (`bash <<EOF`) is that shell's script and is checked; one read by any other
-program (a commit message) is data. `powershell` without `-Command` runs the rest of its line,
+`gh pr merge` only when it is not the value of a flag such as `--subject`. A here-document is unreadable. `powershell` without `-Command` runs the rest of its line,
 `-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command,
 and `-XPUT` is a method: all read as what they run. An encoded PowerShell command and a
 GraphQL query read from a file are refused unread.

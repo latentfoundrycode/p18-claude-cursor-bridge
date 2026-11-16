@@ -226,3 +226,23 @@ def test_r082_graphql_substitution_on_its_own_command_is_refused():
     """R-082 (req 8): gh api graphql is refused when its own words hold a substitution."""
     rc, err = run("Bash", 'gh api graphql -f query="$(echo mergePullRequest)"')
     assert rc == 2 and ("graphql" in err.lower() or "cannot read" in err.lower()), err
+
+
+def test_find_exec_rm_braces_passes_under_bash_and_is_unreadable_under_powershell():
+    """R-082 (req 17): find -exec rm {} ; is readable under Bash and unreadable braces under PowerShell."""
+    bash = "find . -name '*.log' -exec rm {} ;"
+    rc, err = run("Bash", bash)
+    assert rc == 0, err
+    rc, err = run("PowerShell", bash)
+    assert rc == 2 and "cannot read" in err.lower(), err
+
+
+@pytest.mark.parametrize("tool", ["Bash", "PowerShell"])
+@pytest.mark.parametrize("command", [
+    "git commit -F - <<'EOF'\nfix the guard\n\ngh pr merge 12 --squash is refused without the record\nEOF",
+    "git commit -F - <<'EOF'\nfix\n\nbash <<EOF2 is not what this message runs\nEOF",
+])
+def test_here_document_commit_messages_are_unreadable(tool, command):
+    """R-082 (req 17): a here-document on a commit message is unreadable under both tools."""
+    rc, err = run(tool, command)
+    assert rc == 2 and "cannot read" in err.lower(), (tool, err)
