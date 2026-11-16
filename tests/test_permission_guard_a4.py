@@ -607,3 +607,45 @@ def test_r082_r8_req8_a_two_character_step_still_meets_the_deadline():
     parsed = mod._read_bash("echo " + ("\\x" * 2100), False, False)
     err = parsed.get("unreadable") or ""
     assert "cannot read" in err.lower() and "too long" in err.lower(), err
+
+
+def test_r082_r9_req1_msys_reparses_a_word_powershell_handed_it(tmp_path):
+    """R-082 round 9 req 1: env under PowerShell parses quotes and braces again."""
+    rc, err = run('env echo "{a,b}"', tmp_path, tool="PowerShell")
+    assert rc == 2 and "cannot read" in err.lower() and "parses again" in err.lower(), err
+
+
+def test_r082_r9_req2_powershell_drops_an_empty_or_edged_argument(tmp_path):
+    """R-082 round 9 req 2: powershell.exe trims an argument and skips an empty one."""
+    rc, err = run("powershell ' ' -c echo hi", tmp_path)
+    assert rc == 2 and "cannot read" in err.lower() and "whitespace" in err.lower(), err
+
+
+def test_r082_r9_req3_env_assignment_name_must_be_an_identifier(tmp_path):
+    """R-082 round 9 req 3: env treats a word that holds = as an assignment, never the command."""
+    rc, err = run("env X.Y=1 echo hi", tmp_path)
+    assert rc == 2 and "cannot read" in err.lower() and "identifier" in err.lower(), err
+
+
+def test_r082_r9_req4_an_assignment_makes_a_child_shell_run_code(tmp_path):
+    """R-082 round 9 req 4: BASH_ENV is read by the child bash as a script."""
+    rc, err = run("BASH_ENV=/tmp/a echo hi", tmp_path)
+    assert rc == 2 and "cannot read" in err.lower() and "run code" in err.lower(), err
+
+
+def test_r082_r9_req5_git_bash_rewrites_a_path_list_before_powershell(tmp_path):
+    """R-082 round 9 req 5: a POSIX path list becomes a semicolon list before powershell.exe."""
+    rc, err = run("powershell -Command echo /tmp:/c/x", tmp_path)
+    assert rc == 2 and "cannot read" in err.lower() and "path list" in err.lower(), err
+
+
+def test_r082_r9_req6_find_clause_whose_command_is_the_found_file(tmp_path):
+    """R-082 round 9 req 6: {} as the -exec command is the file find just found."""
+    rc, err = run("find . -maxdepth 0 -exec {} ';'", tmp_path)
+    assert rc == 2 and "cannot read" in err.lower() and "found file" in err.lower(), err
+
+
+def test_r082_r9_req7_ssh_agent_runs_the_words_after_its_options(tmp_path):
+    """R-082 round 9 req 7: ssh-agent runs a command when one follows its options."""
+    rc, err = run("ssh-agent echo hi", tmp_path)
+    assert rc == 2 and "cannot read" in err.lower() and "ssh-agent" in err.lower(), err

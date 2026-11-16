@@ -167,7 +167,6 @@ def test_refused(tool, cmd):
     "powershell Get-ChildItem",
     "nice -n 10 python x.py",
     "timeout -s KILL 60 python x.py",
-    "find . -name '*.pyc' -delete",
     "gh alias set co 'pr checkout'",
     "dist/agent.exe --version",
     "cmd //c dir agent",
@@ -225,6 +224,15 @@ def test_r082_graphql_substitution_on_its_own_command_is_refused():
     """R-082 (req 8): gh api graphql is refused when its own words hold a substitution."""
     rc, err = run("Bash", 'gh api graphql -f query="$(echo mergePullRequest)"')
     assert rc == 2 and ("graphql" in err.lower() or "cannot read" in err.lower()), err
+
+
+def test_r082_r9_find_name_glob_passes_under_bash_and_is_unreadable_under_powershell():
+    """R-082 round 9 req 1: '*.pyc' reaches find's MSYS runtime under PowerShell, which globs it."""
+    cmd = "find . -name '*.pyc' -delete"
+    rc, err = run("Bash", cmd)
+    assert rc == 0, err
+    rc, err = run("PowerShell", cmd)
+    assert rc == 2 and "cannot read" in err.lower(), err
 
 
 def test_find_exec_rm_braces_passes_under_bash_and_is_unreadable_under_powershell():

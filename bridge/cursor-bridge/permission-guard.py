@@ -143,7 +143,15 @@ READ_DEPTH_BOUND = 64
 BASH_RESERVED = frozenset("if then else elif fi case esac for select while until do done in function time coproc".split() + ["{", "}", "!", "[[", "]]"])
 BASH_OK_BUILTINS = frozenset(("cd", "echo", "pwd", "true", "false", ":", "exit", "type", "printf"))
 BASH_WRAPPER_CMDS = frozenset(("eval", "exec", "command", "builtin"))
-REFUSED_CMD_WORDS = frozenset(("xargs", "start", "wsl", "mintty", "winpty", "strace", "dash", "zsh", "ksh", "fish", "csh", "tcsh", "ash", "busybox", "forfiles", "conhost", "schtasks", "chroot", "wt", "git-bash", "git-cmd"))
+REFUSED_CMD_WORDS = frozenset(("xargs", "start", "wsl", "mintty", "winpty", "strace", "dash", "zsh", "ksh", "fish", "csh", "tcsh", "ash", "busybox", "forfiles", "conhost", "schtasks", "chroot", "wt", "git-bash", "git-cmd", "gpg-agent", "gpg-connect-agent", "rundll32", "pcalua", "runas", "wmic"))
+_MSYS_PREFIX = frozenset(("env", "nice", "nohup", "stdbuf", "timeout", "setsid", "sudo"))
+_MSYS_COMMAND = frozenset(("bash", "sh", "find"))
+_SHELL_CODE_NAMES = frozenset(("BASH_ENV", "ENV", "PS4", "SHELLOPTS", "BASHOPTS", "PROMPT_COMMAND"))
+_LOCALE_NAMES = frozenset(("LANG", "LC_ALL", "LC_CTYPE"))
+_REPARSE_MARK = "'\"{}*?[]"
+_SSH_AGENT_VALUED = ("-a", "-E", "-P", "-t", "-O")
+_SSH_AGENT_FLAGS = frozenset(("-c", "-s", "-D", "-d", "-k"))
+_SSH_O_KEYS = frozenset(("proxycommand", "localcommand", "permitlocalcommand", "knownhostscommand"))
 REFUSED_BUILTINS = frozenset(
     ". : [ alias bg bind break builtin caller cd command compgen complete compopt continue declare dirs disown echo enable eval exec exit export false fc fg getopts hash help history jobs kill let local logout mapfile popd printf pushd pwd read readarray readonly return set shift shopt source suspend test times trap true type typeset ulimit umask unalias unset wait".split()
 ) - BASH_OK_BUILTINS - BASH_WRAPPER_CMDS
@@ -236,6 +244,140 @@ def _verb_noun(tok):
 def _assignment_name(tok):
     m = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)=", tok)
     return m.group(1) if m else None
+
+
+def _locale_value_ok(value):
+    low = value.lower()
+    if low == "c" or low == "posix":
+        return True
+    return low.endswith(".utf-8") or low.endswith(".utf8")
+
+
+def _apply_assignment(tok, husky, strict):
+    """One NAME=value word. strict is env's words and the words after sudo: any word that holds = is an assignment."""
+    if not tok or tok[:1] == "-" or "=" not in tok:
+        return None, husky, False
+    name, value = tok.split("=", 1)
+    an = _assignment_name(tok)
+    up = name.upper()
+    if up.startswith("BASH_FUNC_") and (strict or an is not None):
+        return _cannot("an assignment that makes a shell run code"), husky, True
+    if an is None:
+        if strict:
+            return _cannot("an assignment whose name is not an identifier"), husky, True
+        return None, husky, False
+    if up.startswith("GIT_CONFIG"):
+        return _cannot("an assignment whose name begins GIT_CONFIG"), husky, True
+    if up in _SHELL_CODE_NAMES:
+        return _cannot("an assignment that makes a shell run code"), husky, True
+    if up in _LOCALE_NAMES and not _locale_value_ok(value):
+        return _cannot("a locale assignment whose charset is not C, POSIX or UTF-8"), husky, True
+    if tok == "HUSKY=0":
+        husky = True
+    return None, husky, True
+
+
+def _reparse_applies(word, mode):
+    """An MSYS program a native parent starts, or Git's bin\\bash.exe handing its command line on."""
+    stem = _exe_stem(word)
+    if stem not in _MSYS_PREFIX and stem not in _MSYS_COMMAND and stem not in REFUSED_CMD_WORDS:
+        return False
+    if mode == "powershell" or mode == "cmd":
+        return True
+    if mode == "bash" and stem in ("bash", "sh"):
+        if ("/" in word or "\\" in word) and not word.startswith("/usr/bin/") and not word.startswith("/bin/"):
+            return True
+    return False
+
+
+def _reparse_word_bad(word):
+    if not word:
+        return False
+    if word[0] == "~" or word[0] == "@":
+        return True
+    slash, blank = False, False
+    for ch in word:
+        if ch in _REPARSE_MARK:
+            return True
+        if ch == "\\":
+            slash = True
+        elif ch in " \t\r\n":
+            blank = True
+    return slash and blank
+
+
+def _words_reparse_refusal(words):
+    for word in words:
+        if _reparse_word_bad(word):
+            return _cannot("a word an MSYS program parses again")
+    return None
+
+
+def _reparse_after(words, i, mode):
+    if i < len(words) and _reparse_applies(words[i], mode):
+        return _words_reparse_refusal(words[i + 1:])
+    return None
+
+
+def _ssh_o_key(val):
+    cut = len(val)
+    for i, ch in enumerate(val):
+        if ch == "=" or ch == " " or ch == "\t":
+            cut = i
+            break
+    return val[:cut]
+
+
+def _ssh_agent_refusal(words, i):
+    """ssh-agent's own options and no command after them."""
+    j, n = i + 1, len(words)
+    while j < n:
+        t = words[j]
+        if t in _SSH_AGENT_FLAGS:
+            j += 1
+            continue
+        if t in _SSH_AGENT_VALUED:
+            if j + 1 >= n:
+                return _cannot("an ssh-agent option without a value")
+            j += 2
+            continue
+        glued = False
+        for opt in _SSH_AGENT_VALUED:
+            if t.startswith(opt) and len(t) > len(opt):
+                glued = True
+                break
+        if glued:
+            j += 1
+            continue
+        if t[:1] == "-":
+            return _cannot("an unknown ssh-agent option")
+        return _cannot("ssh-agent running a command")
+    return None
+
+
+def _ssh_option_refusal(words, i):
+    """ssh -o whose key runs a command."""
+    j, n = i + 1, len(words)
+    while j < n:
+        t = words[j]
+        val = None
+        if t == "-o":
+            if j + 1 >= n:
+                return _cannot("ssh -o without a value")
+            val = words[j + 1]
+            j += 2
+        elif t.startswith("-o") and not t.startswith("--"):
+            val = t[2:]
+            if val[:1] == "=":
+                val = val[1:]
+            j += 1
+        else:
+            j += 1
+            continue
+        key = _ssh_o_key(val)
+        if key.lower() in _SSH_O_KEYS:
+            return _cannot("ssh -o %s" % key)
+    return None
 
 
 def _exe_stem(tok):
@@ -365,12 +507,10 @@ def _walk_env(words, i, husky):
         t = words[i]
         if t in ENV_BAD or t.startswith("--split-string") or (t.startswith("-S") and not t.startswith("--")):
             return _opt_err("env -S or --split-string"), i, husky
-        an = _assignment_name(t)
-        if an:
-            if an.upper().startswith("GIT_CONFIG"):
-                return _opt_err("an assignment whose name begins GIT_CONFIG"), i, husky
-            if t == "HUSKY=0":
-                husky = True
+        err, husky, consumed = _apply_assignment(t, husky, True)
+        if consumed:
+            if err:
+                return err, i, husky
             i += 1
             continue
         if not t.startswith("-"):
@@ -499,16 +639,14 @@ def _walk_valued(words, i, flags, valued):
     return None, i
 
 
-def _take_assignments(words, i, n, husky):
-    """Leading NAME=value words. Returns (error or None, index, husky)."""
+def _take_assignments(words, i, n, husky, strict=False):
+    """Leading NAME=value words, or env and sudo assignments when strict. Returns (error or None, index, husky)."""
     while i < n:
-        an = _assignment_name(words[i])
-        if not an:
+        err, husky, consumed = _apply_assignment(words[i], husky, strict)
+        if not consumed:
             break
-        if an.upper().startswith("GIT_CONFIG"):
-            return _cannot("an assignment whose name begins GIT_CONFIG"), i, husky
-        if words[i] == "HUSKY=0":
-            husky = True
+        if err:
+            return err, i, husky
         i += 1
     return None, i, husky
 
@@ -526,6 +664,10 @@ def _walk_to_command(words, mode="bash", slash_ok=False, fed=False):
             return None, err, husky, saw_prefix
     while mode != "cmd" and i < n:
         head = _exe_stem(words[i])
+        if head in _MSYS_PREFIX:
+            err = _reparse_after(words, i, mode)
+            if err:
+                return None, err, husky, saw_prefix
         if head == "env":
             err, i, husky = _walk_env(words, i, husky)
             saw_prefix = True
@@ -568,7 +710,7 @@ def _walk_to_command(words, mode="bash", slash_ok=False, fed=False):
             if err:
                 return None, err, husky, saw_prefix
             if mode != "cmd":
-                err, i, husky = _take_assignments(words, i, n, husky)
+                err, i, husky = _take_assignments(words, i, n, husky, True)
                 if err:
                     return None, err, husky, saw_prefix
             continue
@@ -593,8 +735,19 @@ def _walk_to_command(words, mode="bash", slash_ok=False, fed=False):
         break
     if i >= n:
         return None, None, husky, saw_prefix
+    err = _reparse_after(words, i, mode)
+    if err:
+        return i, err, husky, saw_prefix
     head = _exe_stem(words[i])
     use_slash = slash_ok and not saw_prefix
+    if head == "ssh-agent":
+        err = _ssh_agent_refusal(words, i)
+        if err:
+            return i, err, husky, saw_prefix
+    if head == "ssh":
+        err = _ssh_option_refusal(words, i)
+        if err:
+            return i, err, husky, saw_prefix
     if head in REFUSED_CMD_WORDS:
         return i, _cannot("a launcher or shell (%s)" % base(words[i])), husky, saw_prefix
     if mode == "bash":
@@ -659,8 +812,15 @@ def _cmd_switch_walk(words, slash_ok=False):
     return _cannot("cmd without /c, /k or /r"), None
 
 
-def _ps_is_switch(raw):
+def _ps_arg_edge(raw):
+    """powershell.exe trims each argument and skips an empty one."""
     if not raw:
+        return True
+    return raw[0].isspace() or raw[-1].isspace()
+
+
+def _ps_is_switch(raw):
+    if _ps_arg_edge(raw):
         return False
     if raw[0] in "-/":
         return True
@@ -673,6 +833,9 @@ def _ps_is_switch(raw):
 def _ps_switch_walk(words, slash_ok=False):
     """One walk of a powershell or pwsh switch table. Returns (error or None, index of the inner command or None)."""
     i, n = 1, len(words)
+    for raw in words[1:]:
+        if _ps_arg_edge(raw):
+            return _cannot("a powershell argument that is empty or begins or ends with whitespace"), None
     while i < n:
         raw = words[i]
         if not _ps_is_switch(raw):
@@ -1801,12 +1964,10 @@ def _chain_lists(parsed, command, mode, depth, tool="Bash", slash_ok=False, fed=
     return lists
 
 
-def chain_reason(command, cwd, tool="Bash", outermost=True, slash_ok=None):
+def chain_reason(command, cwd, tool="Bash", outermost=True, *, slash_ok):
     if not in_workspace(cwd):
         return None
     mode = _mode_name(tool)
-    if slash_ok is None:
-        slash_ok = tool == "PowerShell" and mode == "powershell"
     parsed = read_commands(command, mode=mode, slash_ok=slash_ok)
     if parsed.get("unreadable"):
         return None
@@ -2006,6 +2167,58 @@ def _check_one(command, cwd, tool, mode, depth, slash_ok, fed):
     return None
 
 
+def _find_brace_refusal(words, mode, depth):
+    """A find -exec clause whose command is the found file, at any depth under the clause."""
+    if not words or depth > READ_DEPTH_BOUND:
+        return None
+    if _too_long():
+        return _cannot("too long to read in time")
+    for word in words:
+        if "{}" in word and word != "{}":
+            return _cannot("a find argument holding {}")
+    use = "bash" if mode == "cmd" else mode
+    idx, _err, _h, _s = _walk_to_command(words, use, False, False)
+    if idx is None:
+        return None
+    cmd = words[idx]
+    if "{}" in cmd:
+        return _cannot("a find clause whose command is the found file")
+    head = _exe_stem(cmd)
+    rest = words[idx:]
+    inner, inner_mode = None, mode
+    if head == "eval" and len(rest) > 1:
+        inner, inner_mode = " ".join(rest[1:]), mode
+    elif head in ("bash", "sh"):
+        inner, inner_mode = _bash_inner_string(rest), "bash"
+    elif head in ("powershell", "pwsh"):
+        got = shell_inner(rest, False)
+        if isinstance(got, str):
+            inner, inner_mode = got, "powershell"
+    elif head == "cmd":
+        got = shell_inner(rest, False)
+        if isinstance(got, str):
+            inner, inner_mode = got, "cmd"
+    elif head == "find":
+        ferr, clauses = _find_clauses(rest)
+        if ferr or not clauses:
+            return None
+        for clause in clauses:
+            r = _find_brace_refusal(clause, mode, depth + 1)
+            if r:
+                return r
+        return None
+    if not inner:
+        return None
+    parsed = read_commands(inner, mode=inner_mode, slash_ok=False, fed=False)
+    if parsed.get("unreadable"):
+        return None
+    for one in parsed.get("commands") or []:
+        r = _find_brace_refusal(one.get("words") or [], inner_mode, depth + 1)
+        if r:
+            return r
+    return None
+
+
 def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=False):
     """Every check of one command, on the word list the reader produced or a find clause."""
     if _too_long():
@@ -2046,6 +2259,12 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
     if head in WRAPPER_SHELLS:
         _idx, _err, _husky, saw_prefix = _walk_to_command(cmd_wds, mode, slash_ok, fed)
         base_slash = slash_ok and not saw_prefix
+        if base(w[0]).replace(".exe", "") in ("powershell", "pwsh") and not base_slash:
+            _pse, ps_idx = _ps_switch_walk(w, base_slash)
+            if ps_idx is not None:
+                for word in w[ps_idx:]:
+                    if "/" in word and ":" in word:
+                        return _cannot("a path list a powershell inner command would split")
         inner = shell_inner(w, base_slash)
         if inner is ENCODED:
             return "an encoded PowerShell command, which the guard cannot read"
@@ -2072,6 +2291,9 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
             if _too_long():
                 return _cannot("too long to read in time")
             if clause:
+                r = _find_brace_refusal(clause, mode, depth + 1)
+                if r:
+                    return r
                 r = _check_word_list(clause, command, cwd, tool, mode, depth + 1, False, fed)
                 if r:
                     return r
