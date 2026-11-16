@@ -4101,7 +4101,8 @@ def _entry_marker(item):
 
 
 def _read_list(path, key, cwd):
-    """Every page until total_count entries are in hand. A short list is a failure, never a result."""
+    """Every page until exactly the first page's total_count distinct entries are in hand.
+    A short list, or a list that changed while it was read, is a failure, never a result."""
     entries = []
     seen = set()
     total = None
@@ -4120,6 +4121,8 @@ def _read_list(path, key, cwd):
             return None, "the list cannot be read"
         if total is None:
             total = count
+        elif count != total:
+            return None, "the list changed while it was read"
         added = 0
         for item in items:
             marker = _entry_marker(item)
@@ -4128,7 +4131,9 @@ def _read_list(path, key, cwd):
             seen.add(marker)
             entries.append(item)
             added += 1
-        if len(entries) >= total:
+        if len(entries) > total:
+            return None, "the list changed while it was read"
+        if len(entries) == total:
             return entries, None
         if added == 0:
             return None, "a page added no entry"

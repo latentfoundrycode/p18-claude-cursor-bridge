@@ -879,7 +879,7 @@ def test_r083_r4_a_count_that_grows_between_pages_is_cannot_read(be, crafted, so
     e = [_entry(source, i) for i in range(1, 102)]
     crafted(_paged(source, [(101, e[:100]), (102, e[99:101])]))
     r = be.head_state("OWNER/REPO", SHA)
-    assert r["answer"] == "cannot read" and r["source"] == source and r["reason"], r
+    assert r["answer"] == "cannot read" and r["source"] == source and "changed" in r["reason"], r
 
 
 @pytest.mark.parametrize("source", SOURCES)
@@ -887,7 +887,7 @@ def test_r083_r4_a_count_that_shrinks_between_pages_is_cannot_read(be, crafted, 
     e = [_entry(source, i) for i in range(1, 102)]
     crafted(_paged(source, [(101, e[:100]), (100, e[100:101])]))
     r = be.head_state("OWNER/REPO", SHA)
-    assert r["answer"] == "cannot read" and r["source"] == source and r["reason"], r
+    assert r["answer"] == "cannot read" and r["source"] == source and "changed" in r["reason"], r
 
 
 @pytest.mark.parametrize("pages", ["one-page", "two-pages"])
@@ -900,7 +900,7 @@ def test_r083_r4_more_distinct_entries_than_the_count_states_is_cannot_read(be, 
     else:
         crafted(_paged(source, [(101, e[:100]), (101, e[100:102])]))
     r = be.head_state("OWNER/REPO", SHA)
-    assert r["answer"] == "cannot read" and r["source"] == source and r["reason"], r
+    assert r["answer"] == "cannot read" and r["source"] == source and "changed" in r["reason"], r
 
 
 def test_r083_r4_review_b_s_case_a_run_created_between_the_pages_is_never_dropped_for_an_older_success(be, crafted):
@@ -911,8 +911,7 @@ def test_r083_r4_review_b_s_case_a_run_created_between_the_pages_is_never_droppe
     crafted(_paged("runs", [(101, older[:100]), (102, newer[100:200])]))
     r = be.head_state("OWNER/REPO", SHA)
     assert r["answer"] == "cannot read" and r["source"] == "runs", r
-    kept = be.latest_of_each(r)
-    assert not any(be.ci_class(x, "run") == "passed" for x in kept["runs"]), kept
+    assert r["runs"] == [] and r["checks"] == [] and r["statuses"] == [], "never the runs read so far"
 
 
 @pytest.mark.parametrize("source", SOURCES)
