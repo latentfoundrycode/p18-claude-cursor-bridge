@@ -50,3 +50,5 @@
 2026-11-16 TASK-063-r9: an empty or edge-whitespace argument of powershell.exe has to be refused in the switch walk before those words are joined into the inner command, because the join re-reads the real command and a dangerous one is then refused for the action rather than as unreadable.
 
 2026-11-16 BUG-045-r2: `git --help` on this host prints a short usage line that omits `--attr-source`, `--super-prefix`, `--literal-pathspecs`, `--glob-pathspecs`, `--noglob-pathspecs`, `--icase-pathspecs` and `--list-cmds=`, which the ruled known list keeps; the usage line showed no option the list lacked.
+
+2026-11-16 BUG-045-r3: F9 asks the PowerShell tool to refuse `git -c 'alias.cm="commit" -n -am' cm x` and `git -c 'alias.cm=c"ommit" -n -am' cm x` with `alias` in the reason, but `_read_powershell` refuses a literal double quote inside the word before the git alias loop runs, so the reason is `a literal double quote` and does not contain `alias`; that reader is outside this round's scope.

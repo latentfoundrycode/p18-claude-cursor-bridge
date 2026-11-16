@@ -231,6 +231,39 @@ def test_bug045_a_read_or_an_ordinary_option_still_passes(plain, command):
     assert rc == 0, (command, rc, err)
 
 
+# ---------------------------------------------------------------- round 3's findings (the security audit), red on round 3's tree
+# Round 3's brief set a 4-character floor for the push options' abbreviations; git reads --m as --mirror (no other push
+# option begins with m), so the floor is the shortest prefix git reads as unambiguous, per option. A digit (the IPv4/IPv6
+# flags) in a short-flag cluster with f is a force push as well (git 2.53 ran -4f and -f4 as forced updates).
+
+PUSH_FORMS_REFUSED = [
+    ("push-m", "git push --m origin", "push"),
+    ("push-mi", "git push --mi origin", "push"),
+    ("push-cluster-4f", "git push -4f origin main", "push"),
+    ("push-cluster-f4", "git push -f4 origin main", "push"),
+    ("push-cluster-6fu", "git push -6fu origin main", "push"),
+]
+
+
+@pytest.mark.parametrize("command,reason", [(c, r) for _, c, r in PUSH_FORMS_REFUSED], ids=[n for n, _, _ in PUSH_FORMS_REFUSED])
+def test_bug045_a_force_push_by_its_shortest_abbreviation_or_a_digit_cluster_is_refused(plain, command, reason):
+    rc, err = guard(command, plain)
+    assert rc == 2 and "refused" in err and reason in err, (command, rc, err)
+
+
+PUSH_FORMS_PASSING = [
+    ("push-ipv4", "git push -4 origin task-012"),
+    ("push-u-ipv6", "git push -6u origin task-012"),
+    ("push-follow-tags", "git push --follow-tags origin task-012"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in PUSH_FORMS_PASSING], ids=[n for n, _ in PUSH_FORMS_PASSING])
+def test_bug045_an_ordinary_push_with_a_digit_flag_still_passes(plain, command):
+    rc, err = guard(command, plain)
+    assert rc == 0, (command, rc, err)
+
+
 # ---------------------------------------------------------------- the builder adds its cases below this line and edits nothing above it
 
 
@@ -343,10 +376,10 @@ READ_ALIAS = [
 
 
 @pytest.mark.parametrize("command", [c for _, c in READ_ALIAS], ids=[name for name, _ in READ_ALIAS])
-def test_bug045_an_alias_for_status_or_log_still_passes(plain, command):
-    """BUG-045 (R-082): an alias whose value starts with status or log still passes."""
+def test_bug045_an_alias_for_status_or_log_is_refused(plain, command):
+    """BUG-045 (R-082): an alias whose value starts with status or log is refused on the word alone."""
     rc, err = guard(command, plain)
-    assert rc == 0, (command, rc, err)
+    assert rc == 2 and "refused" in err and "alias" in err, (command, rc, err)
 
 
 @pytest.fixture
@@ -363,3 +396,98 @@ def test_bug045_an_unreadable_option_is_state_changing_in_a_workspace_chain(brid
     """BUG-045 (R-082): chain_reason runs before the word checks, so this chain is refused with `a chain of` only because state_changing read the unreadable git command as state-changing; read as a read, the refusal would be the `cannot read` one instead."""
     rc, err = guard("git status && git --bogus-new-option x commit --no-verify -m x", bridge_workspace)
     assert rc == 2 and "refused" in err and "a chain of" in err, (rc, err)
+
+
+def guard_tool(command, cwd, tool):
+    payload = {"tool_name": tool, "tool_input": {"command": command}, "permission_mode": "auto", "cwd": str(cwd)}
+    p = subprocess.run([sys.executable, PROG], input=json.dumps(payload), capture_output=True, text=True, timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    return p.returncode, p.stderr
+
+
+# BUG-045 (R-082), F9. Each prefix of --no-verify from --no-v to the full word, on each hook skipper.
+_NO_VERIFY = "--no-verify"
+_NO_VERIFY_PREFIXES = [_NO_VERIFY[:n] for n in range(6, len(_NO_VERIFY) + 1)]
+
+
+def _no_verify_abbrev_command(sub, prefix):
+    if sub == "commit":
+        return "git commit %s -m x" % prefix
+    if sub == "push":
+        return "git push %s origin HEAD" % prefix
+    if sub == "merge":
+        return "git merge %s topic" % prefix
+    if sub == "rebase":
+        return "git rebase %s main" % prefix
+    if sub == "am":
+        return "git am %s mbox" % prefix
+    if sub == "cherry-pick":
+        return "git cherry-pick %s abc" % prefix
+    return "git revert %s HEAD" % prefix
+
+
+NO_VERIFY_ABBREVS = [("%s-%s" % (sub, prefix[2:]), _no_verify_abbrev_command(sub, prefix)) for sub in ("commit", "push", "merge", "rebase", "am", "cherry-pick", "revert") for prefix in _NO_VERIFY_PREFIXES]
+
+
+@pytest.mark.parametrize("command", [c for _, c in NO_VERIFY_ABBREVS], ids=[n for n, _ in NO_VERIFY_ABBREVS])
+def test_bug045_every_prefix_of_no_verify_on_a_hook_skipper_is_refused(plain, command):
+    """BUG-045 (R-082): a prefix of --no-verify from --no-v through the full word skips the checks on each hook skipper."""
+    rc, err = guard(command, plain)
+    assert rc == 2 and "refused" in err and "skips its checks" in err, (command, rc, err)
+
+
+# BUG-045 (R-082), F9. Each prefix of the four push options from the 4-character one to the full word.
+_PUSH_LONG = ("--force", "--force-with-lease", "--force-if-includes", "--mirror")
+PUSH_ABBREVS = [("%s-%d" % (opt[2:], n), "git push %s origin main" % opt[:n]) for opt in _PUSH_LONG for n in range(4, len(opt) + 1)]
+
+
+@pytest.mark.parametrize("command", [c for _, c in PUSH_ABBREVS], ids=[n for n, _ in PUSH_ABBREVS])
+def test_bug045_every_prefix_of_a_refused_push_option_is_refused(plain, command):
+    """BUG-045 (R-082): a prefix of --force, --force-with-lease, --force-if-includes or --mirror, from four characters to the full word, is a force push."""
+    rc, err = guard(command, plain)
+    assert rc == 2 and "refused" in err and "push" in err, (command, rc, err)
+
+
+CONFIG_READ_UPPER = [
+    ("bare-upper", "git config CORE.HOOKSPATH"),
+    ("get-option-upper", "git config --get CORE.HOOKSPATH"),
+    ("get-subcommand-upper", "git config get CORE.HOOKSPATH"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in CONFIG_READ_UPPER], ids=[n for n, _ in CONFIG_READ_UPPER])
+def test_bug045_a_hooks_path_read_with_the_key_in_upper_case_passes(plain, command):
+    """BUG-045 (R-082): the three read forms pass when core.hooksPath is written in upper case."""
+    rc, err = guard(command, plain)
+    assert rc == 0, (command, rc, err)
+
+
+CONFIG_OTHER_REFUSED = [
+    ("get-all", "git config --get-all core.hooksPath"),
+    ("unset", "git config --unset core.hooksPath"),
+    ("replace-all", "git config --replace-all core.hooksPath x"),
+    ("file", "git config --file f core.hooksPath x"),
+    ("global", "git config --global core.hooksPath x"),
+    ("set-local", "git config set --local core.hooksPath x"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in CONFIG_OTHER_REFUSED], ids=[n for n, _ in CONFIG_OTHER_REFUSED])
+def test_bug045_another_git_config_form_of_core_hookspath_is_refused(plain, command):
+    """BUG-045 (R-082): a git config form of core.hooksPath other than the four allowed ones is refused."""
+    rc, err = guard(command, plain)
+    assert rc == 2 and "refused" in err and "core.hooksPath" in err, (command, rc, err)
+
+
+PS_ALIASES = [
+    ("alias-value-in-single-quotes", "git -c \"alias.cm='commit' -n -am\" cm x"),
+    ("alias-value-in-double-quotes", "git -c 'alias.cm=\"commit\" -n -am' cm x"),
+    ("alias-value-partly-quoted", "git -c 'alias.cm=c\"ommit\" -n -am' cm x"),
+    ("alias-with-a-hookspath-option-before-commit", 'git -c "alias.cm=-c core.hooksPath=/dev/null commit" cm -a -m x'),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in PS_ALIASES], ids=[n for n, _ in PS_ALIASES])
+def test_bug045_a_quoted_alias_under_powershell_is_refused(plain, command):
+    """BUG-045 (R-082): the quoted alias forms are refused under the PowerShell tool, with alias in the reason."""
+    rc, err = guard_tool(command, plain, "PowerShell")
+    assert rc == 2 and "refused" in err and "alias" in err, (command, rc, err)

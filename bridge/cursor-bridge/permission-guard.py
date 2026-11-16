@@ -66,7 +66,6 @@ PROGRAM_AFTER = ("/c", "/k", "-c", "-command", "-file")
 WRAPPER_SHELLS = SHELLS + ("bash", "bash.exe", "sh", "sh.exe", "zsh", "dash")
 MERGE_MUTATIONS = ("mergePullRequest", "enablePullRequestAutoMerge", "enqueuePullRequest")
 GH_VALUE_FLAGS = ("-t", "--subject", "-b", "--body", "-F", "--body-file", "-A", "--author-email", "-R", "--repo", "--match-head-commit", "--hostname")
-_ALIAS_PREFIXES = ("worktree", "pr", "push", "api")
 VALUE_OPTIONS = {"xargs": ("-I", "-n", "-L", "-s", "-d", "-P", "-E", "-a", "--max-args", "--max-lines", "--delimiter", "--max-procs", "--arg-file", "--replace"),
                  "nice": ("-n", "--adjustment"), "timeout": ("-s", "--signal", "-k", "--kill-after"), "sudo": ("-u", "-g", "--user", "--group"),
                  "env": ("-u", "--unset", "-C", "--chdir", "-S", "--split-string")}
@@ -2007,54 +2006,6 @@ def _husky_git_mutation(simple):
     return re.search(r"\b(commit|push|merge)\b", simple[found.end():], re.I) is not None
 
 
-def _alias_key_char(ch):
-    return ch.isalnum() or ch == "_" or ch == "-"
-
-
-def _alias_value_prefix(a):
-    """The value after =, blanks and one optional quote: a refused prefix, or a hook-skipping subcommand."""
-    if len(a) < 7 or a[:6].lower() != "alias.":
-        return False
-    i, n = 6, len(a)
-    while i < n and _alias_key_char(a[i]):
-        i += 1
-    if i >= n or a[i] != "=":
-        return False
-    i += 1
-    while i < n and a[i].isspace():
-        i += 1
-    if i < n and a[i] in "'\"":
-        i += 1
-        while i < n and a[i].isspace():
-            i += 1
-    if i < n and a[i] == "!":
-        return True
-    for pref in _ALIAS_PREFIXES:
-        if a[i:i + len(pref)].lower() == pref:
-            end = i + len(pref)
-            if end >= n or not (a[end].isalnum() or a[end] == "_"):
-                return True
-    end = i
-    while end < n and not a[end].isspace():
-        end += 1
-    if a[i:end].lower() in ("commit", "merge", "rebase", "am", "cherry-pick", "revert"):
-        return True
-    return False
-
-
-def _alias_names_refused(a):
-    if _alias_value_prefix(a):
-        return True
-    if not a.lower().startswith("alias."):
-        return False
-    if re.search(r"worktree\s+remove|pr\s+merge", a, re.I):
-        return True
-    found = re.search(r"push\b", a, re.I)
-    if found and re.search(r"--forc|-f\b|\+", a[found.end():], re.I):
-        return True
-    return False
-
-
 def _short_letters_hold(a, letter):
     """A single-dash word whose other characters are ASCII letters, one of them letter."""
     if len(a) < 2 or a[0] != "-" or a[1] == "-":
@@ -2323,7 +2274,7 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
         return "starting the Cursor agent as %s, around the bridge's shim (KP-038); start it as cursor-agent, or through bridge-run.py" % started
     if is_git(w):
         for a in w:
-            if _alias_names_refused(a):
+            if a[:6].lower() == "alias." and "=" in a:
                 return "a git alias that defines a refused command (%s)" % a[:60]
             if _too_long():
                 return _cannot("too long to read in time")
@@ -2333,10 +2284,11 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
         helpful = (len(args) == 1 and args[0] in ("-h", "--help")) or (sub == "worktree" and len(args) == 2 and args[0] == "remove" and args[1] in ("-h", "--help"))
         if any(re.match(r"^core\.hookspath=", a, re.I) for a in w) and not helpful:
             return "git -c core.hooksPath=... (the checks a commit runs are switched off; rule 4)"
-        if sub == "config" and not helpful and any(a.lower() == "core.hookspath" for a in args) and not any(a.startswith("--get") for a in args):
-            value = next((a for a in args[args.index(next(x for x in args if x.lower() == "core.hookspath")) + 1:] if not a.startswith("-")), "")
-            norm = os.path.normpath(os.path.expanduser(value)).replace("\\", "/") if value else ""
-            if "--unset" in args or value.lower() in ("/dev/null", "nul", "") or os.path.isabs(norm) or norm.startswith("..") or norm.lower() in ("/dev/null", "nul"):
+        if sub == "config" and not helpful and any(a.lower() == "core.hookspath" for a in args):
+            low = [a.lower() for a in args]
+            allowed = low in (["core.hookspath"], ["--get", "core.hookspath"], ["get", "core.hookspath"]) or (len(args) == 2 and low[0] == "core.hookspath" and args[1] == ".githooks")
+            if not allowed:
+                value = next((a for a in args[args.index(next(x for x in args if x.lower() == "core.hookspath")) + 1:] if not a.startswith("-")), "")
                 return "git config core.hooksPath %s (the checks a commit runs are switched off; rule 4)" % (value or "--unset")
         if sub in HOOK_SKIPPERS and not helpful:
             message = commit_message(args, command)
@@ -2397,7 +2349,7 @@ def hook_skipper_option(sub, args, snapshot):
         if a.startswith("-") and "=" in a:
             i += 1
             continue
-        if a == "--no-verify" and not snapshot:
+        if len(a) >= 6 and "--no-verify".startswith(a) and not snapshot:
             return a
         if sub == "commit" and _short_letters_hold(a, "n") and not snapshot:
             return a
@@ -2455,11 +2407,15 @@ def git_subcommand(w):
 
 
 def force_push_reason(args):
+    long_opts = ("--force", "--force-with-lease", "--force-if-includes", "--mirror")
     for a in args:
         if a in ("--force", "--force-with-lease", "--force-if-includes", "--mirror") or a.startswith("--force-with-lease=") or a.startswith("--force-if-includes="):
             return "git push with %s" % a
         if len(a) >= 4 and "--force".startswith(a):      # git accepts an unambiguous abbreviation
             return "git push with %s (an abbreviation of --force)" % a
+        head = a.split("=", 1)[0]
+        if len(head) >= 4 and any(opt.startswith(head) for opt in long_opts):
+            return "git push with %s" % a
         if _short_letters_hold(a, "f"):
             return "git push with the short flag %s" % a
         if a.startswith("+") and len(a) > 1:
