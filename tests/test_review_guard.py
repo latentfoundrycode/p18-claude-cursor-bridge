@@ -365,3 +365,25 @@ def test_r079_verify_missing_err_prints_no_note(repo):
     ok = [i for i, l in enumerate(lines) if l.startswith("review-guard: OK")]
     assert len(ok) == 1
     assert not "".join(lines[ok[0] + 1:]).strip()
+
+
+def test_r084_a_premerge_that_is_not_a_success_prints_no_auto_merge_line(repo, tmp_path, monkeypatch, capsys):
+    """R-084, D-002 (`review_guard`): a premerge that does not pass prints none of the auto-merge lines, and no armed form."""
+    import json
+    from test_bug039 import load_guard
+    import test_program_branch_rule as recorded
+    guard = load_guard(monkeypatch)
+    standin = tmp_path / "standin_gh.py"
+    standin.write_text(recorded.STANDIN, encoding="utf-8")
+    cfg = tmp_path / "routes.json"
+    cfg.write_text(json.dumps({"routes": {"repos/OWNER/REPO#1": "repo.json"}, "fixtures": recorded.FIXTURES, "log": str(tmp_path / "gh-calls.jsonl"), "sleep": 0}), encoding="utf-8")
+    monkeypatch.setattr(guard.bridge_env, "GH_COMMAND", [sys.executable, str(standin), str(cfg)])
+    monkeypatch.chdir(str(repo))
+    monkeypatch.setattr(sys, "argv", ["review-guard.py", "premerge", "TASK-001"])
+    rc = guard.main()
+    out = capsys.readouterr().out
+    assert rc != 0, out
+    assert "auto-merge is on for this repository" not in out, out
+    assert "auto-merge is off for this repository" not in out, out
+    assert "auto-merge setting not read" not in out, out
+    assert "--auto" not in out, out

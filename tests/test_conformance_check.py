@@ -2,10 +2,12 @@
 missing floor is reported; a guarded scanner step, public-ruleset Semgrep, a design under
 other names, a CLI reference checked by a test, local service passwords and private memory
 notes are judged as the review asked; secret values are never printed; nothing is written."""
+import json
 import os
 import re
 import subprocess
 import sys
+import types
 
 import pytest
 
@@ -469,3 +471,83 @@ def test_r080_session_note_lists_bridge_env_forms_not_boundary_cases(tmp_path):
     v, line = verdict(p.stdout, "Account keys in the session's environment")
     assert v == "NOTE" and "GITHUB_PAT" in line and "DATABASE_HOST" not in line, (v, line)
     assert "x-never-printed" not in p.stdout
+
+
+# ---------------------------------------------------------------- R-083: the required-check row
+
+
+def _load_conformance(monkeypatch):
+    """conformance-check.py in this process, so its gh and its bridge_env can be replaced."""
+    import importlib.util
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    spec = importlib.util.spec_from_file_location("conformance_check_r083", os.path.abspath(PROG))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _repo_view(args, cwd):
+    """The repo view the row still reads itself; no GitHub call."""
+    return json.dumps({"nameWithOwner": "OWNER/REPO", "visibility": "private", "defaultBranchRef": {"name": "main"}}), None
+
+
+def _routes(tmp_path, prot, rules):
+    """The supervisor's stand-in, answering the two branch-rule paths from the recorded replies."""
+    import test_program_branch_rule as recorded
+    standin = tmp_path / "standin_gh.py"
+    standin.write_text(recorded.STANDIN, encoding="utf-8")
+    cfg = tmp_path / "routes.json"
+    routes = {
+        "repos/OWNER/REPO/branches/main/protection/required_status_checks#1": prot,
+        "repos/OWNER/REPO/rules/branches/main#1": rules,
+    }
+    cfg.write_text(json.dumps({"routes": routes, "fixtures": recorded.FIXTURES, "log": str(tmp_path / "gh-calls.jsonl"), "sleep": 0}), encoding="utf-8")
+    return [sys.executable, str(standin), str(cfg)]
+
+
+@pytest.mark.parametrize("prot,rules,kind", [
+    ("protection-main.json", "rules-main.json", "value"),
+    ("protection-empty.json", "rules-main.json", "none"),
+    ("protection-unreadable.json", "rules-main.json", "cannot"),
+], ids=["value", "none", "cannot-read"])
+def test_r083_the_required_check_row_follows_the_branch_rule(tmp_path, monkeypatch, capsys, prot, rules, kind):
+    """R-083, D-002 (`conformance_check`): value prints OK with the contexts, none prints MISSING with the N6 detail, and a rule that cannot be read prints a NOTE and never MISSING."""
+    make_workspace(tmp_path)
+    mod = _load_conformance(monkeypatch)
+    monkeypatch.setattr(mod, "gh", _repo_view)
+    monkeypatch.setattr(mod.bridge_env, "GH_COMMAND", _routes(tmp_path, prot, rules))
+    monkeypatch.setattr(sys, "argv", ["conformance-check.py", str(tmp_path)])
+    rc = mod.main()
+    out = capsys.readouterr().out
+    verdict_name, line = verdict(out, "Required check on the default branch")
+    if kind == "value":
+        assert rc == 0 and verdict_name == "OK", out
+        assert "bridge programs (windows-latest)" in line and "bridge programs (ubuntu-latest)" in line and "security floor" in line, line
+    elif kind == "none":
+        assert rc == 1 and verdict_name == "MISSING", out
+        assert "N6 needs the gate job required" in line, line
+    else:
+        assert rc == 0 and verdict_name == "NOTE", out
+        detail = line.split("  - ", 1)[-1]
+        assert detail.startswith("cannot read the branch rule ("), detail
+        assert "protection" in detail and "review-guard.py ready answers CANNOT CHECK" in detail, detail
+        assert "MISSING" not in line, line
+
+
+def test_r083_a_bridge_env_without_branch_rule_does_not_invent_a_row(tmp_path, monkeypatch, capsys):
+    """R-083: where the loaded bridge_env has no branch_rule, the row is a NOTE that the rule was not read, never OK and never MISSING."""
+    make_workspace(tmp_path)
+    mod = _load_conformance(monkeypatch)
+    stub = types.ModuleType("bridge_env")
+    for name in dir(mod.bridge_env):
+        if name == "branch_rule":
+            continue
+        setattr(stub, name, getattr(mod.bridge_env, name))
+    monkeypatch.setattr(mod, "bridge_env", stub)
+    monkeypatch.setattr(mod, "gh", _repo_view)
+    monkeypatch.setattr(sys, "argv", ["conformance-check.py", str(tmp_path)])
+    rc = mod.main()
+    out = capsys.readouterr().out
+    verdict_name, line = verdict(out, "Required check on the default branch")
+    assert rc == 0 and verdict_name == "NOTE" and "the branch rule was not read" in line, out
+    assert "MISSING" not in line and "OK" not in verdict_name, line

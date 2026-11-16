@@ -916,15 +916,25 @@ def main():
                 branch = (info.get("defaultBranchRef") or {}).get("name") or "main"
                 if str(info.get("visibility", "")).lower() == "public":
                     add("NOTE", "Repository visibility", "%s is public: the diffs, briefs and records are readable by anyone (plan review R4)" % nwo)
-                checks, err2 = gh(["api", "repos/%s/branches/%s/protection/required_status_checks" % (nwo, branch)], ws)
-                if checks is None:
-                    add("MISSING", "Required check on the default branch", "no branch protection with a required status check on %s (%s); N6 needs the gate job required" % (branch, (err2 or "")[:80]))
+                if not hasattr(bridge_env, "branch_rule"):
+                    add("NOTE", "Required check on the default branch", "the branch rule was not read")
                 else:
-                    contexts = json.loads(checks).get("contexts") or [c.get("context") for c in json.loads(checks).get("checks") or []]
-                    if contexts:
-                        add("OK", "Required check on the default branch (%s)" % ", ".join(str(c) for c in contexts[:4]))
+                    rule = bridge_env.branch_rule(nwo, branch, cwd=ws)
+                    answer = rule.get("answer") if isinstance(rule, dict) else None
+                    if answer == getattr(bridge_env, "ANSWER_VALUE", "value"):
+                        names = []
+                        for item in (rule.get("contexts") or [])[:4]:
+                            if isinstance(item, dict):
+                                names.append(str(item.get("context")))
+                            else:
+                                names.append(str(item))
+                        add("OK", "Required check on the default branch (%s)" % ", ".join(names))
+                    elif answer == getattr(bridge_env, "ANSWER_NONE", "none"):
+                        add("MISSING", "Required check on the default branch", "no required status check on %s; N6 needs the gate job required" % branch)
                     else:
-                        add("MISSING", "Required check on the default branch", "branch protection exists but requires no status check; N6 needs the gate job required")
+                        source = rule.get("source") if isinstance(rule, dict) else ""
+                        reply = rule.get("reason") if isinstance(rule, dict) else ""
+                        add("NOTE", "Required check on the default branch", "cannot read the branch rule (%s: %s); review-guard.py ready answers CANNOT CHECK on this branch for this login" % (source or "", reply or ""))
             except (ValueError, KeyError, TypeError) as e:
                 add("NOTE", "Required check on the default branch", "cannot read gh's answer (%s)" % e)
 

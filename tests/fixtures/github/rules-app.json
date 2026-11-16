@@ -1,0 +1,25 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-16 from the captured rules-main.json: body replaced by one rule that requires the context build of the app 15368",
+ "request": "repos/OWNER/REPO/rules/branches/main",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": [
+  {
+   "type": "required_status_checks",
+   "ruleset_source_type": "Repository",
+   "ruleset_source": "OWNER/REPO",
+   "ruleset_id": 1,
+   "parameters": {
+    "strict_required_status_checks_policy": false,
+    "required_status_checks": [
+     {
+      "context": "build",
+      "integration_id": 15368
+     }
+    ]
+   }
+  }
+ ]
+}

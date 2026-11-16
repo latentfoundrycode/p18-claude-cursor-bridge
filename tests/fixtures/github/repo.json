@@ -1,0 +1,12 @@
+{
+ "fixture": "captured",
+ "note": "captured 2026-11-16 from this repository by the supervisor (gh 2.97.0, gh api GET); cut to allow_auto_merge and default_branch",
+ "request": "repos/OWNER/REPO",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "allow_auto_merge": false,
+  "default_branch": "main"
+ }
+}

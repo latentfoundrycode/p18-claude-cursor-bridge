@@ -1,0 +1,12 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-16 from the captured protection-release-none.json: request, message and gh_stderr replaced: a protected branch on which required checks are not enabled",
+ "request": "repos/OWNER/REPO/branches/main/protection/required_status_checks",
+ "status": 404,
+ "gh_exit": 1,
+ "gh_stderr": "gh: Required status checks not enabled (HTTP 404)",
+ "body": {
+  "message": "Required status checks not enabled",
+  "status": "404"
+ }
+}

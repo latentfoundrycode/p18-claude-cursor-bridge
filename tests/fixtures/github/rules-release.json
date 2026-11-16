@@ -1,0 +1,9 @@
+{
+ "fixture": "captured",
+ "note": "captured 2026-11-16 from this repository by the supervisor (gh 2.97.0, gh api GET); no ruleset applies to the branch",
+ "request": "repos/OWNER/REPO/rules/branches/release%2F2026.11.03",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": []
+}

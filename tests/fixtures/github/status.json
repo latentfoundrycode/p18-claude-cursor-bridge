@@ -1,0 +1,13 @@
+{
+ "fixture": "captured",
+ "note": "captured 2026-11-16 from this repository by the supervisor (gh 2.97.0, gh api GET); cut to state, total_count and statuses",
+ "request": "repos/OWNER/REPO/commits/1111111111111111111111111111111111111111/status",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "state": "pending",
+  "total_count": 0,
+  "statuses": []
+ }
+}
