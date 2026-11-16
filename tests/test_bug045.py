@@ -488,6 +488,86 @@ PS_ALIASES = [
 
 @pytest.mark.parametrize("command", [c for _, c in PS_ALIASES], ids=[n for n, _ in PS_ALIASES])
 def test_bug045_a_quoted_alias_under_powershell_is_refused(plain, command):
-    """BUG-045 (R-082): the quoted alias forms are refused under the PowerShell tool, with alias in the reason."""
+    """BUG-045 (R-082): each quoted alias form is refused under the PowerShell tool (exit 2, with refused and either alias or a literal double quote in the reason). The PowerShell reader refuses a literal double quote inside a word before the alias loop, as round 2's tree did, so a value that holds one is refused for that reading."""
     rc, err = guard_tool(command, plain, "PowerShell")
-    assert rc == 2 and "refused" in err and "alias" in err, (command, rc, err)
+    assert rc == 2 and "refused" in err and ("alias" in err or "literal double quote" in err), (command, rc, err)
+
+
+# BUG-045 (R-082), F13. Each prefix of --mirror from the shortest git accepts through the full word.
+_MIRROR = "--mirror"
+MIRROR_FROM_SHORTEST = [("%s-%d" % (_MIRROR[2:], n), "git push %s origin" % _MIRROR[:n], _MIRROR[:n]) for n in range(3, len(_MIRROR) + 1)]
+
+
+@pytest.mark.parametrize("command,word", [(c, w) for _, c, w in MIRROR_FROM_SHORTEST], ids=[n for n, _, _ in MIRROR_FROM_SHORTEST])
+def test_bug045_every_prefix_of_mirror_from_its_shortest_is_refused(plain, command, word):
+    """BUG-045 (R-082): each prefix of --mirror from --m through --mirror on git push is refused, and the reason names the word."""
+    rc, err = guard(command, plain)
+    assert rc == 2 and "refused" in err and ("git push with %s" % word) in err, (command, rc, err)
+
+
+MIRROR_EQUALS = [
+    ("mirror-equals", "git push --mirror=x origin", "--mirror=x"),
+    ("mirror-shortest-equals", "git push --m=x origin", "--m=x"),
+]
+
+
+@pytest.mark.parametrize("command,word", [(c, w) for _, c, w in MIRROR_EQUALS], ids=[n for n, _, _ in MIRROR_EQUALS])
+def test_bug045_a_mirror_word_with_a_value_is_refused(plain, command, word):
+    """BUG-045 (R-082): --mirror=x and --m=x are refused because the part before = is a prefix of --mirror of at least 3 characters. git rejects a value for --mirror, so the command never pushes; refusing the word is the safe result, because a word read as --mirror must not pass."""
+    rc, err = guard(command, plain)
+    assert rc == 2 and "refused" in err and ("git push with %s" % word) in err, (command, rc, err)
+
+
+DIGIT_CLUSTERS_REFUSED = [
+    ("cluster-4f", "git push -4f origin main", "-4f"),
+    ("cluster-6f", "git push -6f origin main", "-6f"),
+    ("cluster-f6", "git push -f6 origin main", "-f6"),
+    ("cluster-4uf", "git push -4uf origin main", "-4uf"),
+    ("cluster-fq", "git push -fq origin main", "-fq"),
+]
+
+
+@pytest.mark.parametrize("command,flag", [(c, f) for _, c, f in DIGIT_CLUSTERS_REFUSED], ids=[n for n, _, _ in DIGIT_CLUSTERS_REFUSED])
+def test_bug045_a_push_cluster_with_f_and_a_digit_is_refused(plain, command, flag):
+    """BUG-045 (R-082): a single-dash push cluster of letters and the digits 4 and 6 that holds f is a force push."""
+    rc, err = guard(command, plain)
+    assert rc == 2 and "refused" in err and ("git push with the short flag %s" % flag) in err, (command, rc, err)
+
+
+DIGIT_CLUSTERS_PASSING = [
+    ("cluster-4u", "git push -4u origin main"),
+    ("cluster-q", "git push -q origin main"),
+    ("cluster-4", "git push -4 origin main"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in DIGIT_CLUSTERS_PASSING], ids=[n for n, _ in DIGIT_CLUSTERS_PASSING])
+def test_bug045_a_push_cluster_without_f_still_passes(plain, command):
+    """BUG-045 (R-082): a push cluster with no f, including a digit flag alone, still passes."""
+    rc, err = guard(command, plain)
+    assert rc == 0, (command, rc, err)
+
+
+PS_PUSH = [
+    ("ps-push-m", "git push --m origin"),
+    ("ps-push-4f", "git push -4f origin main"),
+]
+
+
+@pytest.mark.parametrize("command", [c for _, c in PS_PUSH], ids=[n for n, _ in PS_PUSH])
+def test_bug045_a_force_push_under_powershell_is_refused(plain, command):
+    """BUG-045 (R-082): under the PowerShell tool, git push --m origin and git push -4f origin main are refused with the push reason, as under Bash."""
+    rc, err = guard_tool(command, plain, "PowerShell")
+    assert rc == 2 and "refused" in err and "git push with" in err, (command, rc, err)
+
+
+def test_bug045_commit_n_still_skips_its_checks(plain):
+    """BUG-045 (R-082): git commit -n -m x is still refused with skips its checks, the hook-skipper reading of commit's -n."""
+    rc, err = guard("git commit -n -m x", plain)
+    assert rc == 2 and "refused" in err and "skips its checks" in err, (rc, err)
+
+
+def test_bug045_a_commit_cluster_holding_a_digit_and_n_still_passes(plain):
+    """BUG-045 (R-082): git commit -4n -m x passes, as round 3's tree read it (exit 0), because a digit keeps the cluster out of commit's letter-only -n reading."""
+    rc, err = guard("git commit -4n -m x", plain)
+    assert rc == 0 and "skips its checks" not in err, (rc, err)

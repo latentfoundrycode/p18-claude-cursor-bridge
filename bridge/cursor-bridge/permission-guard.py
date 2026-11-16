@@ -2006,13 +2006,13 @@ def _husky_git_mutation(simple):
     return re.search(r"\b(commit|push|merge)\b", simple[found.end():], re.I) is not None
 
 
-def _short_letters_hold(a, letter):
-    """A single-dash word whose other characters are ASCII letters, one of them letter."""
+def _short_letters_hold(a, letter, digits=""):
+    """A single-dash word whose other characters are ASCII letters, plus the characters in digits, one of them letter."""
     if len(a) < 2 or a[0] != "-" or a[1] == "-":
         return False
     has = False
     for ch in a[1:]:
-        if not (("A" <= ch <= "Z") or ("a" <= ch <= "z")):
+        if not (("A" <= ch <= "Z") or ("a" <= ch <= "z") or ch in digits):
             return False
         if ch == letter:
             has = True
@@ -2414,9 +2414,9 @@ def force_push_reason(args):
         if len(a) >= 4 and "--force".startswith(a):      # git accepts an unambiguous abbreviation
             return "git push with %s (an abbreviation of --force)" % a
         head = a.split("=", 1)[0]
-        if len(head) >= 4 and any(opt.startswith(head) for opt in long_opts):
+        if (len(head) >= 3 and "--mirror".startswith(head)) or (len(head) >= 4 and any(opt.startswith(head) for opt in long_opts)):
             return "git push with %s" % a
-        if _short_letters_hold(a, "f"):
+        if _short_letters_hold(a, "f", "46"):
             return "git push with the short flag %s" % a
         if a.startswith("+") and len(a) > 1:
             return "git push with a forcing refspec %s" % a
