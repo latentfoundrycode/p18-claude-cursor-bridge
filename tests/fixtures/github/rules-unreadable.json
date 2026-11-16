@@ -1,0 +1,12 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-16 from the captured rules-main.json: status, gh_exit, gh_stderr and body replaced: a rule the login cannot read",
+ "request": "repos/OWNER/REPO/rules/branches/main",
+ "status": 403,
+ "gh_exit": 1,
+ "gh_stderr": "gh: Resource not accessible by integration (HTTP 403)",
+ "body": {
+  "message": "Resource not accessible by integration",
+  "status": "403"
+ }
+}

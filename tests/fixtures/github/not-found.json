@@ -1,0 +1,12 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-16 from the captured protection-release-none.json: message and gh_stderr replaced: the reply GitHub gives where the login cannot see the repository",
+ "request": "repos/OWNER/REPO/branches/main/protection/required_status_checks",
+ "status": 404,
+ "gh_exit": 1,
+ "gh_stderr": "gh: Not Found (HTTP 404)",
+ "body": {
+  "message": "Not Found",
+  "status": "404"
+ }
+}

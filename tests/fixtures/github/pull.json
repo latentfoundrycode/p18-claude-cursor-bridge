@@ -1,0 +1,20 @@
+{
+ "fixture": "captured",
+ "note": "captured 2026-11-16 from this repository by the supervisor (gh 2.97.0, gh api GET); cut to number, state, base and head",
+ "request": "repos/OWNER/REPO/pulls/173",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "number": 173,
+  "state": "closed",
+  "base": {
+   "ref": "main",
+   "sha": "b05fbc800cf7be31074a1f9edee37f2493b4a6e3"
+  },
+  "head": {
+   "ref": "bug-045",
+   "sha": "1111111111111111111111111111111111111111"
+  }
+ }
+}

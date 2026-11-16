@@ -1,0 +1,19 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-16 from the captured rules-main.json: body replaced by one rule of another type, naming no check",
+ "request": "repos/OWNER/REPO/rules/branches/main",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": [
+  {
+   "type": "pull_request",
+   "ruleset_source_type": "Repository",
+   "ruleset_source": "OWNER/REPO",
+   "ruleset_id": 3,
+   "parameters": {
+    "required_approving_review_count": 1
+   }
+  }
+ ]
+}

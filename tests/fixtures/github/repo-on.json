@@ -1,0 +1,12 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-16 from the captured repo.json: allow_auto_merge set true",
+ "request": "repos/OWNER/REPO",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "allow_auto_merge": true,
+  "default_branch": "main"
+ }
+}

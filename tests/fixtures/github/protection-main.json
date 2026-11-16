@@ -1,0 +1,29 @@
+{
+ "fixture": "captured",
+ "note": "captured 2026-11-16 from this repository by the supervisor (gh 2.97.0, gh api GET); cut to contexts and checks",
+ "request": "repos/OWNER/REPO/branches/main/protection/required_status_checks",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "contexts": [
+   "bridge programs (windows-latest)",
+   "bridge programs (ubuntu-latest)",
+   "security floor"
+  ],
+  "checks": [
+   {
+    "context": "bridge programs (windows-latest)",
+    "app_id": 15368
+   },
+   {
+    "context": "bridge programs (ubuntu-latest)",
+    "app_id": 15368
+   },
+   {
+    "context": "security floor",
+    "app_id": 15368
+   }
+  ]
+ }
+}

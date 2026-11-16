@@ -1,0 +1,12 @@
+{
+ "fixture": "captured",
+ "note": "captured 2026-11-16 from this repository by the supervisor (gh 2.97.0, gh api GET); a branch with no protection; cut to message and status",
+ "request": "repos/OWNER/REPO/branches/release%2F2026.11.03/protection/required_status_checks",
+ "status": 404,
+ "gh_exit": 1,
+ "gh_stderr": "gh: Branch not protected (HTTP 404)",
+ "body": {
+  "message": "Branch not protected",
+  "status": "404"
+ }
+}
