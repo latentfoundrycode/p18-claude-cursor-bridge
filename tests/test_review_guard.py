@@ -285,6 +285,9 @@ def test_premerge_and_the_permission_guard_agree_end_to_end(repo, tmp_path):
     rc, out = guard(repo, "premerge", "TASK-001")
     assert rc == 0, out
     sha = re.search(r"--match-head-commit ([0-9a-f]{40})", out).group(1)
+    ready = repo / ".git" / "bridge" / "ready"
+    ready.mkdir(parents=True)
+    (ready / ("12-" + sha)).write_text("{}", encoding="utf-8")
     wt = tmp_path / "Worktrees" / "TASK-002"
     git(repo, "worktree", "add", "-q", "-b", "task-002", str(wt))
 
@@ -387,3 +390,27 @@ def test_r084_a_premerge_that_is_not_a_success_prints_no_auto_merge_line(repo, t
     assert "auto-merge is off for this repository" not in out, out
     assert "auto-merge setting not read" not in out, out
     assert "--auto" not in out, out
+
+
+@pytest.mark.parametrize("args", [("ready",), ("ready", "12", "13")], ids=["no argument", "two arguments"])
+def test_r083_ready_with_the_wrong_argument_count_prints_the_usage(tmp_path, args):
+    """R-083: ready with any argument count other than one prints the usage and exits 2."""
+    p = subprocess.run([sys.executable, PROG] + list(args), cwd=str(tmp_path), capture_output=True, text=True, env=ENV, timeout=30)
+    out = p.stdout
+    assert p.returncode == 2 and "review-guard.py ready <pr>" in out and "premerge-records [<pr>]" in out, out
+    assert "Traceback" not in out
+
+
+def test_r083_an_exception_inside_ready_answers_cannot_check(program, monkeypatch, capsys):
+    """R-083: an exception raised inside ready answers CANNOT CHECK, exit 2, never a traceback."""
+    mod = program("review-guard")
+
+    def boom(_start):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(mod, "find_git_dirs", boom)
+    monkeypatch.setattr(sys, "argv", ["review-guard.py", "ready", "12"])
+    rc = mod.main()
+    out = capsys.readouterr().out
+    assert rc == 2 and out.splitlines() == ["review-guard: CANNOT CHECK - pull request 12: boom"], out
+    assert "Traceback" not in out

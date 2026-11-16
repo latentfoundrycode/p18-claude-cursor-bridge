@@ -2448,6 +2448,34 @@ def premerge_recorded(sha, cwd):
     return any(n.lower().startswith(sha.lower()) for n in names)
 
 
+def ready_recorded(pr, sha, cwd):
+    """True when review-guard.py ready wrote bridge/ready/<pr>-<sha> for this head (R-083).
+    A record of another pull request, or of another head, proves nothing."""
+    if not isinstance(pr, str) or not pr or any(char < "0" or char > "9" for char in pr):
+        return False
+    if not re.fullmatch(r"[0-9a-fA-F]{7,64}", sha or ""):
+        return False
+    try:
+        left = _time_left()
+        if left <= 0:
+            return False
+        p = subprocess.run(["git", "-C", cwd or ".", "-c", "core.fsmonitor=false", "rev-parse", "--git-common-dir"],
+                           capture_output=True, text=True, timeout=left, creationflags=NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if p.returncode != 0:
+        return False
+    common = p.stdout.strip()
+    if not os.path.isabs(common):
+        common = os.path.join(cwd or ".", common)
+    try:
+        names = os.listdir(os.path.join(common, "bridge", "ready"))
+    except OSError:
+        return False
+    prefix = ("%s-%s" % (pr, sha)).lower()
+    return any(name.lower().startswith(prefix) for name in names)
+
+
 def merge_reason(args, cwd):
     """The reason to refuse a gh pr merge (args = the words after `merge`), or None."""
     if any(a == "--admin" or a.startswith("--admin=") for a in args):
@@ -2467,8 +2495,23 @@ def merge_reason(args, cwd):
         return "gh pr merge without --match-head-commit <sha>: the sha, and the record review-guard.py premerge writes when it prints OK, are the gate's confirmation"
     if not re.fullmatch(r"[0-9a-fA-F]{7,64}", sha):
         return "gh pr merge with an empty or malformed --match-head-commit value"
+    number, i = None, 0
+    while i < len(args):
+        word = args[i]
+        if word in GH_VALUE_FLAGS:
+            i += 2
+            continue
+        if word.startswith("-"):
+            i += 1
+            continue
+        number = word
+        break
+    if number is None or any(char < "0" or char > "9" for char in number):
+        return "gh pr merge without the pull request's number: gh pr merge <n> --squash --match-head-commit <sha>"
     if not premerge_recorded(sha, cwd):
         return "gh pr merge for %s without the pre-merge check's record: run python ~/.claude/cursor-bridge/review-guard.py premerge <nnn> <n> in the checkout first (it writes the record when it prints OK)" % sha[:12]
+    if not ready_recorded(number, sha, cwd):
+        return "gh pr merge for %s without the ready record of pull request %s: run python ~/.claude/cursor-bridge/review-guard.py ready %s after the CI watch" % (sha[:12], number, number)
     return None
 
 

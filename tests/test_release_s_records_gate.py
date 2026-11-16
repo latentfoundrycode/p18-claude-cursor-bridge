@@ -336,12 +336,14 @@ def state(repo, files, head=None, base=None, into="main"):
             "files": list(files)}
 
 
-def test_with_the_pull_request_the_record_is_written_and_the_permission_guard_lets_the_merge_through(repo, guard, capsys):
+def test_with_the_pull_request_the_record_is_written_and_the_permission_guard_lets_the_merge_through(repo, guard, capsys, monkeypatch, tmp_path):
     """The record is the one `premerge` writes, by the head's sha: the permission guard, which refuses a merge without it, reads it."""
     mod, sleeps, github = guard
     change(repo, "docs/PROJECT_STATUS.md", "Phase: done\n")
     head = git(repo, "rev-parse", "HEAD")
     github(state(repo, ["docs/PROJECT_STATUS.md"]))
+    import test_program_ready as ready_cases
+    ready_cases.use_standin(mod.bridge_env, monkeypatch, tmp_path, ready_cases.ready_routes(head), head)
     pg = _permission_guard(repo, head)
     assert pg("gh pr merge 12 --squash --match-head-commit %s" % head) is not None, "no record yet: the merge is refused"
     rc = mod.cmd_premerge_records(str(repo), "12")
@@ -378,11 +380,14 @@ def test_a_file_github_lists_and_the_local_diff_lacks_is_classified_too(repo, gu
     assert rc == 1 and "FULL GATE  src/a.py: not a record" in out and premerge_record(repo) == [], out
 
 
-def test_a_lagging_head_is_read_again_and_one_that_still_differs_is_not_ready(repo, guard, capsys):
+def test_a_lagging_head_is_read_again_and_one_that_still_differs_is_not_ready(repo, guard, capsys, monkeypatch, tmp_path):
     mod, sleeps, github = guard
     change(repo, "docs/PROJECT_STATUS.md", "Phase: done\n")
+    head = git(repo, "rev-parse", "HEAD")
     lagging = state(repo, ["docs/PROJECT_STATUS.md"], head="0" * 40)
     github(lagging, lagging, state(repo, ["docs/PROJECT_STATUS.md"]))
+    import test_program_ready as ready_cases
+    ready_cases.use_standin(mod.bridge_env, monkeypatch, tmp_path, ready_cases.ready_routes(head), head)
     rc = mod.cmd_premerge_records(str(repo), "12")
     out = capsys.readouterr().out
     assert rc == 0 and "waited 30 seconds" in out and sleeps == [15, 15], out
@@ -415,6 +420,24 @@ def test_the_whole_round_s_premerge_is_untouched_and_still_needs_its_verified_ma
     assert rc == 2 and premerge_record(repo) == [], out
     rc, out = run(repo, "premerge-records", "12", "extra")
     assert rc == 2 and "premerge-records [<pr>]" in out, "more words than the command takes: the usage, nothing run"
+
+
+def test_r083_premerge_records_leaves_neither_record_when_the_ready_record_cannot_be_written(repo, guard, capsys, monkeypatch, tmp_path):
+    """R-083: premerge-records writes both records or neither; a failed ready write removes the premerge record."""
+    mod, _sleeps, github = guard
+    change(repo, "docs/PROJECT_STATUS.md", "Phase: done\n")
+    head = git(repo, "rev-parse", "HEAD")
+    github(state(repo, ["docs/PROJECT_STATUS.md"]))
+    import test_program_ready as ready_cases
+    ready_cases.use_standin(mod.bridge_env, monkeypatch, tmp_path, ready_cases.ready_routes(head), head)
+    bridge = repo / ".git" / "bridge"
+    bridge.mkdir(parents=True, exist_ok=True)
+    (bridge / "ready").write_text("not a folder", encoding="utf-8")
+    rc = mod.cmd_premerge_records(str(repo), "12")
+    out = capsys.readouterr().out
+    assert rc == 2 and "CANNOT CHECK" in out and "ready record" in out, out
+    assert premerge_record(repo) == [], out
+    assert not (bridge / "ready" / ("12-" + head)).exists()
 
 
 def test_r084_premerge_records_without_a_pull_request_prints_no_auto_merge_line(repo, guard, capsys, monkeypatch, tmp_path):

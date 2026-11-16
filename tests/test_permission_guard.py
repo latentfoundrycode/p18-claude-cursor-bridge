@@ -24,13 +24,16 @@ def run(tool, command, cwd=None):
 
 @pytest.fixture
 def recorded_repo(tmp_path):
-    """A repository in which review-guard.py premerge has recorded SHA (the file it writes)."""
+    """A repository in which review-guard.py premerge and ready have recorded SHA (R-083: both records)."""
     repo = tmp_path / "repo"
     repo.mkdir()
-    subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True)
+    subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True, timeout=30)
     folder = repo / ".git" / "bridge" / "premerge"
     folder.mkdir(parents=True)
     (folder / SHA).write_text('{"pr": 12}', encoding="utf-8")
+    ready = repo / ".git" / "bridge" / "ready"
+    ready.mkdir(parents=True)
+    (ready / ("12-" + SHA)).write_text("{}", encoding="utf-8")
     return repo
 
 
@@ -264,6 +267,13 @@ def test_r082_graphql_query_with_literal_quotes_passes_under_bash_only():
     assert rc == 0, err
     rc, err = run("PowerShell", _GRAPHQL_READ)
     assert rc == 2 and "cannot read" in err.lower(), err
+
+
+def test_r083_ready_recorded_fails_closed_outside_a_repository(tmp_path, program):
+    """R-083: ready_recorded is false outside a repository (D-003 ready_recorded is not reached)."""
+    guard = program("permission-guard")
+    assert guard.ready_recorded("12", SHA, str(tmp_path)) is False
+    assert guard.ready_recorded("12", "not-a-sha", str(tmp_path)) is False
 
 
 @pytest.mark.parametrize("command", ["cmd /c echo agent", "cmd /c dir agent"])

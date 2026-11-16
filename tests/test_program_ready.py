@@ -468,3 +468,85 @@ def test_r083_premerge_records_writes_neither_record_where_ci_is_not_proven(tmp_
     rc, out, head, written = records_case(tmp_path, monkeypatch, capsys, kw)
     assert rc == code and verdict(out, word), out
     assert [w for w in written if w.startswith(("premerge/", "ready/"))] == [], written
+
+
+
+# ---------------------------------------------------------------- round 2: the merge command read as gh reads it
+# Review A and the security audit of round 1 (2026-11-17): gh's flag parser gives a value-taking flag the next word as its value even
+# where that word begins with `-`, and reads a cluster of short flags letter by letter, a value-taking letter taking the rest of the
+# word or, where it is the last letter, the next word. The guard read the sha, `--disable-auto` and the number otherwise, so a
+# command could name one head or one pull request to the guard and another to gh.
+
+
+ROUND2_REFUSED = [
+    "gh pr merge 12 --squash --match-head-commit %s --subject --match-head-commit=%s" % (OTHER, SHA),
+    "gh pr merge 12 --squash --match-head-commit %s -t --match-head-commit=%s" % (OTHER, SHA),
+    "gh pr merge 12 --squash --match-head-commit %s -b --match-head-commit=%s" % (OTHER, SHA),
+    "gh pr merge 12 --squash --match-head-commit %s -dt --match-head-commit=%s" % (OTHER, SHA),
+    "gh pr merge 12 --squash --match-head-commit %s --body --match-head-commit %s" % (OTHER, SHA),
+    "gh pr merge 12 --squash --subject --disable-auto",
+    "gh pr merge 12 --squash -b --disable-auto --match-head-commit " + OTHER,
+    "gh pr merge 12 --squash -t --help --match-head-commit " + OTHER,
+    "gh pr merge -sb 12 34 --match-head-commit " + SHA,
+    "gh pr merge -st 12 34 --match-head-commit " + SHA,
+    "gh pr merge -sR 12 34 --match-head-commit " + SHA,
+]
+
+
+@pytest.mark.parametrize("tool", TOOLS)
+@pytest.mark.parametrize("cmd", ROUND2_REFUSED)
+def test_r083_r2_a_word_that_is_a_flags_value_is_never_the_sha_the_exemption_or_the_number(tool, tmp_path, cmd):
+    """enforces: T-CONTEXT, the guard takes the number and the head from the merge command as gh takes them: a word that is the
+    value of a flag (given as the next word, or within a cluster of short flags) is never the `--match-head-commit` value, never
+    `--disable-auto` or `--help`, and never the pull request's number. The records stand for pull request 12 at SHA alone."""
+    repo = records_repo(tmp_path)
+    rc, err = pg(tool, cmd, repo)
+    assert rc == 2, (cmd, err)
+
+
+ROUND2_ALLOWED = [
+    "gh pr merge -s 12 --match-head-commit " + SHA,
+    "gh pr merge -ds 12 --match-head-commit " + SHA,
+    "gh pr merge 12 -st done --match-head-commit " + SHA,
+    "gh pr merge 12 -stdone --match-head-commit " + SHA,
+    "gh pr merge -t 34 12 --squash --match-head-commit " + SHA,
+    "gh pr merge 12 --squash --subject=x --match-head-commit=" + SHA,
+    "gh pr merge 12 --squash --match-head-commit %s --match-head-commit %s" % (OTHER, SHA),
+]
+
+
+@pytest.mark.parametrize("tool", TOOLS)
+@pytest.mark.parametrize("cmd", ROUND2_ALLOWED)
+def test_r083_r2_the_forms_gh_reads_as_pull_request_12_at_sha_pass(tool, tmp_path, cmd):
+    """The positive side of the case above: clusters of flags that take no value, a value glued to its letter or given as the next
+    word, a long flag's `=` value, and the last `--match-head-commit` given (gh keeps the last), each read as gh reads it."""
+    repo = records_repo(tmp_path)
+    rc, err = pg(tool, cmd, repo)
+    assert rc == 0, (cmd, err)
+
+
+@pytest.mark.parametrize("tool", TOOLS)
+def test_r083_r2_a_ready_record_left_half_written_is_no_record(tool, tmp_path):
+    """enforces: T-CONTEXT: the ready record is the file `ready/<pr>-<head>`; the temporary file a write killed between its dump and
+    its rename leaves (`<pr>-<head>.tmp`) proves nothing."""
+    repo = records_repo(tmp_path, ready=("12-" + SHA + ".tmp",))
+    rc, err = pg(tool, "gh pr merge 12 --squash --match-head-commit " + SHA, repo)
+    assert rc == 2 and "review-guard.py ready 12" in err, err
+
+
+def test_r083_r2_ready_recorded_is_true_only_for_its_pull_request_and_head_inside_the_repository(tmp_path):
+    """enforces: D-003 `ready_recorded`: true in the repository that holds `ready/12-<SHA>` for 12 and SHA (a short sha of it too),
+    false for another pull request, another head, a sha that is not hex, and outside any repository."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("permission_guard_083_r2", PGUARD)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    repo = records_repo(tmp_path)
+    assert mod.ready_recorded("12", SHA, str(repo)) is True
+    assert mod.ready_recorded("12", SHA[:12], str(repo)) is True
+    assert mod.ready_recorded("13", SHA, str(repo)) is False
+    assert mod.ready_recorded("12", OTHER, str(repo)) is False
+    assert mod.ready_recorded("12", "not-a-sha", str(repo)) is False
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    assert mod.ready_recorded("12", SHA, str(outside)) is False

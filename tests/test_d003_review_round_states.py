@@ -734,7 +734,7 @@ def test_d003_transition_ready_check_to_premerged_cannot_check(case):
 
 @pytest.mark.parametrize("tool", ["Bash", "PowerShell"])
 def test_d003_transition_premerged_merge_before_ready_is_refused(tool, tmp_path):
-    """R-083, D-003 (`premerged --> premerged`, by this design): a merge with the premerge record and no ready record is refused,
+    """R-083, D-003 (`premerged --> premerged`): a merge with the premerge record and no ready record is refused,
     its message naming review-guard.py ready; the edge `premerged --> [*]` is gone."""
     repo = R.records_repo(tmp_path, ready=())
     rc, err = R.pg(tool, "gh pr merge 12 --squash --match-head-commit " + R.SHA, repo)
@@ -751,7 +751,7 @@ def test_d003_state_ready_recorded_the_merge_passes(tool, tmp_path):
 
 
 def test_d003_transition_short_gate_not_ready_writes_neither_record(tmp_path, monkeypatch, capsys):
-    """R-083, D-003 (`short_gate --> short_gate`, by this design): `premerge-records <pr>` where CI is not proven on the head
+    """R-083, D-003 (`short_gate --> short_gate`): `premerge-records <pr>` where CI is not proven on the head
     answers NOT READY, exit 1, and writes neither record."""
     rc, out, head, written = R.records_case(tmp_path, monkeypatch, capsys, dict(checks="ready-checks-S04-failed.json", runs="ready-runs-S04-failed.json"))
     assert rc == 1 and R.verdict(out, "NOT READY"), out
