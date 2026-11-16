@@ -683,9 +683,76 @@ def test_d003_state_records_premerged_writes_the_record_for_the_head(tmp_path, p
     mod = program("review-guard")
     head = S.git(repo, "rev-parse", "HEAD")
     monkeypatch.setattr(mod, "pr_state", lambda pr, root: (S.state(repo, ["docs/PROJECT_STATUS.md"]), None))
+    import test_program_ready as R                     # TASK-083: CI proven on the head first, both records written
+    R.use_standin(mod.bridge_env, monkeypatch, tmp_path, R.ready_routes(head), head)
     rc = mod.cmd_premerge_records(str(repo), "12")
     out = capsys.readouterr().out
     assert rc == 0 and "OK - records only, 1 file(s)" in out and "gh pr merge 12 --squash --match-head-commit %s" % head in out, out
-    assert guard_files(repo) == ["premerge/" + head]
+    assert guard_files(repo) == ["premerge/" + head, "ready/12-" + head]
     record = json.loads((repo / ".git" / "bridge" / "premerge" / head).read_text(encoding="utf-8"))
     assert record["review"] == "records" and record["pr"] == "12" and record["files"] == ["docs/PROJECT_STATUS.md"], record
+
+
+# ---------------------------------------------------------------- TASK-083 (R-083): ready_check, ready_recorded, both records
+# One test per new state and transition as D-003 draws them; the cases are tests/test_program_ready.py's, on the recorded replies.
+
+from test_program_ready import case  # noqa: E402,F401  (the fixture: a repository whose head holds the premerge record)
+import test_program_ready as R  # noqa: E402
+
+
+def test_d003_transition_premerged_to_ready_check_to_ready_recorded(case):
+    """R-083, D-003 (`premerged --> ready_check`, `ready_check --> ready_recorded`): after premerge's record, `ready <pr>` with CI
+    proven on the head answers READY, exit 0, and writes `ready/<pr>-<head>` beside the premerge record."""
+    rc, out = case.run()
+    assert rc == 0 and R.verdict(out, "READY"), out
+    assert case.ready_records() == ["12-" + case.head]
+    assert os.listdir(str(G.bridge_dir(case.repo) / "premerge")) == [case.head]
+
+
+def test_d003_transition_ready_check_to_premerged_not_ready_on_a_context(case):
+    """R-083, D-003 (`ready_check --> premerged`, NOT READY): a required context failed on the head, exit 1, nothing written and
+    nothing removed, back to the watch."""
+    rc, out = case.run(checks="ready-checks-S04-failed.json", runs="ready-runs-S04-failed.json")
+    assert rc == 1 and "security floor: failed" in R.verdict(out, "NOT READY"), out
+    assert case.ready_records() == [] and os.listdir(str(G.bridge_dir(case.repo) / "premerge")) == [case.head]
+
+
+def test_d003_transition_ready_check_to_verified_ok_the_head_moved(case):
+    """R-083, D-003 (`ready_check --> verified_ok`): GitHub's head differs from the local head, NOT READY exit 1, nothing written."""
+    rc, out = case.run(pull="ready-pull-moved.json")
+    assert rc == 1 and "the head moved" in R.verdict(out, "NOT READY"), out
+    assert case.ready_records() == []
+
+
+def test_d003_transition_ready_check_to_premerged_cannot_check(case):
+    """R-083, D-003 (`ready_check --> premerged`, CANNOT CHECK): the base's rule cannot be read, exit 2, a stop and never a pass,
+    nothing written."""
+    rc, out = case.run(prot="protection-unreadable.json")
+    assert rc == 2 and R.verdict(out, "CANNOT CHECK"), out
+    assert case.ready_records() == []
+
+
+@pytest.mark.parametrize("tool", ["Bash", "PowerShell"])
+def test_d003_transition_premerged_merge_before_ready_is_refused(tool, tmp_path):
+    """R-083, D-003 (`premerged --> premerged`, by this design): a merge with the premerge record and no ready record is refused,
+    its message naming review-guard.py ready; the edge `premerged --> [*]` is gone."""
+    repo = R.records_repo(tmp_path, ready=())
+    rc, err = R.pg(tool, "gh pr merge 12 --squash --match-head-commit " + R.SHA, repo)
+    assert rc == 2 and "review-guard.py ready 12" in err, err
+
+
+@pytest.mark.parametrize("tool", ["Bash", "PowerShell"])
+def test_d003_state_ready_recorded_the_merge_passes(tool, tmp_path):
+    """R-083, D-003 (`ready_recorded --> [*]`, `records_premerged --> [*]`): with both records for the pull request and the head
+    the command names, the guard lets the merge through."""
+    repo = R.records_repo(tmp_path)
+    rc, err = R.pg(tool, "gh pr merge 12 --squash --match-head-commit " + R.SHA, repo)
+    assert rc == 0, err
+
+
+def test_d003_transition_short_gate_not_ready_writes_neither_record(tmp_path, monkeypatch, capsys):
+    """R-083, D-003 (`short_gate --> short_gate`, by this design): `premerge-records <pr>` where CI is not proven on the head
+    answers NOT READY, exit 1, and writes neither record."""
+    rc, out, head, written = R.records_case(tmp_path, monkeypatch, capsys, dict(checks="ready-checks-S04-failed.json", runs="ready-runs-S04-failed.json"))
+    assert rc == 1 and R.verdict(out, "NOT READY"), out
+    assert [w for w in written if w.startswith(("premerge/", "ready/"))] == [], written

@@ -1,0 +1,24 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-16 from the captured rules-main.json by the supervisor for TASK-083: body replaced by one rule that requires the context ci/legacy and names no app",
+ "request": "repos/OWNER/REPO/rules/branches/main",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": [
+  {
+   "type": "required_status_checks",
+   "ruleset_source_type": "Repository",
+   "ruleset_source": "OWNER/REPO",
+   "ruleset_id": 2,
+   "parameters": {
+    "strict_required_status_checks_policy": false,
+    "required_status_checks": [
+     {
+      "context": "ci/legacy"
+     }
+    ]
+   }
+  }
+ ]
+}

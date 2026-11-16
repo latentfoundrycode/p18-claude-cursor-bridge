@@ -1,0 +1,93 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-16 from the captured check-runs.json by the supervisor for TASK-083: security floor concluded skipped",
+ "request": "repos/OWNER/REPO/commits/1111111111111111111111111111111111111111/check-runs?filter=all",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "total_count": 5,
+  "check_runs": [
+   {
+    "id": 133248699692,
+    "name": "Socket Security: Pull Request Alerts",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-11-16T10:51:44Z",
+    "completed_at": "2026-11-16T10:51:48Z",
+    "head_sha": "1111111111111111111111111111111111111111",
+    "check_suite": {
+     "id": 118713691405
+    },
+    "app": {
+     "id": 156372,
+     "slug": "socket-security"
+    }
+   },
+   {
+    "id": 133248673480,
+    "name": "Socket Security: Project Report",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-11-16T10:51:42Z",
+    "completed_at": "2026-11-16T10:51:44Z",
+    "head_sha": "1111111111111111111111111111111111111111",
+    "check_suite": {
+     "id": 118713691405
+    },
+    "app": {
+     "id": 156372,
+     "slug": "socket-security"
+    }
+   },
+   {
+    "id": 133248653587,
+    "name": "bridge programs (windows-latest)",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-11-16T10:51:42Z",
+    "completed_at": "2026-11-16T11:30:32Z",
+    "head_sha": "1111111111111111111111111111111111111111",
+    "check_suite": {
+     "id": 118713714642
+    },
+    "app": {
+     "id": 15368,
+     "slug": "github-actions"
+    }
+   },
+   {
+    "id": 133248653285,
+    "name": "bridge programs (ubuntu-latest)",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-11-16T10:51:42Z",
+    "completed_at": "2026-11-16T11:05:33Z",
+    "head_sha": "1111111111111111111111111111111111111111",
+    "check_suite": {
+     "id": 118713714642
+    },
+    "app": {
+     "id": 15368,
+     "slug": "github-actions"
+    }
+   },
+   {
+    "id": 133248652851,
+    "name": "security floor",
+    "status": "completed",
+    "conclusion": "skipped",
+    "started_at": "2026-11-16T10:51:42Z",
+    "completed_at": "2026-11-16T10:52:13Z",
+    "head_sha": "1111111111111111111111111111111111111111",
+    "check_suite": {
+     "id": 118713714642
+    },
+    "app": {
+     "id": 15368,
+     "slug": "github-actions"
+    }
+   }
+  ]
+ }
+}

@@ -1,0 +1,12 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-16 from the captured protection-release-none.json by the supervisor for TASK-083: status, message and stderr replaced by a refusal (HTTP 403, Resource not accessible by integration) for main",
+ "request": "repos/OWNER/REPO/branches/main/protection/required_status_checks",
+ "status": 403,
+ "gh_exit": 1,
+ "gh_stderr": "gh: Resource not accessible by integration (HTTP 403)",
+ "body": {
+  "message": "Resource not accessible by integration",
+  "status": "403"
+ }
+}

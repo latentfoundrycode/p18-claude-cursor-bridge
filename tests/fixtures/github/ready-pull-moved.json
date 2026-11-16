@@ -1,0 +1,20 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-16 from the captured pull.json by the supervisor for TASK-083: head.sha set to another commit (the head moved)",
+ "request": "repos/OWNER/REPO/pulls/173",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "number": 173,
+  "state": "closed",
+  "base": {
+   "ref": "main",
+   "sha": "b05fbc800cf7be31074a1f9edee37f2493b4a6e3"
+  },
+  "head": {
+   "ref": "bug-045",
+   "sha": "2222222222222222222222222222222222222222"
+  }
+ }
+}

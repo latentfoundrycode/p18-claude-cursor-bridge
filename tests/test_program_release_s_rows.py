@@ -41,19 +41,22 @@ def test_r066_a_test_named_file_under_run_is_no_trace_in_done_mode(tmp_path):
 # ---------------------------------------------------------------- R-067: the short gate opens no round
 
 
-def test_r067_the_short_gate_writes_its_record_and_no_snapshot_round_or_mark(repo, program, monkeypatch, capsys):
-    """R-067: `premerge-records <pr>` writes the pre-merge record for the head and nothing else under the guard's folder: no
-    snapshot, no rounds record, no verified mark, so no Review B is asked for and no round is counted."""
+def test_r067_the_short_gate_writes_its_record_and_no_snapshot_round_or_mark(repo, program, monkeypatch, capsys, tmp_path):
+    """R-067: `premerge-records <pr>` writes the pre-merge record for the head, and since TASK-083 the ready record beside it (R-083,
+    both or neither), and nothing else under the guard's folder: no snapshot, no rounds record, no verified mark, so no Review B is
+    asked for and no round is counted."""
     for k in ("GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"):
         monkeypatch.setenv(k, os.devnull)
     mod = program("review-guard")
     change(repo, "docs/PROJECT_STATUS.md", "Phase: done\n")
     head = git(repo, "rev-parse", "HEAD")
     monkeypatch.setattr(mod, "pr_state", lambda pr, root: (state(repo, ["docs/PROJECT_STATUS.md"]), None))
+    import test_program_ready as R                     # TASK-083: CI proven on the head, on the recorded replies
+    R.use_standin(mod.bridge_env, monkeypatch, tmp_path, R.ready_routes(head), head)
     assert mod.cmd_premerge_records(str(repo), "12") == 0, capsys.readouterr().out
     folder = repo / ".git" / "bridge"
     written = sorted(os.path.relpath(os.path.join(d, f), str(folder)).replace("\\", "/") for d, _, files in os.walk(str(folder)) for f in files)
-    assert written == ["premerge/" + head] and premerge_record(repo) == [head], written
+    assert written == ["premerge/" + head, "ready/12-" + head] and premerge_record(repo) == [head], written
 
 
 # ---------------------------------------------------------------- R-069: after a compaction the hook asks for less
