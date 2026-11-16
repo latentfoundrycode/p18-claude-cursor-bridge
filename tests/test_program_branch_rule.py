@@ -497,3 +497,209 @@ def test_r084_premerge_s_closing_line_says_deleted_or_rewritten(tmp_path):
     rc, out = G.guard(repo2, "premerge", "TASK-001")
     line = _gate_line(out)
     assert rc == 1 and "rewritten after it was taken" in line and "deleted" not in line, out
+
+
+# ---------------------------------------------------------------- round 2 (Review A and the security audit of round 1)
+# Replies no recording shows, built in the case from the recorded shapes: GitHub's answer reaches the reader as outside input, and
+# a reply the reader does not recognise is cannot read, never none and never a traceback (DESIGN, "Security and secret handling",
+# GitHub reads; the brief's Security context). Each case below failed on round 1's tree.
+
+
+@pytest.fixture
+def crafted(tmp_path, monkeypatch, be):
+    """crafted({route: body or (body, gh_exit)}): the stand-in answering from replies written in the case; returns the call log
+    reader. A route is written as for `github` ('#<page>', bare: page 1)."""
+    folder = tmp_path / "crafted"
+    folder.mkdir()
+    standin = tmp_path / "standin_gh.py"
+    standin.write_text(STANDIN, encoding="utf-8")
+    log = tmp_path / "gh-calls.jsonl"
+
+    def setup(routes):
+        full = {}
+        for n, (k, v) in enumerate(routes.items()):
+            body, code = v if isinstance(v, tuple) else (v, 0)
+            name = "reply-%d.json" % n
+            (folder / name).write_text(json.dumps({"body": body, "gh_exit": code, "gh_stderr": ""}), encoding="utf-8")
+            full[k if "#" in k else k + "#1"] = name
+        cfg = tmp_path / "routes.json"
+        cfg.write_text(json.dumps({"routes": full, "fixtures": str(folder), "log": str(log), "sleep": 0}), encoding="utf-8")
+        if log.exists():
+            log.unlink()
+        monkeypatch.setattr(be, "GH_COMMAND", [sys.executable, str(standin), str(cfg)])
+
+    def calls():
+        if not log.exists():
+            return []
+        return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+    setup.calls = calls
+    return setup
+
+
+UNPROTECTED = ({"message": "Branch not protected", "documentation_url": "https://docs.github.com/rest", "status": "404"}, 1)
+RSC = "required_status_checks"
+
+
+@pytest.mark.parametrize("rules", [
+    [{"type": RSC}],
+    [{"type": RSC, "parameters": None}],
+    [{"type": RSC, "parameters": {}}],
+    [{"type": RSC, "parameters": {RSC: None}}],
+    [{"type": RSC, "parameters": {RSC: "build"}}],
+    [{"parameters": {RSC: [{"context": "build"}]}}],
+    [{"type": 5, "parameters": {RSC: [{"context": "build"}]}}],
+    ["required_status_checks"],
+], ids=["no-parameters", "parameters-null", "parameters-empty", "checks-null", "checks-not-a-list", "no-type", "type-not-a-string",
+        "rule-not-an-object"])
+def test_r083_r2_a_rule_whose_shape_is_not_recognised_is_cannot_read_never_none(be, crafted, rules):
+    """A required-status-checks rule without its list of checks, or a rule with no type the reader can read, beside a branch with
+    no classic protection: cannot read from the rules, never none (none would send ready to the weaker proof)."""
+    crafted({PROT_MAIN: UNPROTECTED, RULES_MAIN: rules})
+    r = be.branch_rule("OWNER/REPO", "main")
+    assert r["answer"] == "cannot read" and "rules" in r["source"] and r["reason"], r
+
+
+def _other_rules(n):
+    return [{"type": "deletion", "ruleset_source_type": "Repository", "ruleset_source": "OWNER/REPO", "ruleset_id": 1000 + i} for i in range(n)]
+
+
+def test_r083_r2_the_rules_are_asked_a_hundred_a_page_and_read_to_a_short_page(be, crafted):
+    """The rules endpoint pages its bare list (thirty by default) and states no count: asked with per_page=100, read until a page
+    comes back with fewer than a hundred rules; a required check on the second page is read."""
+    late = {"type": RSC, "parameters": {RSC: [{"context": "late check", "integration_id": 15368}], "strict_required_status_checks_policy": False}}
+    crafted({PROT_MAIN: UNPROTECTED, RULES_MAIN + "#1": _other_rules(100), RULES_MAIN + "#2": [late]})
+    r = be.branch_rule("OWNER/REPO", "main")
+    assert r["answer"] == "value" and contexts(r) == [("late check", 15368)], r
+    rule_paths = [c[c.index("api") + 1] for c in crafted.calls() if "/rules/branches/" in c[c.index("api") + 1]]
+    assert len(rule_paths) == 2 and all("per_page=100" in p for p in rule_paths), rule_paths
+    crafted({PROT_MAIN: UNPROTECTED, RULES_MAIN + "#1": _other_rules(3)})
+    r = be.branch_rule("OWNER/REPO", "main")
+    assert r["answer"] == "none", r
+    assert sum(1 for c in crafted.calls() if "/rules/branches/" in c[c.index("api") + 1]) == 1, "a short first page ends the reading"
+
+
+def test_r083_r2_a_full_page_of_rules_whose_next_page_cannot_be_read_is_cannot_read(be, crafted):
+    crafted({PROT_MAIN: UNPROTECTED, RULES_MAIN + "#1": _other_rules(100)})
+    r = be.branch_rule("OWNER/REPO", "main")
+    assert r["answer"] == "cannot read" and "rules" in r["source"], r
+
+
+def test_r083_r2_a_pending_check_ranks_after_every_completed_one_whatever_their_start_times(be):
+    """R7: the not-completed rank comes first in every case; only the completed fall back to id alone, where one of them carries
+    no start time (Review A's cases A and B: round 1 kept the passed check and dropped the pending one)."""
+    a = [check(10, "lint", 900, started=None, status="queued", conclusion=None), check(20, "lint", 900)]
+    kept = be.latest_of_each({"checks": a, "statuses": [], "runs": []})
+    assert [c["id"] for c in kept["checks"]] == [10], kept
+    b = [check(3, "lint", 900, started="2026-11-16T11:00:00Z", status="in_progress", conclusion=None),
+         check(5, "lint", 900, started=None),
+         check(7, "lint", 900, started="2026-11-16T09:00:00Z")]
+    kept = be.latest_of_each({"checks": b, "statuses": [], "runs": []})
+    assert [c["id"] for c in kept["checks"]] == [3] and be.ci_class(kept["checks"][0], "check") == "pending", kept
+    runs = [run(1, 801, 1, 100)]
+    c = [check(31, "security floor", 100, started=None, status="in_progress", conclusion=None),
+         check(33, "security floor", 100, started=None)]
+    kept = be.latest_of_each({"checks": c, "statuses": [], "runs": runs})
+    assert [x["id"] for x in kept["checks"]] == [31], "in a latest run too"
+
+
+@pytest.mark.parametrize("checks,statuses", [
+    ([check(1, "lint", 900, started="2026-11-16T10:00:00Z"), check(2, "lint", 900, started="2026-11-16T11:00:00")], []),
+    ([], [{"id": 1, "context": "ci", "state": "success", "updated_at": "2026-11-16T10:00:00Z"},
+          {"id": 2, "context": "ci", "state": "failure", "updated_at": "2026-11-16T11:00:00"}]),
+], ids=["check-times", "status-times"])
+def test_r083_r2_a_time_with_no_zone_beside_one_with_a_zone_raises_nothing(be, checks, statuses):
+    kept = be.latest_of_each({"checks": checks, "statuses": statuses, "runs": []})
+    assert len(kept["checks"]) == len(checks[:1]) and len(kept["statuses"]) == len(statuses[:1]), kept
+
+
+def _status_body(statuses):
+    return {"state": "pending", "statuses": statuses, "sha": SHA, "total_count": len(statuses)}
+
+
+def _checks_body(checks):
+    return {"total_count": len(checks), "check_runs": checks}
+
+
+def _runs_body(runs):
+    return {"total_count": len(runs), "workflow_runs": runs}
+
+
+@pytest.mark.parametrize("bad", ["run-number-missing", "run-number-a-string", "run-attempt-missing", "run-id-null", "check-id-missing",
+                                 "status-updated-missing", "status-updated-no-zone", "status-updated-not-a-time"])
+def test_r083_r2_an_entry_without_the_fields_its_order_needs_is_cannot_read(be, crafted, bad):
+    """The brief's constraint, settled: an entry whose rank cannot be read makes the head cannot read (round 1 ranked it lowest,
+    and an older success beside a newer failure was kept)."""
+    runs = [run(1, 801, 1, 100, conclusion="success"), run(2, 802, 1, 200, conclusion="failure")]
+    checks = [check(11, "tests", 200, conclusion="failure")]
+    statuses = [{"id": 1, "context": "ci", "state": "success", "updated_at": "2026-11-16T10:00:00Z"},
+                {"id": 2, "context": "ci", "state": "failure", "updated_at": "2026-11-16T11:00:00Z"}]
+    if bad == "run-number-missing":
+        del runs[1]["run_number"]
+    elif bad == "run-number-a-string":
+        runs[1]["run_number"] = "802"
+    elif bad == "run-attempt-missing":
+        del runs[1]["run_attempt"]
+    elif bad == "run-id-null":
+        runs[1]["id"] = None
+    elif bad == "check-id-missing":
+        del checks[0]["id"]
+    elif bad == "status-updated-missing":
+        del statuses[1]["updated_at"]
+    elif bad == "status-updated-no-zone":
+        statuses[1]["updated_at"] = "2026-11-16T11:00:00"
+    else:
+        statuses[1]["updated_at"] = "later"
+    crafted({CHECKS: _checks_body(checks), STATUS: _status_body(statuses), RUNS: _runs_body(runs)})
+    r = be.head_state("OWNER/REPO", SHA)
+    assert r["answer"] == "cannot read" and r["reason"] and r["source"] in ("checks", "statuses", "runs"), r
+
+
+def test_r083_r2_the_well_formed_entries_still_read_as_a_value(be, crafted):
+    runs = [run(1, 801, 1, 100), run(2, 802, 2, 200)]
+    checks = [check(11, "tests", 200, started=None)]
+    statuses = [{"id": 1, "context": "ci", "state": "success", "updated_at": "2026-11-16T10:00:00Z"}]
+    crafted({CHECKS: _checks_body(checks), STATUS: _status_body(statuses), RUNS: _runs_body(runs)})
+    r = be.head_state("OWNER/REPO", SHA)
+    assert r["answer"] == "value" and len(r["runs"]) == 2 and len(r["checks"]) == 1 and len(r["statuses"]) == 1, r
+
+
+@pytest.mark.parametrize("sha", ["..", "HEAD", "main", "1111111", "1" * 39, "1" * 41, "A" * 40, "1" * 40 + "/../x", ""])
+def test_r083_r2_a_head_that_is_not_a_commit_sha_is_cannot_read_and_asks_nothing(be, crafted, sha):
+    crafted({})
+    r = be.head_state("OWNER/REPO", sha)
+    assert r["answer"] == "cannot read" and r["reason"], r
+    assert crafted.calls() == [], "no call is made for a head that is not 40 or 64 lowercase hex digits"
+
+
+def test_r083_r2_a_sha_of_sixty_four_digits_is_a_head(be, crafted):
+    sha = "a" * 64
+    crafted({"repos/OWNER/REPO/commits/%s/check-runs?filter=all" % sha: _checks_body([]),
+             "repos/OWNER/REPO/commits/%s/status" % sha: _status_body([]),
+             "repos/OWNER/REPO/actions/runs?head_sha=%s" % sha: _runs_body([])})
+    assert be.head_state("OWNER/REPO", sha)["answer"] == "value"
+
+
+@pytest.mark.parametrize("number", ["²", "١٧٣", "17 3", "-1", "", True])
+def test_r083_r2_a_pull_request_number_that_is_not_ascii_digits_is_cannot_read_and_asks_nothing(be, crafted, number):
+    crafted({})
+    r = be.pull_refs("OWNER/REPO", number)
+    assert r["answer"] == "cannot read", r
+    assert crafted.calls() == []
+
+
+@pytest.mark.parametrize("prot,rules", [("protection-release-none.json", "rules-release.json"), ("protection-empty.json", "rules-main.json")],
+                         ids=["nothing-protected", "protection-without-checks"])
+def test_r083_r2_the_none_row_is_true_for_both_causes_of_none(tmp_path, monkeypatch, capsys, prot, rules):
+    """Review A: the none row said "branch protection exists" for a branch nothing protects; one detail true of both causes."""
+    import test_conformance_check as TCC
+    TCC.make_workspace(tmp_path)
+    mod = TCC._load_conformance(monkeypatch)
+    monkeypatch.setattr(mod, "gh", TCC._repo_view)
+    monkeypatch.setattr(mod.bridge_env, "GH_COMMAND", TCC._routes(tmp_path, prot, rules))
+    monkeypatch.setattr(sys, "argv", ["conformance-check.py", str(tmp_path)])
+    rc = mod.main()
+    out = capsys.readouterr().out
+    name, line = TCC.verdict(out, "Required check on the default branch")
+    assert rc == 1 and name == "MISSING", out
+    assert "no required status check on main; N6 needs the gate job required" in line and "protection exists" not in line, line

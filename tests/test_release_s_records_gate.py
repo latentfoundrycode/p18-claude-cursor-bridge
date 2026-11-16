@@ -415,3 +415,23 @@ def test_the_whole_round_s_premerge_is_untouched_and_still_needs_its_verified_ma
     assert rc == 2 and premerge_record(repo) == [], out
     rc, out = run(repo, "premerge-records", "12", "extra")
     assert rc == 2 and "premerge-records [<pr>]" in out, "more words than the command takes: the usage, nothing run"
+
+
+def test_r084_premerge_records_without_a_pull_request_prints_no_auto_merge_line(repo, guard, capsys, monkeypatch, tmp_path):
+    """R-084, D-002 (`review_guard`): without a pull request number the short gate writes nothing and prints no auto-merge line."""
+    import test_program_branch_rule as recorded
+    mod, _sleeps, _github = guard
+    standin = tmp_path / "standin_gh.py"
+    standin.write_text(recorded.STANDIN, encoding="utf-8")
+    cfg = tmp_path / "routes.json"
+    cfg.write_text(json.dumps({"routes": {"repos/OWNER/REPO#1": "repo-on.json"}, "fixtures": recorded.FIXTURES, "log": str(tmp_path / "gh-calls.jsonl"), "sleep": 0}), encoding="utf-8")
+    monkeypatch.setattr(mod.bridge_env, "GH_COMMAND", [sys.executable, str(standin), str(cfg)])
+    change(repo, "docs/PROJECT_STATUS.md", "Phase: done\n")
+    rc = mod.cmd_premerge_records(str(repo), None)
+    out = capsys.readouterr().out
+    assert rc == 0 and "SHORT GATE" in out and "nothing was written" in out, out
+    assert premerge_record(repo) == [], out
+    assert "auto-merge is on for this repository" not in out, out
+    assert "auto-merge is off for this repository" not in out, out
+    assert "auto-merge setting not read" not in out, out
+    assert "--auto" not in out, out

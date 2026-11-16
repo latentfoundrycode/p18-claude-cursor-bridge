@@ -316,10 +316,10 @@ def hash_copy_path(common, nnn):
 
 
 def snapshot_rewritten(common, nnn):
-    """'rewritten' when the snapshot file's hash differs from the copy `snapshot` wrote outside the
-    checkout (FB-037), or the file is gone while the copy stands, 'missing' when there is no copy
-    (fail closed: a snapshot taken before this release or a deleted copy is taken again), None when
-    it matches."""
+    """'deleted' when the snapshot file is gone while the copy stands, 'rewritten' when the file's
+    hash differs from the copy `snapshot` wrote outside the checkout (FB-037), 'missing' when there
+    is no copy (fail closed: a snapshot taken before this release or a deleted copy is taken again),
+    None when it matches."""
     try:
         with open(hash_copy_path(common, nnn), encoding="utf-8") as f:
             recorded = f.read().strip()
@@ -329,7 +329,7 @@ def snapshot_rewritten(common, nnn):
     sp = snapshot_path(common, nnn)
     if not os.path.isfile(sp):
         print("  GATE-INTEGRITY  the snapshot was deleted after it was taken: %s; the hash copy remains in %s" % (sp, hash_copy_path(common, nnn)))
-        return "rewritten"
+        return "deleted"
     if sha256_file(sp) != recorded:
         print("  GATE-INTEGRITY  the snapshot was rewritten after it was taken: %s no longer matches the hash in %s" % (sp, hash_copy_path(common, nnn)))
         return "rewritten"
@@ -990,7 +990,7 @@ def cmd_verify(nnn, cwd):
     if state == "missing":
         return 2
     if state:
-        print("review-guard: GATE-INTEGRITY - the snapshot was rewritten after it was taken; the checkout was NOT restored from it and no git command was run")
+        print("review-guard: GATE-INTEGRITY - the snapshot was %s after it was taken; the checkout was NOT restored from it and no git command was run" % ("deleted" if state == "deleted" else "rewritten"))
         record_flagged_launch(common, root, nnn, None)
         return 1
     flags, notes = [], []
@@ -1190,7 +1190,7 @@ def cmd_premerge(nnn, cwd, pr=None):
     if state == "missing":
         return 2
     if state:
-        print("review-guard: GATE-INTEGRITY - do not merge; the snapshot was rewritten after it was taken")
+        print("review-guard: GATE-INTEGRITY - do not merge; the snapshot was %s after it was taken" % ("deleted" if state == "deleted" else "rewritten"))
         return 1
     try:
         with open(mark_path(common, nnn), encoding="utf-8") as f:
@@ -1257,6 +1257,16 @@ def cmd_premerge(nnn, cwd, pr=None):
         print("review-guard: CANNOT CHECK - the pre-merge record could not be written (%s)" % e)
         return 2
     print("review-guard: merge with  gh pr merge %s--squash --match-head-commit %s" % ((str(pr) + " ") if pr else "", head))
+    try:
+        auto = bridge_env.repo_settings("{owner}/{repo}", cwd=cwd)
+    except Exception:
+        auto = None
+    if isinstance(auto, dict) and auto.get("answer") == bridge_env.ANSWER_VALUE and auto.get("allow_auto_merge") is True:
+        print("auto-merge is on for this repository")
+    elif isinstance(auto, dict) and auto.get("answer") == bridge_env.ANSWER_VALUE and auto.get("allow_auto_merge") is False:
+        print("auto-merge is off for this repository")
+    else:
+        print("auto-merge setting not read")
     return 0
 
 
@@ -1513,6 +1523,16 @@ def cmd_premerge_records(cwd, pr=None):
         return 2
     print("review-guard: OK - records only, %d file(s); the pull request's head matches%s" % (len(paths), (" (waited %d seconds)" % waited) if waited else ""))
     print("review-guard: merge with  gh pr merge %s --squash --match-head-commit %s" % (pr, head))
+    try:
+        auto = bridge_env.repo_settings("{owner}/{repo}", cwd=cwd)
+    except Exception:
+        auto = None
+    if isinstance(auto, dict) and auto.get("answer") == bridge_env.ANSWER_VALUE and auto.get("allow_auto_merge") is True:
+        print("auto-merge is on for this repository")
+    elif isinstance(auto, dict) and auto.get("answer") == bridge_env.ANSWER_VALUE and auto.get("allow_auto_merge") is False:
+        print("auto-merge is off for this repository")
+    else:
+        print("auto-merge setting not read")
     return 0
 
 

@@ -30,6 +30,7 @@ import os
 import re
 import shutil
 import subprocess
+import urllib.parse
 from collections import namedtuple
 import sys
 
@@ -3830,4 +3831,476 @@ def brief_scope_enforcement(text, brief_name, shown_path):
         scope_src = text
     entries, refusal, unread = parse_scope(scope_src)
     return ("ok", entries, refusal, unread)
+
+
+# ---------------------------------------------------------------- GitHub reads (R-083)
+
+GH_COMMAND = ["gh"]
+GH_API_TIMEOUT = 30
+ANSWER_VALUE = "value"
+ANSWER_NONE = "none"
+ANSWER_CANNOT = "cannot read"
+_GH_PER_PAGE = 100
+_GH_MAX_PAGES = 100
+_REASON_LIMIT = 200
+_GH_SECRET = re.compile(r"ghp_[A-Za-z0-9]+|github_pat_[A-Za-z0-9_]+|gho_[A-Za-z0-9]+|ghu_[A-Za-z0-9]+|ghs_[A-Za-z0-9]+|ghr_[A-Za-z0-9]+")
+
+
+def _clip_reason(text):
+    """GitHub's message, or the failure, as one bounded ASCII line with credential shapes removed."""
+    raw = "" if text is None else str(text)
+    kept = []
+    for char in raw:
+        if char in "\r\n\t":
+            kept.append(" ")
+        elif 32 <= ord(char) < 127:
+            kept.append(char)
+    text = _GH_SECRET.sub("[redacted]", "".join(kept))
+    text = " ".join(text.split())
+    if len(text) > _REASON_LIMIT:
+        text = text[:_REASON_LIMIT]
+    return text
+
+
+def _gh_reason(body, err, code):
+    if isinstance(body, dict):
+        message = body.get("message")
+        if isinstance(message, str) and message.strip():
+            return _clip_reason(message)
+    if isinstance(err, str) and err.strip():
+        return _clip_reason(err)
+    return "gh exited %d" % code
+
+
+def _answer(answer, reason="", source="", **extra):
+    out = {
+        "answer": answer,
+        "reason": reason if answer == ANSWER_CANNOT else "",
+        "source": source if answer == ANSWER_CANNOT else "",
+    }
+    if answer == ANSWER_CANNOT and not out["reason"]:
+        out["reason"] = "cannot read"
+    out.update(extra)
+    return out
+
+
+def _gh_get(path, cwd=None):
+    """One GET: GH_COMMAND + ["api", path]. ('ok', body) or ('fail', reason, body). Nothing raises."""
+    command = list(GH_COMMAND) + ["api", path]
+    try:
+        proc = subprocess.run(
+            command,
+            capture_output=True,
+            stdin=subprocess.DEVNULL,
+            creationflags=NO_WINDOW,
+            timeout=GH_API_TIMEOUT,
+            cwd=cwd,
+        )
+    except subprocess.TimeoutExpired:
+        return False, "timed out", None
+    except OSError:
+        return False, "gh cannot start", None
+    text = proc.stdout.decode("utf-8", errors="replace") if isinstance(proc.stdout, (bytes, bytearray)) else (proc.stdout or "")
+    err = proc.stderr.decode("utf-8", errors="replace") if isinstance(proc.stderr, (bytes, bytearray)) else (proc.stderr or "")
+    body = None
+    parsed = False
+    if text.strip():
+        try:
+            body = json.loads(text)
+            parsed = True
+        except (ValueError, RecursionError):
+            parsed = False
+    if proc.returncode != 0:
+        if parsed:
+            return False, _gh_reason(body, err, proc.returncode), body
+        return False, _gh_reason(None, err, proc.returncode) or "gh exited %d" % proc.returncode, None
+    if not parsed:
+        return False, _clip_reason(err) or "reply is not JSON", None
+    return True, "", body
+
+
+def _unprotected(body):
+    """The classic endpoint's reply for a branch with no protection, matched exactly."""
+    return isinstance(body, dict) and body.get("message") == "Branch not protected" and body.get("status") == "404"
+
+
+def _optional_int(item, key):
+    if key not in item or item.get(key) is None:
+        return None, None
+    value = item.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None, "app id is not an integer"
+    return value, None
+
+
+def _protection_contexts(body):
+    if not isinstance(body, dict) or ("contexts" not in body and "checks" not in body):
+        return None, "reply is not a protection"
+    checks = body.get("checks", [])
+    contexts = body.get("contexts", [])
+    if not isinstance(checks, list) or not isinstance(contexts, list):
+        return None, "contexts cannot be read"
+    found = []
+    seen = set()
+    names = set()
+    for item in checks:
+        if not isinstance(item, dict) or not isinstance(item.get("context"), str):
+            return None, "a check context cannot be read"
+        app, err = _optional_int(item, "app_id")
+        if err:
+            return None, err
+        names.add(item["context"])
+        pair = (item["context"], app)
+        if pair in seen:
+            continue
+        seen.add(pair)
+        found.append({"context": item["context"], "app_id": app})
+    for ctx in contexts:
+        if not isinstance(ctx, str):
+            return None, "a context cannot be read"
+        if ctx in names:
+            continue
+        pair = (ctx, None)
+        if pair in seen:
+            continue
+        seen.add(pair)
+        names.add(ctx)
+        found.append({"context": ctx, "app_id": None})
+    return found, None
+
+
+def _rules_contexts(body):
+    if not isinstance(body, list):
+        return None, "reply is not a list of rules"
+    found = []
+    seen = set()
+    for rule in body:
+        if not isinstance(rule, dict):
+            return None, "a rule cannot be read"
+        if rule.get("type") != "required_status_checks":
+            continue
+        params = rule.get("parameters")
+        if params is None:
+            continue
+        if not isinstance(params, dict):
+            return None, "rule parameters cannot be read"
+        if "required_status_checks" not in params or params.get("required_status_checks") is None:
+            continue
+        required = params.get("required_status_checks")
+        if not isinstance(required, list):
+            return None, "required status checks cannot be read"
+        for item in required:
+            if not isinstance(item, dict) or not isinstance(item.get("context"), str):
+                return None, "a rule context cannot be read"
+            app, err = _optional_int(item, "integration_id")
+            if err:
+                return None, err
+            pair = (item["context"], app)
+            if pair in seen:
+                continue
+            seen.add(pair)
+            found.append({"context": item["context"], "app_id": app})
+    return found, None
+
+
+def branch_rule(repo, branch, cwd=None):
+    """Required check contexts of one branch: the classic protection united with the rules that apply.
+
+    The branch's name is percent-encoded in both paths. answer is value, none, or cannot read;
+    cannot read is never turned into none, and a source that failed hides the other source's contexts.
+    """
+    if not isinstance(repo, str) or not isinstance(branch, str):
+        return _answer(ANSWER_CANNOT, "the repository or the branch cannot be read", "protection", contexts=[])
+    encoded = urllib.parse.quote(branch, safe="")
+    protection = _gh_get("repos/%s/branches/%s/protection/required_status_checks" % (repo, encoded), cwd)
+    if not protection[0]:
+        if _unprotected(protection[2]):
+            prot_contexts = []
+        else:
+            return _answer(ANSWER_CANNOT, protection[1], "protection", contexts=[])
+    else:
+        prot_contexts, err = _protection_contexts(protection[2])
+        if err:
+            return _answer(ANSWER_CANNOT, err, "protection", contexts=[])
+    rules = _gh_get("repos/%s/rules/branches/%s" % (repo, encoded), cwd)
+    if not rules[0]:
+        return _answer(ANSWER_CANNOT, rules[1], "rules", contexts=[])
+    rules_contexts, err = _rules_contexts(rules[2])
+    if err:
+        return _answer(ANSWER_CANNOT, err, "rules", contexts=[])
+    merged = []
+    seen = set()
+    for item in prot_contexts + rules_contexts:
+        pair = (item["context"], item["app_id"])
+        if pair in seen:
+            continue
+        seen.add(pair)
+        merged.append(item)
+    if not merged:
+        return _answer(ANSWER_NONE, contexts=[])
+    return _answer(ANSWER_VALUE, contexts=merged)
+
+
+def repo_settings(repo, cwd=None):
+    """allow_auto_merge and the default branch. repo_settings(repo) needs no folder."""
+    if not isinstance(repo, str):
+        return _answer(ANSWER_CANNOT, "the repository cannot be read", "repo")
+    got = _gh_get("repos/%s" % repo, cwd)
+    if not got[0]:
+        return _answer(ANSWER_CANNOT, got[1], "repo")
+    body = got[2]
+    if not isinstance(body, dict) or not isinstance(body.get("allow_auto_merge"), bool):
+        return _answer(ANSWER_CANNOT, "allow_auto_merge is not a boolean", "repo")
+    default = body.get("default_branch")
+    if not isinstance(default, str) or not default:
+        return _answer(ANSWER_CANNOT, "default_branch cannot be read", "repo")
+    return _answer(ANSWER_VALUE, allow_auto_merge=body["allow_auto_merge"], default_branch=default)
+
+
+def pull_refs(repo, number, cwd=None):
+    """The pull request's base ref name and its head commit sha."""
+    if not isinstance(repo, str) or isinstance(number, bool) or not isinstance(number, (int, str)):
+        return _answer(ANSWER_CANNOT, "the pull request cannot be read", "pull")
+    if isinstance(number, str) and (not number or not number.isdigit()):
+        return _answer(ANSWER_CANNOT, "the pull request cannot be read", "pull")
+    got = _gh_get("repos/%s/pulls/%s" % (repo, urllib.parse.quote(str(number), safe="")), cwd)
+    if not got[0] or not isinstance(got[2], dict):
+        return _answer(ANSWER_CANNOT, got[1] or "reply is not an object", "pull")
+    base = got[2].get("base")
+    head = got[2].get("head")
+    base_name = base.get("ref") if isinstance(base, dict) else None
+    head_sha = head.get("sha") if isinstance(head, dict) else None
+    if not isinstance(base_name, str) or not base_name or not isinstance(head_sha, str) or not head_sha:
+        return _answer(ANSWER_CANNOT, "the pull request's base or head cannot be read", "pull")
+    return _answer(ANSWER_VALUE, base=base_name, head=head_sha)
+
+
+def _page_path(path, page):
+    extra = "per_page=%d&page=%d" % (_GH_PER_PAGE, page)
+    if "?" in path:
+        return path + "&" + extra
+    return path + "?" + extra
+
+
+def _entry_marker(item):
+    if isinstance(item, dict):
+        ident = item.get("id")
+        if isinstance(ident, int) and not isinstance(ident, bool):
+            return ("id", ident)
+    try:
+        return ("json", json.dumps(item, sort_keys=True, separators=(",", ":"), default=str))
+    except (TypeError, ValueError):
+        return ("obj", id(item))
+
+
+def _read_list(path, key, cwd):
+    """Every page until total_count entries are in hand. A short list is a failure, never a result."""
+    entries = []
+    seen = set()
+    total = None
+    for page in range(1, _GH_MAX_PAGES + 1):
+        got = _gh_get(_page_path(path, page), cwd)
+        if not got[0]:
+            return None, got[1] or "cannot read"
+        body = got[2]
+        if not isinstance(body, dict):
+            return None, "reply is not an object"
+        count = body.get("total_count")
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            return None, "total_count is not an integer"
+        items = body.get(key)
+        if not isinstance(items, list):
+            return None, "the list cannot be read"
+        if total is None:
+            total = count
+        added = 0
+        for item in items:
+            marker = _entry_marker(item)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            entries.append(item)
+            added += 1
+        if len(entries) >= total:
+            return entries, None
+        if added == 0:
+            return None, "a page added no entry"
+    return None, "the list was not read whole"
+
+
+def head_state(repo, sha, cwd=None):
+    """A head's check runs, commit statuses and workflow runs, each read to the count its reply states."""
+    if not isinstance(repo, str) or not isinstance(sha, str) or not sha:
+        return _answer(ANSWER_CANNOT, "the head cannot be read", "checks", checks=[], statuses=[], runs=[])
+    enc = urllib.parse.quote(sha, safe="")
+    specs = (
+        ("checks", "repos/%s/commits/%s/check-runs?filter=all" % (repo, enc), "check_runs"),
+        ("statuses", "repos/%s/commits/%s/status" % (repo, enc), "statuses"),
+        ("runs", "repos/%s/actions/runs?head_sha=%s" % (repo, enc), "workflow_runs"),
+    )
+    found = {}
+    for source, path, key in specs:
+        entries, err = _read_list(path, key, cwd)
+        if err:
+            return _answer(ANSWER_CANNOT, err, source, checks=[], statuses=[], runs=[])
+        found[source] = entries
+    return _answer(ANSWER_VALUE, checks=found["checks"], statuses=found["statuses"], runs=found["runs"])
+
+
+def _freeze(value):
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    try:
+        return json.dumps(value, sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        return str(type(value))
+
+
+def _int_rank(value):
+    if isinstance(value, bool) or not isinstance(value, int):
+        return (0, 0)
+    return (1, value)
+
+
+def _parse_time(text):
+    if not isinstance(text, str) or not text:
+        return None
+    raw = text[:-1] + "+00:00" if text.endswith("Z") else text
+    try:
+        return datetime.datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+def _last_by(group, time_key, id_only_when_any_time_missing):
+    times = [item.get(time_key) if isinstance(item, dict) else None for item in group]
+    by_id = id_only_when_any_time_missing and any(not isinstance(text, str) or not text or _parse_time(text) is None for text in times)
+    best = None
+    best_key = None
+    for index, item in enumerate(group):
+        ident = _int_rank(item.get("id") if isinstance(item, dict) else None)
+        if by_id:
+            key = (ident, index)
+        elif time_key == "started_at":
+            incomplete = 0 if item.get("status") == "completed" else 1
+            when = _parse_time(item.get("started_at"))
+            key = (incomplete, when, ident, index)
+        else:
+            when = _parse_time(item.get(time_key)) if isinstance(item.get(time_key), str) else None
+            key = ((1, when) if when is not None else (0, ""), ident, index)
+        if best_key is None or key > best_key:
+            best, best_key = item, key
+    return best
+
+
+def _suite_id(item, key):
+    if key == "check_suite":
+        suite = item.get("check_suite")
+        if not isinstance(suite, dict):
+            return None
+        value = suite.get("id")
+    else:
+        value = item.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def _app_id_of(item):
+    app = item.get("app")
+    if not isinstance(app, dict):
+        return None
+    value = app.get("id")
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def latest_of_each(state):
+    """The latest run of each workflow and event, and the latest check or status of each source."""
+    if not isinstance(state, dict):
+        return {"checks": [], "statuses": [], "runs": []}
+    checks = state.get("checks") if isinstance(state.get("checks"), list) else []
+    statuses = state.get("statuses") if isinstance(state.get("statuses"), list) else []
+    runs = state.get("runs") if isinstance(state.get("runs"), list) else []
+    best = {}
+    order = []
+    all_suites = set()
+    for index, run in enumerate(runs):
+        if not isinstance(run, dict):
+            continue
+        sid = _suite_id(run, "check_suite_id")
+        if sid is not None:
+            all_suites.add(sid)
+        key = (_freeze(run.get("workflow_id")), _freeze(run.get("event")))
+        rank = (_int_rank(run.get("run_number")), _int_rank(run.get("run_attempt")), _int_rank(run.get("id")), index)
+        if key not in best:
+            order.append(key)
+            best[key] = (rank, run)
+        elif rank > best[key][0]:
+            best[key] = (rank, run)
+    latest_runs = [best[key][1] for key in order]
+    latest_suites = set()
+    for run in latest_runs:
+        sid = _suite_id(run, "check_suite_id")
+        if sid is not None:
+            latest_suites.add(sid)
+    made = {}
+    made_order = []
+    free = {}
+    free_order = []
+    for item in checks:
+        if not isinstance(item, dict):
+            continue
+        sid = _suite_id(item, "check_suite")
+        if sid is not None and sid in all_suites:
+            if sid not in latest_suites:
+                continue
+            key = (sid, _freeze(item.get("name")))
+            store, store_order = made, made_order
+        else:
+            key = (_freeze(item.get("name")), _app_id_of(item))
+            store, store_order = free, free_order
+        if key not in store:
+            store_order.append(key)
+            store[key] = []
+        store[key].append(item)
+    kept_checks = [_last_by(made[key], "started_at", True) for key in made_order]
+    kept_checks += [_last_by(free[key], "started_at", True) for key in free_order]
+    status_groups = {}
+    status_order = []
+    for item in statuses:
+        if not isinstance(item, dict):
+            continue
+        key = _freeze(item.get("context"))
+        if key not in status_groups:
+            status_order.append(key)
+            status_groups[key] = []
+        status_groups[key].append(item)
+    kept_statuses = [_last_by(status_groups[key], "updated_at", False) for key in status_order]
+    return {"checks": kept_checks, "statuses": kept_statuses, "runs": latest_runs}
+
+
+def ci_class(item, kind):
+    """passed, pending, skipped or failed. An unknown conclusion or state is failed."""
+    if not isinstance(item, dict):
+        return "failed"
+    if kind in ("check", "run"):
+        status = item.get("status")
+        conclusion = item.get("conclusion")
+        if status == "completed" and conclusion == "success":
+            return "passed"
+        if status != "completed":
+            return "pending"
+        if conclusion == "skipped":
+            return "skipped"
+        return "failed"
+    if kind == "status":
+        state = item.get("state")
+        if state == "success":
+            return "passed"
+        if state == "pending":
+            return "pending"
+        return "failed"
+    return "failed"
 
