@@ -762,3 +762,69 @@ def test_r083_r2_pending_checks_are_ordered_among_themselves_by_id(be):
          check(7, "lint", 900, started="2026-11-16T11:00:00Z", status="in_progress", conclusion=None)]
     kept = be.latest_of_each({"checks": b, "statuses": [], "runs": []})
     assert [c["id"] for c in kept["checks"]] == [7], kept
+
+
+# ---------------------------------------------------------------- round 3 (Review B of PR #174): every field the latest reading groups by
+# A head entry whose grouping field cannot be read was grouped under an empty key, and a newer failure could be dropped for an older
+# success. The design rule: every field latest_of_each groups or ranks by is of its type, or the head is cannot read.
+
+
+def _fieldless(source, field):
+    runs = [run(10, 801, 1, 100, conclusion="failure"), run(20, 802, 1, 200)]
+    checks = [check(11, "tests", 200)]
+    statuses = [{"id": 1, "context": "ci", "state": "success", "updated_at": "2026-11-16T10:00:00Z"}]
+    target = {"runs": runs[0], "checks": checks[0], "statuses": statuses[0]}[source]
+    holder, key = target, field
+    if "." in field:
+        outer, key = field.split(".")
+        holder = target[outer]
+    return runs, checks, statuses, holder, key
+
+
+@pytest.mark.parametrize("source,field", [
+    ("runs", "workflow_id"), ("runs", "event"), ("runs", "check_suite_id"),
+    ("checks", "name"), ("checks", "check_suite.id"), ("checks", "app.id"),
+    ("statuses", "context"), ("statuses", "id"),
+])
+@pytest.mark.parametrize("how", ["missing", "null", "wrong-type"])
+def test_r083_r3_an_entry_whose_grouping_field_cannot_be_read_is_cannot_read(be, crafted, source, field, how):
+    runs, checks, statuses, holder, key = _fieldless(source, field)
+    if how == "missing":
+        del holder[key]
+    elif how == "null":
+        holder[key] = None
+    else:
+        holder[key] = ["not", "a", "scalar"] if key in ("event", "name", "context") else "7"
+    crafted({CHECKS: _checks_body(checks), STATUS: _status_body(statuses), RUNS: _runs_body(runs)})
+    r = be.head_state("OWNER/REPO", SHA)
+    assert r["answer"] == "cannot read" and r["source"] == source and key in r["reason"], r
+
+
+@pytest.mark.parametrize("source,outer", [("checks", "check_suite"), ("checks", "app")])
+def test_r083_r3_a_check_without_its_suite_or_app_object_is_cannot_read(be, crafted, source, outer):
+    runs, checks, statuses, _, _ = _fieldless(source, outer + ".id")
+    checks[0][outer] = None
+    crafted({CHECKS: _checks_body(checks), STATUS: _status_body(statuses), RUNS: _runs_body(runs)})
+    r = be.head_state("OWNER/REPO", SHA)
+    assert r["answer"] == "cannot read" and r["source"] == source and outer in r["reason"], r
+
+
+@pytest.mark.parametrize("field,value", [("event", ""), ("name", ""), ("context", "")])
+def test_r083_r3_an_empty_name_is_no_name(be, crafted, field, value):
+    source = {"event": "runs", "name": "checks", "context": "statuses"}[field]
+    runs, checks, statuses, holder, key = _fieldless(source, field)
+    holder[key] = value
+    crafted({CHECKS: _checks_body(checks), STATUS: _status_body(statuses), RUNS: _runs_body(runs)})
+    r = be.head_state("OWNER/REPO", SHA)
+    assert r["answer"] == "cannot read" and r["source"] == source, r
+
+
+def test_r083_r3_review_b_s_case_a_failed_run_is_never_dropped_for_a_later_success(be, crafted):
+    """Review B's reproduction on round 2's tree: runs 10 (failed) and 20 (passed), neither naming its workflow: round 2 answered a
+    value whose latest run was 20 alone, passed."""
+    runs = [run(10, 801, 1, 100, conclusion="failure"), run(20, 802, 1, 200)]
+    for r_ in runs:
+        del r_["workflow_id"]
+    crafted({CHECKS: _checks_body([]), STATUS: _status_body([]), RUNS: _runs_body(runs)})
+    r = be.head_state("OWNER/REPO", SHA)
+    assert r["answer"] == "cannot read" and r["source"] == "runs" and "workflow_id" in r["reason"], r
