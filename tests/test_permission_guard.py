@@ -269,13 +269,6 @@ def test_r082_graphql_query_with_literal_quotes_passes_under_bash_only():
     assert rc == 2 and "cannot read" in err.lower(), err
 
 
-def test_r083_ready_recorded_fails_closed_outside_a_repository(tmp_path, program):
-    """R-083: ready_recorded is false outside a repository (D-003 ready_recorded is not reached)."""
-    guard = program("permission-guard")
-    assert guard.ready_recorded("12", SHA, str(tmp_path)) is False
-    assert guard.ready_recorded("12", "not-a-sha", str(tmp_path)) is False
-
-
 @pytest.mark.parametrize("command", ["cmd /c echo agent", "cmd /c dir agent"])
 def test_r082_cmd_single_slash_passes_under_powershell_and_is_unreadable_under_bash(command):
     """R-082 round 7 req 6: Git Bash rewrites a single-slash cmd switch; PowerShell does not."""
@@ -283,3 +276,16 @@ def test_r082_cmd_single_slash_passes_under_powershell_and_is_unreadable_under_b
     assert rc == 0, (command, err)
     rc, err = run("Bash", command)
     assert rc == 2 and "cannot read" in err.lower(), (command, err)
+
+
+@pytest.mark.parametrize("tool", ["Bash", "PowerShell"])
+def test_r083_r2_a_second_positional_and_a_word_after_end_of_options_are_refused(tool, recorded_repo):
+    """R-083: the number is the one positional, so a second positional is refused where the first is the recorded pull request; a word after -- is a positional, so --disable-auto there is not an exemption; a value-taking flag with no following word has the empty value; -h alone is the help."""
+    two, err = run(tool, "gh pr merge 12 34 --squash --match-head-commit " + SHA, cwd=recorded_repo)
+    assert two == 2 and "pull request's number" in err, err
+    ended, err = run(tool, "gh pr merge 12 -- --disable-auto --match-head-commit " + SHA, cwd=recorded_repo)
+    assert ended == 2 and "--match-head-commit" in err, err
+    empty, err = run(tool, "gh pr merge 12 --squash --match-head-commit", cwd=recorded_repo)
+    assert empty == 2 and "malformed" in err, err
+    help_rc, help_err = run(tool, "gh pr merge -h", cwd=recorded_repo)
+    assert help_rc == 0, help_err

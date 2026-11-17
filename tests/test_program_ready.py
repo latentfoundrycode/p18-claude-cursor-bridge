@@ -550,3 +550,69 @@ def test_r083_r2_ready_recorded_is_true_only_for_its_pull_request_and_head_insid
     outside = tmp_path / "outside"
     outside.mkdir()
     assert mod.ready_recorded("12", SHA, str(outside)) is False
+
+
+
+# ---------------------------------------------------------------- round 3: a true/false option given again, and an option before the subcommand
+# Review A and the security audit of round 2 (2026-11-17): pflag sets a true/false option on each use, the last one standing, so
+# `--disable-auto --disable-auto=false` leaves it false and gh merges; cobra, finding the group and the subcommand, takes an option it
+# does not know as taking the next word, so in `gh --subject xx pr merge 12 ...` the guard read the group as `xx` and never read a
+# merge, while gh merges pull request 12 with the subject `xx`.
+
+
+ROUND3_REFUSED = [
+    "gh pr merge 12 --squash --match-head-commit %s --disable-auto --disable-auto=false" % OTHER,
+    "gh pr merge 12 --squash --match-head-commit %s --disable-auto --disable-auto=0" % OTHER,
+    "gh pr merge 12 --squash --match-head-commit %s --disable-auto=true" % OTHER,
+    "gh pr merge 12 --squash --match-head-commit %s --help --help=false" % OTHER,
+    "gh pr merge 12 --squash --match-head-commit %s -h -h=false" % OTHER,
+    "gh pr merge 12 --squash --match-head-commit %s -h --help=false" % OTHER,
+    "gh --subject xx pr merge 12 --squash --match-head-commit " + OTHER,
+    "gh -b xx pr merge 12 --squash --match-head-commit " + OTHER,
+    "gh --author-email xx pr merge 12 --squash --match-head-commit " + OTHER,
+    "gh pr --subject xx merge 12 --squash --match-head-commit " + OTHER,
+    "gh pr -t xx merge 12 --squash --match-head-commit " + OTHER,
+]
+
+
+@pytest.mark.parametrize("tool", TOOLS)
+@pytest.mark.parametrize("cmd", ROUND3_REFUSED)
+def test_r083_r3_an_exemption_switched_off_again_or_an_option_before_the_subcommand_is_refused(tool, tmp_path, cmd):
+    """enforces: T-CONTEXT: an exemption stands only where no `=` form of its option is given (whatever its value); a gh command
+    with an option before its subcommand that the guard does not know the reading of is not read as anything but refused. The
+    records stand for pull request 12 at SHA alone; every command here names another head."""
+    repo = records_repo(tmp_path)
+    rc, err = pg(tool, cmd, repo)
+    assert rc == 2, (cmd, err)
+
+
+@pytest.mark.parametrize("tool", TOOLS)
+def test_r083_r3_an_option_before_the_subcommand_is_unreadable_even_on_a_recorded_head(tool, tmp_path):
+    """The refusal of an option before the subcommand is the guard's cannot-read refusal, not a reading: it holds even where the
+    pull request and head gh would merge are the recorded ones."""
+    repo = records_repo(tmp_path)
+    rc, err = pg(tool, "gh --subject xx pr merge 12 --squash --match-head-commit " + SHA, repo)
+    assert rc == 2 and "cannot read" in err, err
+
+
+ROUND3_ALLOWED = [
+    "gh pr merge 12 --squash --match-head-commit %s --disable-auto=false" % SHA,
+    "gh pr merge 12 --squash --match-head-commit %s --help=false" % SHA,
+    "gh --repo OWNER/REPO pr view 12",
+    "gh pr --repo OWNER/REPO view 12",
+    "gh api -H Accept:application/json repos/OWNER/REPO/pulls/12",
+    "gh pr checks 12 --watch --required",
+    "gh --help",
+    "gh pr --help",
+    "gh --version",
+]
+
+
+@pytest.mark.parametrize("tool", TOOLS)
+@pytest.mark.parametrize("cmd", ROUND3_ALLOWED)
+def test_r083_r3_the_records_still_decide_and_the_other_gh_forms_pass(tool, tmp_path, cmd):
+    """The positive side: an `=` form of an exemption falls through to the records (here standing), and the gh forms the guard
+    allowed before round 3 (the repository option before or after the group, `gh api`'s own options, help and version alone) pass."""
+    repo = records_repo(tmp_path)
+    rc, err = pg(tool, cmd, repo)
+    assert rc == 0, (cmd, err)

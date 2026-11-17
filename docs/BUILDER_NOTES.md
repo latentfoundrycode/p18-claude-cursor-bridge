@@ -58,3 +58,5 @@
 2026-11-16 TASK-064: a 300-second wait on the six-file side-effect pytest returned while that process was still running; it was not hung and later exited 0 (about 328 seconds). The same command is in Done and has to be waited out past five minutes on this host.
 
 2026-11-17 TASK-083: `review-guard.py` and `permission-guard.py` are CRLF, so a mutation search written with `\n` only matches nothing, and a long bash heredoc of a Python driver was cut off on this host; the self-check had to be a file under `handoff/` that was deleted before the Done commands.
+
+2026-11-17 TASK-083-r2: a foreground wait of 30 seconds backgrounds the shell while `python -m pytest -p no:cacheprovider -q -rfE tests/test_permission_guard.py --tb=line` is still printing progress; that run then exited 0 (`296 passed in 30.21s`), and the Done run of the four permission-guard files was given a longer wait.

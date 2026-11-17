@@ -2473,39 +2473,92 @@ def ready_recorded(pr, sha, cwd):
     except OSError:
         return False
     prefix = ("%s-%s" % (pr, sha)).lower()
-    return any(name.lower().startswith(prefix) for name in names)
+    return any(name.lower().startswith(prefix) and not name.lower().endswith(".tmp") for name in names)
+
+
+def _read_merge_words(args):
+    """The words after `gh pr merge`, read once as gh reads them (pflag).
+    Returns the last `--match-head-commit` value (None when that option is absent, "" when nothing follows it), whether `--disable-auto` or the help (`--help`, or the word `-h` alone) stands as an option, and the positional words. A flag's value is never an option, and every word after `--` is a positional."""
+    long_value = tuple(flag for flag in GH_VALUE_FLAGS if flag[:2] == "--")
+    short_value = tuple(flag[1] for flag in GH_VALUE_FLAGS if len(flag) == 2 and flag[0] == "-" and flag[1] != "-")
+    sha = None
+    disable_auto = False
+    help_opt = False
+    positionals = []
+    ended = False
+    i, n = 0, len(args)
+    while i < n:
+        word = args[i]
+        if ended:
+            positionals.append(word)
+            i += 1
+            continue
+        if word == "--":
+            ended = True
+            i += 1
+            continue
+        if len(word) > 1 and word[0] == "-" and word[1] == "-":
+            name, eq, value = word.partition("=")
+            if eq:
+                if name == "--match-head-commit":
+                    sha = value
+                i += 1
+                continue
+            if word in long_value:
+                if i + 1 < n:
+                    value = args[i + 1]
+                    i += 2
+                else:
+                    value = ""
+                    i += 1
+                if word == "--match-head-commit":
+                    sha = value
+                continue
+            if word == "--disable-auto":
+                disable_auto = True
+            elif word == "--help":
+                help_opt = True
+            i += 1
+            continue
+        clustered = len(word) > 1 and word[0] == "-"
+        if clustered:
+            for ch in word[1:]:
+                if not (("A" <= ch <= "Z") or ("a" <= ch <= "z")):
+                    clustered = False
+                    break
+        if clustered:
+            body = word[1:]
+            k = 0
+            while k < len(body):
+                if body[k] in short_value:
+                    if body[k + 1:] or i + 1 >= n:
+                        i += 1
+                    else:
+                        i += 2
+                    break
+                k += 1
+            else:
+                i += 1
+            if word == "-h":
+                help_opt = True
+            continue
+        positionals.append(word)
+        i += 1
+    return sha, disable_auto, help_opt, positionals
 
 
 def merge_reason(args, cwd):
     """The reason to refuse a gh pr merge (args = the words after `merge`), or None."""
     if any(a == "--admin" or a.startswith("--admin=") for a in args):
         return "gh pr merge --admin (merging past the repository's rules)"
-    if "--disable-auto" in args:
+    sha, disable_auto, help_opt, positionals = _read_merge_words(args)
+    if disable_auto or help_opt:
         return None
-    for i, a in enumerate(args):
-        if a in ("--help", "-h") and (i == 0 or args[i - 1] not in GH_VALUE_FLAGS):
-            return None                                    # `--subject --help` is a subject, and gh merges
-    sha = None
-    for i, a in enumerate(args):
-        if a == "--match-head-commit":
-            sha = args[i + 1] if i + 1 < len(args) else ""
-        elif a.startswith("--match-head-commit="):
-            sha = a.split("=", 1)[1]
     if sha is None:
         return "gh pr merge without --match-head-commit <sha>: the sha, and the record review-guard.py premerge writes when it prints OK, are the gate's confirmation"
     if not re.fullmatch(r"[0-9a-fA-F]{7,64}", sha):
         return "gh pr merge with an empty or malformed --match-head-commit value"
-    number, i = None, 0
-    while i < len(args):
-        word = args[i]
-        if word in GH_VALUE_FLAGS:
-            i += 2
-            continue
-        if word.startswith("-"):
-            i += 1
-            continue
-        number = word
-        break
+    number = positionals[0] if len(positionals) == 1 else None
     if number is None or any(char < "0" or char > "9" for char in number):
         return "gh pr merge without the pull request's number: gh pr merge <n> --squash --match-head-commit <sha>"
     if not premerge_recorded(sha, cwd):
