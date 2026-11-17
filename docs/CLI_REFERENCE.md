@@ -602,7 +602,7 @@ permission-guard: a Claude Code PreToolUse hook for the Bash and PowerShell tool
 refuses the two actions the loop must never take, in every permission mode (KP-032):
 
   - merging a pull request past the repository's rules: `gh pr merge … --admin`, and the
-    REST route `gh api … /pulls/<n>/merge` with a method that writes;
+    REST route `gh api … /pulls/<n>/merge` whatever its method;
   - a force-push in any form: `--force`, `--force-with-lease`, `--force-if-includes`,
     `-f`, a combined short flag such as `-fu`, `--mirror`, a `+` refspec;
   - any `git worktree remove` (rule 19, release A1b): Git for Windows follows a gitignored
@@ -621,9 +621,9 @@ here-documents, subshells, globs) are refused as unreadable; a `git -c alias.<x>
 value starts with `worktree`, `pr`, `push`, `api` or `!` is refused, and so is a `gh alias set`
 for a merge; an abbreviated `--forc` counts as `--force`, as it does for git; `--help` exempts a
 `gh pr merge` only when it is not the value of a flag such as `--subject`. A here-document is unreadable. `powershell` without `-Command` runs the rest of its line,
-`-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command,
-and `-XPUT` is a method: all read as what they run. An encoded PowerShell command and a
-GraphQL query read from a file are refused unread.
+`-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command:
+all read as what they run. An encoded PowerShell command and a `gh api` body read from a file
+or standard input are refused unread, whatever the endpoint.
   - inside a bridge Workspace (one holding docs/PROJECT_STATUS.md), a chain of commands
     (`&&`, `;`, `||`, a new line) carrying a state-changing git or gh command, or a command
     wrapped in `cd …` (rule 8: one command per call; a chain once built an increment on a

@@ -3,7 +3,7 @@
 refuses the two actions the loop must never take, in every permission mode (KP-032):
 
   - merging a pull request past the repository's rules: `gh pr merge … --admin`, and the
-    REST route `gh api … /pulls/<n>/merge` with a method that writes;
+    REST route `gh api … /pulls/<n>/merge` whatever its method;
   - a force-push in any form: `--force`, `--force-with-lease`, `--force-if-includes`,
     `-f`, a combined short flag such as `-fu`, `--mirror`, a `+` refspec;
   - any `git worktree remove` (rule 19, release A1b): Git for Windows follows a gitignored
@@ -22,9 +22,9 @@ here-documents, subshells, globs) are refused as unreadable; a `git -c alias.<x>
 value starts with `worktree`, `pr`, `push`, `api` or `!` is refused, and so is a `gh alias set`
 for a merge; an abbreviated `--forc` counts as `--force`, as it does for git; `--help` exempts a
 `gh pr merge` only when it is not the value of a flag such as `--subject`. A here-document is unreadable. `powershell` without `-Command` runs the rest of its line,
-`-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command,
-and `-XPUT` is a method: all read as what they run. An encoded PowerShell command and a
-GraphQL query read from a file are refused unread.
+`-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command:
+all read as what they run. An encoded PowerShell command and a `gh api` body read from a file
+or standard input are refused unread, whatever the endpoint.
   - inside a bridge Workspace (one holding docs/PROJECT_STATUS.md), a chain of commands
     (`&&`, `;`, `||`, a new line) carrying a state-changing git or gh command, or a command
     wrapped in `cd …` (rule 8: one command per call; a chain once built an increment on a
@@ -54,6 +54,7 @@ passes. ASCII-only on purpose. Never writes.
 """
 import json
 import os
+import posixpath
 import re
 import subprocess
 import sys
@@ -2326,24 +2327,17 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
                 return r
         if group == "api" and any(m in tok for tok in w for m in MERGE_MUTATIONS):
             return "gh api with a merge mutation (merging outside the gate)"
-        if group == "api" and sub == "graphql":
-            if any(t == "--input" or t.startswith("--input=") or t.startswith("@") or "=@" in t or (t in ("-F", "--field", "--raw-field", "-f") and any("@" in a for a in args)) for t in args + w):
-                return "gh api graphql with a query read from a file, which the guard cannot read (write the query on the command line)"
+        if group == "api" and any(t == "--input" or t.startswith("--input=") or t.startswith("@") or "=@" in t for t in w):
+            return "gh api with a body read from a file or standard input, which the guard cannot read (write the query or fields on the command line)"
         if group == "alias" and sub in ("set", "import"):
             expansion = (args[-1] if args else "").strip("'\"").lstrip("!").strip()
             if sub == "import" or re.match(r"^(pr\s+merge|api)\b", expansion) or "worktree" in expansion:
                 return "a gh alias for a merge or an api call (%s)" % " ".join(args)[:60]
         if group == "api":
-            method = "GET"
-            for i, a in enumerate(w):
-                if a in ("-X", "--method") and i + 1 < len(w):
-                    method = w[i + 1].upper()
-                elif a.startswith("--method=") or (a.startswith("-X") and len(a) > 2):
-                    method = a.split("=", 1)[1].upper() if "=" in a else a[2:].upper()
-                elif a in ("-f", "--raw-field", "-F", "--field", "--input"):
-                    method = method if method != "GET" else "POST"
-            if method in WRITE_METHODS and any(re.search(r"/pulls/\d+/merge\b", a) for a in w):
-                return "gh api %s on a pull request's merge endpoint (merging outside the gate)" % method
+            for a in w:
+                path = posixpath.normpath(a.lower().replace("%2f", "/").replace("%2e", "."))
+                if re.search(r"/pulls/[^/]+/merge", path):
+                    return "gh api on a pull request's merge endpoint (merging outside the gate)"
     return None
 
 def hook_skipper_option(sub, args, snapshot):

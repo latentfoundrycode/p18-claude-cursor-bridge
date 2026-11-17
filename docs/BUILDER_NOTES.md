@@ -64,3 +64,5 @@
 2026-11-17 TASK-083-r3: a foreground wait of 30 seconds backgrounds the shell while `python -m pytest -p no:cacheprovider -q -rfE tests/test_program_ready.py -k "r083_r3 or r083_r2 or disable_auto or help" tests/test_permission_guard.py -k "r083_r3 or r083_r2 or test_allowed or test_refused"` is still printing progress; that run then exited 0 (`365 passed, 79 deselected in 41.37s`), and the Done pytest runs were given a longer wait.
 
 2026-11-17 TASK-083-r4: an empty word is falsy, so returning it as the group neither marks the command unreadable (`startswith("-")` is false) nor state-changing (`bool("")` is false); `gh_words` returns the existing `INNER_UNREADABLE` sentinel with the word beside it, and `any()` over that empty number is false so the number test refuses `""` on its own.
+
+2026-11-17 BUG-046: an unquoted `?` in a gh api endpoint is a glob to the Bash reader and never reaches the merge-endpoint refusal, so the query spelling in tests/test_bug046.py is single-quoted, the same way the supervisor's paged dependabot call is.
