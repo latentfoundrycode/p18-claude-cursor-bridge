@@ -662,3 +662,41 @@ def test_r081_refused_driver_prints_no_git_config(tmp_path):
     git_lines = sorted(m.group(1).replace("\\", "/") + " " + m.group(2)
                        for m in (line.match(x) for x in ok.stderr.splitlines()) if m)
     assert git_lines == [".git/hooks/post-merge new"], ok.stderr
+
+
+# ---------------------------------------------------------------- R-085, the wait before a CI watch (D-004)
+
+
+def test_r085_d004_a_watch_with_no_pull_request_number_starts_without_the_wait(tmp_path, monkeypatch, capsys, program):
+    """R-085, D-004: the word after checks is not a pull-request number, so nothing is read and the watch is started as given."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    argv = ["gh", "pr", "checks", "--watch", "--required"]
+    rc = case.run([wait.GREEN], argv=argv, limit=600)
+    assert rc == 0, case.err
+    assert case.watch.calls == [(argv, 600)], case.watch.calls
+    assert case.calls() == [], case.calls()
+    assert case.lines() == ["bridge-run: the watch names no pull request number; it starts without the wait"], case.err
+
+
+def test_r085_d004_every_completed_run_after_a_watch_prints_that_the_exit_stands(tmp_path, monkeypatch, capsys, program):
+    """R-085, D-004: where no list could be named and the watch returns 0 with every latest run completed, that exit stands."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    rc = case.run([dict(wait.NONE_ANYWHERE, **wait.GREEN)], exits=(0,))
+    assert rc == 0 and len(case.started()) == 1 and case.polls() == 2, case.err
+    line = "bridge-run: every latest workflow run of head %s is completed; the watch's exit 0 stands" % case.head[:12]
+    assert line in case.lines(), case.err
+
+
+def test_r085_d004_the_limit_stops_the_wait_before_a_later_green_head(tmp_path, monkeypatch, capsys, program):
+    """R-085, D-004: the run's limit ends the wait, so a head that would pass only on a later poll is not watched."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    rc = case.run([dict(checks="wait-checks-floor-only.json", runs="wait-runs-in-progress.json"), wait.GREEN], limit=10)
+    assert rc == 124 and case.started() == [], case.err
+    assert case.polls() == 1, case.calls()
+    assert any(l.startswith("bridge-run: LIMIT") for l in case.lines()), case.err

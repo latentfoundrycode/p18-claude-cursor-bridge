@@ -66,3 +66,7 @@
 2026-11-17 TASK-083-r4: an empty word is falsy, so returning it as the group neither marks the command unreadable (`startswith("-")` is false) nor state-changing (`bool("")` is false); `gh_words` returns the existing `INNER_UNREADABLE` sentinel with the word beside it, and `any()` over that empty number is false so the number test refuses `""` on its own.
 
 2026-11-17 BUG-046: an unquoted `?` in a gh api endpoint is a glob to the Bash reader and never reaches the merge-endpoint refusal, so the query spelling in tests/test_bug046.py is single-quoted, the same way the supervisor's paged dependabot call is.
+
+2026-11-17 TASK-065: `tests/test_program_watch_wait.py::test_r085_a_poll_that_keeps_failing_ends_at_the_limit` counts every stderr line containing `a poll failed`, and R10's limit left is the same words, so printing both W4 and that left fails the count; the limit line's left is `poll failed (<source>: <reason>)` and W4 keeps `a poll failed (<source>: <reason>); retrying every <WATCH_POLL>s until the limit`.
+
+2026-11-17 TASK-065: a mutant that holds the wait until the 3600s default, with each poll spawning the stand-in, takes about two minutes for one case (`test_r085_a_run_that_completed_without_a_check_does_not_hold_the_wait`) and about three for the two failed-check cases; the fake clock does not make those polls free.

@@ -99,7 +99,7 @@ class Case:
         """Each state a dict of routes() keywords; returns the route maps the stand-in answers from."""
         return [R.routes(self.head, **s) for s in states]
 
-    def run(self, states, argv=WATCH, limit=3600, exits=(0,), duration=60, raw_states=None):
+    def run(self, states, argv=WATCH, limit=3600, exits=(0,), duration=60, raw_states=None, folder=None):
         maps = raw_states if raw_states is not None else self.states(*states)
         standin = self.tmp / "standin_wait_gh.py"
         standin.write_text(STANDIN, encoding="utf-8")
@@ -111,7 +111,7 @@ class Case:
         self.mp.setattr(self.br.bridge_env, "GH_COMMAND", [sys.executable, str(standin), str(cfg)])
         self.watch = Watch(self.clock, exits, duration)
         self.capsys.readouterr()
-        rc = self.br.watch_loop(list(argv), str(self.repo), limit, self.watch)
+        rc = self.br.watch_loop(list(argv), folder or str(self.repo), limit, self.watch)
         self.err = self.capsys.readouterr().err
         return rc
 
@@ -273,8 +273,9 @@ def test_r085_a_run_with_no_check_at_the_limit_ends_with_124_naming_it(case):
 
 
 def test_r085_a_run_that_completed_without_a_check_does_not_hold_the_wait(case):
-    rc = case.run([dict(NONE_ANYWHERE, checks="ready-checks-S07-apps-only.json", runs="wait-runs-failed-at-start.json")])
-    assert rc == 0 and case.started() and case.clock.sleeps == [], case.err
+    """The launcher's exit for this head (a run that failed at its start) is round 2's case below."""
+    case.run([dict(NONE_ANYWHERE, checks="ready-checks-S07-apps-only.json", runs="wait-runs-failed-at-start.json")])
+    assert case.started() and case.clock.sleeps == [], case.err
 
 
 def test_r085_a_failed_check_starts_the_watch_at_once_under_the_runs(case):
@@ -408,3 +409,199 @@ def test_r085_the_launcher_waits_then_runs_the_watch_it_was_given(tmp_path, stat
     assert len(watch_line) == 1, p.stdout
     assert ("--required" in watch_line[0].split()) is expect_required, watch_line
     assert "waited 0s" in p.stderr, p.stderr
+
+
+# ================================================================ round 2: the supervisor's cases after round 1's two reviews
+# (Review A and the security audit). In process unless marked: the same Case, stand-in gh and clock as above.
+
+
+def test_r085_r2_a_local_head_that_cannot_be_read_is_a_failed_poll(case, tmp_path, monkeypatch):
+    """KP-051 kept where git cannot name the pushed head: GitHub's head is never taken in its place (here every list is
+    green), and the wait ends at the limit naming why."""
+    folder = tmp_path / "not-a-checkout"
+    folder.mkdir()
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+    rc = case.run([GREEN], limit=25, folder=str(folder))
+    assert rc == 124 and case.started() == [], case.err
+    failed = [l for l in case.lines() if "a poll failed" in l]
+    assert len(failed) == 1 and "local: the pushed head cannot be read" in failed[0], case.err
+    limit_lines = [l for l in case.lines() if l.startswith("bridge-run: LIMIT")]
+    assert len(limit_lines) == 1 and "the pushed head cannot be read" in limit_lines[0], case.err
+
+
+def test_r085_r2_under_the_base_s_list_a_failed_check_holding_no_named_context_does_not_start_the_watch(case):
+    """--required: gh watches only the named contexts, so a failed app check no rule names would start a watch that returns
+    before the jobs needing security floor are listed. The wait goes on until every named context holds."""
+    rc = case.run([dict(checks="wait-checks-app-failed.json", runs="wait-runs-in-progress.json"), GREEN])
+    assert rc == 0 and case.started() == [WATCH], case.err
+    assert case.clock.sleeps == [case.br.WATCH_POLL], case.clock.sleeps
+    assert not any("Pull Request Alerts" in l for l in case.lines()), case.err
+
+
+def test_r085_r2_without_required_any_failed_check_starts_the_watch_at_once(case):
+    """Without --required gh watches every check, so the same failed app check starts the watch at once (the default
+    branch's list here; the runs' case is test_r085_a_failed_check_starts_the_watch_at_once_under_the_runs)."""
+    rc = case.run([dict(DEFAULT_LIST, checks="wait-checks-app-failed.json", runs="wait-runs-in-progress.json")])
+    assert rc == 0 and case.started() == [[w for w in WATCH if w != "--required"]] and case.clock.sleeps == [], case.err
+    assert any("Pull Request Alerts" in l and "failed" in l for l in case.lines()), case.err
+
+
+def test_r085_r2_a_watch_that_returned_0_where_every_run_completed_and_one_failed_ends_with_1(case):
+    """The run failed at its start and posted no check; the apps' checks are green, so the watch returns 0. Every latest run
+    is completed and one of them failed: the launcher's exit is 1, and the line names that run and its conclusion."""
+    rc = case.run([dict(NONE_ANYWHERE, checks="ready-checks-S07-apps-only.json", runs="wait-runs-failed-at-start.json")], exits=(0,))
+    assert rc == 1 and len(case.started()) == 1 and case.polls() == 2, case.err
+    line = [l for l in case.lines() if "exits 1" in l]
+    assert len(line) == 1 and "run tests (pull_request)" in line[0] and "startup_failure" in line[0], case.err
+    assert not any("exit 0 stands" in l for l in case.lines()), case.err
+
+
+@pytest.mark.parametrize("extra", [["--repo", "octo/other"], ["-R", "octo/other"], ["--repo=octo/other"], ["-Rocto/other"]],
+                         ids=["repo", "R", "repo-equals", "R-joined"])
+def test_r085_r2_a_watch_naming_a_repository_starts_without_the_wait(case, extra):
+    """The wait reads this checkout's repository; a watch of a repository gh is told to use is started as given."""
+    argv = WATCH + extra
+    rc = case.run([GREEN], argv=argv, limit=600)
+    assert rc == 0 and case.watch.calls == [(argv, 600)], case.watch.calls
+    assert case.calls() == [], case.calls()
+    assert case.lines() == ["bridge-run: the watch names another repository; it starts without the wait"], case.err
+
+
+def test_r085_r2_a_run_with_no_time_left_reads_nothing_and_names_no_failed_poll(case):
+    rc = case.run([GREEN], limit=0)
+    assert rc == 124 and case.started() == [] and case.calls() == [], case.err
+    limit_lines = [l for l in case.lines() if l.startswith("bridge-run: LIMIT")]
+    assert len(limit_lines) == 1 and "no time left before the first poll" in limit_lines[0], case.err
+    assert not any("poll failed" in l for l in case.lines()), case.err
+
+
+def test_r085_r2_a_ready_poll_that_ends_past_the_limit_names_what_it_found(case, monkeypatch):
+    """A poll takes time (each gh call up to its own timeout; here the head's lists take 40 seconds of the test's clock).
+    Where the head is ready but the limit is spent, no line says the watch starts, and the limit line says no time was left,
+    never that a poll failed."""
+    read = case.br.bridge_env.head_state
+
+    def slow(*args, **kwargs):
+        got = read(*args, **kwargs)
+        case.clock.now += 40
+        return got
+
+    monkeypatch.setattr(case.br.bridge_env, "head_state", slow)
+    rc = case.run([GREEN], limit=30)
+    assert rc == 124 and case.started() == [], case.err
+    assert not any("the watch starts" in l for l in case.lines()), case.err
+    limit_lines = [l for l in case.lines() if l.startswith("bridge-run: LIMIT")]
+    assert len(limit_lines) == 1 and "no time left" in limit_lines[0] and "poll failed" not in limit_lines[0], case.err
+
+
+def test_r085_r2_a_context_the_rule_ties_to_an_app_is_held_only_by_that_app_s_check(case):
+    """As prove_ci reads it (TASK-083): the rule requires build of the app 15368; a check named build made by another app
+    holds nothing, so the wait goes on to the limit naming build."""
+    rc = case.run([dict(R.APP_RULE, checks="ready-checks-S21-other-app.json", runs="wait-runs-in-progress.json")], limit=25)
+    assert rc == 124 and case.started() == [], case.err
+    limit_lines = [l for l in case.lines() if l.startswith("bridge-run: LIMIT")]
+    assert len(limit_lines) == 1 and "build" in limit_lines[0].rsplit(": ", 1)[-1], case.err
+
+
+def test_r085_r2_a_commit_status_never_holds_a_context_the_rule_ties_to_an_app(case):
+    """A commit status carries no app (TASK-083's S22): a status named build does not hold the app's build."""
+    rc = case.run([dict(R.APP_RULE, status="ready-status-S22-build.json", runs="wait-runs-in-progress.json")], limit=25)
+    assert rc == 124 and case.started() == [], case.err
+    limit_lines = [l for l in case.lines() if l.startswith("bridge-run: LIMIT")]
+    assert len(limit_lines) == 1 and "build" in limit_lines[0].rsplit(": ", 1)[-1], case.err
+
+
+# ---------------------------------------------------------------- round 2: the child launcher (a POSIX stand-in gh, real time)
+
+
+POSIX_ONLY = pytest.mark.skipif(sys.platform == "win32", reason="a stand-in gh on PATH is a shell script; CI's ubuntu job runs it")
+SNAP_AFTER = "args = sys.argv[2:]\n"
+SNAP = ('if config.get("pids_dir"):\n'
+        '    _files = {}\n'
+        '    if os.path.isdir(config["pids_dir"]):\n'
+        '        for _n in sorted(os.listdir(config["pids_dir"])):\n'
+        '            try:\n'
+        '                _files[_n] = open(os.path.join(config["pids_dir"], _n), encoding="utf-8").read().split()\n'
+        '            except OSError:\n'
+        '                _files[_n] = None\n'
+        '    with open(config["pids_log"], "a", encoding="utf-8") as _fh:\n'
+        '        _fh.write(json.dumps({"call": args[:2], "pid": os.getpid(), "files": _files}) + "\\n")\n')
+WATCH_ROUTE = ('if args[:2] == ["pr", "checks"]:\n'
+               '    sys.stdout.write("WATCH " + " ".join(args) + "\\n")\n'
+               '    sys.stdout.flush()\n'
+               '    time.sleep(config.get("watch_sleep", 0))\n'
+               '    sys.exit(0)\n')
+assert STANDIN.count(SNAP_AFTER) == 1 and STANDIN.count('if not args or args[0] != "api":') == 1
+
+
+def launch(tmp_path, states, limit, watch_sleep=0):
+    """The child launcher on a POSIX stand-in gh that also records, at every call, the run's pid files.
+    Returns (exit, stdout, stderr, the launcher's pid, the readings, the pid folder)."""
+    repo = G.make_repo(tmp_path)
+    head = G.git(repo, "rev-parse", "HEAD")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    log = tmp_path / "gh-calls.jsonl"
+    log.write_text("", encoding="utf-8")
+    pids_log = tmp_path / "pid-readings.jsonl"
+    pids_log.write_text("", encoding="utf-8")
+    pids_dir = repo / "run" / "launcher" / "pids"
+    cfg = tmp_path / "routes.json"
+    cfg.write_text(json.dumps({"states": [R.routes(head, **s) for s in states], "fixtures": FIXTURES, "log": str(log),
+                               "sha": head, "pids_dir": str(pids_dir), "pids_log": str(pids_log), "watch_sleep": watch_sleep}),
+                   encoding="utf-8")
+    standin = tmp_path / "standin_wait_gh.py"
+    text = STANDIN.replace(SNAP_AFTER, SNAP_AFTER + SNAP).replace('if not args or args[0] != "api":',
+                                                                   WATCH_ROUTE + 'if not args or args[0] != "api":')
+    standin.write_text(text, encoding="utf-8")
+    gh = bin_dir / "gh"
+    gh.write_text('#!/bin/sh\nexec "%s" "%s" "%s" "$@"\n' % (sys.executable, standin, cfg), encoding="ascii")
+    gh.chmod(0o755)
+    env = {k: v for k, v in os.environ.items() if k.upper() not in ("BRIDGE_RUN_ALLOW_ANY", "BRIDGE_RUN_SLOT_SCALE")}
+    env["PATH"] = os.pathsep.join([str(bin_dir), env.get("PATH", "")])
+    assert shutil.which("gh", path=env["PATH"]) == str(gh)
+    p = subprocess.Popen([sys.executable, LAUNCHER, "--limit", str(limit), "--"] + WATCH, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, text=True, cwd=str(repo), env=env)
+    out, err = p.communicate(timeout=300)
+    readings = [json.loads(l) for l in pids_log.read_text(encoding="utf-8").splitlines() if l.strip()]
+    return p.returncode, out, err, p.pid, readings, pids_dir
+
+
+@POSIX_ONLY
+def test_r085_r2_a_wait_that_reaches_the_limit_after_a_watch_ends_with_the_exit_line(tmp_path):
+    """The watch returned 0 between two jobs; the next check is never listed, so the wait after it reaches the run's limit.
+    The launcher's last line is its exit line, as for every run that ends at its limit."""
+    rc, out, err, _pid, _readings, _d = launch(tmp_path, TWO[:2], limit=20)
+    assert rc == 124, out + err
+    assert len([l for l in out.splitlines() if l.startswith("WATCH ")]) == 1, out
+    lines = [l for l in err.splitlines() if l.strip()]
+    assert lines and lines[-1] == "bridge-run: exit 124", err
+    assert len([l for l in lines if l.startswith("bridge-run: exit ")]) == 1, err
+    assert any(l.startswith("bridge-run: LIMIT 20s reached while waiting") for l in lines), err
+
+
+@POSIX_ONLY
+def test_r085_r2_a_watch_that_outlives_the_limit_is_ended_naming_the_run_s_limit(tmp_path):
+    rc, out, err, _pid, _readings, _d = launch(tmp_path, [GREEN], limit=10, watch_sleep=60)
+    assert rc == 124, out + err
+    lines = [l for l in err.splitlines() if l.strip()]
+    assert any(l.startswith("bridge-run: LIMIT 10s reached after ") for l in lines), err
+    assert lines and lines[-1] == "bridge-run: exit 124", err
+
+
+@POSIX_ONLY
+def test_r085_r2_the_pid_file_names_the_launcher_through_the_wait_and_the_watch_while_it_runs(tmp_path):
+    """bridge-stop.py ends the tree of the pid file's second pid, then the first: during the wait, before and between
+    watches, both are the launcher's; during a watch, the second is the watch's. No file is left after the run."""
+    rc, out, err, pid, readings, pids_dir = launch(tmp_path, TWO[:2], limit=20)
+    assert rc == 124, out + err
+    watch_at = [i for i, r in enumerate(readings) if r["call"] == ["pr", "checks"]]
+    assert len(watch_at) == 1, readings
+    api = [r for r in readings if r["call"][:1] == ["api"]]
+    assert any(i < watch_at[0] for i, r in enumerate(readings) if r["call"][:1] == ["api"]), readings
+    assert any(i > watch_at[0] for i, r in enumerate(readings) if r["call"][:1] == ["api"]), readings
+    for r in api:
+        assert list(r["files"].values()) == [[str(pid), str(pid)]], r
+    w = readings[watch_at[0]]
+    assert list(w["files"].values()) == [[str(pid), str(w["pid"])]], w
+    assert not (pids_dir.is_dir() and os.listdir(str(pids_dir))), os.listdir(str(pids_dir))

@@ -205,11 +205,17 @@ rebuilds the change first). A builder or review run lists the files beside the W
 (its parent folder, the Workspace and `Worktrees/` excluded) before and after, and reports
 each new, changed or removed one as `bridge-run: BOUNDARY ...` on stderr and in the run log:
 the boundary hook does not run in a headless builder run (ISS-010), so this is the one
-detection of a write outside the Workspace. A `gh pr checks <n> --watch` waits up to two
-minutes for the pushed head (the local HEAD) to be the pull request's head on GitHub with a
-check registered, and says how long it waited, so a watch neither ends at once with "no
-checks reported" nor takes the previous commit's run (KP-051). `-p no:cacheprovider` is
-accepted after `python -m pytest` as after `pytest`.
+detection of a write outside the Workspace. A `gh pr checks <n> --watch` waits, inside the run's own
+limit, polling every 15 seconds, until every required check context of the pull request's base
+branch has a check or a commit status on the pushed head (the local HEAD), or a check of that
+head has failed, then starts the watch and says what it waited for; where the base names no
+required context it waits for the default branch's contexts, and where none is named anywhere
+or a rule cannot be read it waits until the head has a workflow run and each latest run has a
+check listed or is completed, says so, and starts a `--required` watch without that option,
+reading the runs again when that watch returns 0 and starting it again while a latest run is
+not completed (R-085). The head on GitHub has to be the pushed head before its checks count
+(KP-051). A watch's return is not the proof that CI passed: `review-guard.py ready` is.
+`-p no:cacheprovider` is accepted after `python -m pytest` as after `pytest`.
 
 `--key-file <path>` (release A2): a file of `NAME=value` lines, outside the Workspace, whose
 values reach the child's environment only; names are printed, values never (the owner's
