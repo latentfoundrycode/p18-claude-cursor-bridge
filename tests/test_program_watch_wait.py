@@ -511,6 +511,36 @@ def test_r085_r2_a_commit_status_never_holds_a_context_the_rule_ties_to_an_app(c
     assert len(limit_lines) == 1 and "build" in limit_lines[0].rsplit(": ", 1)[-1], case.err
 
 
+# ================================================================ round 3: the supervisor's case after round 2's Review A
+
+
+def test_r085_r3_under_the_base_s_list_a_named_failed_check_after_an_unnamed_one_starts_the_watch_at_once(case):
+    """Two failed checks, a job no rule names (lint's) listed before one the rule names (security floor): under --required
+    the named failure starts the watch at once, so that --fail-fast reports it, and W1 names that check."""
+    rc = case.run([dict(checks="wait-checks-lint-failed-first.json", runs="wait-runs-two-running.json")])
+    assert rc == 0 and case.started() == [WATCH] and case.clock.sleeps == [], case.err
+    assert any("check security floor failed (failure)" in l and "the watch starts" in l for l in case.lines()), case.err
+
+
+@pytest.mark.parametrize("listing", ["base", "default"], ids=["base-list", "default-list"])
+@pytest.mark.parametrize("word,early", [("neutral", False), ("cancelled", False), ("action-required", True)],
+                         ids=["neutral", "cancelled", "action-required"])
+def test_r085_r3_only_a_conclusion_gh_counts_as_failed_starts_the_watch_at_once(case, listing, word, early):
+    """gh pr checks (cli/cli, pkg/cmd/pr/checks/aggregate.go) puts failure, timed_out and action_required in its fail
+    bucket, neutral in skipping and cancelled in cancel, and only the fail bucket ends a watch with a non-zero exit. A watch
+    started for a neutral or cancelled check returns 0 once nothing it lists is pending, before the jobs that need security
+    floor are listed: those conclusions do not start it early, and the wait goes on until every named context holds."""
+    extra = {} if listing == "base" else DEFAULT_LIST
+    rc = case.run([dict(extra, checks="wait-checks-floor-%s.json" % word, runs="wait-runs-in-progress.json"), dict(extra, **GREEN)])
+    assert rc == 0 and len(case.started()) == 1, case.err
+    if early:
+        assert case.clock.sleeps == [], case.clock.sleeps
+        assert any("check security floor failed (action_required)" in l and "the watch starts" in l for l in case.lines()), case.err
+    else:
+        assert case.clock.sleeps == [case.br.WATCH_POLL], case.clock.sleeps
+        assert not any("failed (" in l for l in case.lines()), case.err
+
+
 # ---------------------------------------------------------------- round 2: the child launcher (a POSIX stand-in gh, real time)
 
 

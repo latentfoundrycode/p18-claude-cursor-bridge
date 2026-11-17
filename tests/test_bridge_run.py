@@ -700,3 +700,77 @@ def test_r085_d004_the_limit_stops_the_wait_before_a_later_green_head(tmp_path, 
     assert rc == 124 and case.started() == [], case.err
     assert case.polls() == 1, case.calls()
     assert any(l.startswith("bridge-run: LIMIT") for l in case.lines()), case.err
+
+
+@pytest.mark.parametrize("extra", [["--repo", "octo/other"], ["-Rocto/other"]], ids=["repo-before-number", "R-joined-before-number"])
+def test_r085_d004_a_repository_named_before_the_pull_request_number_starts_without_the_wait(tmp_path, monkeypatch, capsys, program, extra):
+    """R-085, D-004: --repo or a joined -R before the number is the repository line, and nothing is read from GitHub."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    argv = ["gh", "pr", "checks"] + extra + ["12", "--watch", "--required"]
+    rc = case.run([wait.GREEN], argv=argv, limit=600)
+    assert rc == 0, case.err
+    assert case.watch.calls == [(argv, 600)], case.watch.calls
+    assert case.calls() == [], case.calls()
+    assert case.lines() == ["bridge-run: the watch names another repository; it starts without the wait"], case.err
+
+
+def test_r085_d004_a_repository_flag_without_watch_runs_as_given(tmp_path, monkeypatch, capsys, program):
+    """R-085, D-004: without --watch a --repo word is not the wait's repository line; the command runs as given."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    argv = ["gh", "pr", "checks", "12", "--repo", "octo/other"]
+    rc = case.run([wait.GREEN], argv=argv, limit=600)
+    assert rc == 0, case.err
+    assert case.watch.calls == [(argv, 600)], case.watch.calls
+    assert case.calls() == [] and case.lines() == [], (case.calls(), case.err)
+
+
+def test_r085_d004_no_time_left_names_the_local_head_and_reads_nothing(tmp_path, monkeypatch, capsys, program):
+    """R-085, D-004: limit 0 reads nothing from GitHub and names the pushed head, not a failed poll and not ?."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    rc = case.run([wait.GREEN], limit=0)
+    assert rc == 124 and case.started() == [] and case.calls() == [], case.err
+    limit_lines = [l for l in case.lines() if l.startswith("bridge-run: LIMIT")]
+    assert len(limit_lines) == 1 and "on head %s" % case.head[:12] in limit_lines[0], case.err
+    assert "no time left before the first poll" in limit_lines[0] and "poll failed" not in limit_lines[0], case.err
+
+
+def test_r085_d004_no_time_left_and_no_local_head_names_the_question_mark(tmp_path, monkeypatch, capsys, program):
+    """R-085, D-004: limit 0 reads no GitHub reply, and a head the checkout cannot name is shown as ?."""
+    import test_program_watch_wait as wait
+
+    folder = tmp_path / "not-a-checkout"
+    folder.mkdir()
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    rc = case.run([wait.GREEN], limit=0, folder=str(folder))
+    assert rc == 124 and case.started() == [] and case.calls() == [], case.err
+    limit_lines = [l for l in case.lines() if l.startswith("bridge-run: LIMIT")]
+    assert len(limit_lines) == 1 and "on head ?" in limit_lines[0] and "no time left before the first poll" in limit_lines[0], case.err
+    assert not any("poll failed" in l for l in case.lines()), case.err
+
+
+def test_r085_d004_a_ready_poll_past_the_limit_names_the_reading_it_would_have_started_for(tmp_path, monkeypatch, capsys, program):
+    """R-085, D-004: a poll that finds the head ready after the limit is spent names that reading and does not say the watch starts."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    read = case.br.bridge_env.head_state
+
+    def slow(*args, **kwargs):
+        got = read(*args, **kwargs)
+        case.clock.now += 40
+        return got
+
+    monkeypatch.setattr(case.br.bridge_env, "head_state", slow)
+    rc = case.run([wait.GREEN], limit=30)
+    assert rc == 124 and case.started() == [], case.err
+    assert not any("the watch starts" in l for l in case.lines()), case.err
+    left = "ready (every required context has a check or a status), but no time left to start the watch"
+    limit_lines = [l for l in case.lines() if l.startswith("bridge-run: LIMIT")]
+    assert len(limit_lines) == 1 and left in limit_lines[0] and "poll failed" not in limit_lines[0], case.err

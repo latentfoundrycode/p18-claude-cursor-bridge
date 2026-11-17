@@ -64,7 +64,9 @@ required context it waits for the default branch's contexts, and where none is n
 or a rule cannot be read it waits until the head has a workflow run and each latest run has a
 check listed or is completed, says so, and starts a `--required` watch without that option,
 reading the runs again when that watch returns 0 and starting it again while a latest run is
-not completed (R-085). The head on GitHub has to be the pushed head before its checks count
+not completed; where every latest run is then completed, a failed one makes the launcher exit 1
+(R-085). A watch that names another repository (`--repo` or `-R`) starts without the wait. The
+head on GitHub has to be the pushed head before its checks count
 (KP-051). A watch's return is not the proof that CI passed: `review-guard.py ready` is.
 `-p no:cacheprovider` is accepted after `python -m pytest` as after `pytest`.
 
@@ -2048,6 +2050,18 @@ def _watch_pr_number(argv):
     return None
 
 
+def _watch_other_repo(argv):
+    """True where a word tells gh which repository to watch. The wait reads this checkout only."""
+    for word in argv:
+        if not isinstance(word, str):
+            continue
+        if word in ("--repo", "-R") or word.startswith("--repo="):
+            return True
+        if len(word) > 2 and word.startswith("-R"):
+            return True
+    return False
+
+
 def _watch_left(began, limit):
     return limit - (time.monotonic() - began)
 
@@ -2161,8 +2175,35 @@ def _failed_check(latest):
     return None
 
 
+def _watch_app(item):
+    """The check's app id, an int. A bool is not an id. A commit status has no app."""
+    app = item.get("app") if isinstance(item, dict) else None
+    if not isinstance(app, dict):
+        return None
+    value = app.get("id")
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def _watch_app_tied(app_id):
+    return isinstance(app_id, int) and not isinstance(app_id, bool)
+
+
+def _check_holds(item, entry):
+    """A latest check holds this context when its name matches, and its app where the rule names one."""
+    if not isinstance(item, dict) or not isinstance(entry, dict):
+        return False
+    name = entry.get("context")
+    if not isinstance(name, str) or item.get("name") != name:
+        return False
+    if _watch_app_tied(entry.get("app_id")):
+        return _watch_app(item) == entry.get("app_id")
+    return True
+
+
 def _missing_contexts(contexts, latest):
-    """Context names that have neither a latest check of that name nor a latest status of that context."""
+    """Context names nothing holds. An app-tied context is held only by that app's check of its name."""
     checks = latest.get("checks") or []
     statuses = latest.get("statuses") or []
     missing = []
@@ -2171,8 +2212,8 @@ def _missing_contexts(contexts, latest):
         if not isinstance(name, str) or not name:
             missing.append("unreadable")
             continue
-        held = any(isinstance(item, dict) and item.get("name") == name for item in checks)
-        if not held:
+        held = any(_check_holds(item, entry) for item in checks)
+        if not held and isinstance(entry, dict) and not _watch_app_tied(entry.get("app_id")):
             held = any(isinstance(item, dict) and item.get("context") == name for item in statuses)
         if not held:
             missing.append(name)
@@ -2182,6 +2223,15 @@ def _missing_contexts(contexts, latest):
 def _all_runs_completed(latest):
     runs = _watch_runs(latest)
     return bool(runs) and all(bridge_env.ci_class(run, "run") != "pending" for run in runs)
+
+
+def _failed_run_notes(latest):
+    """Each latest run ci_class calls failed, as `run <name> (<event>) concluded <conclusion>`."""
+    notes = []
+    for run in _watch_runs(latest):
+        if bridge_env.ci_class(run, "run") == "failed":
+            notes.append("%s concluded %s" % (_run_label(run), _watch_plain(run.get("conclusion"))))
+    return notes
 
 
 def _runs_initial_ready(latest):
@@ -2237,9 +2287,14 @@ def _pending_run_count(latest):
 
 
 def _watch_decision(named, latest, restart):
-    """(ready, what, problem). A failed latest check starts the watch at once, so --fail-fast can report it."""
+    """(ready, what, problem). A failed latest check starts the watch at once, so --fail-fast can report it.
+
+    Under the base's list the watch keeps --required, so only a failure that holds a named context counts:
+    gh would not show a check the rule does not name. Under the default branch's list and the runs, gh watches
+    every check, and any failed latest check starts the watch.
+    """
     failed = _failed_check(latest)
-    if failed is not None:
+    if failed is not None and (named["kind"] != "base" or any(_check_holds(failed, entry) for entry in named["contexts"] or [])):
         what = "check %s failed (%s)" % (_watch_plain(failed.get("name")), _watch_plain(failed.get("conclusion")))
         return True, what, None
     if named["kind"] == "runs":
@@ -2266,7 +2321,9 @@ def _watch_poll(number, folder):
     base, github = got.get("base"), got.get("head")
     if not isinstance(base, str) or not base or not isinstance(github, str) or not github:
         return {"kind": "fail", "source": "pull", "reason": "the pull request's base or head cannot be read", "local": local}
-    if local and github != local:
+    if not local:
+        return {"kind": "fail", "source": "local", "reason": "the pushed head cannot be read", "local": local}
+    if github != local:
         return {"kind": "mismatch", "local": local, "github": github, "base": base}
     state = bridge_env.head_state(_WATCH_REPO, github, cwd=folder)
     if not isinstance(state, dict) or state.get("answer") != bridge_env.ANSWER_VALUE:
@@ -2288,6 +2345,9 @@ def watch_loop(argv, folder, limit, start):
     """
     if "--watch" not in argv:
         return start(list(argv), limit)
+    if _watch_other_repo(argv):
+        _watch_say("the watch names another repository; it starts without the wait")
+        return start(list(argv), limit)
     number = _watch_pr_number(argv)
     if number is None:
         _watch_say("the watch names no pull request number; it starts without the wait")
@@ -2303,7 +2363,13 @@ def watch_loop(argv, folder, limit, start):
 
     def finish_limit():
         reading = named["reading"] if named else "the pull request %s" % number
-        _watch_limit_line(limit, reading, head12, problem or "poll failed (pull: cannot read)")
+        if problem:
+            shown, left = head12, problem
+        else:
+            local = local_head(folder)
+            shown = _watch_plain(local)[:12] if local else "?"
+            left = "no time left before the first poll"
+        _watch_limit_line(limit, reading, shown, left)
 
     while True:
         if _watch_left(began, limit) <= 0 and not after_watch:
@@ -2341,6 +2407,11 @@ def watch_loop(argv, folder, limit, start):
         head12 = _watch_head12(polled.get("local"), polled.get("github"))
         if after_watch:
             if _all_runs_completed(latest):
+                failed_notes = _failed_run_notes(latest)
+                if failed_notes:
+                    _watch_say("every latest workflow run of head %s is completed and %s; the launcher exits 1" % (
+                        head12, ", ".join(failed_notes)))
+                    return 1
                 _watch_say("every latest workflow run of head %s is completed; the watch's exit 0 stands" % head12)
                 return 0
             after_watch = False
@@ -2358,6 +2429,10 @@ def watch_loop(argv, folder, limit, start):
                 finish_limit()
                 return 124
             continue
+        left = _watch_left(began, limit)
+        if left <= 0:
+            _watch_limit_line(limit, named["reading"], head12, "ready (%s), but no time left to start the watch" % what)
+            return 124
         if restart:
             waited = int(time.monotonic() - gap_began) if gap_began is not None else int(time.monotonic() - began)
             _watch_say("the watch returned 0 while %d latest run(s) of head %s are not completed; waited %ds; the watch starts again" % (
@@ -2365,9 +2440,6 @@ def watch_loop(argv, folder, limit, start):
         else:
             _watch_say("waited %ds for %s on head %s: %s; the watch starts" % (
                 int(time.monotonic() - began), named["reading"], head12, what))
-        left = _watch_left(began, limit)
-        if left <= 0:
-            continue
         words = list(argv) if named["kind"] == "base" else [word for word in argv if word != "--required"]
         code = start(words, left)
         if named["kind"] != "runs" or code != 0:
@@ -2950,7 +3022,7 @@ def main():
     if kind == "watch":
         # The watch's own child is started from watch_loop, once per watch, with the seconds still left of this run.
         mark = time.time()
-        box = {"ran": False, "killer": None}
+        box = {"ran": False, "killer": None, "pid_file": write_pid_file(folder, run_id, os.getpid(), os.getpid())}
 
         def run_child(words, seconds):
             resolved, _is_agent = resolve(words)
@@ -2992,14 +3064,15 @@ def main():
                     return 125
                 killer = lambda: os.killpg(os.getpgid(proc.pid), signal.SIGKILL)  # noqa: E731
             box["ran"] = True
-            child_started = time.time()
             entry.update(pid=os.getpid(), child_pid=proc.pid)
-            pid_file = write_pid_file(folder, run_id, os.getpid(), proc.pid)   # read by bridge-stop.py while the run lives (2026.10.11c)
+            written = write_pid_file(folder, run_id, os.getpid(), proc.pid)   # read by bridge-stop.py while the run lives (2026.10.11c)
+            if written:
+                box["pid_file"] = written
             try:
                 child_rc = proc.wait(timeout=seconds)
             except subprocess.TimeoutExpired:
                 sys.stderr.write("bridge-run: LIMIT %ds reached after %ds; terminating the whole process tree\n"
-                                 % (int(seconds), int(time.time() - child_started)))
+                                 % (int(limit), int(time.time() - mark)))
                 report_git_config()
                 report_boundary()               # before the exit line, which stays the last (the job ends this process)
                 sys.stderr.write("bridge-run: exit 124\n")
@@ -3014,25 +3087,22 @@ def main():
                     proc.wait(timeout=30)
                 except subprocess.TimeoutExpired:
                     proc.kill()
-                remove_pid_file(pid_file)
+                remove_pid_file(box["pid_file"])
                 return 124
-            remove_pid_file(pid_file)
+            written = write_pid_file(folder, run_id, os.getpid(), os.getpid())
+            if written:
+                box["pid_file"] = written
             return child_rc
 
         rc = watch_loop(argv[argv.index("--") + 1:], folder, limit, run_child)
-        if entry["exit"] is None and box["ran"]:
+        remove_pid_file(box["pid_file"])
+        if entry["exit"] is None:
             report_git_config()
-            if rc != 124:
-                report_boundary()
-                sys.stderr.write("bridge-run: exit %d\n" % rc)
-                sys.stderr.flush()
+            report_boundary()
+            sys.stderr.write("bridge-run: exit %d\n" % rc)
+            sys.stderr.flush()
             healthy = True if (kind == "test" and rc == 0) or (kind == "driver" and rc in (0, 1)) else None
             entry.update(seconds=int(time.time() - mark), exit=rc, healthy=healthy)
-            write_log(folder, entry)
-        elif entry["exit"] is None and rc == 124:
-            sys.stderr.write("bridge-run: exit 124\n")
-            sys.stderr.flush()
-            entry.update(seconds=int(time.time() - mark), exit=124, healthy=None)
             write_log(folder, entry)
         return rc
 

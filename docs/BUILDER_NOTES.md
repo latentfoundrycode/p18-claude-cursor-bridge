@@ -70,3 +70,5 @@
 2026-11-17 TASK-065: `tests/test_program_watch_wait.py::test_r085_a_poll_that_keeps_failing_ends_at_the_limit` counts every stderr line containing `a poll failed`, and R10's limit left is the same words, so printing both W4 and that left fails the count; the limit line's left is `poll failed (<source>: <reason>)` and W4 keeps `a poll failed (<source>: <reason>); retrying every <WATCH_POLL>s until the limit`.
 
 2026-11-17 TASK-065: a mutant that holds the wait until the 3600s default, with each poll spawning the stand-in, takes about two minutes for one case (`test_r085_a_run_that_completed_without_a_check_does_not_hold_the_wait`) and about three for the two failed-check cases; the fake clock does not make those polls free.
+
+2026-11-17 TASK-065-r2: when no time is left the loop returns before the first poll, so a limit of 0 never calls GitHub; the limit line has to read the local head itself on that path, or the head stays `?`.

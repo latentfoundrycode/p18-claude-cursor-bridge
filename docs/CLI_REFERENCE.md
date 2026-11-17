@@ -213,7 +213,9 @@ required context it waits for the default branch's contexts, and where none is n
 or a rule cannot be read it waits until the head has a workflow run and each latest run has a
 check listed or is completed, says so, and starts a `--required` watch without that option,
 reading the runs again when that watch returns 0 and starting it again while a latest run is
-not completed (R-085). The head on GitHub has to be the pushed head before its checks count
+not completed; where every latest run is then completed, a failed one makes the launcher exit 1
+(R-085). A watch that names another repository (`--repo` or `-R`) starts without the wait. The
+head on GitHub has to be the pushed head before its checks count
 (KP-051). A watch's return is not the proof that CI passed: `review-guard.py ready` is.
 `-p no:cacheprovider` is accepted after `python -m pytest` as after `pytest`.
 
