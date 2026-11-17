@@ -113,6 +113,8 @@ class Scratch:
         return self.git("rev-parse", "--short", "HEAD")
 
     def run(self, *args, cwd=None, **env_extra):
+        # Python exits 2 for a missing script too, so an exit-2 case would pass before the program exists.
+        assert os.path.isfile(PROG), "push-scan.py is not built: %s" % os.path.basename(PROG)
         p = subprocess.run([sys.executable, PROG] + list(args), cwd=str(cwd or self.repo), capture_output=True,
                            env=self.env(**env_extra), timeout=300)
         out = p.stdout.decode("utf-8", errors="replace") + p.stderr.decode("utf-8", errors="replace")
