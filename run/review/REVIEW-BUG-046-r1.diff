@@ -1,0 +1,1853 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index f8f8851..399ba7a 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.11.12a",
+-  "generated": "2026-11-17 02:56",
++  "generated": "2026-11-17 10:59",
+   "files": {
+     "agents/cursor-configurator.md": "a8aad7838a9bc5b4f00e13fd3749919158cbe37ec7acfa9a40960600398784bc",
+     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
+@@ -87,7 +87,7 @@
+     "cursor-bridge/minimal-code.snapshot.md": "b822c4d7abd69971dc5fee671b8a63daa58ba62a2711c9cf07849ed82d01a215",
+     "cursor-bridge/mutation-run.py": "3489d7778015393029dc9a768f42b3f213e999fad32e9b918c4c10160676569f",
+     "cursor-bridge/pace-report.py": "95d3116b8559c392e14a07154dcbea25eb5365bdc368f33fe62aef6b02e51bd2",
+-    "cursor-bridge/permission-guard.py": "3f069b24fbcc3effa5f689d61279ee032390ebabb3b536012ffc39057d2c4842",
++    "cursor-bridge/permission-guard.py": "6e85731afcca3f8fa4a71c80a3501d9875c7f4f470128ca3f10f8e089db6c31a",
+     "cursor-bridge/plan-check.py": "f8167ac2793c34c7cd8ea8c5fe96ab24937dae28f8051709b9b9f6b248139405",
+     "cursor-bridge/pr-activity-check.py": "7b6f59a14a52c34d14222939d5af52f677e7494e9008d702e3a5bb0bdb8a8768",
+     "cursor-bridge/records-check.py": "6c5ec6e7aef58c634096bc0bf8ed94415e62d16c6a173be166d1f22d445dcd69",
+diff --git a/bridge/cursor-bridge/permission-guard.py b/bridge/cursor-bridge/permission-guard.py
+index 6f5ec7a..633f142 100644
+--- a/bridge/cursor-bridge/permission-guard.py
++++ b/bridge/cursor-bridge/permission-guard.py
+@@ -3,7 +3,7 @@
+ refuses the two actions the loop must never take, in every permission mode (KP-032):
+ 
+   - merging a pull request past the repository's rules: `gh pr merge … --admin`, and the
+-    REST route `gh api … /pulls/<n>/merge` with a method that writes;
++    REST route `gh api … /pulls/<n>/merge` whatever its method;
+   - a force-push in any form: `--force`, `--force-with-lease`, `--force-if-includes`,
+     `-f`, a combined short flag such as `-fu`, `--mirror`, a `+` refspec;
+   - any `git worktree remove` (rule 19, release A1b): Git for Windows follows a gitignored
+@@ -22,9 +22,9 @@ here-documents, subshells, globs) are refused as unreadable; a `git -c alias.<x>
+ value starts with `worktree`, `pr`, `push`, `api` or `!` is refused, and so is a `gh alias set`
+ for a merge; an abbreviated `--forc` counts as `--force`, as it does for git; `--help` exempts a
+ `gh pr merge` only when it is not the value of a flag such as `--subject`. A here-document is unreadable. `powershell` without `-Command` runs the rest of its line,
+-`-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command,
+-and `-XPUT` is a method: all read as what they run. An encoded PowerShell command and a
+-GraphQL query read from a file are refused unread.
++`-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command:
++all read as what they run. An encoded PowerShell command and a `gh api` body read from a file
++or standard input are refused unread, whatever the endpoint.
+   - inside a bridge Workspace (one holding docs/PROJECT_STATUS.md), a chain of commands
+     (`&&`, `;`, `||`, a new line) carrying a state-changing git or gh command, or a command
+     wrapped in `cd …` (rule 8: one command per call; a chain once built an increment on a
+@@ -59,7 +59,6 @@ import subprocess
+ import sys
+ import time
+ 
+-WRITE_METHODS = ("PUT", "POST", "PATCH", "DELETE")
+ AROUND_THE_SHIM = ("agent", "agent.cmd", "agent.ps1", "cursor-agent.cmd", "cursor-agent.ps1", "cursor-agent.exe")
+ SHELLS = ("cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe")
+ PROGRAM_AFTER = ("/c", "/k", "-c", "-command", "-file")
+@@ -2197,6 +2196,16 @@ def _find_brace_refusal(words, mode, depth):
+     return None
+ 
+ 
++def _percent_decoded(word):
++    """Each % and two hex digits becomes that character, repeated until a pass changes nothing. A result that is not ASCII is those characters."""
++    decoded = word
++    while True:
++        nxt = re.sub(r"%([0-9A-Fa-f]{2})", lambda m: chr(int(m.group(1), 16)), decoded)
++        if nxt == decoded:
++            return decoded
++        decoded = nxt
++
++
+ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=False):
+     """Every check of one command, on the word list the reader produced or a find clause."""
+     if _too_long():
+@@ -2324,26 +2333,20 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
+             r = merge_reason(args, cwd)
+             if r:
+                 return r
+-        if group == "api" and any(m in tok for tok in w for m in MERGE_MUTATIONS):
++        decoded_w = [_percent_decoded(tok) for tok in w] if group == "api" else []
++        if group == "api" and any(m in tok or m in dec for tok, dec in zip(w, decoded_w) for m in MERGE_MUTATIONS):
+             return "gh api with a merge mutation (merging outside the gate)"
+-        if group == "api" and sub == "graphql":
+-            if any(t == "--input" or t.startswith("--input=") or t.startswith("@") or "=@" in t or (t in ("-F", "--field", "--raw-field", "-f") and any("@" in a for a in args)) for t in args + w):
+-                return "gh api graphql with a query read from a file, which the guard cannot read (write the query on the command line)"
++        if group == "api" and any(t == "--input" or t.startswith("--input=") or t.startswith("@") or "=@" in t for t in w):
++            return "gh api with a body read from a file or standard input, which the guard cannot read (write the query or fields on the command line)"
+         if group == "alias" and sub in ("set", "import"):
+             expansion = (args[-1] if args else "").strip("'\"").lstrip("!").strip()
+             if sub == "import" or re.match(r"^(pr\s+merge|api)\b", expansion) or "worktree" in expansion:
+                 return "a gh alias for a merge or an api call (%s)" % " ".join(args)[:60]
+         if group == "api":
+-            method = "GET"
+-            for i, a in enumerate(w):
+-                if a in ("-X", "--method") and i + 1 < len(w):
+-                    method = w[i + 1].upper()
+-                elif a.startswith("--method=") or (a.startswith("-X") and len(a) > 2):
+-                    method = a.split("=", 1)[1].upper() if "=" in a else a[2:].upper()
+-                elif a in ("-f", "--raw-field", "-F", "--field", "--input"):
+-                    method = method if method != "GET" else "POST"
+-            if method in WRITE_METHODS and any(re.search(r"/pulls/\d+/merge\b", a) for a in w):
+-                return "gh api %s on a pull request's merge endpoint (merging outside the gate)" % method
++            for dec in decoded_w:
++                low = dec.lower()
++                if "pulls" in low and "merge" in low:
++                    return "gh api on a pull request's merge endpoint (merging outside the gate)"
+     return None
+ 
+ def hook_skipper_option(sub, args, snapshot):
+diff --git a/docs/BUILDER_NOTES.md b/docs/BUILDER_NOTES.md
+index 0b21f7f..0a2ad92 100644
+--- a/docs/BUILDER_NOTES.md
++++ b/docs/BUILDER_NOTES.md
+@@ -64,3 +64,5 @@
+ 2026-11-17 TASK-083-r3: a foreground wait of 30 seconds backgrounds the shell while `python -m pytest -p no:cacheprovider -q -rfE tests/test_program_ready.py -k "r083_r3 or r083_r2 or disable_auto or help" tests/test_permission_guard.py -k "r083_r3 or r083_r2 or test_allowed or test_refused"` is still printing progress; that run then exited 0 (`365 passed, 79 deselected in 41.37s`), and the Done pytest runs were given a longer wait.
+ 
+ 2026-11-17 TASK-083-r4: an empty word is falsy, so returning it as the group neither marks the command unreadable (`startswith("-")` is false) nor state-changing (`bool("")` is false); `gh_words` returns the existing `INNER_UNREADABLE` sentinel with the word beside it, and `any()` over that empty number is false so the number test refuses `""` on its own.
++
++2026-11-17 BUG-046: an unquoted `?` in a gh api endpoint is a glob to the Bash reader and never reaches the merge-endpoint refusal, so the query spelling in tests/test_bug046.py is single-quoted, the same way the supervisor's paged dependabot call is.
+diff --git a/docs/CHANGES.md b/docs/CHANGES.md
+index 209a1ca..f33592e 100644
+--- a/docs/CHANGES.md
++++ b/docs/CHANGES.md
+@@ -2,6 +2,12 @@
+ 
+ Newest first. Each entry records a call the supervisor made on the record of a reviewers' split or a resolution round (Merge-Verification-Policy, Resolution round), and the reasoning that settled it.
+ 
++## 2026-11-17 BUG-046: the merge endpoint named by what it holds, not by how it is spelled, at round 3 (R-082)
++
++- **Question:** how the permission guard should recognise a `gh api` call on a pull request's merge endpoint, now that the method is read for nothing. Round 1's brief ruled a normalised pattern (lower-cased, `%2f` and `%2e` decoded, dot segments resolved, `/pulls/<segment>/merge`); both reviewers found escaped letters passing and the supervisor found dot segments in a query erasing the path. Round 2's brief decoded every escape and cut at the first `?` or `#`; both reviewers found escaped delimiters and an escaped slash hiding the path. Each time the brief's own rule was the defect.
++- **Decision: at round 3, the ceiling, under its class line `safety mechanism`, the design changed: a `gh api` word whose decoded, lower-cased text holds both `pulls` and `merge` is the merge endpoint**, refused whatever its method; one decoding per word serves this rule and the merge-mutation rule. Ordinary words holding both names are refused with it, an accepted over-refusal. The placeholder route both round-3 reviewers named (`GH_REPO` or the current branch filling `{repo}`, `:repo`, `{branch}`) is outside the guard's threat-model row and recorded as a lead (docs/HARDENING.md, BUG-046).
++- **Reasoning.** A spelling rule must agree with gh's and GitHub's reading of escapes, delimiters and dot segments; two rounds showed each next reviewer finds a spelling read apart, a defeated safety mechanism that sends the work back every time. GitHub routes the merge only on a path whose segments are `pulls` and `merge`, and gh sends its one endpoint word with its escapes kept, so after decoding every such word holds both names: a rule on what the word contains needs no model of the spelling. The cost is refusing a few ordinary calls the bridge never makes. This is TASK-083's lesson (name what is accepted) applied at the round it was due.
++
+ ## 2026-11-17 TASK-083: the guard reads a merge command as gh reads it, over four rounds; `gh api`'s walk drawn to BUG-046 (R-083)
+ 
+ - **Question:** how far TASK-083 must go in making the permission guard read `gh pr merge` as gh itself reads it, now that the merge is held on the ready record `<pr>-<head>` and the number and sha come from the command's words; and where the line is drawn for the guard's older code the new rule rests on. Round 1 built `ready`, `prove_ci`, `premerge-records`' proof and the guard's `ready_recorded`; Review A rejected it on a cluster of short flags (`gh pr merge -sb 12 34`, 34 merged on 12's record) and the audit on two readings older than TASK-083 (a flag's value read as `--match-head-commit`; `--disable-auto` as a flag's value exempting the command). Round 2 read the words after `merge` as gh's flag parser does; both reviewers rejected it on a true/false exemption set again by its `=` form and on `gh_words`, older still, reading an unknown option before the subcommand as one word. Round 3 cleared an exemption on any `=` form and made any option before the subcommand unreadable; both rejected it on an empty word (`gh pr '' merge`) that cobra passes over. Round 4 admits only a command's name before the subcommand.
+diff --git a/docs/CLI_REFERENCE.md b/docs/CLI_REFERENCE.md
+index a828710..fbf185a 100644
+--- a/docs/CLI_REFERENCE.md
++++ b/docs/CLI_REFERENCE.md
+@@ -602,7 +602,7 @@ permission-guard: a Claude Code PreToolUse hook for the Bash and PowerShell tool
+ refuses the two actions the loop must never take, in every permission mode (KP-032):
+ 
+   - merging a pull request past the repository's rules: `gh pr merge … --admin`, and the
+-    REST route `gh api … /pulls/<n>/merge` with a method that writes;
++    REST route `gh api … /pulls/<n>/merge` whatever its method;
+   - a force-push in any form: `--force`, `--force-with-lease`, `--force-if-includes`,
+     `-f`, a combined short flag such as `-fu`, `--mirror`, a `+` refspec;
+   - any `git worktree remove` (rule 19, release A1b): Git for Windows follows a gitignored
+@@ -621,9 +621,9 @@ here-documents, subshells, globs) are refused as unreadable; a `git -c alias.<x>
+ value starts with `worktree`, `pr`, `push`, `api` or `!` is refused, and so is a `gh alias set`
+ for a merge; an abbreviated `--forc` counts as `--force`, as it does for git; `--help` exempts a
+ `gh pr merge` only when it is not the value of a flag such as `--subject`. A here-document is unreadable. `powershell` without `-Command` runs the rest of its line,
+-`-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command,
+-and `-XPUT` is a method: all read as what they run. An encoded PowerShell command and a
+-GraphQL query read from a file are refused unread.
++`-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command:
++all read as what they run. An encoded PowerShell command and a `gh api` body read from a file
++or standard input are refused unread, whatever the endpoint.
+   - inside a bridge Workspace (one holding docs/PROJECT_STATUS.md), a chain of commands
+     (`&&`, `;`, `||`, a new line) carrying a state-changing git or gh command, or a command
+     wrapped in `cd …` (rule 8: one command per call; a chain once built an increment on a
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 7da469a..570363b 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -2172,3 +2172,17 @@ The plan's Done when asks that D-004's note on the withheld names and tests/test
+ - **Process.** Round 1's builder applied its mutants to the product files by a script it then deleted (its note in BUILDER_NOTES.md; KP-056's hazard), though the brief said by hand; no mutant was left in the diff (Review A); rounds 2 to 4's briefs forbade any mutation script. The round-4 security auditor ran the real gh twice, though its prompt did not allow network use explicitly: a PUT merge request aimed at a host that does not resolve (it failed at DNS; nothing was merged) and a read-only GraphQL viewer query with the owner's login. No harm; every reviewer prompt from now on says never run gh or anything that reaches the network.
+ - **Lesson (one reading, not shapes).** Each round closed the shapes the last reviews named, and each next review found another word the guard and gh read apart (a flag's value, a repeated true/false option, an option before the subcommand, the empty word). Round 4's rule admits only what gh can read as a command and refuses the rest; a guard that must agree with another program's parser closes the family by naming what it accepts, at the round the family is first met.
+ - **Leads, recorded, not fixed.** (1) K1 refuses forms gh would run that merge nothing: `gh browse <path>` (a top-level command's positional in the subcommand's place), an extension name holding `_`, `gh --version pr view 12`, `gh -Ro/r pr ...`, `gh -- pr ...`; each inside a Workspace chain counts as a change. (2) `gh alias set` can be got round (`gh alias set mm 'pr merge' --clobber`, a `!gh pr merge` expansion, `--shell`), after which `gh mm ...` merges with no record; a command taken from configuration is outside the guard's threat model (INVENTORY, Decisions). (3) `-R`/`--repo` and `GH_REPO` aim a merge at another repository while the guard reads the local records. (4) gh started from code handed to an interpreter, or behind a launcher the guard does not list, passes by design (the threat model). (5) `premerge-records` passes its argument to `gh pr view` before a digit check (no traversal: `bridge_env.pull_refs` refuses non-digits before any record). (6) `cmd_premerge` without `<pr>` still prints a merge line naming no number, which the guard now refuses (the loop always passes `<pr>`). (7) `ready_recorded` matches a short sha by prefix; an exact name where the sha is 40 characters would be stricter.
++
++### TASK-083's gate, after its records (2026-11-17, PR #176)
++- **Review B's round 1** (gpt-5.6-sol-high, launch 03:58:20Z) approved TASK-083, confirming round 4's class line; `verify TASK-083-r1` OK, `pr-activity-check.py 176` OK, `premerge TASK-083-r1 176` OK, CI green. **`review-guard.py ready 176`, the first live use of TASK-083's own command** (the branch's copy, the installed release being older), answered READY for head 765f9b4a1a27 on the base branch's required contexts (main); merged as f3fa7b4 with `--match-head-commit`. No records pull request was needed; this entry carries the gate's end.
++
++### BUG-046: the guard's `gh api` merge refusal read as gh reads it (2026-11-17, three builder rounds)
++- **The defect.** Found by TASK-083's round-4 security audit (ruling 2 above): in `_check_word_list`'s `gh api` walk the method loop read a value-shaped word as the method (`gh api -X PUT repos/o/r/pulls/5/merge -p -XGET` passed), and the file-body refusal held only where the endpoint word was exactly `graphql` (`gh api https://api.github.com/graphql -F query=@q.graphql` passed). Reproduced in process (docs/debug/BUG-046.md). Before the brief, gh 2.97.0 was checked locally by `--help` only: it matches command names neither by case nor by prefix (`gh PR MERGE` is an unknown command), so Review A's question from TASK-083 closed with no fix. The supervisor's tests, tests/test_bug046.py, red on f3fa7b4: 32 failed, 18 passed.
++- **Round 1.** F1 a body the guard cannot read (`--input` in any form, a word beginning `@` or holding `=@`) refused whatever the endpoint; F2 the merge endpoint refused whatever the method, the word lower-cased, `%2f`/`%2e` decoded and resolved by `posixpath.normpath`, the method loop deleted; F3 `tests/test_permission_guard.py`'s allowed read of the merge endpoint moved to the refused list. The supervisor's probe found a regression: normpath over the whole word let a `..` in a query or fragment, or a trailing `merge/..`, erase the merge path (refused on f3fa7b4). Review A rejected and the security audit failed it on the same blocker, the brief's error: only `%2f` and `%2e` were decoded, so an escaped letter (`%70ulls`, `merg%65`) passed.
++- **Round 2.** G1 every `%XX` decoded until stable; G2 the endpoint looked for in the decoded word, in its path before the first `?` or `#`, and in that path resolved; G3 the merge-mutation names looked for in the decoded word too; G5 the dead `WRITE_METHODS` deleted. Supervisor's cases red on round 1's tree: 28 failed, 84 passed. Review A rejected and the audit failed it on the same blocker, the brief's error again: it decoded before cutting, where gh cuts only at a literal `?` or `#`, so an escaped `%3F` or `%23` at any nesting stayed inside the path gh sends and hid the `..` after it (`repos/o/r/pulls/5/%23/../merge`), and a decoded `%2F` split one segment in two.
++- **Round 3 (at the ceiling, its class line `safety mechanism`, confirmed by Review A against round 2's code).** The family met twice, the design changed rather than a third spelling closed: K1 a `gh api` word whose decoded, lower-cased text holds both `pulls` and `merge` is the merge endpoint (no cut, no resolution, no pattern); K2 one decoding per word for both refusals; K3 `import posixpath` deleted. The premise: a request GitHub routes to `/repos/<o>/<r>/pulls/<n>/merge` carries both names in gh's one endpoint word, whatever escapes or dot segments surround them. Supervisor's cases red on round 2's tree: 18 failed, 120 passed. Review A approved; the security audit passed it. The supervisor's own run of the Done files: `1986 passed, 20 skipped`. The line is drawn here (docs/CHANGES.md, 2026-11-17).
++- **BUG-046's mutation run (2026-11-17, on round 3's tree).** 12 single-line mutants, each listing every test it fails in tests/test_bug046.py: the body refusal off, or for GraphQL only; the endpoint refusal off; the endpoint read undecoded; decoded once; the mutation names read undecoded; the endpoint not lower-cased; `merge` alone or `pulls` alone; `=@`, `--input=` and the `--input` word each not read. counts: run=12 cached=0 killed=12 survived=0 not applied=0 error=0 expected survive=0 (run/agent/BUG-046-r3-mutation.out). The new tests against the checkpoint 3d6e4eb (f3fa7b4's guard with the supervisor's first cases; `--checkpoint 3d6e4eb`, exit 4): of 144 test ids, 96 fail on the old code and 48 pass there: 32 ordinary calls the fix keeps passing, and 16 refusals f3fa7b4 already made through its PUT-only pattern (the full URL and the seven round-1 spellings round 1 had regressed) (run/agent/BUG-046-r3-checkpoint.out).
++- **Rulings.** (1) The over-refusal K1 brings is accepted: an ordinary `gh api` word holding both names (`'repos/o/r/pulls?q=merged'`, a field `body=merge the pulls`, `repos/o/r/pulls/5/mergeable-report`) is refused; the bridge makes no such call (Review A searched `bridge/`). (2) Both reviewers of round 3 named the same route, outside the guard's threat-model row (docs/INVENTORY.md, Decisions: a value a program takes from the environment): gh fills `{owner}`, `{repo}`, `:owner`, `:repo` and `{branch}` in the endpoint and in `-F` values from `GH_REPO` or the current branch, so the two names can be split between the environment and the word (`GH_REPO=o/pulls gh api -X PUT repos/o/r/:repo/5/merge`; a branch named `pulls/5/merge` and `repos/o/r/{branch}`; a mutation name assembled in a `-F` value). Recorded, not blocking: not a regression (rounds 1 and 2 needed a literal `pulls` too), and a deliberate split no agent types by habit; the habitual `repos/{owner}/{repo}/pulls/5/merge` holds both names and is refused. Gh's placeholder behaviour is the reviewers' reading, not run (no network).
++- **The builder's assumptions, dispositioned.** Round 1: `posixpath.normpath` resolves `..` as GitHub would, and a `..` in a query is collapsed with the path (the second was the supervisor's finding, closed by round 2; both moot under round 3, which resolves nothing). Round 2: no Semgrep run (accepted: CI's security floor runs it); a non-ASCII escape decoded to the character its hex digits name (accepted: the reading refuses more). Round 3: no Semgrep run (accepted, the same).
++- **Leads, recorded, not fixed.** (1) The placeholders of ruling 2; a fix would read a leading `GH_REPO=` assignment with gh's words, or refuse a placeholder while one is assigned. (2) The decoding is quadratic on nested `%25` with no length check inside its loop; the hook's 15-second limit governs and both round-2 reviewers found it unreachable in ordinary use (a Windows command line of 32 KB decodes in 0.27 s; Linux's 128 KiB in about 4 s). (3) F1's over-refusals: `--jq '@tsv'` and `-f body=@name`. (4) PowerShell refuses `-f body='x'` (the quote not at the word's start), older than BUG-046. (5) Not taken, outside the merge refusal, GitHub's branch rules deciding a direct write to a protected branch: REST `POST repos/<o>/<r>/merges` and `PATCH repos/<o>/<r>/git/refs/heads/<b>`, the GraphQL `mergeBranch`, `updateRef`, `updateRefs` and `createCommitOnBranch`; `gh.cmd`, `gh.com` and a gh named by path as the command's head.
++- **Lesson (TASK-083's, met again).** Rounds 1 and 2 each named a spelling rule for the endpoint and each next review found a spelling gh sends that the rule read apart; the briefs' own rules were the defect both times. Round 3 named what the endpoint must contain rather than how it may be spelled. A rule that must agree with another program's reading names what it accepts at the round the family is first met, not the round after.
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index eb7bea4..8a0ed8f 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -1,7 +1,7 @@
+ ---
+ record: inventory
+ header: 1
+-reflected_through: "2026-11-17 TASK-083: the guard reads a merge command as gh reads it, over four rounds; `gh api`'s walk drawn to BUG-046 (R-083)"
++reflected_through: "2026-11-17 BUG-046: the merge endpoint named by what it holds, not by how it is spelled, at round 3 (R-082)"
+ development_data: "Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet (§15 condition 1, A1a condition 1)"
+ tables:
+   features:
+@@ -18,7 +18,7 @@ tables:
+     key: Item
+ ---
+ # Inventory — Claude-Cursor Bridge
+-Reflected through: 2026-11-17 TASK-083: the guard reads a merge command as gh reads it, over four rounds; `gh api`'s walk drawn to BUG-046 (R-083)
++Reflected through: 2026-11-17 BUG-046: the merge endpoint named by what it holds, not by how it is spelled, at round 3 (R-082)
+ Updated: 2026-11-15
+ 
+ The bridge already exists (releases 0, A1a–A5). This inventory is opened as the bridge becomes a supervised project (release B). Features accrue to the register as release B's increments merge; the rows below record the decisions and resources release B rests on.
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index f1972c6..3263bfb 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -17,7 +17,7 @@ Phase: changing
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable, External services
+ Change cycle: the program release (begun 2026-11-13, the owner's word in this chat; its intake's read-back confirmed by the owner 2026-11-13; the field finding F7 added to it by the owner 2026-11-13; its design revision and plan addendum, one subject, `program`, approved by the owner at the design gate 2026-11-13, seven decisions in the question form, the trait External services approved and the carry comparison kept a recorded lead; its scoped revision for F7, one subject with its plan revision, `program-f7`, approved by the owner at its gate 2026-11-14, five decisions in the question form; step: the loop, stage P2, TASK-083 merged (R-083's merge held on its ready record), BUG-046 next, then TASK-065, on Opus 5.5; the owner placed one more item into it 2026-11-14, the diagram design-decision Feedback entry, planned at the next plan revision (INVENTORY, Decisions)); before it release B2, begun 2026-11-04, complete 2026-11-11 (Claude-Cursor Bridge 2026.11.11a)
+ Awaiting user on: nothing
+-Next: the loop's BUG-046 (the guard's `gh api` walk read as gh reads it; HARDENING, TASK-083, ruling 2), then TASK-065, TASK-066, TASK-067 and TASK-082; R-105 planned until TASK-082; the next plan revision also places the owner's two rules of 2026-11-15, and release G's widening waits for G's planning (both INVENTORY, Decisions); the plan revision that places the owner's diagram design-decision item (2026-11-14) into a later stage, a records pull request of its own; stage P2 goes on, F7's packager's clause at TASK-082 (docs/DESIGN.md, Change: the one-increment merge unit); stage P1 (TASK-055 to TASK-058, REFAC-007) closed 2026-11-14, then P2 to P4 (docs/BUILD_PLAN.md, The program release — the plan addendum; docs/DESIGN.md, Change: the program release); each brief names its calls' time and retry limits (the trait External services); the release ends with the owner's install from a run sheet, Context7's setup a step of it. The order after it (INVENTORY, Decisions): the progress graph, W, G, F, then C, which waits for the TDP's code-map command, D, the trial of the code map, and E last (the owner, 2026-11-15). reAngle and the video factory calibrate when the owner resumes them (R-031, R-037), the TDP in its own session; release T's field items on the TDP (the first stripped suite at its TASK-172; the weekly workflow, rewritten from the frozen block, v7.0.1 since 2026.11.12a, at its next configuration touch) stand in HARDENING, Correction to project end. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++Next: the loop's TASK-065, then TASK-066, TASK-067 and TASK-082; R-105 planned until TASK-082; the next plan revision also places the owner's two rules of 2026-11-15, and release G's widening waits for G's planning (both INVENTORY, Decisions); the plan revision that places the owner's diagram design-decision item (2026-11-14) into a later stage, a records pull request of its own; stage P2 goes on, F7's packager's clause at TASK-082 (docs/DESIGN.md, Change: the one-increment merge unit); stage P1 (TASK-055 to TASK-058, REFAC-007) closed 2026-11-14, then P2 to P4 (docs/BUILD_PLAN.md, The program release — the plan addendum; docs/DESIGN.md, Change: the program release); each brief names its calls' time and retry limits (the trait External services); the release ends with the owner's install from a run sheet, Context7's setup a step of it. The order after it (INVENTORY, Decisions): the progress graph, W, G, F, then C, which waits for the TDP's code-map command, D, the trial of the code map, and E last (the owner, 2026-11-15). reAngle and the video factory calibrate when the owner resumes them (R-031, R-037), the TDP in its own session; release T's field items on the TDP (the first stripped suite at its TASK-172; the weekly workflow, rewritten from the frozen block, v7.0.1 since 2026.11.12a, at its next configuration touch) stand in HARDENING, Correction to project end. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
+ Deviations accepted: none; told to the owner (rule 58): stage H2's refactoring pass recorded its twelve candidates as next-release leads, nothing merged after the stamp (HARDENING, stage H2's close); TASK-054's viewer check made on GitHub only, Typora not opened (HARDENING, TASK-054); TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions); stage T2's demonstration ran after the install, where the plan says before (HARDENING, Stage T2's demonstration)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+diff --git a/docs/cli-reference.json b/docs/cli-reference.json
+index 437c1c9..30f6fa1 100644
+--- a/docs/cli-reference.json
++++ b/docs/cli-reference.json
+@@ -847,7 +847,7 @@
+       "name": "permission-guard.py",
+       "path": "bridge/cursor-bridge/permission-guard.py",
+       "source": "docstring",
+-      "usage": "permission-guard: a Claude Code PreToolUse hook for the Bash and PowerShell tools that\nrefuses the two actions the loop must never take, in every permission mode (KP-032):\n\n  - merging a pull request past the repository's rules: `gh pr merge \u2026 --admin`, and the\n    REST route `gh api \u2026 /pulls/<n>/merge` with a method that writes;\n  - a force-push in any form: `--force`, `--force-with-lease`, `--force-if-includes`,\n    `-f`, a combined short flag such as `-fu`, `--mirror`, a `+` refspec;\n  - any `git worktree remove` (rule 19, release A1b): Git for Windows follows a gitignored\n    junction or symbolic link inside the worktree into its target in an ordinary removal\n    as in a forced one; `worktree-teardown.py` removes a worktree and refuses while a link\n    is inside (it runs git as its own child, which this hook never sees);\n  - a merge without the pre-merge check's record (release A1b): `gh pr merge` must carry\n    `--match-head-commit <sha>`, and `review-guard.py premerge` must have written the record\n    `<git common dir>/bridge/premerge/<sha>` for that sha when it printed OK; `--disable-auto`\n    and `--help` pass; a `gh api graphql` call carrying a merge mutation is refused.\n\nA command behind a wrapper shell (`bash -c`, `cmd /c`, `powershell -Command`), quoted or not, is\nchecked as the command it is when the guard can read that wrapper's options; a single `&` and the\nPowerShell call operator `&` separate commands; nested shell forms (`$(`, backticks,\nhere-documents, subshells, globs) are refused as unreadable; a `git -c alias.<x>=...` whose\nvalue starts with `worktree`, `pr`, `push`, `api` or `!` is refused, and so is a `gh alias set`\nfor a merge; an abbreviated `--forc` counts as `--force`, as it does for git; `--help` exempts a\n`gh pr merge` only when it is not the value of a flag such as `--subject`. A here-document is unreadable. `powershell` without `-Command` runs the rest of its line,\n`-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command,\nand `-XPUT` is a method: all read as what they run. An encoded PowerShell command and a\nGraphQL query read from a file are refused unread.\n  - inside a bridge Workspace (one holding docs/PROJECT_STATUS.md), a chain of commands\n    (`&&`, `;`, `||`, a new line) carrying a state-changing git or gh command, or a command\n    wrapped in `cd \u2026` (rule 8: one command per call; a chain once built an increment on a\n    merged branch; release A4). A pipe into a reader and a chain of reads pass.\n  - a commit or push that skips its checks: `--no-verify`, commit's `-n`, or a\n    `-c core.hooksPath=\u2026` override (rule 4; release A4), except the two snapshots the merge\n    policy allows: the pre-delegation checkpoint, whose subject starts with \"checkpoint\" and\n    names the increment (`checkpoint before TASK-nnn`, with a round or a note after it,\n    `checkpoint: \u2026 before TASK-nnn \u2026`) and carries no accept, merge or release word; and a\n    builder's hand-off (\"\u2026 hand-off\") made inside a worktree (`-C \u2026/Worktrees/\u2026`).\n  - the Cursor agent started around the bridge's shim (`agent`, `agent.cmd`, `agent.ps1`,\n    `cursor-agent.cmd`, `cursor-agent.ps1`, `cursor-agent.exe`, also behind `cmd /c` or\n    `powershell`), which would run it with the owner's real home and identity (KP-038): the\n    agent is started as `cursor-agent`, or through bridge-run.py.\n\nIt reads one flat grammar (plain words, quotes, redirections, wrappers with option tables)\nand refuses every other form as unreadable; within that grammar, chains, wrappers and quoting\ndo not hide the action, and `git commit -m \"never use --force\"` is not refused. Deny rules in\nsettings.bridge.json cover the common spellings as a second layer; this hook is the one\nthat reads the whole command.\n\nRegistered by bridge-install.py from settings.bridge.json (hooks.PreToolUse, matcher\n\"Bash|PowerShell\"). Reads the hook's JSON on stdin; exit 2 with the reason on stderr blocks\nthe call (documented), exit 0 lets it through. An exception raised while checking a command\nrefuses it (exit 2) with an internal-error reason; input that is not the hook's JSON still\npasses. ASCII-only on purpose. Never writes.\n"
++      "usage": "permission-guard: a Claude Code PreToolUse hook for the Bash and PowerShell tools that\nrefuses the two actions the loop must never take, in every permission mode (KP-032):\n\n  - merging a pull request past the repository's rules: `gh pr merge \u2026 --admin`, and the\n    REST route `gh api \u2026 /pulls/<n>/merge` whatever its method;\n  - a force-push in any form: `--force`, `--force-with-lease`, `--force-if-includes`,\n    `-f`, a combined short flag such as `-fu`, `--mirror`, a `+` refspec;\n  - any `git worktree remove` (rule 19, release A1b): Git for Windows follows a gitignored\n    junction or symbolic link inside the worktree into its target in an ordinary removal\n    as in a forced one; `worktree-teardown.py` removes a worktree and refuses while a link\n    is inside (it runs git as its own child, which this hook never sees);\n  - a merge without the pre-merge check's record (release A1b): `gh pr merge` must carry\n    `--match-head-commit <sha>`, and `review-guard.py premerge` must have written the record\n    `<git common dir>/bridge/premerge/<sha>` for that sha when it printed OK; `--disable-auto`\n    and `--help` pass; a `gh api graphql` call carrying a merge mutation is refused.\n\nA command behind a wrapper shell (`bash -c`, `cmd /c`, `powershell -Command`), quoted or not, is\nchecked as the command it is when the guard can read that wrapper's options; a single `&` and the\nPowerShell call operator `&` separate commands; nested shell forms (`$(`, backticks,\nhere-documents, subshells, globs) are refused as unreadable; a `git -c alias.<x>=...` whose\nvalue starts with `worktree`, `pr`, `push`, `api` or `!` is refused, and so is a `gh alias set`\nfor a merge; an abbreviated `--forc` counts as `--force`, as it does for git; `--help` exempts a\n`gh pr merge` only when it is not the value of a flag such as `--subject`. A here-document is unreadable. `powershell` without `-Command` runs the rest of its line,\n`-com` abbreviates `-Command`, `.` runs a program as `&` does, `find -exec` runs its command:\nall read as what they run. An encoded PowerShell command and a `gh api` body read from a file\nor standard input are refused unread, whatever the endpoint.\n  - inside a bridge Workspace (one holding docs/PROJECT_STATUS.md), a chain of commands\n    (`&&`, `;`, `||`, a new line) carrying a state-changing git or gh command, or a command\n    wrapped in `cd \u2026` (rule 8: one command per call; a chain once built an increment on a\n    merged branch; release A4). A pipe into a reader and a chain of reads pass.\n  - a commit or push that skips its checks: `--no-verify`, commit's `-n`, or a\n    `-c core.hooksPath=\u2026` override (rule 4; release A4), except the two snapshots the merge\n    policy allows: the pre-delegation checkpoint, whose subject starts with \"checkpoint\" and\n    names the increment (`checkpoint before TASK-nnn`, with a round or a note after it,\n    `checkpoint: \u2026 before TASK-nnn \u2026`) and carries no accept, merge or release word; and a\n    builder's hand-off (\"\u2026 hand-off\") made inside a worktree (`-C \u2026/Worktrees/\u2026`).\n  - the Cursor agent started around the bridge's shim (`agent`, `agent.cmd`, `agent.ps1`,\n    `cursor-agent.cmd`, `cursor-agent.ps1`, `cursor-agent.exe`, also behind `cmd /c` or\n    `powershell`), which would run it with the owner's real home and identity (KP-038): the\n    agent is started as `cursor-agent`, or through bridge-run.py.\n\nIt reads one flat grammar (plain words, quotes, redirections, wrappers with option tables)\nand refuses every other form as unreadable; within that grammar, chains, wrappers and quoting\ndo not hide the action, and `git commit -m \"never use --force\"` is not refused. Deny rules in\nsettings.bridge.json cover the common spellings as a second layer; this hook is the one\nthat reads the whole command.\n\nRegistered by bridge-install.py from settings.bridge.json (hooks.PreToolUse, matcher\n\"Bash|PowerShell\"). Reads the hook's JSON on stdin; exit 2 with the reason on stderr blocks\nthe call (documented), exit 0 lets it through. An exception raised while checking a command\nrefuses it (exit 2) with an internal-error reason; input that is not the hook's JSON still\npasses. ASCII-only on purpose. Never writes.\n"
+     },
+     {
+       "description": "Validate the build plan and list ready increments.",
+diff --git a/docs/debug/BUG-046.md b/docs/debug/BUG-046.md
+new file mode 100644
+index 0000000..dc3185e
+--- /dev/null
++++ b/docs/debug/BUG-046.md
+@@ -0,0 +1,48 @@
++# BUG-046: the permission guard's `gh api` merge refusal reads a flag's value as the method, and its file-body refusal holds only for the bare word `graphql` (R-082, R-083)
++
++Found 2026-11-17 by the security audit of TASK-083's round 4 (docs/HARDENING.md, TASK-083, ruling 2), in code older than TASK-083 and untouched by it. Ruled its own increment, run next after TASK-083 merged as f3fa7b4 (PR #176), before TASK-065.
++
++## Reproduction
++
++On main at f3fa7b4, from a folder that is no bridge Workspace, `bridge/cursor-bridge/permission-guard.py`'s `check(command, cwd, tool)` returns None (passes) under Bash and PowerShell for each of:
++
++- `gh api -X PUT repos/o/r/pulls/5/merge -p -XGET`, `gh api --method PUT repos/o/r/pulls/5/merge -H --method=GET`, and the same with `-q` or `-t` holding the method-shaped word;
++- `gh api https://api.github.com/graphql -F query=@q.graphql`, `gh api https://api.github.com/graphql --input body.json`, `gh api /graphql -F query=@q.graphql`, `gh api /graphql --input -`;
++
++and refuses `gh api -X PUT repos/o/r/pulls/5/merge` and `gh api graphql -F query=@q.graphql`. The supervisor reproduced both in process before the ruling (run/supervisor/probe_083_r4_api.py, no gh run).
++
++On gh 2.97.0 (`gh api --help`, read locally, no network): `-p/--preview`, `-H/--header`, `-q/--jq`, `-t/--template`, `-X/--method`, `-f/--raw-field`, `-F/--field`, `--input`, `--cache` and `--hostname` take a value; gh's flag parser (pflag) takes the word after such an option as its value whatever it begins with, and a string option keeps its last value, so `-X PUT ... -p -XGET` sends PUT. The endpoint is either a REST path or the word `graphql`; a full URL is taken as given, and a REST-shaped POST of `{"query": ...}` to `/graphql` or its URL reaches the GraphQL endpoint. A field value beginning `@` is read from a file, `@-` from standard input; `--input` reads the whole body from a file or standard input.
++
++gh 2.97.0 matches command names neither by case nor by prefix: `gh PR MERGE --help` answers `unknown command "PR" for "gh"`, and `gh pr mer --help` prints the `pr` group's help, not `merge`'s. Review A's question on TASK-083's round 4 (does `gh PR MERGE`, which the guard passes, merge?) is answered no; nothing to fix there.
++
++The reproduction tests: `tests/test_bug046.py`, above its marker line (the known run on f3fa7b4 is quoted in the brief).
++
++## Hypotheses
++
++1. **The method is read from every word of the command.** Discriminating observation: a method-shaped word in any value position (`-p`, `-H`, `-q`, `-t`) after the real method changes the verdict, while the same word as a positional is irrelevant to gh.
++2. **The method is read from the right words, but the last method option is not the one gh honours.** Discriminating observation: `-X PUT ... -X GET` would pass (gh sends GET there, so passing is right) while `-X PUT ... -p -XGET` would be refused.
++3. **The file-body refusal is keyed to the endpoint word gh_words returns.** Discriminating observation: the same body refused with `graphql` and passed with `/graphql` or the URL.
++
++## Evidence
++
++- `permission-guard.py` (the `gh api` branch of `_check_word_list`, `if group == "api":`): `for i, a in enumerate(w): if a in ("-X", "--method") ... method = w[i + 1].upper() elif a.startswith("--method=") or (a.startswith("-X") and len(a) > 2): ...` walks every word of the command, value positions included; the last match wins. `-p -XGET` sets GET after PUT. Hypothesis 1 holds by reading and by the reproduction; hypothesis 2 is refuted (the reading does not skip values at all).
++- The same branch: `if group == "api" and sub == "graphql":` guards the refusal of `--input`, `@` and `=@` words; `sub` is the endpoint as gh_words reads it, so `/graphql` and the URL skip it. Hypothesis 3 holds.
++- Both lines stand at TASK-063's merge (b05fbc8): older than TASK-083 and no regression of it.
++
++## Confirmed cause
++
++Hypotheses 1 and 3: the merge refusal's method is read from every word, where gh reads the method only from its own option, a value-taking option's next word being that option's value; and the refusal of a body the guard cannot read is tied to one spelling of the GraphQL endpoint, where gh reaches GraphQL by several. Class: a defeated safety mechanism (the guard's refusal of a merge outside the gate, through REST or through a GraphQL mutation the guard cannot read), reachable in ordinary use by a command that names the merge in its own words, inside the guard's threat-model row (docs/INVENTORY.md, Decisions).
++
++## The fix the supervisor rules
++
++The lesson of TASK-083 (docs/HARDENING.md, TASK-083, "one reading, not shapes"): name what is accepted rather than extend the shapes. The bridge's own `gh api` calls are reads (the report cycle's alerts, check runs) and none sends a body from a file or names a merge endpoint.
++
++- **F1.** A `gh api` call holding a body the guard cannot read is refused whatever its endpoint: an `--input` option in any form, or a word beginning `@` or holding `=@` (a field read from a file or standard input). The `graphql` condition is dropped. A raw field (`-f`) whose value begins `@` is refused with it: an over-refusal, safe.
++- **F2.** A `gh api` call naming a pull request's merge endpoint is refused whatever its method, a read included: a word that, lower-cased, with `%2f` read as `/` and `%2e` as `.`, its path's runs of `/` read as one and its dot segments resolved as a URL's are, holds `/pulls/<one segment>/merge`. The method is then read for nothing and its loop may go. `tests/test_permission_guard.py`'s allowed case `gh api repos/o/r/pulls/12/merge` pins the old rule and moves to the refused list.
++- Every other `gh api` refusal (the merge mutations by name, the `&` refusal, the alias refusals) is unchanged; `gh pr merge`'s reading (TASK-083) is unchanged.
++
++Not taken, recorded as leads (outside the guard's merge refusal; GitHub's branch rules decide a direct write to a protected branch): REST `POST repos/<o>/<r>/merges` and `PATCH repos/<o>/<r>/git/refs/heads/<b>`, and the GraphQL mutations `mergeBranch`, `updateRef`, `updateRefs` and `createCommitOnBranch`; `gh.cmd`, `gh.com` and a gh named by path as the command's head.
++
++## The fix as built (three rounds)
++
++F2 as first ruled was the brief's error twice over: round 1 resolved dot segments over the whole word and decoded only `%2f` and `%2e`; round 2 decoded every escape until stable and then cut the word at its first `?` or `#`, where gh cuts only at a literal one. Each round's reviews found another spelling gh sends to the merge endpoint that the guard read apart. Round 3, at the ceiling, replaced the spelling rule with one that names what it accepts: a `gh api` word whose decoded (every `%XX` until stable), lower-cased text holds both `pulls` and `merge` is the merge endpoint, refused whatever its method; one decoding per word feeds this rule and the merge-mutation rule. An ordinary word holding both names is refused with it, an over-refusal, safe (docs/HARDENING.md, BUG-046).
+diff --git a/handoff/BUG-046-r2-report.md b/handoff/BUG-046-r2-report.md
+new file mode 100644
+index 0000000..7695d55
+--- /dev/null
++++ b/handoff/BUG-046-r2-report.md
+@@ -0,0 +1,169 @@
++# BUG-046 round 2 report
++
++## Files changed
++- `bridge/cursor-bridge/permission-guard.py`
++- `bridge/cursor-bridge/MANIFEST.json` (rewritten by `python tools/make-manifest.py`, not by hand)
++- `tests/test_bug046.py` (below the builder's marker only)
++- `handoff/BUG-046-r2-report.md` (this file, written after the Done commands, so neither `git status` below lists it)
++
++`docs/BUILDER_NOTES.md` was not changed. `bridge/cursor-bridge/VERSION` was restored with `git restore` after `make-manifest.py` and is not in the final status. Its bytes are `2026.11.12a` followed by CRLF.
++
++## Summary
++`_percent_decoded` decodes every `%` and two hexadecimal digits, repeating until a pass changes nothing, and `_check_word_list` uses that text for both `gh api` refusals that this round may change: a merge mutation is sought in each word as written and in the decoded word, case kept, and a pull request's merge endpoint is sought in the lower-cased decoded word, in the path cut at the first `?` or `#`, and in `posixpath.normpath` of that path only. `WRITE_METHODS` is deleted. The body refusal, the alias refusal, `gh_words`, `merge_reason`, the module docstring, and the import list are unchanged.
++
++## Causes
++The merge-endpoint check no longer runs `posixpath.normpath` over a query or a fragment, so a `..` after `?` or `#`, or a trailing `merge/..`, cannot erase the merge path, while the whole decoded word is still searched so a word that holds `/pulls/<segment>/merge` before that cut stays refused.
++Every `%` and two hex digits is decoded, and the decoding is repeated, so an escaped letter of the path is that letter, including a doubly escaped `%2570`.
++The merge-mutation refusal searches the decoded word as well as the word as written, so a mutation name with an escaped letter in a query string is the GraphQL name.
++
++## G1
++`_percent_decoded` (lines 2200-2207) replaces each `%` and two hex digits via `re.sub` over `%([0-9A-Fa-f]{2})` and repeats until a pass changes nothing; a pass that changes the word shortens it, and a non-ASCII result is those characters. Pinned by `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused` (the escaped-letter ids), by `doubly-escaped-letter` in `test_bug046_a_merge_endpoint_with_a_query_fragment_or_percent_2e_is_refused` (`%2570` is `p` only on the second pass), and by `test_bug046_r1_an_escaped_merge_mutation_name_is_refused`.
++
++## G2
++In `_check_word_list` at lines 2345-2352 the decoded word is lower-cased, cut at the first `?` or `#`, and refused with the round-1 merge-endpoint reason when `/pulls/[^/]+/merge` holds in the whole decoded word, in that path, or in `posixpath.normpath` of that path. Pinned by `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused`, `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling`, `test_bug046_a_merge_endpoint_with_a_query_fragment_or_percent_2e_is_refused`, `test_bug046_mergeable_report_is_refused`, `test_bug046_an_issues_merge_endpoint_passes`, and `test_bug046_r1_ordinary_calls_with_escapes_or_queries_pass`.
++
++## G3
++In `_check_word_list` at line 2337 each name in `MERGE_MUTATIONS` is sought in the word as written and in `_percent_decoded` of that word, case kept, and the reason text is the round-1 sentence. Pinned by `test_bug046_r1_an_escaped_merge_mutation_name_is_refused`.
++
++## G4
++Below the marker, `test_bug046_glued_and_clustered_unreadable_bodies_are_refused_on_rest_and_graphql` asserts `body read from a file or standard input`, and the PowerShell value of `rest-glued-field` and `graphql-glued-field` is `-Fquery=@-` while the Bash value stays `-Fquery=@q.graphql`. `test_bug046_a_merge_endpoint_with_a_query_fragment_or_percent_2e_is_refused` and `test_bug046_mergeable_report_is_refused` assert `merge endpoint`. The id `percent-2e-parent` is `percent-2e-dot-before-pulls`. Nothing above the marker was edited.
++
++## G5
++`WRITE_METHODS` (round 1's line 63) is deleted. After the edit, `rg -n "WRITE_METHODS" bridge tests` printed no lines, so no file under `bridge/` or `tests/` names it.
++
++## Mutations
++None. No source line was mutated in process.
++
++## Commands
++Counts below belong to commit `2d26100b5d148b4bc90639aa670e2bffb774c425` with uncommitted changes. Steps 1-5 were one shell, joined by `&&`, with echo markers that are not part of those programs. The probe and the line-ending check ran before that, on the same program text, before `MANIFEST.json` was regenerated.
++
++Line endings, before the Done list: `python -c "p=open('bridge/cursor-bridge/permission-guard.py','rb').read(); print('CRLF' if b'\r\n' in p else 'LF', 'mixed' if b'\n' in p.replace(b'\r\n', b'') else 'pure'); t=open('tests/test_bug046.py','rb').read(); print('test', 'CRLF' if b'\r\n' in t else 'LF')"`
++
++```
++CRLF pure
++test LF
++```
++
++Diff stat, before the Done list: `git diff --stat`
++
++```
++ bridge/cursor-bridge/permission-guard.py | 20 ++++++++++++++++----
++ tests/test_bug046.py                     | 31 +++++++++++++++++--------------
++ 2 files changed, 33 insertions(+), 18 deletions(-)
++```
++
++Probe, before the Done list: `python -m pytest -q -rs tests/test_bug046.py`
++
++```
++........................................................................ [ 63%]
++..........................................                               [100%]
++114 passed in 10.83s
++```
++
++Done step 1: `git status --short`
++
++```
++ M bridge/cursor-bridge/permission-guard.py
++ M tests/test_bug046.py
++```
++
++Done step 2: `python tools/make-manifest.py`
++
++```
++make-manifest: version 2026.11.12a, 146 files hashed, VERSION + MANIFEST.json written
++```
++
++Done step 3: `git restore bridge/cursor-bridge/VERSION` printed no lines.
++
++Done step 4: `python tools/dump-cli.py --check` printed no lines. The shell then ran `echo "exit:$?"`, which printed `exit:0`.
++
++Done step 5: `git status --short`
++
++```
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/permission-guard.py
++ M tests/test_bug046.py
++```
++
++VERSION bytes, in that same shell after step 5: `python -c "import pathlib; print(repr(pathlib.Path('bridge/cursor-bridge/VERSION').read_bytes()))"`
++
++```
++b'2026.11.12a\r\n'
++```
++
++Done step 6: `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++```
++bridge-check: version 2026.11.12a (2026-11-17 07:37) at <Workspace>\bridge
++bridge-check: 146 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.12a
++```
++
++Done step 7: `python -m pytest -q -rs tests/test_bug046.py`
++
++```
++........................................................................ [ 63%]
++..........................................                               [100%]
++114 passed in 10.73s
++```
++
++Done step 8: `python -m pytest -q tests/test_permission_guard.py tests/test_permission_guard_a4.py tests/test_program_permission_guard.py tests/test_bug045.py`
++
++```
++........................................................................ [  5%]
++........................................................................ [ 11%]
++........................................................................ [ 16%]
++........................................................................ [ 22%]
++........................................................................ [ 27%]
++........................................................................ [ 33%]
++........................................................................ [ 39%]
++........................................................................ [ 44%]
++........................................................................ [ 50%]
++........................................................................ [ 55%]
++........................................................................ [ 61%]
++........................................................................ [ 67%]
++........................................................................ [ 72%]
++........................................................................ [ 78%]
++........................................................................ [ 83%]
++........................................................................ [ 89%]
++........................................................................ [ 94%]
++.................................................................        [100%]
++1289 passed in 132.29s (0:02:12)
++```
++
++Done step 9: `python -m pytest -q tests/test_program_ready.py tests/test_allowlist.py tests/test_task032_supervisor_guard.py tests/test_tests_windowless.py`
++
++```
++........................................................................ [ 12%]
++........................................................................ [ 25%]
++.....................s...ss.....sss....................s...............s [ 37%]
++...............................................s...........s............ [ 50%]
++.....s...ss.....sss....................s...............s................ [ 62%]
++...............................s...........s............................ [ 75%]
++........................................................................ [ 87%]
++.....................................................................    [100%]
++553 passed, 20 skipped in 177.09s (0:02:57)
++```
++
++Done step 10: `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++
++```
++windowless-check: 39 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++Done step 11: `git rev-parse HEAD` then `git status --short` (one shell, after an echo marker)
++
++```
++2d26100b5d148b4bc90639aa670e2bffb774c425
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/permission-guard.py
++ M tests/test_bug046.py
++```
++
++After step 11: `rg -n "WRITE_METHODS" bridge tests` printed no lines.
++
++`semgrep` was not run.
++
++## Assumed, not verified
++- No new Semgrep high finding · the Done list does not name Semgrep, and it was not run · the project's Semgrep invocation on this diff.
++- A decoded word that is not ASCII is kept as the characters the two hex digits name, then lower-cased for the endpoint check · "read as it is" was taken as those characters, so an ASCII escape beside a non-ASCII escape is still decoded · a `gh api` word whose only merge spelling is an ASCII percent-escape next to a non-ASCII percent-escape: this reading refuses it, and the other reading (keep the original word) would let it pass.
+diff --git a/handoff/BUG-046-r2.md b/handoff/BUG-046-r2.md
+new file mode 100644
+index 0000000..007e941
+--- /dev/null
++++ b/handoff/BUG-046-r2.md
+@@ -0,0 +1,152 @@
++---
++record: brief
++header: 1
++id: BUG-046
++round: 2
++satisfies: [R-082, R-082]
++scope: ["bridge/cursor-bridge/permission-guard.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_bug046.py", "docs/BUILDER_NOTES.md", "handoff/BUG-046-r2-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# BUG-046 round 2: the merge endpoint read after every escape is decoded and only from the path (R-082)
++
++Round cause: security
++
++## Objective
++Fix the following confirmed defects in the permission guard's `gh api` refusals, and nothing else.
++
++This is round 2 of BUG-046. Round 1 made the two ruled refusals (a body the guard cannot read, whatever the endpoint; the merge endpoint, whatever the method), and all of that stays except what G1 to G5 below change. The supervisor, Review A and the security audit of round 1 found two defects in the merge-endpoint rule round 1's brief gave, both the brief's own error, not the builder's. The supervisor commits round 1's tree together with this brief and the new tests before your run, so the line numbers below hold when you start.
++
++**The confirmed defects** (each reproduced in process on round 1's tree, each now a red test):
++1. `bridge/cursor-bridge/permission-guard.py:2338` resolves dot segments with `posixpath.normpath` over the **whole** word, query and fragment included, so a `..` after a `?` or `#`, or a trailing `merge/..`, removes the merge path gh requests: `gh api -X PUT 'repos/o/r/pulls/5/merge?a=/../../x'`, `...merge#/../../x`, `...merge/..`, `...merge/%2e%2e`, `...merge/.%2e` pass under both tools. Commit f3fa7b4's guard refused each: a regression this round must undo.
++2. The same line decodes only `%2f` and `%2e`. gh sends a path's percent-escapes as written (Go's `net/url` keeps a valid raw path), and an escaped letter is the same path as the letter (RFC 3986, 6.2.2.2): `gh api -X PUT repos/o/r/%70ulls/5/merge`, `.../pulls/5/merg%65`, `.../me%72ge`, and every letter escaped pass under both tools.
++3. An advisory of the security audit, the same family, taken here: the merge-mutation refusal at 2328 looks for the mutation's name in the raw words, so a name with an escaped letter in a URL query string (`gh api -X POST 'graphql?query=mutation%7Bmerge%50ullRequest(...)...'`) passes.
++
++**Two test findings of Review A** on round 1's own cases below the marker: the PowerShell rows of `rest-glued-field` and `graphql-glued-field` are refused by another rule (a switch split at a dot), so asserting only `refused` proves nothing about F1 there; and the id `percent-2e-parent` names a single-dot segment, not a parent.
++
++**The reproduction tests:** `tests/test_bug046.py`, the section headed `# ---------------------------------------------------------------- round 1's findings (the supervisor, Review A and the security audit, 2026-11-17)`, above the builder's marker. On round 1's tree the result is quoted under Constraints, "Known failures"; every case in the file must pass.
++
++Satisfies: R-082 - The permission guard reads a command as the shell does (C5 as rescoped): [...] every wrapper, `eval`, here-document, alias, GraphQL-mutation and launcher-bypass refusal stands, each held by a test, and the deny rules of `settings.bridge.json` are unchanged. (Full text: R-082's row in `docs/REQUIREMENTS.md`. This brief serves its reading of a `gh api` command as gh sends it: the merge endpoint and a merge mutation found in every spelling gh would send.)
++
++## Scope
++Files you may create or modify:
++- bridge/cursor-bridge/permission-guard.py
++- bridge/cursor-bridge/MANIFEST.json
++- tests/test_bug046.py
++- docs/BUILDER_NOTES.md
++- handoff/BUG-046-r2-report.md
++
++Limits on these files:
++- `bridge/cursor-bridge/permission-guard.py`: only the gh branch's merge-mutation refusal (2328-2329) and merge-endpoint refusal (2336-2340), as G1 to G3 say, one new helper beside `_check_word_list` if they need one, and the deletion of `WRITE_METHODS` (line 63, G5). The body refusal (2330-2331), the alias refusal, `gh_words`, `merge_reason`, the module docstring and every other function stay byte-identical to round 1's tree. Add no import: `import posixpath` stays, and nothing else is added.
++- `bridge/cursor-bridge/MANIFEST.json` changes only by being regenerated with `python tools/make-manifest.py` (Done, step 2). `bridge/cursor-bridge/VERSION` is outside Scope and reads `2026.11.12a`; restore it with `git restore bridge/cursor-bridge/VERSION` right after (Done, step 3).
++- `tests/test_bug046.py`: everything above the builder's marker is the supervisor's; edit nothing there. Below the marker, your round-1 cases change only as G4 says, and you may add cases.
++
++Do not modify anything else.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration
++- docs/ and handoff/, except the files the Scope section names. Every record under docs/ is the supervisor's.
++- `tests/test_permission_guard.py` and every other test file: you run them and edit none.
++- `docs/cli-reference.json` and `docs/CLI_REFERENCE.md`: the docstring does not change, so neither does; `python tools/dump-cli.py --check` must exit 0.
++- The leads not taken: a `{branch}` placeholder gh fills at run time (outside the threat model: a value filled at run time); REST `POST .../merges`, `PATCH .../git/refs/...` and the GraphQL `mergeBranch`, `updateRef`, `updateRefs`, `createCommitOnBranch` (GitHub's branch rules decide); the over-refusals of `--jq '@tsv'` and `-f body=@name` (F1, accepted).
++- Any mutation script. The mutation run is the supervisor's, after your run.
++
++## Context
++**The program as it stands** (round 1's tree, committed with this brief; `bridge/cursor-bridge/permission-guard.py`):
++- `WRITE_METHODS = ("PUT", "POST", "PATCH", "DELETE")` at line 63: read nowhere since round 1 deleted the method loop.
++- `MERGE_MUTATIONS = ("mergePullRequest", "enablePullRequestAutoMerge", "enqueuePullRequest")` at line 68.
++- The gh branch's `gh api` refusals, lines 2328-2340, quoted:
++
++```python
++        if group == "api" and any(m in tok for tok in w for m in MERGE_MUTATIONS):
++            return "gh api with a merge mutation (merging outside the gate)"
++        if group == "api" and any(t == "--input" or t.startswith("--input=") or t.startswith("@") or "=@" in t for t in w):
++            return "gh api with a body read from a file or standard input, which the guard cannot read (write the query or fields on the command line)"
++        if group == "alias" and sub in ("set", "import"):
++            expansion = (args[-1] if args else "").strip("'\"").lstrip("!").strip()
++            if sub == "import" or re.match(r"^(pr\s+merge|api)\b", expansion) or "worktree" in expansion:
++                return "a gh alias for a merge or an api call (%s)" % " ".join(args)[:60]
++        if group == "api":
++            for a in w:
++                path = posixpath.normpath(a.lower().replace("%2f", "/").replace("%2e", "."))
++                if re.search(r"/pulls/[^/]+/merge", path):
++                    return "gh api on a pull request's merge endpoint (merging outside the gate)"
++```
++
++- `w` is the command's word list; `_too_long()` and `_cannot(...)` are the guard's deadline and its cannot-read refusal (used throughout `_check_word_list`).
++
++**Development data, security context, the tests' conventions and the host** are as in round 1's brief, `handoff/BUG-046.md`, sections "Context" and "Diagrams": run the guard only from tests on folders under `tmp_path`, or loaded in process; never install it; ASVS level 2; the guard's threat-model row in `docs/INVENTORY.md`; the diagram D-002 element `permission_guard` with no edge. Never run `gh`: nothing in this fix needs GitHub or the network.
++
++## Requirements
++Use the labels G1 to G5 in your report.
++
++1. **G1. Every escape decoded.** For both `gh api` refusals G2 and G3 read, each word is first decoded: every `%` followed by two hexadecimal digits (either case) is replaced by the character those digits name, and the decoding is repeated on its result until a pass changes nothing (a doubly escaped `%2570` reads as `p`: an over-refusal at worst, never a miss). Decode with `re.sub` over `%([0-9A-Fa-f]{2})` (no new import). A word that is not ASCII after decoding is read as it is.
++2. **G2. The merge endpoint read from the path, as written and resolved.** Lower-case the decoded word. Cut it at its first `?` or `#` (the part before is the path; the whole word if it holds neither). Refuse the command, with round 1's text (`gh api on a pull request's merge endpoint (merging outside the gate)`), where any of these three holds `/pulls/<segment>/merge` (`<segment>` one or more characters other than `/`): the decoded lower-cased word whole; its path; its path through `posixpath.normpath`. Reading the whole word as well keeps every word f3fa7b4 refused refused.
++3. **G3. The merge mutations read in the decoded words.** The merge-mutation refusal looks for each name of `MERGE_MUTATIONS` in each word as written **and** in its decoded form (G1, case kept: GraphQL names are case-sensitive), with its text unchanged.
++4. **G4. Your round-1 cases.** Every refusal case you added below the marker asserts its reason as well as `refused`: `body read from a file or standard input` for F1's cases, `merge endpoint` for the merge-endpoint cases. Where a PowerShell row is refused by another rule first (the glued `-Fquery=@q.graphql` rows), change that row's value so F1 is the rule that refuses it (`-Fquery=@-` holds no dot), keeping the Bash row as it is. Rename the id `percent-2e-parent` to `percent-2e-dot-before-pulls` (the supervisor's section holds the `%2E%2E` parent case).
++5. **G5. The dead constant.** Delete `WRITE_METHODS` (line 63); it is read nowhere. Confirm in the report that no file under `bridge/` or `tests/` names it.
++
++## Acceptance criteria
++- [ ] Every case in `tests/test_bug046.py` passes, the round-1 section's red cases turned green and its ordinary cases still green.
++- [ ] `python -m pytest -q tests/test_permission_guard.py tests/test_permission_guard_a4.py tests/test_program_permission_guard.py tests/test_bug045.py` passes whole.
++- [ ] `python -m pytest -q tests/test_program_ready.py tests/test_allowlist.py tests/test_task032_supervisor_guard.py tests/test_tests_windowless.py` passes whole.
++- [ ] The named causes are addressed at their mechanism: the endpoint test no longer resolves dot segments across a query or fragment and reads every escape, and the mutation names are read in decoded words.
++- [ ] The body refusal, the alias refusal, `gh_words`, `merge_reason` and the module docstring are byte-identical to round 1's tree; no import added.
++- [ ] No test above the marker edited; no `DEBUG-BUG-` line or stray print left.
++- [ ] `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` prints `RESULT: SOURCES MATCH`; `python tools/dump-cli.py --check` exits 0; `git status --short` does not list `bridge/cursor-bridge/VERSION`, and it reads `2026.11.12a`.
++- [ ] `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks` passes.
++- [ ] No new Semgrep high findings; no exception escapes the guard as a traceback and none is swallowed into a silent pass (ASVS L2). The decoding loop ends on every input (each pass that changes the word shortens it).
++
++## Constraints
++- Fix the cause; never suppress its tests' symptom. No retry, no broad `try/except`, no widened tolerance, no special case for the reproduction commands.
++- Do not edit anything above the marker in `tests/test_bug046.py`.
++- Do not leave any `DEBUG-BUG-` line or stray print.
++- **If you believe the real cause is different from the one named, stop, do not change code, and report why in your summary**; the supervisor will re-diagnose.
++- The guard is a PreToolUse hook that must answer within its deadline: the fix adds no work that grows with anything but the words already read, and no call to a program, the network or the filesystem.
++- Do not add dependencies, and add no import.
++- Never run `gh`, and run nothing that reaches the network.
++- Do not read or write any file outside this workspace, apart from pytest's own `tmp_path` folders.
++- No secret is needed or used.
++- If the brief, the rules, or the tooling got in your way, append one dated line to `docs/BUILDER_NOTES.md`; do the same for anything you learned about a defect or a pitfall.
++- In any Markdown you write, never break a line inside a paragraph or a list item.
++- This increment talks to no external service.
++- **Windowless launches.** As in round 1's brief: no `creationflags` needed in tests; any that is written carries `CREATE_NO_WINDOW` on its line; every subprocess call in a test has a timeout.
++- **Run every command synchronously, in the foreground, and wait for it to end.** Start nothing in the background.
++- **Do NOT run the full `tests/` tree.** Run only the test files the Done section names, exactly as written there.
++- Do not refactor code outside the two refusals and the deleted constant.
++- No value in this increment is the owner's (rule 52).
++- ASCII program text and ASCII output.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`. The single exception is `git restore bridge/cursor-bridge/VERSION`, at Done step 3.
++- The mutation check is the supervisor's: write no mutation script, apply no mutation by any script, and leave none in the diff. You may mutate by hand in process to test a case of yours; if you do, list each mutation and what caught it.
++- **Known failures.** On round 1's tree, `python -m pytest -q -rA tests/test_bug046.py` gives "28 failed, 84 passed in 11.72s". The failing cases are all in the round-1 section: `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[query-dot-segments-Bash]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[query-dot-segments-PowerShell]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[fragment-dot-segments-Bash]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[fragment-dot-segments-PowerShell]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[trailing-dot-dot-Bash]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[trailing-dot-dot-PowerShell]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[trailing-encoded-dot-dot-Bash]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[trailing-encoded-dot-dot-PowerShell]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[trailing-mixed-dot-dot-Bash]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[trailing-mixed-dot-dot-PowerShell]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[query-encoded-slashes-dot-segments-Bash]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[query-encoded-slashes-dot-segments-PowerShell]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[path-dot-dot-before-a-query-dot-dot-Bash]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[path-dot-dot-before-a-query-dot-dot-PowerShell]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[escaped-first-letter-Bash]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[escaped-first-letter-PowerShell]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[escaped-last-letter-Bash]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[escaped-last-letter-PowerShell]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[escaped-middle-letter-Bash]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[escaped-middle-letter-PowerShell]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[every-letter-escaped-Bash]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[every-letter-escaped-PowerShell]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[escaped-upper-hex-Bash]`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused[escaped-upper-hex-PowerShell]`, `test_bug046_r1_an_escaped_merge_mutation_name_is_refused[query-string-escaped-name-Bash]`, `test_bug046_r1_an_escaped_merge_mutation_name_is_refused[query-string-escaped-name-PowerShell]`, `test_bug046_r1_an_escaped_merge_mutation_name_is_refused[url-query-string-escaped-name-Bash]`, `test_bug046_r1_an_escaped_merge_mutation_name_is_refused[url-query-string-escaped-name-PowerShell]`. No other failure is known in the files the Done section runs; if one appears that this change did not cause, report it by its test id with its failure lines and fix none.
++- Prefer reuse over new code; write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force).
++- Rules in force for you: `.cursor/rules/secure-coding.mdc`, `.cursor/rules/workspace-boundary.mdc` and the frozen `minimal-code.mdc`.
++
++## Done
++Your report is the file `handoff/BUG-046-r2-report.md`. Write it as you go. It names no computer path and no user name: write `<Workspace>` for the repository folder and `<tmp>` for a temporary folder, including in quoted command output.
++
++When you finish, it holds:
++- a list of every file you changed;
++- a one-paragraph summary of what you did;
++- one sentence stating how the change addresses each named cause;
++- for each of G1 to G5, one sentence on what changed, naming the function and its lines as the file stands after your change, and the tests that pin it;
++- every command of the list below with its output;
++- a section headed exactly `Assumed, not verified`, as the report's last section (one item per line: what you assumed · why · what would confirm it; or `Assumed, not verified: none`).
++
++Run these from the Workspace root, in this order, after your last edit, each synchronously in the foreground, with no `PYTHONPATH` or other environment change:
++1. `git status --short`
++2. `python tools/make-manifest.py`
++3. `git restore bridge/cursor-bridge/VERSION`
++4. `python tools/dump-cli.py --check` (expect exit 0)
++5. `git status --short` (`bridge/cursor-bridge/VERSION` must not be listed)
++6. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` (expect `RESULT: SOURCES MATCH`)
++7. `python -m pytest -q -rs tests/test_bug046.py`
++8. `python -m pytest -q tests/test_permission_guard.py tests/test_permission_guard_a4.py tests/test_program_permission_guard.py tests/test_bug045.py`
++9. `python -m pytest -q tests/test_program_ready.py tests/test_allowlist.py tests/test_task032_supervisor_guard.py tests/test_tests_windowless.py`
++10. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++11. `git rev-parse HEAD` and `git status --short`
++
++Quoting rules: every command you ran is quoted with the lines it printed, verbatim, in a fenced block; each pytest summary line verbatim; a claim that a check passed quotes its output line; a command you did not run is written `not run`; the results name the commit their counts belong to and whether the tree then held uncommitted changes.
++
++Your last message is the summary and the report file's path, and nothing follows it.
+diff --git a/handoff/BUG-046-r3-report.md b/handoff/BUG-046-r3-report.md
+new file mode 100644
+index 0000000..552bfe4
+--- /dev/null
++++ b/handoff/BUG-046-r3-report.md
+@@ -0,0 +1,203 @@
++# BUG-046 round 3 report
++
++## Files changed
++- `bridge/cursor-bridge/permission-guard.py`
++- `bridge/cursor-bridge/MANIFEST.json` (rewritten by `python tools/make-manifest.py`, not by hand)
++- `tests/test_bug046.py` (below the builder's marker only)
++- `handoff/BUG-046-r3-report.md` (this file, written after the Done commands, so neither `git status` below lists it)
++
++`docs/BUILDER_NOTES.md` was not changed. `bridge/cursor-bridge/VERSION` was restored with `git restore` after `make-manifest.py` and is not in the final status. Its bytes are `2026.11.12a` followed by CRLF.
++
++## Summary
++`_check_word_list` now percent-decodes each word of a `gh api` command once, and that one decoding serves both refusals: a merge mutation is still sought, case kept, in the raw word or the decoding, and a pull request's merge endpoint is refused when the lower-cased decoding of any one word holds both `pulls` and `merge`, in either order, with no cut, no `posixpath.normpath`, and no path pattern. `import posixpath` is deleted. Below the marker, three cases cover a word that holds the two names only after decoding, the accepted reverse-order field, and a comments path that passes. No source line was mutated in process.
++
++## Cause
++The merge-endpoint refusal no longer parses the path, so an escaped `%3F`, `%23`, or `%2F` cannot split the word away from `pulls` and `merge`: both names are sought in the decoded, lower-cased text of that one word.
++
++## K1
++In `_check_word_list` at lines 2345-2349 a `gh api` command is refused with `gh api on a pull request's merge endpoint (merging outside the gate)` when any word of `decoded_w`, lower-cased, contains both `pulls` and `merge`, pinned by `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint`, `test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused`, `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling`, `test_bug046_a_merge_endpoint_with_a_query_fragment_or_percent_2e_is_refused`, `test_bug046_mergeable_report_is_refused`, `test_bug046_an_issues_merge_endpoint_passes`, `test_bug046_r1_ordinary_calls_with_escapes_or_queries_pass`, `test_bug046_r2_pulls_and_merge_in_separate_words_pass`, `test_bug046_r3_pulls_and_merge_only_after_decoding_are_refused`, `test_bug046_r3_merge_then_pulls_in_one_field_is_refused`, and `test_bug046_r3_pull_request_comments_pass`.
++
++## K2
++In `_check_word_list` at lines 2336-2338 each word of `w` is passed through `_percent_decoded` once when `group == "api"`, and that list is what line 2337 searches for `MERGE_MUTATIONS` (case kept, in the raw word or the decoding) and what lines 2346-2348 lower-case for K1, with the mutation refusal still first, pinned by `test_bug046_r1_an_escaped_merge_mutation_name_is_refused` and by the endpoint tests named under K1.
++
++## K3
++`import posixpath` is deleted, and the import block is lines 55-60; after the edit a count of the name `posixpath` in `permission-guard.py` is 0, so the guard names it nowhere else.
++
++## K4
++Below the marker, `test_bug046_r3_pulls_and_merge_only_after_decoding_are_refused` (lines 277-281) refuses `repos/o/r/pul%6cs/5/m%65rge`, `test_bug046_r3_merge_then_pulls_in_one_field_is_refused` (lines 284-288) refuses `-f 'body=merge the pulls'` and its comment calls that an accepted over-refusal, and `test_bug046_r3_pull_request_comments_pass` (lines 291-295) lets `repos/o/r/pulls/5/comments` through, each under both tools with `ids=["Bash", "PowerShell"]`; every earlier case and its assertion is unchanged.
++
++## Commands
++Counts below belong to commit `2c653de54940e8fc041823231096e01dcb777229` with uncommitted changes. The Done steps were one shell, in order, with echo markers that are not part of those programs. The probes ran before that, on the same program text, before `MANIFEST.json` was regenerated.
++
++Probe, before the Done list: `git diff --stat` joined with a line-ending print and `python -m pytest -q -rs tests/test_bug046.py`. The line-ending print labels any file that still contains `\n` after removing `\r\n` as mixed, so an LF-only file is labelled mixed by that print.
++
++```
++warning: in the working copy of 'tests/test_bug046.py', LF will be replaced by CRLF the next time Git touches it
++ bridge/cursor-bridge/permission-guard.py | 13 +++++--------
++ tests/test_bug046.py                     | 22 ++++++++++++++++++++++
++ 2 files changed, 27 insertions(+), 8 deletions(-)
++guard CRLF pure
++test LF mixed
++........................................................................ [ 50%]
++........................................................................ [100%]
++144 passed in 13.90s
++```
++
++Probe, before the Done list: a count of `\r` in `tests/test_bug046.py`
++
++```
++cr count 0
++```
++
++Probe, before the Done list: `git diff -- bridge/cursor-bridge/permission-guard.py`
++
++```
++diff --git a/bridge/cursor-bridge/permission-guard.py b/bridge/cursor-bridge/permission-guard.py
++index 46488b6..633f142 100644
++--- a/bridge/cursor-bridge/permission-guard.py
+++++ b/bridge/cursor-bridge/permission-guard.py
++@@ -54,7 +54,6 @@ passes. ASCII-only on purpose. Never writes.
++ """
++ import json
++ import os
++-import posixpath
++ import re
++ import subprocess
++ import sys
++@@ -2334,7 +2333,8 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
++             r = merge_reason(args, cwd)
++             if r:
++                 return r
++-        if group == "api" and any(m in tok or m in _percent_decoded(tok) for tok in w for m in MERGE_MUTATIONS):
+++        decoded_w = [_percent_decoded(tok) for tok in w] if group == "api" else []
+++        if group == "api" and any(m in tok or m in dec for tok, dec in zip(w, decoded_w) for m in MERGE_MUTATIONS):
++             return "gh api with a merge mutation (merging outside the gate)"
++         if group == "api" and any(t == "--input" or t.startswith("--input=") or t.startswith("@") or "=@" in t for t in w):
++             return "gh api with a body read from a file or standard input, which the guard cannot read (write the query or fields on the command line)"
++@@ -2343,12 +2343,9 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
++             if sub == "import" or re.match(r"^(pr\s+merge|api)\b", expansion) or "worktree" in expansion:
++                 return "a gh alias for a merge or an api call (%s)" % " ".join(args)[:60]
++         if group == "api":
++-            for a in w:
++-                decoded = _percent_decoded(a).lower()
++-                q, h = decoded.find("?"), decoded.find("#")
++-                cuts = [i for i in (q, h) if i >= 0]
++-                path = decoded if not cuts else decoded[:min(cuts)]
++-                if any(re.search(r"/pulls/[^/]+/merge", part) for part in (decoded, path, posixpath.normpath(path))):
+++            for dec in decoded_w:
+++                low = dec.lower()
+++                if "pulls" in low and "merge" in low:
++                     return "gh api on a pull request's merge endpoint (merging outside the gate)"
++     return None
++```
++
++Done step 1: `git status --short`
++
++```
++ M bridge/cursor-bridge/permission-guard.py
++ M tests/test_bug046.py
++```
++
++Done step 2: `python tools/make-manifest.py`
++
++```
++make-manifest: version 2026.11.12a, 146 files hashed, VERSION + MANIFEST.json written
++```
++
++Done step 3: `git restore bridge/cursor-bridge/VERSION` printed no lines.
++
++Done step 4: `python tools/dump-cli.py --check` printed no lines and exited 0.
++
++Done step 5: `git status --short`
++
++```
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/permission-guard.py
++ M tests/test_bug046.py
++```
++
++Done step 6: `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++```
++bridge-check: version 2026.11.12a (2026-11-17 10:59) at <Workspace>\bridge
++bridge-check: 146 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.12a
++```
++
++Done step 7: `python -m pytest -q -rs tests/test_bug046.py`
++
++```
++........................................................................ [ 50%]
++........................................................................ [100%]
++144 passed in 14.70s
++```
++
++Done step 8: `python -m pytest -q tests/test_permission_guard.py tests/test_permission_guard_a4.py tests/test_program_permission_guard.py tests/test_bug045.py`
++
++```
++........................................................................ [  5%]
++........................................................................ [ 11%]
++........................................................................ [ 16%]
++........................................................................ [ 22%]
++........................................................................ [ 27%]
++........................................................................ [ 33%]
++........................................................................ [ 39%]
++........................................................................ [ 44%]
++........................................................................ [ 50%]
++........................................................................ [ 55%]
++........................................................................ [ 61%]
++........................................................................ [ 67%]
++........................................................................ [ 72%]
++........................................................................ [ 78%]
++........................................................................ [ 83%]
++........................................................................ [ 89%]
++........................................................................ [ 94%]
++.................................................................        [100%]
++1289 passed in 135.90s (0:02:15)
++```
++
++Done step 9: `python -m pytest -q tests/test_program_ready.py tests/test_allowlist.py tests/test_task032_supervisor_guard.py tests/test_tests_windowless.py`
++
++```
++........................................................................ [ 12%]
++........................................................................ [ 25%]
++.....................s...ss.....sss....................s...............s [ 37%]
++...............................................s...........s............ [ 50%]
++.....s...ss.....sss....................s...............s................ [ 62%]
++...............................s...........s............................ [ 75%]
++........................................................................ [ 87%]
++.....................................................................    [100%]
++553 passed, 20 skipped in 185.60s (0:03:05)
++```
++
++Done step 10: `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++
++```
++windowless-check: 39 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++Done step 11: `git rev-parse HEAD` then `git status --short`
++
++```
++2c653de54940e8fc041823231096e01dcb777229
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/permission-guard.py
++ M tests/test_bug046.py
++```
++
++After step 11, in that same shell: `python -c "print(repr(open('bridge/cursor-bridge/VERSION','rb').read()))"`
++
++```
++b'2026.11.12a\r\n'
++```
++
++After step 11, in that same shell: a count of `posixpath` in `bridge/cursor-bridge/permission-guard.py`
++
++```
++posixpath count 0
++```
++
++`semgrep` was not run.
++
++## Assumed, not verified
++- No new Semgrep high finding · the Done list does not name Semgrep, and it was not run · the project's Semgrep invocation on this diff.
+diff --git a/handoff/BUG-046-r3.md b/handoff/BUG-046-r3.md
+new file mode 100644
+index 0000000..720c5e3
+--- /dev/null
++++ b/handoff/BUG-046-r3.md
+@@ -0,0 +1,142 @@
++---
++record: brief
++header: 1
++id: BUG-046
++round: 3
++satisfies: [R-082, R-082]
++scope: ["bridge/cursor-bridge/permission-guard.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_bug046.py", "docs/BUILDER_NOTES.md", "handoff/BUG-046-r3-report.md"]
++merge_unit: null
++blocking_class: "safety mechanism"
++---
++# BUG-046 round 3: the merge endpoint is a word that names both pulls and merge (R-082)
++
++Round cause: security
++
++Blocking class: safety mechanism - Review A and the security audit of round 2, each reproduced in process under both tools: gh api -X PUT 'repos/o/r/pulls/5/%23/../merge' and gh api -X PUT 'repos/o/r/pulls/5/%3F/../merge' pass round 2's guard while gh sends the escaped delimiter inside the path, which resolves to the merge endpoint; round 1's tree refused both
++
++## Objective
++Replace the merge-endpoint rule's reading of the path with one that cannot be split by any delimiter, and nothing else.
++
++This is round 3 of BUG-046, at the review ceiling. Rounds 1 and 2 each read the merge endpoint by a parse of the word (round 1: dot segments resolved over the whole word; round 2: the word decoded, then cut at its first `?` or `#`, then resolved), and each next review found a spelling the parse reads apart from gh (round 2: an escaped `%3F` or `%23`, at any nesting, which gh keeps inside the path, so the `..` after it is never seen; and an escaped `%2F` read as a separator). The family has now been met twice, so the design changes instead of the parse growing: **a `gh api` word is a merge endpoint when its decoded, lower-cased text holds both `pulls` and `merge`.** A request GitHub routes to `/repos/<o>/<r>/pulls/<n>/merge` must carry those two names in its one endpoint word, in some spelling that decodes to them: a dot segment only removes whole segments, a query or fragment adds nothing to the path, and an escape decodes to its letter. No cut, no resolution, no segment reading is then needed. The supervisor commits round 2's tree together with this brief and the new tests before your run, so the line numbers below hold when you start.
++
++**The confirmed defects** (each reproduced in process on round 2's tree, each now a red test): the nine commands of `ROUND2_MERGE_SPELLINGS` in `tests/test_bug046.py` pass round 2's guard under both tools.
++
++**The reproduction tests:** `tests/test_bug046.py`, the section headed `# ---------------------------------------------------------------- round 2's findings (Review A and the security audit, 2026-11-17)`, above the builder's marker. On round 2's tree the result is quoted under Constraints, "Known failures"; every case in the file must pass.
++
++Satisfies: R-082 - The permission guard reads a command as the shell does (C5 as rescoped): [...] every wrapper, `eval`, here-document, alias, GraphQL-mutation and launcher-bypass refusal stands, each held by a test, and the deny rules of `settings.bridge.json` are unchanged. (Full text: R-082's row in `docs/REQUIREMENTS.md`. This brief serves its reading of a `gh api` command as gh sends it: the merge endpoint found in every spelling gh would send.)
++
++## Scope
++Files you may create or modify:
++- bridge/cursor-bridge/permission-guard.py
++- bridge/cursor-bridge/MANIFEST.json
++- tests/test_bug046.py
++- docs/BUILDER_NOTES.md
++- handoff/BUG-046-r3-report.md
++
++Limits on these files:
++- `bridge/cursor-bridge/permission-guard.py`: only the merge-endpoint refusal (lines 2345-2352 of round 2's tree) and the merge-mutation refusal's line (2337), as K1 and K2 say, and the import line of `posixpath` (K3). `_percent_decoded` (2200-2207), the body refusal, the alias refusal, `gh_words`, `merge_reason`, the module docstring and every other function stay byte-identical to round 2's tree.
++- `bridge/cursor-bridge/MANIFEST.json` changes only by being regenerated with `python tools/make-manifest.py` (Done, step 2). `bridge/cursor-bridge/VERSION` is outside Scope and reads `2026.11.12a`; restore it with `git restore bridge/cursor-bridge/VERSION` right after (Done, step 3).
++- `tests/test_bug046.py`: everything above the builder's marker is the supervisor's; edit nothing there. Below the marker you may add cases (K4); keep every existing case and its assertion.
++
++Do not modify anything else.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration
++- docs/ and handoff/, except the files the Scope section names. Every record under docs/ is the supervisor's.
++- `tests/test_permission_guard.py` and every other test file: you run them and edit none.
++- `docs/cli-reference.json` and `docs/CLI_REFERENCE.md`: the docstring does not change; `python tools/dump-cli.py --check` must exit 0.
++- The decoding's cost on a word of tens of thousands of nested `%25` escapes (both reviewers judged it unreachable in ordinary use; a lead for the supervisor's records). Do not add a deadline check or a pass limit.
++- Any mutation script. The mutation run is the supervisor's, after your run.
++
++## Context
++**The program as it stands** (round 2's tree, committed with this brief; `bridge/cursor-bridge/permission-guard.py`):
++- `import posixpath` at line 57, used only by the merge-endpoint refusal.
++- `_percent_decoded(word)` at 2200-2207: every `%` with two hexadecimal digits replaced by its character, repeated until a pass changes nothing.
++- Line 2337: `if group == "api" and any(m in tok or m in _percent_decoded(tok) for tok in w for m in MERGE_MUTATIONS):` (it decodes each word once per mutation name).
++- Lines 2345-2352, quoted:
++
++```python
++        if group == "api":
++            for a in w:
++                decoded = _percent_decoded(a).lower()
++                q, h = decoded.find("?"), decoded.find("#")
++                cuts = [i for i in (q, h) if i >= 0]
++                path = decoded if not cuts else decoded[:min(cuts)]
++                if any(re.search(r"/pulls/[^/]+/merge", part) for part in (decoded, path, posixpath.normpath(path))):
++                    return "gh api on a pull request's merge endpoint (merging outside the gate)"
++```
++
++**Development data, security context, the tests' conventions and the host** are as in round 1's brief, `handoff/BUG-046.md`, sections "Context" and "Diagrams": run the guard only from tests on folders under `tmp_path`, or loaded in process; never install it; ASVS level 2; the guard's threat-model row in `docs/INVENTORY.md`; D-002's element `permission_guard` with no edge. Never run `gh`.
++
++## Requirements
++Use the labels K1 to K4 in your report.
++
++1. **K1. The merge endpoint by its two names.** Replace lines 2345-2352 so that a `gh api` command (`group == "api"`) is refused, with the same text (`gh api on a pull request's merge endpoint (merging outside the gate)`), where any of its words, decoded by `_percent_decoded` and lower-cased, holds both the text `pulls` and the text `merge` (anywhere in that one word, in either order). No cut at `?` or `#`, no `posixpath.normpath`, no regular expression on the path.
++2. **K2. One decoding per word.** Decode each word of `w` once and use that decoding for both the merge-mutation refusal (line 2337; the names matched case kept, in the raw word or its decoding, as now) and K1 (lower-cased). The two refusals keep their order and their texts: the merge-mutation refusal first.
++3. **K3. The unused import.** Delete `import posixpath` (line 57): K1 leaves it read nowhere. Confirm in the report that the guard names `posixpath` nowhere else.
++4. **K4. Your cases below the marker.** Add, naming `BUG-046` or `R-082`, under both tools with plain `ids=`: at least one word holding `pulls` and `merge` only after decoding (`repos/o/r/pul%6cs/5/m%65rge`), one with the two names in reverse order (`-f 'body=merge the pulls'`, an accepted over-refusal: say so in a comment), and `repos/o/r/pulls/5/comments` passing. Every existing case of yours keeps passing.
++
++## Acceptance criteria
++- [ ] Every case in `tests/test_bug046.py` passes, the round-2 section's red cases turned green and every earlier case still green.
++- [ ] `python -m pytest -q tests/test_permission_guard.py tests/test_permission_guard_a4.py tests/test_program_permission_guard.py tests/test_bug045.py` passes whole.
++- [ ] `python -m pytest -q tests/test_program_ready.py tests/test_allowlist.py tests/test_task032_supervisor_guard.py tests/test_tests_windowless.py` passes whole.
++- [ ] The named cause is addressed at its mechanism: no parse of the endpoint's path (cut, resolution, segment pattern) is left in the merge-endpoint refusal.
++- [ ] `_percent_decoded`, the body refusal, the alias refusal, `gh_words`, `merge_reason` and the module docstring are byte-identical to round 2's tree; the only import change is the deleted `posixpath`.
++- [ ] No test above the marker edited; no `DEBUG-BUG-` line or stray print left.
++- [ ] `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` prints `RESULT: SOURCES MATCH`; `python tools/dump-cli.py --check` exits 0; `git status --short` does not list `bridge/cursor-bridge/VERSION`, and it reads `2026.11.12a`.
++- [ ] `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks` passes.
++- [ ] No new Semgrep high findings; no exception escapes the guard as a traceback and none is swallowed into a silent pass (ASVS L2).
++
++## Constraints
++- Fix the cause; never suppress its tests' symptom. No retry, no broad `try/except`, no widened tolerance, no special case for the reproduction commands.
++- Do not edit anything above the marker in `tests/test_bug046.py`.
++- Do not leave any `DEBUG-BUG-` line or stray print.
++- **If you believe the real cause is different from the one named, stop, do not change code, and report why in your summary**; the supervisor will re-diagnose.
++- The guard is a PreToolUse hook that must answer within its deadline: the fix adds no work that grows with anything but the words already read, and no call to a program, the network or the filesystem.
++- Do not add dependencies, and add no import.
++- Never run `gh`, and run nothing that reaches the network.
++- Do not read or write any file outside this workspace, apart from pytest's own `tmp_path` folders.
++- No secret is needed or used.
++- If the brief, the rules, or the tooling got in your way, append one dated line to `docs/BUILDER_NOTES.md`; do the same for anything you learned about a defect or a pitfall.
++- In any Markdown you write, never break a line inside a paragraph or a list item.
++- This increment talks to no external service.
++- **Windowless launches.** As in round 1's brief: no `creationflags` needed in tests; any that is written carries `CREATE_NO_WINDOW` on its line; every subprocess call in a test has a timeout.
++- **Run every command synchronously, in the foreground, and wait for it to end.** Start nothing in the background.
++- **Do NOT run the full `tests/` tree.** Run only the test files the Done section names, exactly as written there.
++- Do not refactor code outside the two refusals and the import line.
++- No value in this increment is the owner's (rule 52).
++- ASCII program text and ASCII output.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`. The single exception is `git restore bridge/cursor-bridge/VERSION`, at Done step 3.
++- The mutation check is the supervisor's: write no mutation script, apply no mutation by any script, and leave none in the diff. You may mutate by hand in process to test a case of yours; if you do, list each mutation and what caught it.
++- **Known failures.** On round 2's tree, `python -m pytest -q -rA tests/test_bug046.py` gives "18 failed, 120 passed in 14.31s". The failing cases are all in the round-2 section: `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-hash-segment-Bash]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-hash-segment-PowerShell]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-question-segment-Bash]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-question-segment-PowerShell]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-question-inside-a-segment-Bash]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-question-inside-a-segment-PowerShell]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[doubly-escaped-question-Bash]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[doubly-escaped-question-PowerShell]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-hash-full-url-Bash]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-hash-full-url-PowerShell]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-question-before-the-number-Bash]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-question-before-the-number-PowerShell]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-hash-before-the-number-Bash]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-hash-before-the-number-PowerShell]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-question-and-encoded-dots-Bash]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-question-and-encoded-dots-PowerShell]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-slash-inside-a-segment-Bash]`, `test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint[escaped-slash-inside-a-segment-PowerShell]`. No other failure is known in the files the Done section runs; if one appears that this change did not cause, report it by its test id with its failure lines and fix none.
++- Prefer reuse over new code; write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force).
++- Rules in force for you: `.cursor/rules/secure-coding.mdc`, `.cursor/rules/workspace-boundary.mdc` and the frozen `minimal-code.mdc`.
++
++## Done
++Your report is the file `handoff/BUG-046-r3-report.md`. Write it as you go. It names no computer path and no user name: write `<Workspace>` for the repository folder and `<tmp>` for a temporary folder, including in quoted command output.
++
++When you finish, it holds:
++- a list of every file you changed;
++- a one-paragraph summary of what you did;
++- one sentence stating how the change addresses the named cause;
++- for each of K1 to K4, one sentence on what changed, naming the function and its lines as the file stands after your change, and the tests that pin it;
++- every command of the list below with its output;
++- a section headed exactly `Assumed, not verified`, as the report's last section (one item per line: what you assumed · why · what would confirm it; or `Assumed, not verified: none`).
++
++Run these from the Workspace root, in this order, after your last edit, each synchronously in the foreground, with no `PYTHONPATH` or other environment change:
++1. `git status --short`
++2. `python tools/make-manifest.py`
++3. `git restore bridge/cursor-bridge/VERSION`
++4. `python tools/dump-cli.py --check` (expect exit 0)
++5. `git status --short` (`bridge/cursor-bridge/VERSION` must not be listed)
++6. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` (expect `RESULT: SOURCES MATCH`)
++7. `python -m pytest -q -rs tests/test_bug046.py`
++8. `python -m pytest -q tests/test_permission_guard.py tests/test_permission_guard_a4.py tests/test_program_permission_guard.py tests/test_bug045.py`
++9. `python -m pytest -q tests/test_program_ready.py tests/test_allowlist.py tests/test_task032_supervisor_guard.py tests/test_tests_windowless.py`
++10. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++11. `git rev-parse HEAD` and `git status --short`
++
++Quoting rules: every command you ran is quoted with the lines it printed, verbatim, in a fenced block; each pytest summary line verbatim; a claim that a check passed quotes its output line; a command you did not run is written `not run`; the results name the commit their counts belong to and whether the tree then held uncommitted changes.
++
++Your last message is the summary and the report file's path, and nothing follows it.
+diff --git a/handoff/BUG-046-report.md b/handoff/BUG-046-report.md
+new file mode 100644
+index 0000000..0aead75
+--- /dev/null
++++ b/handoff/BUG-046-report.md
+@@ -0,0 +1,270 @@
++# BUG-046 report
++
++## Summary
++`_check_word_list`'s `gh api` branch no longer takes a method from the command's words. A `gh api` call is refused when any word is a body the guard cannot read (`--input`, a word beginning `--input=`, a word beginning `@`, or a word holding `=@`), whatever the endpoint, and when any word, lower-cased, with `%2f` read as `/` and `%2e` read as `.` and then passed through `posixpath.normpath`, holds `/pulls/<segment>/merge`. The pinned read `gh api repos/o/r/pulls/12/merge` is on the refused list, the module docstring matches those two refusals, and the manifest and the CLI reference were regenerated from the program.
++
++## Files changed
++- `bridge/cursor-bridge/permission-guard.py`
++- `bridge/cursor-bridge/MANIFEST.json` (rewritten by `python tools/make-manifest.py`, not by hand)
++- `docs/cli-reference.json` (rewritten by `python tools/dump-cli.py`, not by hand)
++- `docs/CLI_REFERENCE.md` (rewritten by `python tools/dump-cli.py`, not by hand)
++- `tests/test_bug046.py` (cases below the marker only)
++- `tests/test_permission_guard.py` (the one moved line)
++- `docs/BUILDER_NOTES.md` (one dated line)
++- `handoff/BUG-046-report.md` (this file)
++
++`bridge/cursor-bridge/VERSION` was restored with `git restore` after `make-manifest.py` and is not in the final status. Its text is `2026.11.12a`.
++
++## Causes
++The merge refusal no longer reads a method from any word, so a method-shaped value of `-p`, `-H`, `-q`, or `-t` cannot replace the method gh would send.
++The body refusal no longer depends on the endpoint word being exactly `graphql`, so `--input` or a field read from a file is refused for a URL or a path as well as for the bare word.
++
++## F1
++In `_check_word_list` at lines 2330-2331, a `group == "api"` command is refused when any word equals `--input`, begins with `--input=`, begins with `@`, or holds `=@`, and the reason names a body read from a file or standard input that the guard cannot read and tells the caller to write the query or fields on the command line. Pinned by `test_bug046_a_body_the_guard_cannot_read_is_refused_whatever_the_endpoint`, by `test_bug046_glued_and_clustered_unreadable_bodies_are_refused_on_rest_and_graphql`, and by the existing `test_refused` rows `gh api graphql -F query=@merge.graphql` and `gh api graphql --input merge.json`.
++
++## F2
++In `_check_word_list` at lines 2336-2340 the method loop is gone: each word is lower-cased, `%2f` and `%2e` are read as `/` and `.`, `posixpath.normpath` resolves `.` and `..` and collapsed slashes, and a word that then holds `/pulls/[^/]+/merge` is refused with a reason that names a pull request's merge endpoint and merging outside the gate. Pinned by `test_bug046_a_method_word_that_is_another_options_value_never_lets_a_merge_through`, `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling`, `test_bug046_a_merge_endpoint_with_a_query_fragment_or_percent_2e_is_refused`, `test_bug046_mergeable_report_is_refused`, and `test_bug046_an_issues_merge_endpoint_passes`. `WRITE_METHODS` at line 63 is the same tuple as before and is not read. The merge-mutation refusal at lines 2328-2329, the alias refusal at lines 2332-2335, `gh_words`, and `merge_reason` are unchanged.
++
++## F3
++`"gh api repos/o/r/pulls/12/merge"` moved from `test_allowed` to the refused list in `tests/test_permission_guard.py`, on the line after `gh api --method PUT /repos/o/r/pulls/12/merge`. No other line of that file changed.
++
++## F4
++The module docstring lines 5-6 say the REST route `gh api … /pulls/<n>/merge` is refused whatever its method, and lines 25-27 drop "`-XPUT` is a method" and say a `gh api` body read from a file or standard input is refused unread, whatever the endpoint. The colon after `` `find -exec` runs its command `` is the colon that clause used to carry. `python tools/dump-cli.py` rewrote `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` from that docstring. No other docstring sentence changed.
++
++## F5
++Each case runs `guard` from `plain` under Bash and PowerShell (`ids=["Bash", "PowerShell"]`).
++- `rest-input-equals` pins `--input=body.json` on a REST path.
++- `graphql-input-equals` pins `--input=body.json` on `graphql`.
++- `rest-glued-field` pins `-Fquery=@q.graphql` on a REST path.
++- `graphql-glued-field` pins `-Fquery=@q.graphql` on `graphql`.
++- `rest-long-field` pins `--field=query=@q.graphql` on a REST path.
++- `graphql-long-field` pins `--field=query=@q.graphql` on `graphql`.
++- `raw-field-at` pins the accepted over-refusal of `-f key=@x` (a raw field, refused because the word holds `=@`).
++- `trailing-query` pins `repos/o/r/pulls/5/merge?x=1` (single-quoted, because an unquoted `?` is a glob to the Bash reader).
++- `trailing-fragment` pins `repos/o/r/pulls/5/merge#frag`.
++- `percent-2e-dot` pins `repos/o/r/pulls/5/%2E/merge`.
++- `percent-2e-parent` pins `repos/o/r/%2E/pulls/5/merge`.
++- `test_bug046_an_issues_merge_endpoint_passes` pins that `repos/o/r/issues/5/merge` is allowed.
++- `test_bug046_mergeable_report_is_refused` pins the accepted over-refusal of `repos/o/r/pulls/5/mergeable-report`, which holds `/pulls/5/merge`. The comment on that test says so.
++
++## Mutations
++None. No source line was mutated in process.
++
++## Commands
++`semgrep` was not run. The Done list does not name it.
++
++A probe before the Done list, `python -m pytest -q -rs tests/test_bug046.py`:
++
++```
++........................................................................ [ 94%]
++....                                                                     [100%]
++76 passed in 7.29s
++```
++
++Done step 1, then 2, then 3, then a read of VERSION, in one shell: `git status --short && echo "---STEP2---" && python tools/make-manifest.py && echo "---STEP3---" && git restore bridge/cursor-bridge/VERSION && echo "---VERSION---" && python -c "import pathlib; print(repr(pathlib.Path('bridge/cursor-bridge/VERSION').read_bytes()))"`
++
++```
++ M bridge/cursor-bridge/permission-guard.py
++ M docs/BUILDER_NOTES.md
++ M tests/test_bug046.py
++ M tests/test_permission_guard.py
++---STEP2---
++make-manifest: version 2026.11.12a, 146 files hashed, VERSION + MANIFEST.json written
++---STEP3---
++---VERSION---
++b'2026.11.12a\r\n'
++```
++
++`git restore` printed no lines. The VERSION bytes are the text `2026.11.12a` and a CRLF.
++
++Done step 4, first check: `python tools/dump-cli.py --check; echo "exit:$?"`
++
++```
++docs/cli-reference.json
++docs/CLI_REFERENCE.md
++exit:1
++```
++
++Done step 4, regenerate and check again: `python tools/dump-cli.py; echo "dump_exit:$?"; python tools/dump-cli.py --check; echo "check_exit:$?"`
++
++```
++dump_exit:0
++check_exit:0
++```
++
++`python tools/dump-cli.py` printed no lines.
++
++Done steps 5 and 6: `git status --short; echo "status_exit:$?"; python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet; echo "check_exit:$?"`
++
++```
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/permission-guard.py
++ M docs/BUILDER_NOTES.md
++ M docs/CLI_REFERENCE.md
++ M docs/cli-reference.json
++ M tests/test_bug046.py
++ M tests/test_permission_guard.py
++status_exit:0
++bridge-check: version 2026.11.12a (2026-11-17 06:57) at <Workspace>\bridge
++bridge-check: 146 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.12a
++check_exit:0
++```
++
++`bridge/cursor-bridge/VERSION` is not in that status. The bridge-check line that names a folder is quoted with `<Workspace>` in place of the repository folder.
++
++Done step 7, then 8, then 9, in one shell.
++
++`python -m pytest -q -rs tests/test_bug046.py`
++
++```
++........................................................................ [ 94%]
++....                                                                     [100%]
++76 passed in 7.16s
++pytest7_exit:0
++```
++
++`python -m pytest -q tests/test_permission_guard.py tests/test_permission_guard_a4.py tests/test_program_permission_guard.py tests/test_bug045.py`
++
++```
++........................................................................ [  5%]
++........................................................................ [ 11%]
++........................................................................ [ 16%]
++........................................................................ [ 22%]
++........................................................................ [ 27%]
++........................................................................ [ 33%]
++........................................................................ [ 39%]
++........................................................................ [ 44%]
++........................................................................ [ 50%]
++........................................................................ [ 55%]
++........................................................................ [ 61%]
++........................................................................ [ 67%]
++........................................................................ [ 72%]
++........................................................................ [ 78%]
++........................................................................ [ 83%]
++........................................................................ [ 89%]
++........................................................................ [ 94%]
++.................................................................        [100%]
++1289 passed in 130.24s (0:02:10)
++pytest8_exit:0
++```
++
++`python -m pytest -q tests/test_program_ready.py tests/test_allowlist.py tests/test_task032_supervisor_guard.py tests/test_tests_windowless.py`
++
++```
++........................................................................ [ 12%]
++........................................................................ [ 25%]
++.....................s...ss.....sss....................s...............s [ 37%]
++...............................................s...........s............ [ 50%]
++.....s...ss.....sss....................s...............s................ [ 62%]
++...............................s...........s............................ [ 75%]
++........................................................................ [ 87%]
++.....................................................................    [100%]
++553 passed, 20 skipped in 175.86s (0:02:55)
++pytest9_exit:0
++```
++
++Done steps 10 and 11: `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks; echo "win_exit:$?"; git rev-parse HEAD; echo "rev_exit:$?"; git status --short; echo "status_exit:$?"`
++
++```
++windowless-check: 39 file(s) scanned, 0 FAIL, 0 NOTE
++win_exit:0
++3d6e4eb3b3a640842d3be13ea1c2cce36b243eb7
++rev_exit:0
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/permission-guard.py
++ M docs/BUILDER_NOTES.md
++ M docs/CLI_REFERENCE.md
++ M docs/cli-reference.json
++ M tests/test_bug046.py
++ M tests/test_permission_guard.py
++status_exit:0
++```
++
++Results after step 11 belong to commit `3d6e4eb3b3a640842d3be13ea1c2cce36b243eb7`. The working tree held uncommitted changes, the seven paths in the status above. This report file was written after that status, so it is not in that fence. A later `git status --short`, after this file existed, printed:
++
++```
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/permission-guard.py
++ M docs/BUILDER_NOTES.md
++ M docs/CLI_REFERENCE.md
++ M docs/cli-reference.json
++ M tests/test_bug046.py
++ M tests/test_permission_guard.py
++?? handoff/BUG-046-report.md
++```
++
++The step 9 skips are named by a later run, `python -m pytest -q -rs --tb=no tests/test_program_ready.py tests/test_allowlist.py tests/test_task032_supervisor_guard.py tests/test_tests_windowless.py`:
++
++```
++........................................................................ [ 12%]
++........................................................................ [ 25%]
++.....................s...ss.....sss....................s...............s [ 37%]
++...............................................s...........s............ [ 50%]
++.....s...ss.....sss....................s...............s................ [ 62%]
++...............................s...........s............................ [ 75%]
++........................................................................ [ 87%]
++.....................................................................    [100%]
++=========================== short test summary info ===========================
++SKIPPED [10] tests\test_allowlist.py:65: prose, not a runnable command
++SKIPPED [10] tests\test_allowlist.py:106: prose, not a runnable command
++553 passed, 20 skipped in 176.50s (0:02:56)
++```
++
++Those two rows are the allowlist file's prose cases. This change does not edit that file.
++
++A reason probe after the tests, run as one `python -c` that launches the guard the way `guard()` does. Its cwd was a folder from `tempfile.mkdtemp`, which is outside `<Workspace>` and is not a pytest `tmp_path`. The guard was not installed, and `gh` was not run. The printed reasons are the merge-endpoint sentence, the unread-body sentence, or exit 0 for `repos/o/r/issues/5/merge`.
++
++```
++Bash 2 permission-guard (Claude-Cursor Bridge): refused - gh api on a pull request's merge endpoint (merging outside the gate). The loop merges only through the verified gate and never fo
++CMD gh api 'repos/o/r/pulls/5/merge?x=1'
++Bash 2 permission-guard (Claude-Cursor Bridge): refused - gh api on a pull request's merge endpoint (merging outside the gate). The loop merges only through the verified gate and never fo
++CMD gh api repos/o/r/pulls/5/merge#frag
++Bash 2 permission-guard (Claude-Cursor Bridge): refused - gh api on a pull request's merge endpoint (merging outside the gate). The loop merges only through the verified gate and never fo
++CMD gh api repos/o/r/pulls/5/%2E/merge
++Bash 2 permission-guard (Claude-Cursor Bridge): refused - gh api with a body read from a file or standard input, which the guard cannot read (write the query or fields on the command line
++CMD gh api repos/o/r/issues/5/comments --input=body.json
++Bash 2 permission-guard (Claude-Cursor Bridge): refused - gh api with a body read from a file or standard input, which the guard cannot read (write the query or fields on the command line
++CMD gh api repos/o/r/issues/5/comments -f key=@x
++Bash 2 permission-guard (Claude-Cursor Bridge): refused - gh api on a pull request's merge endpoint (merging outside the gate). The loop merges only through the verified gate and never fo
++CMD gh api repos/o/r/pulls/5/mergeable-report
++Bash 0 
++CMD gh api repos/o/r/issues/5/merge
++Bash 2 permission-guard (Claude-Cursor Bridge): refused - gh api on a pull request's merge endpoint (merging outside the gate). The loop merges only through the verified gate and never fo
++CMD gh api -X PUT repos/o/r/pulls/5/merge -p -XGET
++PowerShell 2 permission-guard (Claude-Cursor Bridge): refused - gh api on a pull request's merge endpoint (merging outside the gate). The loop merges only through the verified gate and never fo
++CMD gh api 'repos/o/r/pulls/5/merge?x=1'
++PowerShell 2 permission-guard (Claude-Cursor Bridge): refused - gh api on a pull request's merge endpoint (merging outside the gate). The loop merges only through the verified gate and never fo
++CMD gh api repos/o/r/pulls/5/merge#frag
++PowerShell 2 permission-guard (Claude-Cursor Bridge): refused - gh api on a pull request's merge endpoint (merging outside the gate). The loop merges only through the verified gate and never fo
++CMD gh api repos/o/r/pulls/5/%2E/merge
++PowerShell 2 permission-guard (Claude-Cursor Bridge): refused - gh api with a body read from a file or standard input, which the guard cannot read (write the query or fields on the command line
++CMD gh api repos/o/r/issues/5/comments --input=body.json
++PowerShell 2 permission-guard (Claude-Cursor Bridge): refused - gh api with a body read from a file or standard input, which the guard cannot read (write the query or fields on the command line
++CMD gh api repos/o/r/issues/5/comments -f key=@x
++PowerShell 2 permission-guard (Claude-Cursor Bridge): refused - gh api on a pull request's merge endpoint (merging outside the gate). The loop merges only through the verified gate and never fo
++CMD gh api repos/o/r/pulls/5/mergeable-report
++PowerShell 0 
++CMD gh api repos/o/r/issues/5/merge
++PowerShell 2 permission-guard (Claude-Cursor Bridge): refused - gh api on a pull request's merge endpoint (merging outside the gate). The loop merges only through the verified gate and never fo
++CMD gh api -X PUT repos/o/r/pulls/5/merge -p -XGET
++```
++
++`git diff --stat && git diff -U3 -- bridge/cursor-bridge/permission-guard.py | head -n 220` showed line-ending warnings for `MANIFEST.json`, `docs/CLI_REFERENCE.md`, `docs/cli-reference.json`, and `tests/test_bug046.py`, then this stat:
++
++```
++ bridge/cursor-bridge/MANIFEST.json       |  4 +--
++ bridge/cursor-bridge/permission-guard.py | 28 +++++++----------
++ docs/BUILDER_NOTES.md                    |  2 ++
++ docs/CLI_REFERENCE.md                    |  8 ++---
++ docs/cli-reference.json                  |  2 +-
++ tests/test_bug046.py                     | 53 ++++++++++++++++++++++++++++++++
++ tests/test_permission_guard.py           |  2 +-
++ 7 files changed, 74 insertions(+), 25 deletions(-)
++```
++
++The permission-guard hunks are the two docstring edits, `import posixpath`, and the two `gh api` refusals. The alias block and the merge-mutation line are absent from the diff.
++
++## Assumed, not verified
++- `posixpath.normpath` resolves a leading `..` the way GitHub's server would · the brief names `posixpath.normpath` as the reader and the tests only check the guard's result · send GitHub a path that climbs with `..` and compare the path it routes
++- a `..` or `%2e` inside a query or fragment is collapsed with the path, because `normpath` sees the whole word · the added query case is `?x=1` and holds no `..`, and the brief applies `normpath` to the whole word · run the guard on `repos/o/r/pulls/5/merge?x=../y` and compare it with the path gh actually requests
+diff --git a/handoff/BUG-046.md b/handoff/BUG-046.md
+new file mode 100644
+index 0000000..eeb23bb
+--- /dev/null
++++ b/handoff/BUG-046.md
+@@ -0,0 +1,275 @@
++---
++record: brief
++header: 1
++id: BUG-046
++round: 1
++satisfies: [R-082, R-082]
++scope: ["bridge/cursor-bridge/permission-guard.py", "bridge/cursor-bridge/MANIFEST.json", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "tests/test_bug046.py", "tests/test_permission_guard.py", "docs/BUILDER_NOTES.md", "handoff/BUG-046-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# BUG-046: the permission guard's `gh api` merge refusal reads a flag's value as the method, and its file-body refusal holds only for the bare word `graphql` (R-082)
++
++Round cause: first round (no earlier round)
++
++## Objective
++Fix the following confirmed defect: repair the named cause, nothing else.
++
++**Root cause, in one sentence:** in `bridge/cursor-bridge/permission-guard.py`, the `gh api` part of `_check_word_list` (lines 2327-2346 as of commit f3fa7b4) takes the request's method from every word of the command (lines 2337-2344), so a method-shaped word that gh reads as another option's value (`-p -XGET`, `-H --method=GET`) is read as the method, and a PUT merge passes; and it refuses a body it cannot read (`--input`, a field read from a file) only where the endpoint word is exactly `graphql` (line 2329), while gh reaches the GraphQL endpoint by its URL or its path as well.
++
++**Evidence** (docs/debug/BUG-046.md, found 2026-11-17 by the security audit of TASK-083's round 4):
++1. On main at f3fa7b4, from a folder that is no bridge Workspace, the guard passes under Bash and PowerShell: `gh api -X PUT repos/o/r/pulls/5/merge -p -XGET`, `gh api --method PUT repos/o/r/pulls/5/merge -H --method=GET`, `gh api https://api.github.com/graphql -F query=@q.graphql`, `gh api https://api.github.com/graphql --input body.json`, `gh api /graphql -F query=@q.graphql`; it refuses `gh api -X PUT repos/o/r/pulls/5/merge` and `gh api graphql -F query=@q.graphql`.
++2. gh 2.97.0's own help (`gh api --help`): `-p/--preview`, `-H/--header`, `-q/--jq`, `-t/--template`, `-X/--method`, `-f`, `-F`, `--input` take a value; gh's flag parser takes the word after such an option as its value whatever it begins with, so `-X PUT ... -p -XGET` sends PUT. A field value beginning `@` is read from a file (`@-` from standard input); `--input` reads the body from a file or standard input.
++3. Both lines stand at commit b05fbc8 (TASK-063's merge): older than TASK-083 and no regression of it.
++
++**The reproduction tests:** `tests/test_bug046.py`, every case above the line `# ---------------------------------------------------------------- the builder adds its cases below this line and edits nothing above it`. On f3fa7b4, `python -m pytest -q -rA tests/test_bug046.py` gives "32 failed, 18 passed in 5.75s". 
++
++These 32 fail and must pass:
++- `test_bug046_a_method_word_that_is_another_options_value_never_lets_a_merge_through[preview-value-short-method-Bash]`
++- `test_bug046_a_method_word_that_is_another_options_value_never_lets_a_merge_through[preview-value-short-method-PowerShell]`
++- `test_bug046_a_method_word_that_is_another_options_value_never_lets_a_merge_through[header-value-long-method-Bash]`
++- `test_bug046_a_method_word_that_is_another_options_value_never_lets_a_merge_through[header-value-long-method-PowerShell]`
++- `test_bug046_a_method_word_that_is_another_options_value_never_lets_a_merge_through[jq-value-short-method-Bash]`
++- `test_bug046_a_method_word_that_is_another_options_value_never_lets_a_merge_through[jq-value-short-method-PowerShell]`
++- `test_bug046_a_method_word_that_is_another_options_value_never_lets_a_merge_through[template-value-long-method-Bash]`
++- `test_bug046_a_method_word_that_is_another_options_value_never_lets_a_merge_through[template-value-long-method-PowerShell]`
++- `test_bug046_a_body_the_guard_cannot_read_is_refused_whatever_the_endpoint[url-field-from-a-file-Bash]`
++- `test_bug046_a_body_the_guard_cannot_read_is_refused_whatever_the_endpoint[url-field-from-a-file-PowerShell]`
++- `test_bug046_a_body_the_guard_cannot_read_is_refused_whatever_the_endpoint[url-input-file-Bash]`
++- `test_bug046_a_body_the_guard_cannot_read_is_refused_whatever_the_endpoint[url-input-file-PowerShell]`
++- `test_bug046_a_body_the_guard_cannot_read_is_refused_whatever_the_endpoint[path-field-from-a-file-Bash]`
++- `test_bug046_a_body_the_guard_cannot_read_is_refused_whatever_the_endpoint[path-field-from-a-file-PowerShell]`
++- `test_bug046_a_body_the_guard_cannot_read_is_refused_whatever_the_endpoint[path-input-standard-input-Bash]`
++- `test_bug046_a_body_the_guard_cannot_read_is_refused_whatever_the_endpoint[path-input-standard-input-PowerShell]`
++- `test_bug046_a_body_the_guard_cannot_read_is_refused_whatever_the_endpoint[url-long-field-from-standard-input-Bash]`
++- `test_bug046_a_body_the_guard_cannot_read_is_refused_whatever_the_endpoint[url-long-field-from-standard-input-PowerShell]`
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[read-no-method-Bash]`
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[read-no-method-PowerShell]`
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[put-doubled-slashes-Bash]`
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[put-doubled-slashes-PowerShell]`
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[put-upper-case-Bash]`
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[put-upper-case-PowerShell]`
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[put-dot-segment-Bash]`
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[put-dot-segment-PowerShell]`
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[put-dot-dot-segment-Bash]`
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[put-dot-dot-segment-PowerShell]`
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[put-encoded-slashes-Bash]`
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[put-encoded-slashes-PowerShell]`
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[get-method-given-Bash]`
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[get-method-given-PowerShell]`
++
++These 18 pass today and must still pass:
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[put-url-Bash]`
++- `test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling[put-url-PowerShell]`
++- `test_bug046_ordinary_api_calls_still_pass[pull-request-read-Bash]`
++- `test_bug046_ordinary_api_calls_still_pass[pull-request-read-PowerShell]`
++- `test_bug046_ordinary_api_calls_still_pass[pull-request-read-with-header-Bash]`
++- `test_bug046_ordinary_api_calls_still_pass[pull-request-read-with-header-PowerShell]`
++- `test_bug046_ordinary_api_calls_still_pass[vulnerability-alerts-Bash]`
++- `test_bug046_ordinary_api_calls_still_pass[vulnerability-alerts-PowerShell]`
++- `test_bug046_ordinary_api_calls_still_pass[dependabot-alerts-paged-Bash]`
++- `test_bug046_ordinary_api_calls_still_pass[dependabot-alerts-paged-PowerShell]`
++- `test_bug046_ordinary_api_calls_still_pass[graphql-read-on-the-command-line-Bash]`
++- `test_bug046_ordinary_api_calls_still_pass[graphql-read-on-the-command-line-PowerShell]`
++- `test_bug046_ordinary_api_calls_still_pass[search-with-get-and-a-field-Bash]`
++- `test_bug046_ordinary_api_calls_still_pass[search-with-get-and-a-field-PowerShell]`
++- `test_bug046_ordinary_api_calls_still_pass[issue-comment-post-Bash]`
++- `test_bug046_ordinary_api_calls_still_pass[issue-comment-post-PowerShell]`
++- `test_bug046_ordinary_api_calls_still_pass[check-runs-read-Bash]`
++- `test_bug046_ordinary_api_calls_still_pass[check-runs-read-PowerShell]`
++
++
++The fix, as the supervisor ruled it (F1 to F4 under Requirements):
++- **F1.** A `gh api` call holding a body the guard cannot read is refused whatever its endpoint.
++- **F2.** A `gh api` call naming a pull request's merge endpoint is refused whatever its method, a read of it included; the endpoint is read in every spelling gh could send.
++- **F3.** `tests/test_permission_guard.py`'s allowed case `gh api repos/o/r/pulls/12/merge` pins the old rule: move it to that file's refused list.
++- **F4.** The guard's module docstring says what the guard now refuses through `gh api`.
++
++Satisfies: R-082 - The permission guard reads a command as the shell does (C5 as rescoped): a command substitution inside double quotes, `$(` or a backtick, is read as a command; a quote closes as bash closes it (no escape inside single quotes; inside double quotes a quote is escaped only by an odd run of backslashes), so a quoted string ending in a backslash hides nothing after it; the `gh api graphql` substitution test reads that command's own arguments, the `HUSKY=0` test the leading assignments, and `--no-verify` is read as an option of each of the seven git subcommands the guard holds to it (commit, push, merge, rebase, am, cherry-pick, revert) and not from another option's value; an unquoted `&` in a `gh api` argument is refused with a message that says what to quote; a process substitution (`<(`, `>(`) is read as a command substitution is, a substitution inside `${ }` is found, ANSI-C quoting (`$'`) closes by its own escapes, and a `$(` behind an odd run of backslashes outside single quotes is none; what a word expands to at run time (an indirect expansion, a variable in a command's place) stays outside the reading, stated in INVENTORY's threat-model row; every wrapper, `eval`, here-document, alias, GraphQL-mutation and launcher-bypass refusal stands, each held by a test, and the deny rules of `settings.bridge.json` are unchanged. (Full text: R-082's row in `docs/REQUIREMENTS.md`. This brief serves its reading of a `gh api` command as gh reads it: a merge through the REST endpoint and a body the guard cannot read are refused whatever the other words say.)
++
++## Scope
++Files you may create or modify:
++- bridge/cursor-bridge/permission-guard.py
++- bridge/cursor-bridge/MANIFEST.json
++- docs/cli-reference.json
++- docs/CLI_REFERENCE.md
++- tests/test_bug046.py
++- tests/test_permission_guard.py
++- docs/BUILDER_NOTES.md
++- handoff/BUG-046-report.md
++
++Limits on these files:
++- `bridge/cursor-bridge/permission-guard.py`: F1, F2 and F4 and nothing else. In `_check_word_list`'s gh branch (lines 2317-2347), the two refusals at 2329-2331 and 2336-2346 change; the merge-mutation refusal at 2327-2328, the alias refusal at 2332-2335, `gh_words` (line 2056), `merge_reason` (line 2572) and every other function stay byte-identical. In the module docstring, only the sentences that describe the `gh api` refusals change (lines 5-6, and lines 26-27's "`-XPUT` is a method" and "a GraphQL query read from a file are refused unread").
++- `bridge/cursor-bridge/MANIFEST.json` changes only by being regenerated with `python tools/make-manifest.py` (Done, step 2). Never edit it by hand.
++- `bridge/cursor-bridge/VERSION` is outside your Scope; it reads `2026.11.12a`. `make-manifest.py` rewrites its line endings; restore it with `git restore bridge/cursor-bridge/VERSION` right after (Done, step 3), and edit it in no other way.
++- `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` change only by running `python tools/dump-cli.py` (Done, step 4), and only if `python tools/dump-cli.py --check` fails after your docstring change. Never edit either by hand.
++- `tests/test_bug046.py` is the supervisor's above the marker line quoted in the Objective. Edit nothing above that line, the module docstring, imports, the `guard` helper, `TOOLS` and the `plain` fixture included. Your cases go below it.
++- `tests/test_permission_guard.py`: F3 only. Move the line `"gh api repos/o/r/pulls/12/merge",` (line 183, in `test_allowed`'s list) into the refused list that opens at line 40 (any place in it). Every other line of the file stays as it is.
++
++Do not modify anything else.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration
++- docs/ and handoff/, except the files the Scope section names. Every record under docs/ is the supervisor's, `docs/debug/BUG-046.md` and `docs/HARDENING.md` included.
++- `tests/test_program_permission_guard.py`, `tests/test_program_ready.py`, `tests/test_allowlist.py`, `tests/test_task032_supervisor_guard.py`, `tests/test_permission_guard_a4.py`, `tests/test_bug045.py`: you run them and edit none. Every other test file likewise.
++- Every other program under `bridge/cursor-bridge/`, `tools/make-manifest.py` and `tools/dump-cli.py`.
++- The leads docs/debug/BUG-046.md names as not taken: REST `POST repos/<o>/<r>/merges` and `PATCH .../git/refs/heads/<b>`, the GraphQL mutations `mergeBranch`, `updateRef`, `updateRefs` and `createCommitOnBranch`, and `gh.cmd`, `gh.com` or a gh named by path. Do not add a refusal for any of them.
++- `gh pr merge`'s reading (TASK-083) and the gh words before the subcommand (`gh_words`): unchanged.
++- Any mutation script. The mutation run is the supervisor's, after your run.
++
++## Context
++**The design that binds this program:** `docs/DESIGN.md`, "Change: the program release", the section on the permission guard, `permission-guard.py` (C5), and the security paragraph that begins "ASVS level 2 and the trust boundaries stand" with its bullet **The permission guard**: "reads more of a command than before and nothing less; its fail-open on unreadable input stands, with the deny rules behind it."
++
++**The program as merged** (`bridge/cursor-bridge/permission-guard.py`, line numbers as of commit f3fa7b4; the reproduction-test commit changes no program):
++- `WRITE_METHODS = ("PUT", "POST", "PATCH", "DELETE")` at line 62; `MERGE_MUTATIONS = ("mergePullRequest", "enablePullRequestAutoMerge", "enqueuePullRequest")` at 67; `GH_API_OPTS` at 178 (the api options that take a value, used by `gh_words`).
++- `check(command, cwd=None, tool="Bash", _depth=0)` at 2112 calls `_check_one`, which calls `_check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=False)` (from 2200) for every command; `w` there is the command's word list after any prefix the guard sees through.
++- The gh branch, lines 2317-2347, quoted:
++
++```python
++    elif head in ("gh", "gh.exe"):
++        group, sub, args = gh_words(w)
++        if group is INNER_UNREADABLE:
++            if isinstance(sub, str) and sub.startswith("-"):
++                return _cannot("an option before the gh subcommand (%s)" % sub)
++            return _cannot("a word before the gh subcommand that is not a command's name (%s)" % repr(sub))
++        if group == "pr" and sub == "merge":
++            r = merge_reason(args, cwd)
++            if r:
++                return r
++        if group == "api" and any(m in tok for tok in w for m in MERGE_MUTATIONS):
++            return "gh api with a merge mutation (merging outside the gate)"
++        if group == "api" and sub == "graphql":
++            if any(t == "--input" or t.startswith("--input=") or t.startswith("@") or "=@" in t or (t in ("-F", "--field", "--raw-field", "-f") and any("@" in a for a in args)) for t in args + w):
++                return "gh api graphql with a query read from a file, which the guard cannot read (write the query on the command line)"
++        if group == "alias" and sub in ("set", "import"):
++            expansion = (args[-1] if args else "").strip("'\"").lstrip("!").strip()
++            if sub == "import" or re.match(r"^(pr\s+merge|api)\b", expansion) or "worktree" in expansion:
++                return "a gh alias for a merge or an api call (%s)" % " ".join(args)[:60]
++        if group == "api":
++            method = "GET"
++            for i, a in enumerate(w):
++                if a in ("-X", "--method") and i + 1 < len(w):
++                    method = w[i + 1].upper()
++                elif a.startswith("--method=") or (a.startswith("-X") and len(a) > 2):
++                    method = a.split("=", 1)[1].upper() if "=" in a else a[2:].upper()
++                elif a in ("-f", "--raw-field", "-F", "--field", "--input"):
++                    method = method if method != "GET" else "POST"
++            if method in WRITE_METHODS and any(re.search(r"/pulls/\d+/merge\b", a) for a in w):
++                return "gh api %s on a pull request's merge endpoint (merging outside the gate)" % method
++    return None
++```
++
++- For `gh api`, `gh_words` returns `group == "api"` and `sub` the endpoint word (the first word that is not an option or an option's value), `args` the words after it.
++
++**gh's reading (gh 2.97.0, `gh api --help`).** The endpoint is a REST path or the word `graphql`; a full URL is taken as given; the method is `GET`, or `POST` where a field is given, or what `-X`/`--method` says (the last one gh reads as that option). A field value beginning `@` is read from a file, `@-` from standard input; `--input <file>` (also `--input=<file>`, `--input -`) reads the whole body. The supervisor's ruling does not need the method at all (F2), so do not build a reading of gh's flags for it.
++
++**The bridge's own `gh api` calls** are reads: the report cycle's `gh api repos/<owner>/<repo>/vulnerability-alerts` and `gh api --paginate "repos/<owner>/<repo>/dependabot/alerts?state=open"`; none sends a body from a file and none names a merge endpoint. `tests/test_bug046.py`'s `ORDINARY_API_CALLS` must stay allowed.
++
++**Development data.** The inventory's decision (`docs/INVENTORY.md`, Decisions, the row beginning `Development data:`): "the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet". For you: run the guard only from tests, as `tests/test_bug046.py`'s `guard(tool, command, cwd)` runs it, with `cwd` a folder under pytest's `tmp_path`, or loaded in process; never install it, never copy it under `~/.claude`, and never point it at this repository's folder as its `cwd`. The guard only reads the command it is given; it runs none of it. Never run `gh` yourself: nothing in this fix needs GitHub or the network.
++
++**Security context.** ASVS level 2 (INVENTORY, Decisions: "The builder's secure-coding rule is ASVS level 2"). The threat model that binds this fix is INVENTORY's row "The permission guard's threat model": inside it, a command the agent's Bash or PowerShell tool is about to run that names a refused action in its own words (here, a merge outside the gate through `gh api`) under any quoting, chain, wrapper shell, prefix, assignment or launcher the guard reads or sees through. Each command of the Evidence names its merge in its own words, so the defect is inside the model, of the class "a defeated safety mechanism". The trust boundary: the command text is outside input; the guard decides on it and executes nothing of it. `.cursor/rules/secure-coding.mdc` is in force for you.
++
++**The tests' conventions.** `tests/test_bug046.py` runs the guard as a child with `guard(tool, command, cwd)`, which returns `(returncode, stderr)`: exit 2 with `refused` on standard error refuses, exit 0 lets through; `plain` is a folder under `tmp_path` that is no bridge Workspace; every case runs under both tools (`TOOLS`). `tests/conftest.py` makes every launch in a test windowless.
++
++**Host.** Windows 11; Python as on the owner's interpreter.
++
++## Diagrams
++`docs/diagrams/D-002-components.md`, element `permission_guard` (map row `| permission_guard | bridge/cursor-bridge/permission-guard.py |`):
++
++```mermaid
++    subgraph sg_claude_hooks["Started by Claude Code hooks"]
++        permission_guard["permission-guard.py (PreToolUse)"]
++    end
++```
++
++The diagram draws no edge from `permission_guard`: the guard imports and loads no bridge module. The fix adds no import of a bridge module. If the fix cannot be done within the diagram, stop and report the conflict instead of deviating.
++
++## Requirements
++Use the labels F1 to F5 in your report.
++
++1. **F1. A body the guard cannot read, whatever the endpoint.** In the gh branch, a `gh api` command (`group == "api"`) is refused where any of its words is `--input`, begins `--input=`, begins `@`, or holds `=@`. The test no longer depends on `sub`. The refusal's text names a body read from a file or standard input that the guard cannot read, and keeps the advice to write the query or fields on the command line. A raw field (`-f key=@x`) is refused with it: an accepted over-refusal.
++2. **F2. The merge endpoint, whatever the method and the spelling.** A `gh api` command is refused where any of its words, read as follows, holds `/pulls/<segment>/merge` with `<segment>` one or more characters other than `/`: lower-case the word; read `%2f` as `/` and `%2e` as `.` (in any case); then read its runs of `/` as one and resolve its `.` and `..` segments as a URL path's are (`posixpath.normpath` does both; the guard already imports `os`, so `os.path` is not it on Windows: use `posixpath`, a standard-library import, the one import this fix may add). The method is not read; delete the method loop (lines 2337-2344). The refusal's text names a pull request's merge endpoint and merging outside the gate. No other endpoint is refused by this rule.
++3. **F3. The pinned case.** As the Scope says: `"gh api repos/o/r/pulls/12/merge"` moves from `test_allowed` to the refused list in `tests/test_permission_guard.py`.
++4. **F4. The docstring.** Lines 5-6 say the REST route `gh api … /pulls/<n>/merge` is refused whatever its method; lines 26-27 drop "`-XPUT` is a method" and say a `gh api` body read from a file or standard input is refused unread, whatever the endpoint. No other docstring text changes.
++5. **F5. Your cases, below the marker in `tests/test_bug046.py`.** Each names `BUG-046` or `R-082` in its name, docstring or a comment, runs the guard from the `plain` folder under both tools, and gives a parametrized case a plain `ids=` list. They cover at least: the glued and clustered forms of `--input` and `-F` (`--input=body.json`, `-Fquery=@q.graphql`, `--field=query=@q.graphql`) on a REST path as well as on `graphql`; a merge endpoint spelled with a trailing query or fragment (`repos/o/r/pulls/5/merge?x=1`) and with `%2E` segments; an endpoint that is not a pull request's merge endpoint and passes (`repos/o/r/issues/5/merge`); and `repos/o/r/pulls/5/mergeable-report`, which the rule as written refuses because it holds `/pulls/5/merge`: pin that refusal as the accepted over-refusal and say so in a comment.
++
++## Acceptance criteria
++- [ ] Each case above the marker in `tests/test_bug046.py` passes: the red cases named in the Objective go from red to green, and the green cases stay green.
++- [ ] Every case you add below the marker passes, and each names BUG-046 or R-082.
++- [ ] `python -m pytest -q tests/test_permission_guard.py tests/test_permission_guard_a4.py tests/test_program_permission_guard.py tests/test_bug045.py` passes whole.
++- [ ] `python -m pytest -q tests/test_program_ready.py tests/test_allowlist.py tests/test_task032_supervisor_guard.py tests/test_tests_windowless.py` passes whole.
++- [ ] The named causes are addressed at the mechanisms the evidence points at: no refusal of `gh api` reads a method from the command's words any more, and the body refusal no longer depends on the endpoint word.
++- [ ] `gh_words`, `merge_reason`, the merge-mutation refusal and the alias refusal are byte-identical to f3fa7b4.
++- [ ] No test above the marker edited; no `DEBUG-BUG-` line or stray print left.
++- [ ] `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` prints `RESULT: SOURCES MATCH`; `python tools/dump-cli.py --check` exits 0; `git status --short` does not list `bridge/cursor-bridge/VERSION` at the end, and it reads `2026.11.12a`.
++- [ ] `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks` passes.
++- [ ] R-082 is fully met for this reading: no stand-in, placeholder or "later" text.
++- [ ] No new Semgrep high findings; no exception escapes the guard as a traceback and none is swallowed into a silent pass (ASVS L2).
++
++## Constraints
++- Fix the cause; never suppress its tests' symptom. No retry, no broad `try/except`, no widened tolerance, no added `sleep`, no null-check that hides a wrong value, and no special case for the reproduction commands.
++- Do not edit the reproduction tests or anything else above the marker in `tests/test_bug046.py`.
++- Do not leave any `DEBUG-BUG-` line or stray print.
++- **If you believe the real cause is different from the one named, stop, do not change code, and report why in your summary**; the supervisor will re-diagnose.
++- The guard is a PreToolUse hook that must answer within its deadline (`_READ_LIMIT`): the fix adds no work that grows with anything but the words already read, and no call to a program, the network or the filesystem.
++- Do not add dependencies. The one import this fix may add is `posixpath` (standard library).
++- Never run `gh`, and run nothing that reaches the network.
++- Do not read or write any file outside this workspace (the folder you were started in), apart from pytest's own `tmp_path` folders. Everything you need is inside it; everything you produce goes inside it.
++- No secret is needed or used. Refer to `.env` and configuration keys by name only; never reproduce a value.
++- If the brief, the rules, or the tooling got in your way (an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason), append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall: one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks.
++- This increment talks to no external service.
++- **Windowless launches.** The guard starts no new process in this fix. In tests a launch needs no `creationflags` argument, because `tests/conftest.py` makes every launch windowless. Where a test does write a `creationflags` argument, that line must carry the literal text `CREATE_NO_WINDOW` on the same line (`tests/test_tests_windowless.py` refuses it otherwise). Any string in a test that holds Python launch code (`os.system` and the like) is written in concatenated parts. Every subprocess call in a test has a timeout, and each child ends before its test does.
++- **Run every command synchronously, in the foreground, and wait for it to end.** Start nothing in the background, leave no process running when you finish, and never start a server, a watcher or a daemon.
++- **Do NOT run the full `tests/` tree** (`python -m pytest`, `python -m pytest tests`, or any command that collects all of it). Run only the test files the Done section names, exactly as written there, with no `PYTHONPATH` or other environment change. The supervisor runs the full suite.
++- Do not refactor code outside the two refusals and the docstring sentences, even if it looks wrong.
++- Never run the product, a migration, a seed or a test against the owner's live data. Run the guard only from tests on folders under `tmp_path` (Context, "Development data").
++- No value in this increment is the owner's (rule 52).
++- Follow existing conventions in the files you touch: ASCII program text, and ASCII output.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`. You read with `git status`, `git diff` and `git log` only. The single exception is `git restore bridge/cursor-bridge/VERSION`, at Done step 3.
++- Every verification command is written in the Done section in full; run exactly those, from the Workspace root. The mutation check is the supervisor's, after your run: write no mutation script, apply no mutation by any script, and leave none in the diff. You may mutate by hand in process to test a case of yours; if you do, list each mutation and what caught it.
++- **Known failures.** None is known in the files the Done section runs, apart from the reproduction cases this fix turns green. If a case fails that this change did not cause, report it by its test id with its failure lines and fix none.
++- Prefer reuse over new code. Write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a security, observability or accessibility requirement stated above.
++- Rules in force for you: `.cursor/rules/secure-coding.mdc`, `.cursor/rules/workspace-boundary.mdc` and the frozen `minimal-code.mdc`.
++
++## Done
++Your report is the file `handoff/BUG-046-report.md`. Write it as you go, so that nothing of it is lost if your run ends early. It records what you did, what you changed, what you ran and what it printed, and what you could not do. It names no computer path and no user name: write `<Workspace>` for the repository folder and `<tmp>` for a temporary folder, including in quoted command output.
++
++When you finish, it holds:
++- a list of every file you changed;
++- a one-paragraph summary of what you did;
++- one sentence stating how the change addresses each named cause (the method read from every word; the body refusal tied to the word `graphql`);
++- for each of F1 to F4, one sentence on what changed, naming the function and its lines as the file stands after your change, and the tests that pin it; for F5, each case you added with its id and what it pins;
++- every command of the list below with its output;
++- a section headed exactly `Assumed, not verified`, as the report's last section.
++
++The `Assumed, not verified` section lists every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. Examples:
++- whether the PowerShell tool's reading gives the guard the same words as the Bash tool's for a word beginning `@`;
++- whether any `gh api` endpoint the loop or a reviewer uses holds `/pulls/<n>/merge` in a read;
++- whether `posixpath.normpath` resolves a leading `..` the way GitHub's server would.
++
++Write one item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Run these from the Workspace root, in this order, after your last edit to the program and the tests, each synchronously in the foreground, with no `PYTHONPATH` or other environment change:
++1. `git status --short`
++2. `python tools/make-manifest.py`
++3. `git restore bridge/cursor-bridge/VERSION`
++4. `python tools/dump-cli.py --check`; only if it fails, `python tools/dump-cli.py` and then `python tools/dump-cli.py --check` again (expect exit 0)
++5. `git status --short` (`bridge/cursor-bridge/VERSION` must not be listed; if it is, report it)
++6. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` (expect `RESULT: SOURCES MATCH`)
++7. `python -m pytest -q -rs tests/test_bug046.py`
++8. `python -m pytest -q tests/test_permission_guard.py tests/test_permission_guard_a4.py tests/test_program_permission_guard.py tests/test_bug045.py`
++9. `python -m pytest -q tests/test_program_ready.py tests/test_allowlist.py tests/test_task032_supervisor_guard.py tests/test_tests_windowless.py`
++10. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++11. `git rev-parse HEAD` and `git status --short`
++
++Quoting rules:
++- Every command you ran is quoted in the report with the lines it printed, verbatim, in a fenced block.
++- Each pytest summary line is quoted verbatim in a fenced block; never restate a count in prose.
++- A claim that a check passed quotes the output line that shows it, and a number of failing or skipped cases is backed by the pytest lines naming them.
++- Each mutation is listed with what caught it.
++- A command you did not run is written `not run`, never described as run.
++- Write the report's results after step 11, naming the commit its counts belong to (`git rev-parse HEAD`) and whether the working tree then held uncommitted changes (`git status --short`).
++
++Your last message is the summary and the report file's path, and nothing follows it. The supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/tests/test_bug046.py b/tests/test_bug046.py
+new file mode 100644
+index 0000000..ec92b34
+--- /dev/null
++++ b/tests/test_bug046.py
+@@ -0,0 +1,296 @@
++"""BUG-046 (R-082, R-083): the permission guard's refusal of a merge through `gh api` reads the method from words gh reads as other options' values, and its refusal of a body it cannot read holds only for the bare endpoint word `graphql`.
++
++The supervisor's reproduction tests, written before the builder's run (docs/debug/BUG-046.md). Each runs
++permission-guard.py as the hook runs it (the hook's JSON on standard input), under the Bash tool and the PowerShell
++tool, from a scratch folder that is no bridge Workspace, and reads the exit code (2 refuses, 0 lets through).
++
++The causes: permission-guard.py's `gh api` branch of `_check_word_list` takes the method from every word, so a
++value-taking option's value that looks like a method (`-p -XGET`, `-H --method=GET`) is read as the last method, where gh
++(pflag) reads it as that option's value and sends the method written before it; and its refusal of a query read from a file
++or standard input runs only where gh_words reads the endpoint as exactly `graphql`, where gh also takes a URL or a path to
++the GraphQL endpoint (`https://api.github.com/graphql`, `/graphql`) and a body from `--input`. Found by the security audit
++of TASK-083's round 4 (docs/HARDENING.md, TASK-083, ruling 2).
++
++enforces: docs/DESIGN.md, "Change: the program release", "The permission guard, permission-guard.py (C5)"; R-082; R-083;
++docs/INVENTORY.md, Decisions, the permission guard's threat-model row (a refused action named in the command's own words).
++"""
++import json
++import os
++import subprocess
++import sys
++
++import pytest
++
++HERE = os.path.dirname(os.path.abspath(__file__))
++PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "permission-guard.py")
++TOOLS = ["Bash", "PowerShell"]
++
++
++def guard(tool, command, cwd):
++    payload = {"tool_name": tool, "tool_input": {"command": command}, "permission_mode": "auto", "cwd": str(cwd)}
++    p = subprocess.run([sys.executable, PROG], input=json.dumps(payload), capture_output=True, text=True, timeout=120, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
++    return p.returncode, p.stderr
++
++
++@pytest.fixture
++def plain(tmp_path):
++    """A folder that is no bridge Workspace."""
++    d = tmp_path / "plain"
++    d.mkdir()
++    return d
++
++
++# A merge through the REST endpoint whose method gh reads as PUT, a word that looks like a method standing as another
++# option's value. Each is refused (red on f3fa7b4).
++METHOD_AS_A_VALUE = [
++    ("preview-value-short-method", "gh api -X PUT repos/o/r/pulls/5/merge -p -XGET"),
++    ("header-value-long-method", "gh api --method PUT repos/o/r/pulls/5/merge -H --method=GET"),
++    ("jq-value-short-method", "gh api -X PUT repos/o/r/pulls/5/merge -q -XGET"),
++    ("template-value-long-method", "gh api -XPUT repos/o/r/pulls/5/merge -t --method=GET"),
++]
++
++
++@pytest.mark.parametrize("tool", TOOLS)
++@pytest.mark.parametrize("command", [c for _, c in METHOD_AS_A_VALUE], ids=[n for n, _ in METHOD_AS_A_VALUE])
++def test_bug046_a_method_word_that_is_another_options_value_never_lets_a_merge_through(plain, tool, command):
++    rc, err = guard(tool, command, plain)
++    assert rc == 2 and "refused" in err, (tool, command, rc, err)
++
++
++# A query or body read from a file or standard input, sent to the GraphQL endpoint named another way than the bare word.
++# Each is refused (red on f3fa7b4).
++BODY_IT_CANNOT_READ = [
++    ("url-field-from-a-file", "gh api https://api.github.com/graphql -F query=@q.graphql"),
++    ("url-input-file", "gh api https://api.github.com/graphql --input body.json"),
++    ("path-field-from-a-file", "gh api /graphql -F query=@q.graphql"),
++    ("path-input-standard-input", "gh api /graphql --input -"),
++    ("url-long-field-from-standard-input", "gh api https://api.github.com/graphql --field=query=@-"),
++]
++
++
++@pytest.mark.parametrize("tool", TOOLS)
++@pytest.mark.parametrize("command", [c for _, c in BODY_IT_CANNOT_READ], ids=[n for n, _ in BODY_IT_CANNOT_READ])
++def test_bug046_a_body_the_guard_cannot_read_is_refused_whatever_the_endpoint(plain, tool, command):
++    rc, err = guard(tool, command, plain)
++    assert rc == 2 and "refused" in err, (tool, command, rc, err)
++
++
++# The ruling F2: a pull request's merge endpoint named in any form is refused whatever the method, a read of it as well
++# (the bridge never reads it; `gh pr view <n> --json mergedAt,mergeable` is the read). Each is refused.
++MERGE_ENDPOINT_FORMS = [
++    ("read-no-method", "gh api repos/o/r/pulls/12/merge"),
++    ("put-doubled-slashes", "gh api -X PUT repos/o/r/pulls//5//merge"),
++    ("put-upper-case", "gh api -X PUT repos/o/r/PULLS/5/MERGE"),
++    ("put-dot-segment", "gh api -X PUT repos/o/r/pulls/5/./merge"),
++    ("put-dot-dot-segment", "gh api -X PUT repos/o/r/pulls/5/x/../merge"),
++    ("put-encoded-slashes", "gh api -X PUT repos/o/r/pulls%2F5%2Fmerge"),
++    ("put-url", "gh api -X PUT https://api.github.com/repos/o/r/pulls/5/merge"),
++    ("get-method-given", "gh api -X GET repos/o/r/pulls/5/merge"),
++]
++
++
++@pytest.mark.parametrize("tool", TOOLS)
++@pytest.mark.parametrize("command", [c for _, c in MERGE_ENDPOINT_FORMS], ids=[n for n, _ in MERGE_ENDPOINT_FORMS])
++def test_bug046_the_merge_endpoint_is_refused_whatever_the_method_or_spelling(plain, tool, command):
++    rc, err = guard(tool, command, plain)
++    assert rc == 2 and "refused" in err, (tool, command, rc, err)
++
++
++# The reads and writes the bridge and an ordinary session make through gh api, none a merge and none with a body read from
++# a file. Each passes, before the fix and after it.
++ORDINARY_API_CALLS = [
++    ("pull-request-read", "gh api repos/o/r/pulls/12 --jq .mergeable"),
++    ("pull-request-read-with-header", "gh api -H Accept:application/json repos/OWNER/REPO/pulls/12"),
++    ("vulnerability-alerts", "gh api repos/OWNER/REPO/vulnerability-alerts"),
++    ("dependabot-alerts-paged", "gh api --paginate 'repos/OWNER/REPO/dependabot/alerts?state=open'"),
++    ("graphql-read-on-the-command-line", "gh api graphql -f 'query=query { viewer { login } }'"),
++    ("search-with-get-and-a-field", "gh api -X GET search/issues -f q=repo:cli/cli"),
++    ("issue-comment-post", "gh api repos/o/r/issues/5/comments -f body=hi"),
++    ("check-runs-read", "gh api 'repos/OWNER/REPO/commits/abc/check-runs?per_page=100'"),
++]
++
++
++@pytest.mark.parametrize("tool", TOOLS)
++@pytest.mark.parametrize("command", [c for _, c in ORDINARY_API_CALLS], ids=[n for n, _ in ORDINARY_API_CALLS])
++def test_bug046_ordinary_api_calls_still_pass(plain, tool, command):
++    rc, err = guard(tool, command, plain)
++    assert rc == 0, (tool, command, rc, err)
++
++
++# ---------------------------------------------------------------- round 1's findings (the supervisor, Review A and the security audit, 2026-11-17)
++# Round 1 resolved dot segments over the whole word, so a `..` in a query or fragment, or a trailing `merge/..`, erased the
++# merge path gh requests (a regression: f3fa7b4 refused each); and it decoded only `%2f` and `%2e`, so an escaped letter of
++# the path (`%70` is `p`, `%65` is `e`) passed. Each is refused under both tools, with the merge endpoint in the reason.
++ROUND1_MERGE_SPELLINGS = [
++    ("query-dot-segments", "gh api -X PUT 'repos/o/r/pulls/5/merge?a=/../../x'"),
++    ("fragment-dot-segments", "gh api -X PUT 'repos/o/r/pulls/5/merge#/../../x'"),
++    ("trailing-dot-dot", "gh api -X PUT repos/o/r/pulls/5/merge/.."),
++    ("trailing-encoded-dot-dot", "gh api -X PUT repos/o/r/pulls/5/merge/%2e%2e"),
++    ("trailing-mixed-dot-dot", "gh api -X PUT 'repos/o/r/pulls/5/merge/.%2e'"),
++    ("query-encoded-slashes-dot-segments", "gh api -X PUT 'repos/o/r/pulls/5/merge?a=%2f..%2f..%2fx'"),
++    ("path-dot-dot-before-a-query-dot-dot", "gh api -X PUT 'repos/o/r/pulls/5/x/../merge?q=/..'"),
++    ("escaped-first-letter", "gh api -X PUT repos/o/r/%70ulls/5/merge"),
++    ("escaped-last-letter", "gh api -X PUT repos/o/r/pulls/5/merg%65"),
++    ("escaped-middle-letter", "gh api -X PUT repos/o/r/pulls/5/me%72ge"),
++    ("every-letter-escaped", "gh api -X PUT repos/o/r/%70%75%6c%6c%73/5/%6d%65%72%67%65"),
++    ("escaped-upper-hex", "gh api -X PUT repos/o/r/pull%73/5/%6Derge"),
++    ("encoded-parent-segment", "gh api -X PUT repos/o/r/%2E%2E/r/pulls/5/merge"),
++]
++
++
++@pytest.mark.parametrize("tool", TOOLS)
++@pytest.mark.parametrize("command", [c for _, c in ROUND1_MERGE_SPELLINGS], ids=[n for n, _ in ROUND1_MERGE_SPELLINGS])
++def test_bug046_r1_a_merge_endpoint_hidden_by_a_query_a_dot_segment_or_an_escape_is_refused(plain, tool, command):
++    rc, err = guard(tool, command, plain)
++    assert rc == 2 and "merge endpoint" in err, (tool, command, rc, err)
++
++
++# A merge mutation's name written with escapes in a word gh sends (the security audit's advisory, the same family): refused
++# under both tools as a merge mutation.
++ROUND1_ESCAPED_MUTATIONS = [
++    ("query-string-escaped-name", "gh api -X POST 'graphql?query=mutation%7Bmerge%50ullRequest(input:%7BpullRequestId:%22x%22%7D)%7BclientMutationId%7D%7D'"),
++    ("url-query-string-escaped-name", "gh api -X POST 'https://api.github.com/graphql?query=mutation%7B%65nablePullRequestAutoMerge(input:%7B%7D)%7BclientMutationId%7D%7D'"),
++]
++
++
++@pytest.mark.parametrize("tool", TOOLS)
++@pytest.mark.parametrize("command", [c for _, c in ROUND1_ESCAPED_MUTATIONS], ids=[n for n, _ in ROUND1_ESCAPED_MUTATIONS])
++def test_bug046_r1_an_escaped_merge_mutation_name_is_refused(plain, tool, command):
++    rc, err = guard(tool, command, plain)
++    assert rc == 2 and "merge mutation" in err, (tool, command, rc, err)
++
++
++# Ordinary calls with escapes or queries that name no merge endpoint: each passes, before round 2 and after it.
++ROUND1_ORDINARY = [
++    ("escaped-space-in-a-search", "gh api 'search/issues?q=repo%3Ao%2Fr%20is%3Aopen'"),
++    ("pull-request-files-paged", "gh api 'repos/o/r/pulls/5/files?per_page=100'"),
++    ("issue-merge-escaped", "gh api repos/o/r/issues/5/%6derge"),
++]
++
++
++@pytest.mark.parametrize("tool", TOOLS)
++@pytest.mark.parametrize("command", [c for _, c in ROUND1_ORDINARY], ids=[n for n, _ in ROUND1_ORDINARY])
++def test_bug046_r1_ordinary_calls_with_escapes_or_queries_pass(plain, tool, command):
++    rc, err = guard(tool, command, plain)
++    assert rc == 0, (tool, command, rc, err)
++
++
++# ---------------------------------------------------------------- round 2's findings (Review A and the security audit, 2026-11-17)
++# Round 2 decoded the word and then cut it at its first `?` or `#`, where gh cuts only at a literal one: an escaped `%3F` or
++# `%23` (at any nesting) stays inside the path gh sends, and the `..` after it then resolves to the merge endpoint; and a
++# decoded `%2F` split one segment into two, so `..` removed only half of it. Each is refused under both tools, with the
++# merge endpoint in the reason (round 3: a word whose decoded, lower-cased text holds both `pulls` and `merge`).
++ROUND2_MERGE_SPELLINGS = [
++    ("escaped-hash-segment", "gh api -X PUT 'repos/o/r/pulls/5/%23/../merge'"),
++    ("escaped-question-segment", "gh api -X PUT 'repos/o/r/pulls/5/%3F/../merge'"),
++    ("escaped-question-inside-a-segment", "gh api -X PUT 'repos/o/r/pulls/5/a%3Fb/../merge'"),
++    ("doubly-escaped-question", "gh api -X PUT 'repos/o/r/pulls/5/%253F/../merge'"),
++    ("escaped-hash-full-url", "gh api -X PUT 'https://api.github.com/repos/o/r/pulls/5/%23/../merge'"),
++    ("escaped-question-before-the-number", "gh api -X PUT 'repos/o/r/pulls/x%3F/../5/merge'"),
++    ("escaped-hash-before-the-number", "gh api -X PUT 'repos/o/r/pulls/x%23/../5/merge'"),
++    ("escaped-question-and-encoded-dots", "gh api -X PUT 'repos/o/r/pulls/5/a%3f/%2e%2e/merge'"),
++    ("escaped-slash-inside-a-segment", "gh api -X PUT 'repos/o/r/pulls/5/a%2Fb/../merge'"),
++]
++
++
++@pytest.mark.parametrize("tool", TOOLS)
++@pytest.mark.parametrize("command", [c for _, c in ROUND2_MERGE_SPELLINGS], ids=[n for n, _ in ROUND2_MERGE_SPELLINGS])
++def test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint(plain, tool, command):
++    rc, err = guard(tool, command, plain)
++    assert rc == 2 and "merge endpoint" in err, (tool, command, rc, err)
++
++
++# Ordinary calls that name pull requests or merges in separate words: each passes, before round 3 and after it.
++ROUND2_ORDINARY = [
++    ("pull-requests-listed-with-a-merged-filter", "gh api repos/o/r/pulls --jq '.[] | select(.merged_at)'"),
++    ("pull-request-commits", "gh api repos/o/r/pulls/5/commits"),
++    ("merged-search", "gh api 'search/issues?q=repo:o/r+is:pr+is:merged'"),
++]
++
++
++@pytest.mark.parametrize("tool", TOOLS)
++@pytest.mark.parametrize("command", [c for _, c in ROUND2_ORDINARY], ids=[n for n, _ in ROUND2_ORDINARY])
++def test_bug046_r2_pulls_and_merge_in_separate_words_pass(plain, tool, command):
++    rc, err = guard(tool, command, plain)
++    assert rc == 0, (tool, command, rc, err)
++
++
++# ---------------------------------------------------------------- the builder adds its cases below this line and edits nothing above it
++
++
++# BUG-046 (R-082): --input= and a field glued to @, on a REST path and on graphql.
++# PowerShell refuses a single-dash switch that holds a dot before the body rule, so those two rows use -Fquery=@- there. Bash keeps the dotted name.
++GLUED_UNREADABLE_BODIES = [
++    ("rest-input-equals", "gh api repos/o/r/issues/5/comments --input=body.json", "gh api repos/o/r/issues/5/comments --input=body.json"),
++    ("graphql-input-equals", "gh api graphql --input=body.json", "gh api graphql --input=body.json"),
++    ("rest-glued-field", "gh api repos/o/r/issues/5/comments -Fquery=@q.graphql", "gh api repos/o/r/issues/5/comments -Fquery=@-"),
++    ("graphql-glued-field", "gh api graphql -Fquery=@q.graphql", "gh api graphql -Fquery=@-"),
++    ("rest-long-field", "gh api repos/o/r/issues/5/comments --field=query=@q.graphql", "gh api repos/o/r/issues/5/comments --field=query=@q.graphql"),
++    ("graphql-long-field", "gh api graphql --field=query=@q.graphql", "gh api graphql --field=query=@q.graphql"),
++    # Accepted over-refusal (BUG-046 F1): -f sends the value as written, and key=@x is refused with the file reads.
++    ("raw-field-at", "gh api repos/o/r/issues/5/comments -f key=@x", "gh api repos/o/r/issues/5/comments -f key=@x"),
++]
++
++
++@pytest.mark.parametrize("tool", TOOLS, ids=["Bash", "PowerShell"])
++@pytest.mark.parametrize("name,bash,powershell", GLUED_UNREADABLE_BODIES, ids=[n for n, _, _ in GLUED_UNREADABLE_BODIES])
++def test_bug046_glued_and_clustered_unreadable_bodies_are_refused_on_rest_and_graphql(plain, tool, name, bash, powershell):
++    """BUG-046 (R-082): a body the guard cannot read is refused on a REST path and on graphql."""
++    command = powershell if tool == "PowerShell" else bash
++    rc, err = guard(tool, command, plain)
++    assert rc == 2 and "refused" in err and "body read from a file or standard input" in err, (tool, name, command, rc, err)
++
++
++# BUG-046 (R-082): the merge endpoint with a query, a fragment, or %2E segments. The query is quoted because an unquoted ? is a glob.
++MERGE_ENDPOINT_SPELLINGS = [
++    ("trailing-query", "gh api 'repos/o/r/pulls/5/merge?x=1'"),
++    ("trailing-fragment", "gh api repos/o/r/pulls/5/merge#frag"),
++    ("percent-2e-dot", "gh api repos/o/r/pulls/5/%2E/merge"),
++    ("percent-2e-dot-before-pulls", "gh api repos/o/r/%2E/pulls/5/merge"),
++    ("doubly-escaped-letter", "gh api -X PUT repos/o/r/%2570ulls/5/merge"),
++]
++
++
++@pytest.mark.parametrize("tool", TOOLS, ids=["Bash", "PowerShell"])
++@pytest.mark.parametrize("command", [c for _, c in MERGE_ENDPOINT_SPELLINGS], ids=[n for n, _ in MERGE_ENDPOINT_SPELLINGS])
++def test_bug046_a_merge_endpoint_with_a_query_fragment_or_percent_2e_is_refused(plain, tool, command):
++    """BUG-046 (R-082): those spellings still name a pull request's merge endpoint."""
++    rc, err = guard(tool, command, plain)
++    assert rc == 2 and "refused" in err and "merge endpoint" in err, (tool, command, rc, err)
++
++
++@pytest.mark.parametrize("tool", TOOLS, ids=["Bash", "PowerShell"])
++def test_bug046_an_issues_merge_endpoint_passes(plain, tool):
++    """BUG-046 (R-082): repos/o/r/issues/5/merge is not a pull request's merge endpoint."""
++    rc, err = guard(tool, "gh api repos/o/r/issues/5/merge", plain)
++    assert rc == 0, (tool, rc, err)
++
++
++@pytest.mark.parametrize("tool", TOOLS, ids=["Bash", "PowerShell"])
++def test_bug046_mergeable_report_is_refused(plain, tool):
++    """BUG-046 (R-082): accepted over-refusal. The rule refuses a word that holds /pulls/<segment>/merge, so repos/o/r/pulls/5/mergeable-report is refused because it holds /pulls/5/merge."""
++    rc, err = guard(tool, "gh api repos/o/r/pulls/5/mergeable-report", plain)
++    assert rc == 2 and "refused" in err and "merge endpoint" in err, (tool, rc, err)
++
++
++# BUG-046 (R-082): the two names in one word after decoding, in reverse order, and a comments path that holds only pulls.
++@pytest.mark.parametrize("tool", TOOLS, ids=["Bash", "PowerShell"])
++def test_bug046_r3_pulls_and_merge_only_after_decoding_are_refused(plain, tool):
++    """BUG-046 (R-082): pul%6cs and m%65rge are pulls and merge only once the word is decoded."""
++    rc, err = guard(tool, "gh api repos/o/r/pul%6cs/5/m%65rge", plain)
++    assert rc == 2 and "refused" in err and "merge endpoint" in err, (tool, rc, err)
++
++
++@pytest.mark.parametrize("tool", TOOLS, ids=["Bash", "PowerShell"])
++def test_bug046_r3_merge_then_pulls_in_one_field_is_refused(plain, tool):
++    # Accepted over-refusal (BUG-046, R-082): -f sends the value as written, and body=merge the pulls holds the two names in reverse order in one word.
++    rc, err = guard(tool, "gh api repos/o/r/issues/5/comments -f 'body=merge the pulls'", plain)
++    assert rc == 2 and "refused" in err and "merge endpoint" in err, (tool, rc, err)
++
++
++@pytest.mark.parametrize("tool", TOOLS, ids=["Bash", "PowerShell"])
++def test_bug046_r3_pull_request_comments_pass(plain, tool):
++    """BUG-046 (R-082): repos/o/r/pulls/5/comments holds pulls and does not hold merge."""
++    rc, err = guard(tool, "gh api repos/o/r/pulls/5/comments", plain)
++    assert rc == 0, (tool, rc, err)
++
+diff --git a/tests/test_permission_guard.py b/tests/test_permission_guard.py
+index 185bf7f..5aa0206 100644
+--- a/tests/test_permission_guard.py
++++ b/tests/test_permission_guard.py
+@@ -58,6 +58,7 @@ def recorded_repo(tmp_path):
+     "cd x && gh pr merge 5 --squash --admin",
+     "gh api -X PUT repos/o/r/pulls/12/merge -f merge_method=squash",
+     "gh api --method PUT /repos/o/r/pulls/12/merge",
++    "gh api repos/o/r/pulls/12/merge",
+     "git worktree remove --force ../Worktrees/TASK-012",
+     "git worktree remove -f ../Worktrees/TASK-012",
+     "git worktree remove ../Worktrees/TASK-012 --force",
+@@ -180,7 +181,6 @@ def test_refused(tool, cmd):
+     "git push --follow-tags origin main",
+     "git commit -m \"docs: never push with --force\"",
+     "git commit -m 'why -f is forbidden'",
+-    "gh api repos/o/r/pulls/12/merge",
+     "gh api repos/o/r/pulls/12 --jq .mergeable",
+     "gh pr view 12 --json comments",
+     "python ~/.claude/cursor-bridge/bridge-run.py --limit 7200 -- cursor-agent -p --force --model x \"Read handoff/TASK-012.md and implement; do not git push\"",
