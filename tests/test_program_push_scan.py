@@ -310,6 +310,23 @@ def test_r087_owner_2026_11_18_the_configured_identity_is_no_finding_anywhere(tm
     silent(out)
 
 
+def test_r087_owner_2026_11_18_a_searched_name_equal_to_an_identity_name_is_dropped(tmp_path):
+    """The owner's decision of 2026-11-18 (rule 52), where it bites: the profile folder's name equals the configured
+    identity's user.name and the login equals its address's local part, so both are dropped as public and pass in the
+    message, the author and committer lines and an added line; the identity's address holds a further searched name in
+    its domain, which is no finding in the identity's own author and committer lines; that name is still searched in an
+    added line, so the scan is not switched off."""
+    s = Scratch(tmp_path)
+    s.gitconfig.write_text("[user]\n\tname = %s\n\temail = %s\n[core]\n\tautocrlf = false\n"
+                           % (PROFILE_NAME, LOGIN + "@" + EXTRA.lower() + ".invalid"), encoding="utf-8")
+    short = s.commit({"notes.md": "by %s\nmail %s\nand %s\n" % (PROFILE_NAME, LOGIN, EXTRA)},
+                     message="from %s and %s" % (PROFILE_NAME, LOGIN))
+    rc, out = s.run()
+    assert rc == 1, out
+    assert hits(out) == [hit(short, "line notes.md:3", "name")], out
+    silent(out)
+
+
 def test_r087_a_derived_name_equal_to_the_remote_s_owner_is_dropped_and_not_printed(tmp_path):
     """R-087: a derived name equal to the owner segment of the remote's address is public with the repository: dropped,
     the note counting such names and printing none."""
