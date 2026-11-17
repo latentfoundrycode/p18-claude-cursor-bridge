@@ -1998,6 +1998,7 @@ def review_family_refusal(argv, folder):
 
 
 WATCH_POLL = 15                                          # seconds between polls of the wait before a CI watch (R-085)
+WATCH_FAIL_FAST = ("failure", "timed_out", "action_required")  # gh's fail bucket (cli/cli pkg/cmd/pr/checks/aggregate.go)
 _WATCH_REPO = "{owner}/{repo}"                        # the same repository name the review guard's prove_ci reads
 
 
@@ -2168,10 +2169,13 @@ def _run_label(run):
     return "run %s (%s)" % (_watch_plain(run.get("name")), _watch_plain(run.get("event")))
 
 
-def _failed_check(latest):
+def _failed_check(latest, named):
+    """The first latest check gh reports failed. Under the base's list, the first of those that holds a named context."""
+    contexts = (named["contexts"] or []) if named["kind"] == "base" else None
     for item in latest.get("checks") or []:
-        if isinstance(item, dict) and bridge_env.ci_class(item, "check") == "failed":
-            return item
+        if isinstance(item, dict) and item.get("status") == "completed" and item.get("conclusion") in WATCH_FAIL_FAST:
+            if contexts is None or any(_check_holds(item, entry) for entry in contexts):
+                return item
     return None
 
 
@@ -2287,13 +2291,14 @@ def _pending_run_count(latest):
 
 
 def _watch_decision(named, latest, restart):
-    """(ready, what, problem). A failed latest check starts the watch at once, so --fail-fast can report it.
+    """(ready, what, problem). A latest check gh reports failed starts the watch at once, so --fail-fast can report it.
 
-    Under the base's list the watch keeps --required, so only a failure that holds a named context counts:
+    The early start reads every latest check. gh's fail bucket (aggregate.go) is failure, timed_out and action_required.
+    Under the base's list the watch keeps --required, so only such a failure that holds a named context counts:
     gh would not show a check the rule does not name. Under the default branch's list and the runs, gh watches
-    every check, and any failed latest check starts the watch.
+    every check, and the first such failure starts the watch.
     """
-    failed = _failed_check(latest)
+    failed = _failed_check(latest, named)
     if failed is not None and (named["kind"] != "base" or any(_check_holds(failed, entry) for entry in named["contexts"] or [])):
         what = "check %s failed (%s)" % (_watch_plain(failed.get("name")), _watch_plain(failed.get("conclusion")))
         return True, what, None
@@ -3079,6 +3084,7 @@ def main():
                 sys.stderr.flush()
                 entry.update(seconds=int(time.time() - mark), exit=124)
                 write_log(folder, entry)        # before the job ends this process too
+                remove_pid_file(box["pid_file"])  # before killer(); on Windows the job ends this process
                 try:
                     killer()                    # on Windows this ends this process too, with exit code 124
                 except OSError as e:

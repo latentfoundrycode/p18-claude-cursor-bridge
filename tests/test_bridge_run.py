@@ -774,3 +774,39 @@ def test_r085_d004_a_ready_poll_past_the_limit_names_the_reading_it_would_have_s
     left = "ready (every required context has a check or a status), but no time left to start the watch"
     limit_lines = [l for l in case.lines() if l.startswith("bridge-run: LIMIT")]
     assert len(limit_lines) == 1 and left in limit_lines[0] and "poll failed" not in limit_lines[0], case.err
+
+
+@pytest.mark.parametrize("word", ["neutral", "cancelled"], ids=["neutral", "cancelled"])
+def test_r085_r3_under_the_runs_a_conclusion_gh_does_not_count_failed_does_not_start_the_watch(tmp_path, monkeypatch, capsys, program, word):
+    """R-085: under the runs, neutral and cancelled are not failures gh reports. The lint run has no check yet, so the
+    runs' reading does not start the watch, and a neutral or cancelled security floor must not start it either."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    first = dict(wait.NONE_ANYWHERE, checks="wait-checks-floor-%s.json" % word, runs="wait-runs-two-running.json")
+    rc = case.run([first, dict(wait.NONE_ANYWHERE, **wait.GREEN)])
+    assert rc == 0 and len(case.started()) == 1, case.err
+    assert case.clock.sleeps == [case.br.WATCH_POLL], case.clock.sleeps
+    assert not any("failed (" in l for l in case.lines()), case.err
+
+
+def test_r085_r3_under_the_runs_action_required_starts_before_the_other_run_has_a_check(tmp_path, monkeypatch, capsys, program):
+    """R-085: action_required is a failure gh reports, so under the runs the watch starts at once while the lint run still has no check."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    state = dict(wait.NONE_ANYWHERE, checks="wait-checks-floor-action-required.json", runs="wait-runs-two-running.json")
+    rc = case.run([state], exits=(1,))
+    assert rc == 1 and len(case.started()) == 1 and case.clock.sleeps == [], case.err
+    assert any("check security floor failed (action_required)" in l and "the watch starts" in l for l in case.lines()), case.err
+
+
+def test_r085_r3_under_the_default_list_the_first_failure_gh_reports_is_the_one_named(tmp_path, monkeypatch, capsys, program):
+    """R-085: under the default branch's list the first check gh reports failed starts the watch, lint's job before security floor."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    state = dict(wait.DEFAULT_LIST, checks="wait-checks-lint-failed-first.json", runs="wait-runs-two-running.json")
+    rc = case.run([state])
+    assert rc == 0 and len(case.started()) == 1 and case.clock.sleeps == [], case.err
+    assert any("check lint (first) failed (failure)" in l and "the watch starts" in l for l in case.lines()), case.err
