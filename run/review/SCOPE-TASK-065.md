@@ -1,0 +1,34 @@
+# SCOPE: TASK-065, the watch waits for the required checks (R-085)
+
+## Where the increment ends
+
+The branch task-065 against origin/main: the launcher's wait before a CI watch (`gh pr checks <n> --watch`) in `bridge/cursor-bridge/bridge-run.py` (`WATCH_POLL`, `WATCH_FAIL_FAST`, `watch_loop` and its helpers, and `main()`'s watch block), built in three builder rounds (briefs `handoff/TASK-065.md`, `handoff/TASK-065-r2.md`, `handoff/TASK-065-r3.md`), with the supervisor's tests and recorded replies, and the records. Design for later increments is not this diff's defect: the loop's own step-8 text and the policy's pointer are TASK-082's; ISS-031's characters are TASK-066's.
+
+## The briefs' Scope and Out of scope, quoted
+
+Round 1 (`handoff/TASK-065.md`), Scope: bridge/cursor-bridge/bridge-run.py; bridge/cursor-bridge/MANIFEST.json; docs/cli-reference.json; docs/CLI_REFERENCE.md; tests/test_program_watch_wait.py; tests/test_bridge_run.py; tests/fixtures/github/; docs/BUILDER_NOTES.md; handoff/TASK-065-r1-report.md. Limits: `tests/test_program_watch_wait.py` and everything under `tests/fixtures/github/` belong to the supervisor (the builder reads and runs them, edits none); `tests/test_bridge_run.py` only gains cases; the two generated CLI files change only by `python tools/dump-cli.py`, MANIFEST only by `python tools/make-manifest.py`; in bridge-run.py only the docstring's sentence on the watch's wait, the old wait's block (`WATCH_WAIT` to `wait_for_first_check`), and in `main()` the old wait's call and the child's start and wait as far as running the watch through `watch_loop` needs. Out of scope: .env and secrets/; CI configuration; docs/ and handoff/ except the files named; `bridge_env.py` and every other program under `bridge/cursor-bridge/` (the reader is TASK-064's and must not change); `review-guard.py` and `ready` (TASK-083); the loop's text, the policy and the digest (TASK-082); `tools/make-manifest.py`, `tools/dump-cli.py` and every test file not named; any mutation script.
+
+Round 2 (`handoff/TASK-065-r2.md`), Scope: bridge-run.py, MANIFEST.json, the two generated CLI files, tests/test_bridge_run.py, docs/BUILDER_NOTES.md, handoff/TASK-065-r2-report.md; in bridge-run.py only the wait's block from `WATCH_POLL` to the end of `watch_loop`, `main()`'s watch block, and one docstring clause each for G5 and G6. Out of scope as round 1, plus `bridge-stop.py` and round 1's report.
+
+Round 3 (`handoff/TASK-065-r3.md`), Scope: bridge-run.py, MANIFEST.json, tests/test_bridge_run.py, docs/BUILDER_NOTES.md, handoff/TASK-065-r3-report.md; in bridge-run.py only `_failed_check`, the first two lines of `_watch_decision`'s body with its docstring, one new constant beside `WATCH_POLL`, and the child's timeout path in `main()`. Out of scope as round 2, plus the CLI files (unchanged), `ci_class` (keeps its meaning everywhere else), and any finding of round 2's reviews not named in H1-H3 (recorded in docs/HARDENING.md).
+
+Round 3 was at the review ceiling with its brief's class line `Blocking class: behaviour`; the guard's count for this snapshot is 1, so no class line lifts this review round.
+
+## The threat model
+
+`docs/INVENTORY.md`, Decisions, "The bridge's threat model as a whole" (no narrower row names the launcher's wait): outside input is what the builder and the reviewers write and what a program reads from GitHub or another service; inside the trust boundary are the owner, the installed bridge, the owner's keys and the supervisor's session. A defect of the five is one an outside input can reach or one that reproduces on an ordinary, realistic layout; a deliberate reach past a program's check by a process running as the owner's account is outside it and recorded (KP-032). For this diff the outside input is GitHub's replies to `bridge_env`'s `gh api` GETs (the pull request, the branch rules, the repository, the head's checks, statuses and runs).
+
+## The tests the supervisor wrote, each with what it enforces
+
+- `tests/test_program_watch_wait.py` (the supervisor's; the builder never edits it): R-085 and docs/DESIGN.md, "Change: the program release", the launcher (F2, both cases, and J6), and docs/BUILD_PLAN.md, TASK-065's Done when. Its sections: the field's two cases (F2); the base's list (every context held, a pending check holds, a failed check starts at once, the limit, KP-051's head); the three cases with no list of the base's (no `--required`); the runs; the watch started again; a poll that fails; what stays (no `--watch`, the old wait gone, GETs only); the child launcher (POSIX, CI's ubuntu job). Round 2's section (G1-G8 of `handoff/TASK-065-r2.md`): a local head that cannot be read is a failed poll; under `--required` a failed check no rule names does not start the watch; without `--required` any failed check does; a failed run after the watch ends with 1; a watch naming a repository starts without the wait; limit 0 reads nothing; a ready poll past the limit names what it found; an app's context held only by that app's check, never by a status; and three POSIX child-launcher cases (the exit line after a watch, the run's limit in the child's LIMIT line, the pid file through the wait). Round 3's section (H1-H2 of `handoff/TASK-065-r3.md`): a named failed check after an unnamed one; only `failure`, `timed_out`, `action_required` start the watch early, under the base's list and the default branch's.
+- `tests/fixtures/github/wait-*.json`: head states built from TASK-064's captured replies by `run/supervisor/make_065_fixtures.py` (local, gitignored), each header naming the captured reply and the fields changed.
+- `tests/test_hotfix25a_roster_launcher.py`: the old wait's two cases replaced by a pointer (outside the plan's Scope list; docs/CHANGES.md, TASK-065).
+- The builder's cases in `tests/test_bridge_run.py` (`test_r085_*`), not the supervisor's.
+
+## The mutation run
+
+`run/supervisor/TASK-065-mutants.json` (local, gitignored; written by `run/supervisor/make_065_mutants.py`): 29 single-line mutants of the wait, each listing every test it fails; counts run=10 cached=19 killed=29 survived=0 error=0. The four mutants that live in `main()` were checked by hand under WSL on copies of the launcher (`run/supervisor/wsl_mutants_065.py`, all killed); the POSIX cases by `run/supervisor/wsl_e2e_065.py`. The checkpoint run: all 62 new test ids fail on 7f8dd8e. Details: docs/HARDENING.md, TASK-065.
+
+## Expected bookkeeping and record files in the diff
+
+`docs/BUILDER_NOTES.md`; the builder's reports `handoff/TASK-065-r1-report.md`, `handoff/TASK-065-r2-report.md`, `handoff/TASK-065-r3-report.md`; the briefs `handoff/TASK-065.md`, `handoff/TASK-065-r2.md`, `handoff/TASK-065-r3.md`; the records `docs/HARDENING.md`, `docs/CHANGES.md`, `docs/INVENTORY.md`, `docs/PROJECT_STATUS.md`; the generated `docs/cli-reference.json`, `docs/CLI_REFERENCE.md`, `bridge/cursor-bridge/MANIFEST.json`; and `run/review/` (this file, the diff, the assumptions file).
