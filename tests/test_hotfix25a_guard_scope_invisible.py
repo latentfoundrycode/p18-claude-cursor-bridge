@@ -422,3 +422,11 @@ def test_bug030_r2_a_waited_that_is_not_a_count_of_seconds_is_not_used(program, 
     monkeypatch.chdir(ws)
     ends = [end - t0 for start_, end in sc.builder_windows()]
     assert ends == [720.0] * 6 + [2220.0, 2220.5, 720.0], ends
+
+
+def test_r086_mongolian_vowel_separator_stays_a_named_finding(tmp_path):
+    """R-086: U+180E, a Cf character the old list named, is still a finding under the category rule, named as before."""
+    r = changed_repo(tmp_path, "a%sb\n" % chr(0x180E))
+    rc, out = run(INVISIBLE, r, "HEAD")
+    assert rc == 1, out
+    assert "INVISIBLE: doc.md:1:2 U+180E mongolian vowel separator" in out, out

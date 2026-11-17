@@ -9,7 +9,8 @@ alone where the character has no Unicode name (the names are compared without re
 ([<base-ref>] [--all] [--non-ascii]), its exit codes (0 none, 1 at least one, 2 cannot verify) and what it reads (the
 files changed against the base plus the untracked ones, or every tracked file with --all) are unchanged.
 
-On the checkpoint every case is red but the last: the old program names its characters by a list and passes each
+One case, a byte-order mark later in line 1, was added after the builder's first run, when the supervisor's mutants found
+no case reaching it. On the checkpoint every case is red but the last: the old program names its characters by a list and passes each
 character below, so a run prints `RESULT: OK` where these cases expect a finding. The last case runs the Workspace's own
 program over the Workspace's tracked files and skips where the Workspace is not a git work tree (a mutation run's copy).
 
@@ -42,13 +43,13 @@ def env():
 
 
 def git(repo, *args):
-    p = subprocess.run(["git"] + list(args), cwd=str(repo), capture_output=True, text=True, env=env())
+    p = subprocess.run(["git"] + list(args), cwd=str(repo), capture_output=True, text=True, env=env(), timeout=120)
     assert p.returncode == 0, p.stderr
     return p.stdout.strip()
 
 
 def run(repo, *args):
-    p = subprocess.run([sys.executable, PROG] + list(args), cwd=str(repo), capture_output=True, env=env())
+    p = subprocess.run([sys.executable, PROG] + list(args), cwd=str(repo), capture_output=True, env=env(), timeout=300)
     out = p.stdout.decode("utf-8", errors="replace") + p.stderr.decode("utf-8", errors="replace")
     return p.returncode, out
 
@@ -112,6 +113,18 @@ def test_r086_the_allow_list_passes_and_only_the_other_characters_are_findings(t
     assert "RESULT: 2 invisible character(s)" in out, out
 
 
+def test_r086_a_byte_order_mark_after_line_one_s_first_character_is_a_finding(tmp_path):
+    """R-086: only the file's first character may be U+FEFF; one later in line 1 is a finding, beside a line separator."""
+    r = base_repo(tmp_path)
+    (r / "doc.md").write_bytes(("ab" + BOM + "c" + LF + "x" + chr(0x2028) + LF).encode("utf-8"))
+    rc, out = run(r, "HEAD")
+    assert rc == 1, out
+    lines = finding_lines(out)
+    assert len(lines) == 2, out
+    assert lines[0].startswith("INVISIBLE: doc.md:1:3 U+FEFF "), out
+    assert lines[1].startswith("INVISIBLE: doc.md:2:2 U+2028 "), out
+
+
 def test_r086_every_tracked_file_is_read_with_all(tmp_path):
     """R-086 with the options unchanged: --all reads every tracked file, committed or not changed."""
     r = base_repo(tmp_path)
@@ -156,8 +169,9 @@ def test_r086_the_non_ascii_listing_keeps_the_exit_code(tmp_path):
 
 def _work_tree(folder):
     try:
-        p = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=folder, capture_output=True, text=True, env=env())
-    except OSError:
+        p = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=folder, capture_output=True, text=True, env=env(),
+                           timeout=120)
+    except (OSError, subprocess.TimeoutExpired):
         return False
     return p.returncode == 0 and os.path.normcase(os.path.normpath(p.stdout.strip())) == os.path.normcase(folder)
 
