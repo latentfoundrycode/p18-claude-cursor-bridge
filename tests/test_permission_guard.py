@@ -293,7 +293,7 @@ def test_r083_r2_a_second_positional_and_a_word_after_end_of_options_are_refused
 
 @pytest.mark.parametrize("tool", ["Bash", "PowerShell"])
 def test_r083_r3_an_equals_form_before_the_bare_option_clears_it_and_the_option_is_state_changing(tool, tmp_path):
-    """R-083: an equals form of --disable-auto or of help clears the exemption wherever it stands, including before the bare option and in a single-dash word such as -sh=false; an option before the gh subcommand is state-changing, so a workspace chain is refused as a chain."""
+    """R-083: an equals form of --disable-auto or of help clears the exemption wherever it stands, including before the bare option and in a single-dash word such as -sh=false; an option before the gh subcommand is state-changing even when GH_READ names that option, so a workspace chain is refused as a chain, while the same chain of reads is allowed."""
     bare_after, err = run(tool, "gh pr merge 12 --squash --match-head-commit " + SHA + " --disable-auto=false --disable-auto", cwd=tmp_path)
     assert bare_after == 2 and "record" in err, err
     clustered, err = run(tool, "gh pr merge -h -sh=false 12 --squash --match-head-commit " + SHA, cwd=tmp_path)
@@ -301,5 +301,13 @@ def test_r083_r3_an_equals_form_before_the_bare_option_clears_it_and_the_option_
     ws = tmp_path / "ws"
     (ws / "docs").mkdir(parents=True)
     (ws / "docs" / "PROJECT_STATUS.md").write_text("# Project Status\n", encoding="utf-8")
-    chain, err = run(tool, "git status && gh --subject xx pr view 12", cwd=ws)
+    chain, err = run(tool, "git status && gh --version pr view 12", cwd=ws)
     assert chain == 2 and "a chain of" in err, err
+    plain, err = run(tool, "git status && gh pr view 12", cwd=ws)
+    assert plain == 0, err
+
+
+def test_r083_r4_an_empty_pull_request_number_is_no_number(recorded_repo):
+    """R-083: an empty word in the number's place is no pull request number, in a repository that holds both records for the head."""
+    rc, err = run("Bash", "gh pr merge '' --squash --match-head-commit " + SHA, cwd=recorded_repo)
+    assert rc == 2 and "gh pr merge without the pull request's number: gh pr merge <n> --squash --match-head-commit <sha>" in err, err

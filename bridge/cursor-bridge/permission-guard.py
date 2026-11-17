@@ -2054,7 +2054,7 @@ def shell_inner(w, slash_ok=False):
 
 
 def gh_words(w):
-    """Before the group is found, and after any group other than api before the subcommand is found, a word beginning with `-` other than `-R`, `--repo` or `--hostname` makes the command unreadable where any word follows it."""
+    """Before the group is found, and after any group other than api before the subcommand is found, only a command's name (`[A-Za-z0-9][A-Za-z0-9-]*`) is read as one. A word beginning with `-` other than `-R`, `--repo` or `--hostname`, where any word follows it, and any other word that is not such a name, make the command unreadable: (INNER_UNREADABLE, word, [])."""
     found, rest, i = [], [], 1
     while i < len(w):
         tok = w[i]
@@ -2073,8 +2073,10 @@ def gh_words(w):
                     i += 1; continue
             elif tok.startswith("-"):
                 if i + 1 < len(w):
-                    return tok, None, []
+                    return INNER_UNREADABLE, tok, []
                 i += 1; continue
+            elif not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]*", tok):
+                return INNER_UNREADABLE, tok, []
             found.append(tok)
         else:
             rest.append(tok)
@@ -2314,8 +2316,10 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
             return "git worktree remove (git follows a gitignored junction or link inside the worktree into its target, forced or not): tear a worktree down with python ~/.claude/cursor-bridge/worktree-teardown.py <path>, which refuses while a link is inside"
     elif head in ("gh", "gh.exe"):
         group, sub, args = gh_words(w)
-        if isinstance(group, str) and group.startswith("-"):
-            return _cannot("an option before the gh subcommand (%s)" % group)
+        if group is INNER_UNREADABLE:
+            if isinstance(sub, str) and sub.startswith("-"):
+                return _cannot("an option before the gh subcommand (%s)" % sub)
+            return _cannot("a word before the gh subcommand that is not a command's name (%s)" % repr(sub))
         if group == "pr" and sub == "merge":
             r = merge_reason(args, cwd)
             if r:
@@ -2388,7 +2392,7 @@ def state_changing(w):
         return sub in STATE_GIT
     if base(w[0]) in ("gh", "gh.exe"):
         group, sub, _ = gh_words(w)
-        if isinstance(group, str) and group.startswith("-"):
+        if group is INNER_UNREADABLE:
             return True
         return bool(group) and group not in GH_READ and sub not in GH_READ
     return False
@@ -2577,7 +2581,7 @@ def merge_reason(args, cwd):
     if not re.fullmatch(r"[0-9a-fA-F]{7,64}", sha):
         return "gh pr merge with an empty or malformed --match-head-commit value"
     number = positionals[0] if len(positionals) == 1 else None
-    if number is None or any(char < "0" or char > "9" for char in number):
+    if number is None or number == "" or any(char < "0" or char > "9" for char in number):
         return "gh pr merge without the pull request's number: gh pr merge <n> --squash --match-head-commit <sha>"
     if not premerge_recorded(sha, cwd):
         return "gh pr merge for %s without the pre-merge check's record: run python ~/.claude/cursor-bridge/review-guard.py premerge <nnn> <n> in the checkout first (it writes the record when it prints OK)" % sha[:12]
