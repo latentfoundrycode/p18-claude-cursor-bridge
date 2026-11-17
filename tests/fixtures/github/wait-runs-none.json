@@ -1,0 +1,12 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-17 from the captured runs.json by the supervisor for TASK-065: no workflow run on the head (none registered yet)",
+ "request": "repos/OWNER/REPO/actions/runs?head_sha=1111111111111111111111111111111111111111",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "total_count": 0,
+  "workflow_runs": []
+ }
+}

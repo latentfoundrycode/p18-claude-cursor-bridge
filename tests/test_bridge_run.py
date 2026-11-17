@@ -662,3 +662,151 @@ def test_r081_refused_driver_prints_no_git_config(tmp_path):
     git_lines = sorted(m.group(1).replace("\\", "/") + " " + m.group(2)
                        for m in (line.match(x) for x in ok.stderr.splitlines()) if m)
     assert git_lines == [".git/hooks/post-merge new"], ok.stderr
+
+
+# ---------------------------------------------------------------- R-085, the wait before a CI watch (D-004)
+
+
+def test_r085_d004_a_watch_with_no_pull_request_number_starts_without_the_wait(tmp_path, monkeypatch, capsys, program):
+    """R-085, D-004: the word after checks is not a pull-request number, so nothing is read and the watch is started as given."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    argv = ["gh", "pr", "checks", "--watch", "--required"]
+    rc = case.run([wait.GREEN], argv=argv, limit=600)
+    assert rc == 0, case.err
+    assert case.watch.calls == [(argv, 600)], case.watch.calls
+    assert case.calls() == [], case.calls()
+    assert case.lines() == ["bridge-run: the watch names no pull request number; it starts without the wait"], case.err
+
+
+def test_r085_d004_every_completed_run_after_a_watch_prints_that_the_exit_stands(tmp_path, monkeypatch, capsys, program):
+    """R-085, D-004: where no list could be named and the watch returns 0 with every latest run completed, that exit stands."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    rc = case.run([dict(wait.NONE_ANYWHERE, **wait.GREEN)], exits=(0,))
+    assert rc == 0 and len(case.started()) == 1 and case.polls() == 2, case.err
+    line = "bridge-run: every latest workflow run of head %s is completed; the watch's exit 0 stands" % case.head[:12]
+    assert line in case.lines(), case.err
+
+
+def test_r085_d004_the_limit_stops_the_wait_before_a_later_green_head(tmp_path, monkeypatch, capsys, program):
+    """R-085, D-004: the run's limit ends the wait, so a head that would pass only on a later poll is not watched."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    rc = case.run([dict(checks="wait-checks-floor-only.json", runs="wait-runs-in-progress.json"), wait.GREEN], limit=10)
+    assert rc == 124 and case.started() == [], case.err
+    assert case.polls() == 1, case.calls()
+    assert any(l.startswith("bridge-run: LIMIT") for l in case.lines()), case.err
+
+
+@pytest.mark.parametrize("extra", [["--repo", "octo/other"], ["-Rocto/other"]], ids=["repo-before-number", "R-joined-before-number"])
+def test_r085_d004_a_repository_named_before_the_pull_request_number_starts_without_the_wait(tmp_path, monkeypatch, capsys, program, extra):
+    """R-085, D-004: --repo or a joined -R before the number is the repository line, and nothing is read from GitHub."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    argv = ["gh", "pr", "checks"] + extra + ["12", "--watch", "--required"]
+    rc = case.run([wait.GREEN], argv=argv, limit=600)
+    assert rc == 0, case.err
+    assert case.watch.calls == [(argv, 600)], case.watch.calls
+    assert case.calls() == [], case.calls()
+    assert case.lines() == ["bridge-run: the watch names another repository; it starts without the wait"], case.err
+
+
+def test_r085_d004_a_repository_flag_without_watch_runs_as_given(tmp_path, monkeypatch, capsys, program):
+    """R-085, D-004: without --watch a --repo word is not the wait's repository line; the command runs as given."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    argv = ["gh", "pr", "checks", "12", "--repo", "octo/other"]
+    rc = case.run([wait.GREEN], argv=argv, limit=600)
+    assert rc == 0, case.err
+    assert case.watch.calls == [(argv, 600)], case.watch.calls
+    assert case.calls() == [] and case.lines() == [], (case.calls(), case.err)
+
+
+def test_r085_d004_no_time_left_names_the_local_head_and_reads_nothing(tmp_path, monkeypatch, capsys, program):
+    """R-085, D-004: limit 0 reads nothing from GitHub and names the pushed head, not a failed poll and not ?."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    rc = case.run([wait.GREEN], limit=0)
+    assert rc == 124 and case.started() == [] and case.calls() == [], case.err
+    limit_lines = [l for l in case.lines() if l.startswith("bridge-run: LIMIT")]
+    assert len(limit_lines) == 1 and "on head %s" % case.head[:12] in limit_lines[0], case.err
+    assert "no time left before the first poll" in limit_lines[0] and "poll failed" not in limit_lines[0], case.err
+
+
+def test_r085_d004_no_time_left_and_no_local_head_names_the_question_mark(tmp_path, monkeypatch, capsys, program):
+    """R-085, D-004: limit 0 reads no GitHub reply, and a head the checkout cannot name is shown as ?."""
+    import test_program_watch_wait as wait
+
+    folder = tmp_path / "not-a-checkout"
+    folder.mkdir()
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    rc = case.run([wait.GREEN], limit=0, folder=str(folder))
+    assert rc == 124 and case.started() == [] and case.calls() == [], case.err
+    limit_lines = [l for l in case.lines() if l.startswith("bridge-run: LIMIT")]
+    assert len(limit_lines) == 1 and "on head ?" in limit_lines[0] and "no time left before the first poll" in limit_lines[0], case.err
+    assert not any("poll failed" in l for l in case.lines()), case.err
+
+
+def test_r085_d004_a_ready_poll_past_the_limit_names_the_reading_it_would_have_started_for(tmp_path, monkeypatch, capsys, program):
+    """R-085, D-004: a poll that finds the head ready after the limit is spent names that reading and does not say the watch starts."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    read = case.br.bridge_env.head_state
+
+    def slow(*args, **kwargs):
+        got = read(*args, **kwargs)
+        case.clock.now += 40
+        return got
+
+    monkeypatch.setattr(case.br.bridge_env, "head_state", slow)
+    rc = case.run([wait.GREEN], limit=30)
+    assert rc == 124 and case.started() == [], case.err
+    assert not any("the watch starts" in l for l in case.lines()), case.err
+    left = "ready (every required context has a check or a status), but no time left to start the watch"
+    limit_lines = [l for l in case.lines() if l.startswith("bridge-run: LIMIT")]
+    assert len(limit_lines) == 1 and left in limit_lines[0] and "poll failed" not in limit_lines[0], case.err
+
+
+@pytest.mark.parametrize("word", ["neutral", "cancelled"], ids=["neutral", "cancelled"])
+def test_r085_r3_under_the_runs_a_conclusion_gh_does_not_count_failed_does_not_start_the_watch(tmp_path, monkeypatch, capsys, program, word):
+    """R-085: under the runs, neutral and cancelled are not failures gh reports. The lint run has no check yet, so the
+    runs' reading does not start the watch, and a neutral or cancelled security floor must not start it either."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    first = dict(wait.NONE_ANYWHERE, checks="wait-checks-floor-%s.json" % word, runs="wait-runs-two-running.json")
+    rc = case.run([first, dict(wait.NONE_ANYWHERE, **wait.GREEN)])
+    assert rc == 0 and len(case.started()) == 1, case.err
+    assert case.clock.sleeps == [case.br.WATCH_POLL], case.clock.sleeps
+    assert not any("failed (" in l for l in case.lines()), case.err
+
+
+def test_r085_r3_under_the_runs_action_required_starts_before_the_other_run_has_a_check(tmp_path, monkeypatch, capsys, program):
+    """R-085: action_required is a failure gh reports, so under the runs the watch starts at once while the lint run still has no check."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    state = dict(wait.NONE_ANYWHERE, checks="wait-checks-floor-action-required.json", runs="wait-runs-two-running.json")
+    rc = case.run([state], exits=(1,))
+    assert rc == 1 and len(case.started()) == 1 and case.clock.sleeps == [], case.err
+    assert any("check security floor failed (action_required)" in l and "the watch starts" in l for l in case.lines()), case.err
+
+
+def test_r085_r3_under_the_default_list_the_first_failure_gh_reports_is_the_one_named(tmp_path, monkeypatch, capsys, program):
+    """R-085: under the default branch's list the first check gh reports failed starts the watch, lint's job before security floor."""
+    import test_program_watch_wait as wait
+
+    case = wait.Case(tmp_path, monkeypatch, capsys, program)
+    state = dict(wait.DEFAULT_LIST, checks="wait-checks-lint-failed-first.json", runs="wait-runs-two-running.json")
+    rc = case.run([state])
+    assert rc == 0 and len(case.started()) == 1 and case.clock.sleeps == [], case.err
+    assert any("check lint (first) failed (failure)" in l and "the watch starts" in l for l in case.lines()), case.err

@@ -56,11 +56,19 @@ rebuilds the change first). A builder or review run lists the files beside the W
 (its parent folder, the Workspace and `Worktrees/` excluded) before and after, and reports
 each new, changed or removed one as `bridge-run: BOUNDARY ...` on stderr and in the run log:
 the boundary hook does not run in a headless builder run (ISS-010), so this is the one
-detection of a write outside the Workspace. A `gh pr checks <n> --watch` waits up to two
-minutes for the pushed head (the local HEAD) to be the pull request's head on GitHub with a
-check registered, and says how long it waited, so a watch neither ends at once with "no
-checks reported" nor takes the previous commit's run (KP-051). `-p no:cacheprovider` is
-accepted after `python -m pytest` as after `pytest`.
+detection of a write outside the Workspace. A `gh pr checks <n> --watch` waits, inside the run's own
+limit, polling every 15 seconds, until every required check context of the pull request's base
+branch has a check or a commit status on the pushed head (the local HEAD), or a check of that
+head has failed, then starts the watch and says what it waited for; where the base names no
+required context it waits for the default branch's contexts, and where none is named anywhere
+or a rule cannot be read it waits until the head has a workflow run and each latest run has a
+check listed or is completed, says so, and starts a `--required` watch without that option,
+reading the runs again when that watch returns 0 and starting it again while a latest run is
+not completed; where every latest run is then completed, a failed one makes the launcher exit 1
+(R-085). A watch that names another repository (`--repo` or `-R`) starts without the wait. The
+head on GitHub has to be the pushed head before its checks count
+(KP-051). A watch's return is not the proof that CI passed: `review-guard.py ready` is.
+`-p no:cacheprovider` is accepted after `python -m pytest` as after `pytest`.
 
 `--key-file <path>` (release A2): a file of `NAME=value` lines, outside the Workspace, whose
 values reach the child's environment only; names are printed, values never (the owner's
@@ -1989,21 +1997,9 @@ def review_family_refusal(argv, folder):
     return None
 
 
-WATCH_WAIT = 120                                         # seconds the watch waits for the pushed head's first check
-WATCH_STEP = 10
-
-
-def gh_pr_state(pr_args, folder):
-    """(head sha on GitHub, number of checks on it) of the pull request, or (None, None)."""
-    try:
-        p = subprocess.run(["gh", "pr", "view"] + pr_args + ["--json", "headRefOid,statusCheckRollup"], cwd=folder, capture_output=True,
-                           text=True, encoding="utf-8", errors="replace", timeout=60, creationflags=NO_WINDOW)
-        if p.returncode != 0:
-            return None, None
-        o = json.loads(p.stdout or "{}")
-        return o.get("headRefOid"), len(o.get("statusCheckRollup") or [])
-    except (OSError, ValueError, subprocess.TimeoutExpired):
-        return None, None
+WATCH_POLL = 15                                          # seconds between polls of the wait before a CI watch (R-085)
+WATCH_FAIL_FAST = ("failure", "timed_out", "action_required")  # gh's fail bucket (cli/cli pkg/cmd/pr/checks/aggregate.go)
+_WATCH_REPO = "{owner}/{repo}"                        # the same repository name the review guard's prove_ci reads
 
 
 def local_head(folder):
@@ -2014,27 +2010,447 @@ def local_head(folder):
         return None
 
 
-def wait_for_first_check(argv, folder):
-    """Before `gh pr checks <n> --watch`: wait up to WATCH_WAIT seconds until the pull request's head on
-    GitHub is the local head and has a check (2026.10.25a, FB-002: a watch started seconds after the push
-    exited at once with "no checks reported"; KP-051: a watch begun before the new run took the old one).
-    Returns the line to print."""
-    if "--watch" not in argv:
+def _watch_say(text):
+    """One wait line on stderr. GitHub's text is already one ASCII line before it is placed here."""
+    sys.stderr.write("bridge-run: %s\n" % text)
+    sys.stderr.flush()
+
+
+def _watch_plain(text):
+    """One ASCII line, so a GitHub name cannot split a wait line or carry a control character."""
+    kept = []
+    for char in "" if text is None else str(text):
+        if char in "\r\n\t":
+            kept.append(" ")
+        elif 32 <= ord(char) < 127:
+            kept.append(char)
+    return " ".join("".join(kept).split())
+
+
+def _watch_bits(got, fallback):
+    """(source, reason) as the reader clipped them, or the fallback when the reply has neither."""
+    source, reason = fallback, "cannot read"
+    if isinstance(got, dict):
+        if isinstance(got.get("source"), str) and got.get("source"):
+            source = got["source"]
+        if isinstance(got.get("reason"), str) and got.get("reason"):
+            reason = got["reason"]
+    return _watch_plain(source), _watch_plain(reason)
+
+
+def _watch_pr_number(argv):
+    """The pull-request number, the word after `checks`, when it is ASCII digits; otherwise None."""
+    if "checks" not in argv:
         return None
-    rest = argv[3:]
-    pr_args = [a for a in rest[:1] if not a.startswith("-")]
-    want = local_head(folder)
-    waited = 0
+    index = argv.index("checks") + 1
+    if index >= len(argv):
+        return None
+    word = argv[index]
+    if isinstance(word, str) and word and all("0" <= char <= "9" for char in word):
+        return word
+    return None
+
+
+def _watch_other_repo(argv):
+    """True where a word tells gh which repository to watch. The wait reads this checkout only."""
+    for word in argv:
+        if not isinstance(word, str):
+            continue
+        if word in ("--repo", "-R") or word.startswith("--repo="):
+            return True
+        if len(word) > 2 and word.startswith("-R"):
+            return True
+    return False
+
+
+def _watch_left(began, limit):
+    return limit - (time.monotonic() - began)
+
+
+def _watch_pause(began, limit):
+    """Sleep until the next poll, never past the run's limit. False when no time remains."""
+    left = _watch_left(began, limit)
+    if left <= 0:
+        return False
+    time.sleep(min(WATCH_POLL, left))
+    return True
+
+
+def _watch_head12(local, github):
+    shown = local or github or "?"
+    return _watch_plain(shown)[:12]
+
+
+def _watch_contexts(rule):
+    """The rule's contexts, [] where it names none, or None where it cannot be read (never a pass)."""
+    if not isinstance(rule, dict):
+        return None
+    if rule.get("answer") == bridge_env.ANSWER_NONE:
+        return []
+    if rule.get("answer") != bridge_env.ANSWER_VALUE:
+        return None
+    contexts = rule.get("contexts")
+    if not isinstance(contexts, list) or not contexts:
+        return None
+    return contexts
+
+
+def _watch_name(base, folder):
+    """What this run waits for, read once, in the same order as prove_ci. A rule that cannot be read waits on the runs."""
+    base_shown = _watch_plain(base)
+    rule = bridge_env.branch_rule(_WATCH_REPO, base, cwd=folder)
+    contexts = _watch_contexts(rule)
+    if contexts:
+        return {"kind": "base", "reading": "the base branch's required contexts (%s)" % base_shown,
+                "contexts": contexts, "why": None}
+    if contexts is None:
+        source, reason = _watch_bits(rule, "protection")
+        why = "the rule of %s cannot be read (%s: %s)" % (base_shown, source, reason)
+        return {"kind": "runs", "reading": "the workflow runs", "contexts": None, "why": why}
+    settings = bridge_env.repo_settings(_WATCH_REPO, cwd=folder)
+    if not isinstance(settings, dict) or settings.get("answer") != bridge_env.ANSWER_VALUE:
+        source, reason = _watch_bits(settings, "repo")
+        why = "the default branch cannot be read (%s: %s)" % (source, reason)
+        return {"kind": "runs", "reading": "the workflow runs", "contexts": None, "why": why}
+    default = settings.get("default_branch")
+    if not isinstance(default, str) or not default:
+        why = "the default branch cannot be read (repo: default_branch cannot be read)"
+        return {"kind": "runs", "reading": "the workflow runs", "contexts": None, "why": why}
+    if default == base:
+        why = "the base branch %s names no required context and is the default branch" % base_shown
+        return {"kind": "runs", "reading": "the workflow runs", "contexts": None, "why": why}
+    default_shown = _watch_plain(default)
+    other = bridge_env.branch_rule(_WATCH_REPO, default, cwd=folder)
+    contexts = _watch_contexts(other)
+    if contexts:
+        why = "the base branch %s names no required context" % base_shown
+        return {"kind": "default", "reading": "the default branch's required contexts (%s)" % default_shown,
+                "contexts": contexts, "why": why}
+    if contexts is None:
+        source, reason = _watch_bits(other, "protection")
+        why = "the rule of %s cannot be read (%s: %s)" % (default_shown, source, reason)
+        return {"kind": "runs", "reading": "the workflow runs", "contexts": None, "why": why}
+    why = "the base branch %s names no required context, nor does the default branch %s" % (base_shown, default_shown)
+    return {"kind": "runs", "reading": "the workflow runs", "contexts": None, "why": why}
+
+
+def _watch_suite(item):
+    suite = item.get("check_suite") if isinstance(item, dict) else None
+    if not isinstance(suite, dict):
+        return None
+    value = suite.get("id")
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def _run_suite(run):
+    if not isinstance(run, dict):
+        return None
+    value = run.get("check_suite_id")
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def _checks_of_run(run, checks):
+    """Latest checks whose suite is this run's. A check no run made never counts."""
+    suite = _run_suite(run)
+    if suite is None:
+        return []
+    return [item for item in checks if isinstance(item, dict) and _watch_suite(item) == suite]
+
+
+def _watch_runs(latest):
+    return [run for run in (latest.get("runs") or []) if isinstance(run, dict)]
+
+
+def _run_label(run):
+    return "run %s (%s)" % (_watch_plain(run.get("name")), _watch_plain(run.get("event")))
+
+
+def _failed_check(latest, named):
+    """The first latest check gh reports failed. Under the base's list, the first of those that holds a named context."""
+    contexts = (named["contexts"] or []) if named["kind"] == "base" else None
+    for item in latest.get("checks") or []:
+        if isinstance(item, dict) and item.get("status") == "completed" and item.get("conclusion") in WATCH_FAIL_FAST:
+            if contexts is None or any(_check_holds(item, entry) for entry in contexts):
+                return item
+    return None
+
+
+def _watch_app(item):
+    """The check's app id, an int. A bool is not an id. A commit status has no app."""
+    app = item.get("app") if isinstance(item, dict) else None
+    if not isinstance(app, dict):
+        return None
+    value = app.get("id")
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def _watch_app_tied(app_id):
+    return isinstance(app_id, int) and not isinstance(app_id, bool)
+
+
+def _check_holds(item, entry):
+    """A latest check holds this context when its name matches, and its app where the rule names one."""
+    if not isinstance(item, dict) or not isinstance(entry, dict):
+        return False
+    name = entry.get("context")
+    if not isinstance(name, str) or item.get("name") != name:
+        return False
+    if _watch_app_tied(entry.get("app_id")):
+        return _watch_app(item) == entry.get("app_id")
+    return True
+
+
+def _missing_contexts(contexts, latest):
+    """Context names nothing holds. An app-tied context is held only by that app's check of its name."""
+    checks = latest.get("checks") or []
+    statuses = latest.get("statuses") or []
+    missing = []
+    for entry in contexts or []:
+        name = entry.get("context") if isinstance(entry, dict) else None
+        if not isinstance(name, str) or not name:
+            missing.append("unreadable")
+            continue
+        held = any(_check_holds(item, entry) for item in checks)
+        if not held and isinstance(entry, dict) and not _watch_app_tied(entry.get("app_id")):
+            held = any(isinstance(item, dict) and item.get("context") == name for item in statuses)
+        if not held:
+            missing.append(name)
+    return missing
+
+
+def _all_runs_completed(latest):
+    runs = _watch_runs(latest)
+    return bool(runs) and all(bridge_env.ci_class(run, "run") != "pending" for run in runs)
+
+
+def _failed_run_notes(latest):
+    """Each latest run ci_class calls failed, as `run <name> (<event>) concluded <conclusion>`."""
+    notes = []
+    for run in _watch_runs(latest):
+        if bridge_env.ci_class(run, "run") == "failed":
+            notes.append("%s concluded %s" % (_run_label(run), _watch_plain(run.get("conclusion"))))
+    return notes
+
+
+def _runs_initial_ready(latest):
+    """At least one run, and every latest run completed or listed with a check of its own suite."""
+    runs = _watch_runs(latest)
+    if not runs:
+        return False
+    checks = latest.get("checks") or []
+    for run in runs:
+        if bridge_env.ci_class(run, "run") == "pending" and not _checks_of_run(run, checks):
+            return False
+    return True
+
+
+def _runs_restart_ready(latest):
+    """Every run completed, or each run that is not completed has a check of its suite that is not completed."""
+    runs = _watch_runs(latest)
+    if not runs:
+        return False
+    checks = latest.get("checks") or []
+    for run in runs:
+        if bridge_env.ci_class(run, "run") != "pending":
+            continue
+        pending = [item for item in _checks_of_run(run, checks) if bridge_env.ci_class(item, "check") == "pending"]
+        if not pending:
+            return False
+    return True
+
+
+def _runs_problem(latest, restarted):
+    runs = _watch_runs(latest)
+    if not runs:
+        return "no workflow run started"
+    checks = latest.get("checks") or []
+    held = []
+    for run in runs:
+        if bridge_env.ci_class(run, "run") != "pending":
+            continue
+        own = _checks_of_run(run, checks)
+        if restarted:
+            pending = [item for item in own if bridge_env.ci_class(item, "check") == "pending"]
+            if not pending:
+                held.append("%s is not completed and has no check listed that is not completed" % _run_label(run))
+        elif not own:
+            held.append("%s has no check listed" % _run_label(run))
+    if not held:
+        return "no workflow run started"
+    return ", ".join(held)
+
+
+def _pending_run_count(latest):
+    return sum(1 for run in _watch_runs(latest) if bridge_env.ci_class(run, "run") == "pending")
+
+
+def _watch_decision(named, latest, restart):
+    """(ready, what, problem). A latest check gh reports failed starts the watch at once, so --fail-fast can report it.
+
+    The early start reads every latest check. gh's fail bucket (aggregate.go) is failure, timed_out and action_required.
+    Under the base's list the watch keeps --required, so only such a failure that holds a named context counts:
+    gh would not show a check the rule does not name. Under the default branch's list and the runs, gh watches
+    every check, and the first such failure starts the watch.
+    """
+    failed = _failed_check(latest, named)
+    if failed is not None and (named["kind"] != "base" or any(_check_holds(failed, entry) for entry in named["contexts"] or [])):
+        what = "check %s failed (%s)" % (_watch_plain(failed.get("name")), _watch_plain(failed.get("conclusion")))
+        return True, what, None
+    if named["kind"] == "runs":
+        if restart:
+            if _all_runs_completed(latest) or _runs_restart_ready(latest):
+                return True, "every latest run has a check listed or is completed", None
+            return False, None, _runs_problem(latest, True)
+        if _runs_initial_ready(latest):
+            return True, "every latest run has a check listed or is completed", None
+        return False, None, _runs_problem(latest, False)
+    missing = _missing_contexts(named["contexts"], latest)
+    if not missing:
+        return True, "every required context has a check or a status", None
+    return False, None, "missing " + ", ".join(_watch_plain(name) for name in missing)
+
+
+def _watch_poll(number, folder):
+    """One poll. Begins with the pull request. A head GitHub has not taken yet reads no list (KP-051)."""
+    local = local_head(folder)
+    got = bridge_env.pull_refs(_WATCH_REPO, number, cwd=folder)
+    if not isinstance(got, dict) or got.get("answer") != bridge_env.ANSWER_VALUE:
+        source, reason = _watch_bits(got, "pull")
+        return {"kind": "fail", "source": source, "reason": reason, "local": local}
+    base, github = got.get("base"), got.get("head")
+    if not isinstance(base, str) or not base or not isinstance(github, str) or not github:
+        return {"kind": "fail", "source": "pull", "reason": "the pull request's base or head cannot be read", "local": local}
+    if not local:
+        return {"kind": "fail", "source": "local", "reason": "the pushed head cannot be read", "local": local}
+    if github != local:
+        return {"kind": "mismatch", "local": local, "github": github, "base": base}
+    state = bridge_env.head_state(_WATCH_REPO, github, cwd=folder)
+    if not isinstance(state, dict) or state.get("answer") != bridge_env.ANSWER_VALUE:
+        source, reason = _watch_bits(state, "checks")
+        return {"kind": "fail", "source": source, "reason": reason, "local": local, "github": github, "base": base}
+    return {"kind": "lists", "latest": bridge_env.latest_of_each(state), "local": local, "github": github, "base": base}
+
+
+def _watch_limit_line(limit, reading, head12, left):
+    _watch_say("LIMIT %ds reached while waiting for %s on head %s: %s" % (int(limit), reading, head12, left))
+
+
+def watch_loop(argv, folder, limit, start):
+    """Run one CI watch, waiting first until the head shows what the base's rule requires (R-085).
+
+    argv is the watch's words, folder the launch folder, limit the run's seconds. start(words, seconds) runs
+    one watch for at most that many seconds and returns its exit. Returns the launcher's exit. The clock is
+    time.monotonic and the pause is time.sleep, both through this module's name time.
+    """
+    if "--watch" not in argv:
+        return start(list(argv), limit)
+    if _watch_other_repo(argv):
+        _watch_say("the watch names another repository; it starts without the wait")
+        return start(list(argv), limit)
+    number = _watch_pr_number(argv)
+    if number is None:
+        _watch_say("the watch names no pull request number; it starts without the wait")
+        return start(list(argv), limit)
+    began = time.monotonic()
+    named = None
+    told_fail = False
+    seen_watch = False
+    after_watch = False
+    gap_began = None
+    problem = None
+    head12 = "?"
+
+    def finish_limit():
+        reading = named["reading"] if named else "the pull request %s" % number
+        if problem:
+            shown, left = head12, problem
+        else:
+            local = local_head(folder)
+            shown = _watch_plain(local)[:12] if local else "?"
+            left = "no time left before the first poll"
+        _watch_limit_line(limit, reading, shown, left)
+
     while True:
-        head, checks = gh_pr_state(pr_args, folder)
-        if head and want and head == want and checks:
-            return "waited %ds for the pushed head %s's first check (%d check(s) registered)" % (waited, want[:12], checks)
-        if waited >= WATCH_WAIT:
-            return ("waited %ds and the pushed head %s has no check registered on GitHub (its head there: %s); the watch starts anyway "
-                    "- if it ends at once with \"no checks reported\", run `gh pr checks <n>` once and start the watch again" % (
-                        waited, (want or "?")[:12], (head or "unknown")[:12]))
-        time.sleep(WATCH_STEP)
-        waited += WATCH_STEP
+        if _watch_left(began, limit) <= 0 and not after_watch:
+            finish_limit()
+            return 124
+        polled = _watch_poll(number, folder)
+        if polled.get("base") and named is None:
+            named = _watch_name(polled["base"], folder)
+            if named["why"]:
+                line = "%s; waiting for %s" % (named["why"], named["reading"])
+                if "--required" in argv:
+                    line += ", and the watch starts without --required"
+                _watch_say(line)
+        if polled["kind"] == "fail":
+            head12 = _watch_head12(polled.get("local"), polled.get("github") if polled.get("base") else None)
+            if not polled.get("base"):
+                head12 = _watch_head12(polled.get("local"), None)
+            if not told_fail:
+                _watch_say("a poll failed (%s: %s); retrying every %ds until the limit" % (polled["source"], polled["reason"], WATCH_POLL))
+                told_fail = True
+            problem = "poll failed (%s: %s)" % (polled["source"], polled["reason"])
+            if not _watch_pause(began, limit):
+                finish_limit()
+                return 124
+            continue
+        if polled["kind"] == "mismatch":
+            head12 = _watch_head12(polled.get("local"), None)
+            problem = "the pull request's head on GitHub is %s, not the pushed head %s" % (
+                _watch_plain(polled["github"])[:12], _watch_plain(polled["local"])[:12])
+            if not _watch_pause(began, limit):
+                finish_limit()
+                return 124
+            continue
+        latest = polled["latest"]
+        head12 = _watch_head12(polled.get("local"), polled.get("github"))
+        if after_watch:
+            if _all_runs_completed(latest):
+                failed_notes = _failed_run_notes(latest)
+                if failed_notes:
+                    _watch_say("every latest workflow run of head %s is completed and %s; the launcher exits 1" % (
+                        head12, ", ".join(failed_notes)))
+                    return 1
+                _watch_say("every latest workflow run of head %s is completed; the watch's exit 0 stands" % head12)
+                return 0
+            after_watch = False
+            gap_began = time.monotonic()
+            problem = _runs_problem(latest, True)
+            if not _watch_pause(began, limit):
+                finish_limit()
+                return 124
+            continue
+        restart = seen_watch and named["kind"] == "runs"
+        ready, what, problem_now = _watch_decision(named, latest, restart)
+        if not ready:
+            problem = problem_now
+            if not _watch_pause(began, limit):
+                finish_limit()
+                return 124
+            continue
+        left = _watch_left(began, limit)
+        if left <= 0:
+            _watch_limit_line(limit, named["reading"], head12, "ready (%s), but no time left to start the watch" % what)
+            return 124
+        if restart:
+            waited = int(time.monotonic() - gap_began) if gap_began is not None else int(time.monotonic() - began)
+            _watch_say("the watch returned 0 while %d latest run(s) of head %s are not completed; waited %ds; the watch starts again" % (
+                _pending_run_count(latest), head12, waited))
+        else:
+            _watch_say("waited %ds for %s on head %s: %s; the watch starts" % (
+                int(time.monotonic() - began), named["reading"], head12, what))
+        words = list(argv) if named["kind"] == "base" else [word for word in argv if word != "--required"]
+        code = start(words, left)
+        if named["kind"] != "runs" or code != 0:
+            return code
+        seen_watch = True
+        after_watch = True
 
 
 BOUNDARY_SKIP = {".git", "node_modules", "__pycache__", ".venv", "venv", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
@@ -2529,11 +2945,6 @@ def main():
             entry["lift_line"] = brief_meta["lift_line"]
         if brief_meta.get("cause"):
             entry["cause"] = brief_meta["cause"]
-    if kind == "watch" and head.startswith("gh pr checks"):
-        line = wait_for_first_check(argv[argv.index("--") + 1:], folder)
-        if line:
-            sys.stderr.write("bridge-run: %s\n" % line)
-            sys.stderr.flush()
     # A builder's or reviewer's write outside the Workspace (2026.10.25a, ISS-010: the boundary hook does not run in a
     # headless builder run): the files beside the Workspace are listed before and after, and every new,
     # changed or removed one is reported as BOUNDARY on stderr and in the run log.
@@ -2612,6 +3023,94 @@ def main():
         for path, word in changes:
             sys.stderr.write("bridge-run: GIT-CONFIG %s %s\n" % (path, word))
         sys.stderr.flush()
+
+    if kind == "watch":
+        # The watch's own child is started from watch_loop, once per watch, with the seconds still left of this run.
+        mark = time.time()
+        box = {"ran": False, "killer": None, "pid_file": write_pid_file(folder, run_id, os.getpid(), os.getpid())}
+
+        def run_child(words, seconds):
+            resolved, _is_agent = resolve(words)
+            killer = None
+            if sys.platform == "win32":
+                if box["killer"] is None:
+                    try:
+                        job = Job()
+                        job.assign_self()
+                        box["killer"] = job.terminate
+                    except OSError as e:
+                        sys.stderr.write("bridge-run: no job object (%s); the limit will end the first process only\n" % e)
+                try:
+                    # A process created without a console (NO_WINDOW) does not inherit the standard
+                    # handles by itself; they are passed explicitly so the caller's redirects hold.
+                    proc = subprocess.Popen(resolved, env=env, stdin=subprocess.DEVNULL, stdout=sys.stdout, stderr=sys.stderr,
+                                            creationflags=NO_WINDOW | 0x00000200)  # CREATE_NEW_PROCESS_GROUP
+                except OSError as e:
+                    sys.stderr.write("bridge-run: cannot start %s (%s)\n" % (resolved[0], e))
+                    if slot_fd is not None:
+                        _unlock_byte(slot_fd)
+                        try:
+                            os.close(slot_fd)
+                        except OSError:
+                            pass
+                    return 125
+                killer = box["killer"] if box["killer"] is not None else proc.kill
+            else:
+                try:
+                    proc = subprocess.Popen(resolved, env=env, preexec_fn=os.setsid, creationflags=NO_WINDOW)
+                except OSError as e:
+                    sys.stderr.write("bridge-run: cannot start %s (%s)\n" % (resolved[0], e))
+                    if slot_fd is not None:
+                        _unlock_byte(slot_fd)
+                        try:
+                            os.close(slot_fd)
+                        except OSError:
+                            pass
+                    return 125
+                killer = lambda: os.killpg(os.getpgid(proc.pid), signal.SIGKILL)  # noqa: E731
+            box["ran"] = True
+            entry.update(pid=os.getpid(), child_pid=proc.pid)
+            written = write_pid_file(folder, run_id, os.getpid(), proc.pid)   # read by bridge-stop.py while the run lives (2026.10.11c)
+            if written:
+                box["pid_file"] = written
+            try:
+                child_rc = proc.wait(timeout=seconds)
+            except subprocess.TimeoutExpired:
+                sys.stderr.write("bridge-run: LIMIT %ds reached after %ds; terminating the whole process tree\n"
+                                 % (int(limit), int(time.time() - mark)))
+                report_git_config()
+                report_boundary()               # before the exit line, which stays the last (the job ends this process)
+                sys.stderr.write("bridge-run: exit 124\n")
+                sys.stderr.flush()
+                entry.update(seconds=int(time.time() - mark), exit=124)
+                write_log(folder, entry)        # before the job ends this process too
+                remove_pid_file(box["pid_file"])  # before killer(); on Windows the job ends this process
+                try:
+                    killer()                    # on Windows this ends this process too, with exit code 124
+                except OSError as e:
+                    sys.stderr.write("bridge-run: terminate failed (%s)\n" % e)
+                try:
+                    proc.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                remove_pid_file(box["pid_file"])
+                return 124
+            written = write_pid_file(folder, run_id, os.getpid(), os.getpid())
+            if written:
+                box["pid_file"] = written
+            return child_rc
+
+        rc = watch_loop(argv[argv.index("--") + 1:], folder, limit, run_child)
+        remove_pid_file(box["pid_file"])
+        if entry["exit"] is None:
+            report_git_config()
+            report_boundary()
+            sys.stderr.write("bridge-run: exit %d\n" % rc)
+            sys.stderr.flush()
+            healthy = True if (kind == "test" and rc == 0) or (kind == "driver" and rc in (0, 1)) else None
+            entry.update(seconds=int(time.time() - mark), exit=rc, healthy=healthy)
+            write_log(folder, entry)
+        return rc
 
     killer = None
     if sys.platform == "win32":

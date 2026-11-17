@@ -1,0 +1,25 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-17 from the captured runs.json by the supervisor for TASK-065: the run completed with success (the captured run as it is, kept under this name for the wait's states)",
+ "request": "repos/OWNER/REPO/actions/runs?head_sha=1111111111111111111111111111111111111111",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "total_count": 1,
+  "workflow_runs": [
+   {
+    "id": 43852586868,
+    "name": "tests",
+    "workflow_id": 374570417,
+    "event": "pull_request",
+    "run_number": 801,
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "check_suite_id": 118713714642,
+    "head_sha": "1111111111111111111111111111111111111111"
+   }
+  ]
+ }
+}

@@ -151,25 +151,9 @@ def test_pytest_without_its_cache_is_accepted_after_python_m_pytest(program):
     assert not br.accepted(["python", "-p", "no:x", "-m", "pytest"])
 
 
-def test_the_watch_waits_for_the_pushed_heads_first_check(program, monkeypatch):
-    """2026-10-25 C5 (FB-002, KP-051): no "no checks reported" at once, never the previous commit's run."""
-    br = program("bridge-run")
-    states = iter([("old", 3), ("new", 0), ("new", 2)])
-    monkeypatch.setattr(br, "gh_pr_state", lambda args, folder: next(states))
-    monkeypatch.setattr(br, "local_head", lambda folder: "new")
-    monkeypatch.setattr(br.time, "sleep", lambda s: None)
-    line = br.wait_for_first_check(["gh", "pr", "checks", "12", "--watch", "--required"], ".")
-    assert line.startswith("waited 20s") and "2 check(s)" in line, line
-
-
-def test_the_watch_starts_anyway_after_two_minutes_and_says_so(program, monkeypatch):
-    br = program("bridge-run")
-    monkeypatch.setattr(br, "gh_pr_state", lambda args, folder: ("old", 1))
-    monkeypatch.setattr(br, "local_head", lambda folder: "new")
-    monkeypatch.setattr(br.time, "sleep", lambda s: None)
-    line = br.wait_for_first_check(["gh", "pr", "checks", "12", "--watch"], ".")
-    assert line.startswith("waited 120s") and "starts anyway" in line, line
-    assert br.wait_for_first_check(["gh", "pr", "checks", "12"], ".") is None, "a one-off check is not a watch"
+# 2026-10-25 C5's two cases of the watch's wait (FB-002, KP-051: no "no checks reported" at once, never the previous commit's
+# run; a one-off check is not a watch) moved to tests/test_program_watch_wait.py with TASK-065 (R-085), which replaced the
+# 120-second wait and its message that the watch starts anyway.
 
 
 def test_a_builder_run_reports_a_write_outside_the_workspace(tmp_path):
