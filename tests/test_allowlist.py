@@ -254,6 +254,15 @@ def test_r049_d4_the_guard_treats_the_stage_tag_as_it_treats_the_loop_s_state_co
         assert not guard.state_changing(guard.words(sample(cmd))), cmd
 
 
+def test_r087_push_scan_rule_in_allow():
+    """R-087 (TASK-067): push-scan.py, a read-only command, is allowed with and without its base."""
+    rule = "Bash(python ~/.claude/cursor-bridge/push-scan.py:*)"
+    assert rule in ALLOW
+    for cmd in ("python ~/.claude/cursor-bridge/push-scan.py",
+                "python ~/.claude/cursor-bridge/push-scan.py origin/main"):
+        assert decide(cmd, ALLOW, DENY)[0] == "allow", cmd
+
+
 def test_r062_records_migrate_rule_in_allow():
     """R13: records-migrate.py is allowed for a normal run and for --check."""
     rule = "Bash(python ~/.claude/cursor-bridge/records-migrate.py:*)"
