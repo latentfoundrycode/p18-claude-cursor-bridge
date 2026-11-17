@@ -6,6 +6,7 @@ before the launch, verified and restored after it, and checked once more before 
   python ~/.claude/cursor-bridge/review-guard.py verify   <nnn>          after it returns
   python ~/.claude/cursor-bridge/review-guard.py premerge <nnn> [<pr>]   after the review files are removed, committed and pushed
   python ~/.claude/cursor-bridge/review-guard.py premerge-records [<pr>] the short gate of a pull request that changes only records
+  python ~/.claude/cursor-bridge/review-guard.py ready <pr>              after the CI watch, the proof that CI passed
 
 Why (release 0b review, finding 2 and its second pass): Review B keeps `--force` so it can
 run the tests and build reproductions (the owner's decision), and it acts after Review A and
@@ -62,8 +63,9 @@ What each step does:
   premerge-records  (release S) the short gate: a pull request whose every changed file is a
             record (under docs/ or handoff/, or project.json; a text or a picture by its type,
             a plain file by its mode) and none of them one a program reads to decide a gate
-            merges without the cross-family round, on CI, which the branch rule holds, and one
-            Review A read, which is the supervisor's step: this command checks neither. The
+            merges without the cross-family round. With the pull request's number, CI is proven
+            by the same check as ready and both records are written or neither. The one Review A
+            read stays the supervisor's step and is not checked here. The
             full gate stays for docs/RUN_PARAMETERS.md, docs/BUILD_PLAN*, docs/ROSTER*,
             everything under docs/diagrams/, a removed status file, inventory, register or
             project file, the register where a Status cell changed, a row left, a new row is
@@ -74,8 +76,15 @@ What each step does:
             every path that is no record. Without <pr> it prints SHORT GATE or FULL GATE for the
             branch against origin/main and writes nothing. With <pr> the changed files are
             GitHub's list of the pull request joined with the local diff from its base, its
-            head must be the local HEAD (read again as premerge does), and on OK the same
-            record is written and the merge command printed. Exit 1 on FULL GATE or NOT READY.
+            head must be the local HEAD (read again as premerge does), and on OK the premerge
+            record and the ready record are written, or neither is, and the merge command printed.
+            Exit 1 on FULL GATE or NOT READY.
+  ready     proves CI on the pull request's head. READY (exit 0) when GitHub's head is the local
+            head, the premerge record for that head stands and CI is proven, and the record
+            <git common dir>/bridge/ready/<pr>-<head> is written. NOT READY (exit 1) names each
+            context or run that is missing, pending or failed, or the head that moved, and writes
+            nothing. CANNOT CHECK (exit 2) where GitHub, a branch's rule, the pull request or the
+            premerge record cannot be read, and writes nothing.
 
 Exit 0 = OK; 1 = GATE-INTEGRITY (open the flag, condition 4, and an issue; do not merge);
 a snapshot deleted after it was taken, its hash copy standing, is GATE-INTEGRITY;
@@ -1454,15 +1463,285 @@ def pr_state(pr, root):
         return None, ": its reply cannot be read (%s)" % e
 
 
+def _show(text):
+    """One ASCII line, so a GitHub name cannot split a verdict or carry a control character."""
+    kept = []
+    for char in "" if text is None else str(text):
+        kept.append(char if 32 <= ord(char) < 127 else " ")
+    return " ".join("".join(kept).split())
+
+
+def _cannot(pr, reason):
+    return "review-guard: CANNOT CHECK - pull request %s: %s" % (pr, reason)
+
+
+def _reader_bits(got, fallback):
+    source, reason = fallback, "cannot read"
+    if isinstance(got, dict):
+        if isinstance(got.get("source"), str) and got.get("source"):
+            source = got["source"]
+        if isinstance(got.get("reason"), str) and got.get("reason"):
+            reason = got["reason"]
+    return source, reason
+
+
+def _premerge_stands(common, head):
+    """The premerge record for this head, present and readable as a JSON object. Anything else is no record."""
+    if not isinstance(head, str) or not head or head in (".", "..") or "/" in head or "\\" in head:
+        return False
+    path = os.path.join(common, "bridge", "premerge", head)
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except Exception:
+        return False
+    return isinstance(data, dict)
+
+
+def _write_json(path, payload):
+    folder = os.path.dirname(path)
+    os.makedirs(folder, exist_ok=True)
+    tmp = path + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            if os.path.isfile(tmp):
+                os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def _write_ready_record(common, pr, head, reading):
+    path = os.path.join(common, "bridge", "ready", "%s-%s" % (pr, head))
+    _write_json(path, {"pr": pr, "head": head, "reading": reading,
+                       "written": time.strftime("%Y-%m-%dT%H:%M:%S")})
+
+
+def _rule_contexts(got, which):
+    """(contexts, None) or (None, the CANNOT CHECK reason). An empty list is a rule that names none."""
+    if not isinstance(got, dict) or got.get("answer") not in (bridge_env.ANSWER_VALUE, bridge_env.ANSWER_NONE):
+        source, reason = _reader_bits(got, "protection")
+        return None, "the %s branch's rule cannot be read (%s: %s)" % (which, source, reason)
+    if got.get("answer") == bridge_env.ANSWER_NONE:
+        return [], None
+    contexts = got.get("contexts")
+    if not isinstance(contexts, list) or not contexts:
+        source, reason = _reader_bits(got, "protection")
+        return None, "the %s branch's rule cannot be read (%s: %s)" % (which, source, reason)
+    return contexts, None
+
+
+def _check_app(item):
+    app = item.get("app") if isinstance(item, dict) else None
+    if not isinstance(app, dict):
+        return None
+    value = app.get("id")
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def _named_app(app_id):
+    return isinstance(app_id, int) and not isinstance(app_id, bool)
+
+
+def _failure_beside(latest):
+    """A latest check or a latest run of the head that ci_class calls failed."""
+    for item in latest.get("checks") or []:
+        if bridge_env.ci_class(item, "check") == "failed":
+            return True
+    for item in latest.get("runs") or []:
+        if bridge_env.ci_class(item, "run") == "failed":
+            return True
+    return False
+
+
+def _context_result(name, app_id, latest):
+    """(class, note or None) of one required context. passed, missing, pending or failed."""
+    named = _named_app(app_id)
+    checks, statuses = [], []
+    for item in latest.get("checks") or []:
+        if isinstance(item, dict) and item.get("name") == name and (not named or _check_app(item) == app_id):
+            checks.append(item)
+    for item in latest.get("statuses") or []:
+        if isinstance(item, dict) and item.get("context") == name:
+            statuses.append(item)
+    holders = [("check", item) for item in checks]
+    if not named:
+        holders += [("status", item) for item in statuses]
+    if not holders:
+        note = "a commit status carries no app" if named and statuses else None
+        return "missing", note
+    classes = [(kind, item, bridge_env.ci_class(item, kind)) for kind, item in holders]
+    if any(klass == "failed" for _kind, _item, klass in classes):
+        neutral = any(kind == "check" and item.get("conclusion") == "neutral" for kind, item, klass in classes if klass == "failed")
+        return "failed", ("neutral: stricter than GitHub" if neutral else None)
+    if named and any(bridge_env.ci_class(item, "status") == "failed" for item in statuses):
+        return "failed", None
+    if any(klass == "pending" for _kind, _item, klass in classes):
+        return "pending", None
+    if named and any(bridge_env.ci_class(item, "status") == "pending" for item in statuses):
+        return "pending", None
+    if any(klass == "skipped" for _kind, _item, klass in classes):
+        if _failure_beside(latest):
+            return "failed", "skipped beside a failure"
+        return "passed", None
+    return "passed", None
+
+
+def _runs_items(latest):
+    """The runs reading's items. Empty only where the latest runs prove CI."""
+    items, passed_run = [], False
+    for item in latest.get("runs") or []:
+        if not isinstance(item, dict):
+            continue
+        klass = bridge_env.ci_class(item, "run")
+        if klass == "passed":
+            passed_run = True
+        elif klass in ("pending", "failed"):
+            items.append("run %s (%s): %s" % (_show(item.get("name")), _show(item.get("event")), klass))
+    for item in latest.get("checks") or []:
+        if isinstance(item, dict) and bridge_env.ci_class(item, "check") == "failed":
+            items.append("check %s: failed" % _show(item.get("name")))
+    for item in latest.get("statuses") or []:
+        if isinstance(item, dict) and bridge_env.ci_class(item, "status") == "failed":
+            items.append("status %s: failed" % _show(item.get("context")))
+    if not passed_run:
+        items.append("no workflow run succeeded")
+    return items
+
+
+def _await_pull(pr, head, cwd):
+    """(GitHub head, base, None) or (None, None, reason). Re-reads while the head lags, as premerge does."""
+    repo = "{owner}/{repo}"
+
+    def read():
+        got = bridge_env.pull_refs(repo, pr, cwd=cwd)
+        if not isinstance(got, dict) or got.get("answer") != bridge_env.ANSWER_VALUE:
+            source, reason = _reader_bits(got, "pull")
+            return None, "the pull request cannot be read (%s: %s)" % (source, reason)
+        return got, None
+
+    got, err = read()
+    waited = 0
+    while err is None and got.get("head") != head and waited < PR_HEAD_WAIT:
+        time.sleep(PR_HEAD_STEP)
+        waited += PR_HEAD_STEP
+        got, err = read()
+    if err is not None:
+        return None, None, err
+    remote, base = got.get("head"), got.get("base")
+    if not isinstance(remote, str) or not remote or not isinstance(base, str) or not base:
+        return None, None, "the pull request cannot be read (pull: the pull request's base or head cannot be read)"
+    return remote, base, None
+
+
+def prove_ci(pr, head, cwd):
+    """The one proof that CI passed on `head` for pull request `pr` (R-083).
+
+    Returns (exit, line, reading). Exit 0 carries the reading phrase; 1 and 2 carry "".
+    Prints nothing and writes nothing. Every GitHub read goes through bridge_env.
+    """
+    repo = "{owner}/{repo}"
+    remote, base, err = _await_pull(pr, head, cwd)
+    if err is not None:
+        return 2, _cannot(pr, err), ""
+    if remote != head:
+        line = "review-guard: NOT READY - pull request %s, head %s: the head moved (GitHub's head is %s)" % (
+            pr, head[:12], remote[:12])
+        return 1, line, ""
+    contexts, err = _rule_contexts(bridge_env.branch_rule(repo, base, cwd=cwd), "base")
+    if err is not None:
+        return 2, _cannot(pr, err), ""
+    if contexts:
+        reading, required = "the base branch's required contexts (%s)" % _show(base), contexts
+    else:
+        settings = bridge_env.repo_settings(repo, cwd=cwd)
+        if not isinstance(settings, dict) or settings.get("answer") != bridge_env.ANSWER_VALUE:
+            source, reason = _reader_bits(settings, "repo")
+            return 2, _cannot(pr, "the default branch cannot be read (%s: %s)" % (source, reason)), ""
+        default = settings.get("default_branch")
+        if not isinstance(default, str) or not default:
+            return 2, _cannot(pr, "the default branch cannot be read (repo: default_branch cannot be read)"), ""
+        if default == base:
+            reading, required = "the workflow runs", None
+        else:
+            contexts, err = _rule_contexts(bridge_env.branch_rule(repo, default, cwd=cwd), "default")
+            if err is not None:
+                return 2, _cannot(pr, err), ""
+            if contexts:
+                reading, required = "the default branch's required contexts (%s)" % _show(default), contexts
+            else:
+                reading, required = "the workflow runs", None
+    state = bridge_env.head_state(repo, remote, cwd=cwd)
+    if not isinstance(state, dict) or state.get("answer") != bridge_env.ANSWER_VALUE:
+        source, reason = _reader_bits(state, "checks")
+        return 2, _cannot(pr, "the head cannot be read (%s: %s)" % (source, reason)), ""
+    latest = bridge_env.latest_of_each(state)
+    if required is not None:
+        items = []
+        for entry in required:
+            if not isinstance(entry, dict) or not isinstance(entry.get("context"), str) or not entry.get("context"):
+                return 2, _cannot(pr, "a required context cannot be read"), ""
+            app_id = entry.get("app_id")
+            if app_id is not None and not _named_app(app_id):
+                return 2, _cannot(pr, "a required context cannot be read"), ""
+            klass, note = _context_result(entry["context"], app_id, latest)
+            if klass == "passed":
+                continue
+            shown = "%s: %s" % (_show(entry["context"]), klass)
+            if note:
+                shown += " (%s)" % note
+            items.append(shown)
+    else:
+        items = _runs_items(latest)
+    if items:
+        line = "review-guard: NOT READY - pull request %s, head %s, %s: %s" % (pr, head[:12], reading, "; ".join(items))
+        return 1, line, ""
+    line = "review-guard: READY - pull request %s, head %s, %s" % (pr, head[:12], reading)
+    return 0, line, reading
+
+
+def cmd_ready(pr, cwd):
+    """ready <pr>: prove CI and, on READY only, write bridge/ready/<pr>-<head>."""
+    if not isinstance(pr, str) or not pr or any(char < "0" or char > "9" for char in pr):
+        print("review-guard: CANNOT CHECK - pull request %s: the pull request's number is not digits" % pr)
+        return 2
+    root, _git_dir, common = find_git_dirs(cwd)
+    if root is None:
+        print("review-guard: CANNOT CHECK - pull request %s: not inside a git repository; the premerge record cannot be read" % pr)
+        return 2
+    head = run_git(["rev-parse", "HEAD"], root, common).strip()
+    if not _premerge_stands(common, head):
+        print("review-guard: CANNOT CHECK - pull request %s: the premerge record for this head cannot be read" % pr)
+        return 2
+    code, line, reading = prove_ci(pr, head, cwd)
+    if code != 0:
+        print(line)
+        return code
+    try:
+        _write_ready_record(common, pr, head, reading)
+    except OSError as e:
+        print("review-guard: CANNOT CHECK - pull request %s: the ready record could not be written (%s)" % (pr, e))
+        return 2
+    print(line)
+    return 0
+
+
 def cmd_premerge_records(cwd, pr=None):
     """The short gate (release S): a pull request that changes only records, none of them one a program
     reads to decide a gate, merges without the cross-family round. This command decides that by path,
-    type and mode and nothing else: CI is held by the repository's branch rule and the one Review A
-    read by the supervisor's step, neither is checked here. Without
+    type and mode and nothing else. With <pr>, CI is proven by the same check as ready before any
+    record is written, and both records are written or neither. The one Review A read stays the
+    supervisor's step and is not checked here. Without
     <pr> it only says which gate the branch takes, against origin/main, and writes nothing. With <pr> the
     changed files are GitHub's own list beside the local diff (a local ref moved, by anyone, cannot
-    shrink it), the pull request's head must be the local HEAD, and the record the permission guard
-    reads is written."""
+    shrink it), the pull request's head must be the local HEAD, and both records the permission guard
+    reads are written, or neither is."""
     root, _, common = find_git_dirs(cwd)
     if root is None:
         print("review-guard: CANNOT CHECK - not inside a git repository")
@@ -1513,6 +1792,11 @@ def cmd_premerge_records(cwd, pr=None):
         print("review-guard: SHORT GATE - %d changed file(s), every one a record no program reads to decide a gate; after CI and one Review A read, "
               "run it again with the pull request's number (nothing was written)" % len(paths))
         return 0
+    code, line, reading = prove_ci(pr, head, cwd)
+    if code != 0:
+        print(line)
+        return code
+    print(line)
     folder = os.path.join(common, "bridge", "premerge")
     try:
         os.makedirs(folder, exist_ok=True)
@@ -1520,6 +1804,15 @@ def cmd_premerge_records(cwd, pr=None):
             json.dump({"pr": pr, "review": "records", "files": paths, "written": time.strftime("%Y-%m-%dT%H:%M:%S")}, f)
     except OSError as e:
         print("review-guard: CANNOT CHECK - the pre-merge record could not be written (%s)" % e)
+        return 2
+    try:
+        _write_ready_record(common, pr, head, reading)
+    except OSError as e:
+        try:
+            os.remove(os.path.join(folder, head))
+        except OSError:
+            pass
+        print("review-guard: CANNOT CHECK - pull request %s: the ready record could not be written (%s)" % (pr, e))
         return 2
     print("review-guard: OK - records only, %d file(s); the pull request's head matches%s" % (len(paths), (" (waited %d seconds)" % waited) if waited else ""))
     print("review-guard: merge with  gh pr merge %s --squash --match-head-commit %s" % (pr, head))
@@ -1543,6 +1836,16 @@ def main():
             return cmd_premerge_records(os.getcwd(), argv[1] if len(argv) > 1 else None)
         except (RuntimeError, subprocess.TimeoutExpired, OSError) as e:
             print("review-guard: CANNOT VERIFY - %s" % e)
+            return 2
+    if argv[:1] == ["ready"]:
+        if len(argv) != 2:
+            print(__doc__.split("\n\n")[1])
+            return 2
+        try:
+            return cmd_ready(argv[1], os.getcwd())
+        except Exception as e:
+            reason = " ".join(str(e).split()) or type(e).__name__
+            print("review-guard: CANNOT CHECK - pull request %s: %s" % (argv[1], reason))
             return 2
     if len(argv) < 2 or argv[0] not in ("snapshot", "verify", "premerge"):
         print(__doc__.split("\n\n")[1])

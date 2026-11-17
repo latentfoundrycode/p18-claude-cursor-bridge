@@ -777,6 +777,7 @@ before the launch, verified and restored after it, and checked once more before 
   python ~/.claude/cursor-bridge/review-guard.py verify   <nnn>          after it returns
   python ~/.claude/cursor-bridge/review-guard.py premerge <nnn> [<pr>]   after the review files are removed, committed and pushed
   python ~/.claude/cursor-bridge/review-guard.py premerge-records [<pr>] the short gate of a pull request that changes only records
+  python ~/.claude/cursor-bridge/review-guard.py ready <pr>              after the CI watch, the proof that CI passed
 
 Why (release 0b review, finding 2 and its second pass): Review B keeps `--force` so it can
 run the tests and build reproductions (the owner's decision), and it acts after Review A and
@@ -833,8 +834,9 @@ What each step does:
   premerge-records  (release S) the short gate: a pull request whose every changed file is a
             record (under docs/ or handoff/, or project.json; a text or a picture by its type,
             a plain file by its mode) and none of them one a program reads to decide a gate
-            merges without the cross-family round, on CI, which the branch rule holds, and one
-            Review A read, which is the supervisor's step: this command checks neither. The
+            merges without the cross-family round. With the pull request's number, CI is proven
+            by the same check as ready and both records are written or neither. The one Review A
+            read stays the supervisor's step and is not checked here. The
             full gate stays for docs/RUN_PARAMETERS.md, docs/BUILD_PLAN*, docs/ROSTER*,
             everything under docs/diagrams/, a removed status file, inventory, register or
             project file, the register where a Status cell changed, a row left, a new row is
@@ -845,8 +847,15 @@ What each step does:
             every path that is no record. Without <pr> it prints SHORT GATE or FULL GATE for the
             branch against origin/main and writes nothing. With <pr> the changed files are
             GitHub's list of the pull request joined with the local diff from its base, its
-            head must be the local HEAD (read again as premerge does), and on OK the same
-            record is written and the merge command printed. Exit 1 on FULL GATE or NOT READY.
+            head must be the local HEAD (read again as premerge does), and on OK the premerge
+            record and the ready record are written, or neither is, and the merge command printed.
+            Exit 1 on FULL GATE or NOT READY.
+  ready     proves CI on the pull request's head. READY (exit 0) when GitHub's head is the local
+            head, the premerge record for that head stands and CI is proven, and the record
+            <git common dir>/bridge/ready/<pr>-<head> is written. NOT READY (exit 1) names each
+            context or run that is missing, pending or failed, or the head that moved, and writes
+            nothing. CANNOT CHECK (exit 2) where GitHub, a branch's rule, the pull request or the
+            premerge record cannot be read, and writes nothing.
 
 Exit 0 = OK; 1 = GATE-INTEGRITY (open the flag, condition 4, and an issue; do not merge);
 a snapshot deleted after it was taken, its hash copy standing, is GATE-INTEGRITY;

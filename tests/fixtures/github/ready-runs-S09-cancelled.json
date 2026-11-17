@@ -1,0 +1,37 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-16 from the captured runs.json by the supervisor for TASK-083: run 800 of the same workflow and event, cancelled (suite 900001), added before its successor 801",
+ "request": "repos/OWNER/REPO/actions/runs?head_sha=1111111111111111111111111111111111111111",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "total_count": 2,
+  "workflow_runs": [
+   {
+    "id": 43852500001,
+    "name": "tests",
+    "workflow_id": 374570417,
+    "event": "pull_request",
+    "run_number": 800,
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "cancelled",
+    "check_suite_id": 900001,
+    "head_sha": "1111111111111111111111111111111111111111"
+   },
+   {
+    "id": 43852586868,
+    "name": "tests",
+    "workflow_id": 374570417,
+    "event": "pull_request",
+    "run_number": 801,
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "check_suite_id": 118713714642,
+    "head_sha": "1111111111111111111111111111111111111111"
+   }
+  ]
+ }
+}

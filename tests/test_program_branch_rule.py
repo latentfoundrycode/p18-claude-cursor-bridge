@@ -431,11 +431,8 @@ def test_r084_premerge_records_prints_the_line_after_its_verdict_too(tmp_path, m
     base = G.git(repo, "rev-parse", "refs/remotes/origin/main")
     guard = load_guard(monkeypatch)
     monkeypatch.setattr(guard, "pr_state", lambda pr, root: ({"head": head, "base": base, "into": "main", "files": ["docs/PROJECT_STATUS.md"]}, None))
-    standin = tmp_path / "standin_gh.py"
-    standin.write_text(STANDIN, encoding="utf-8")
-    cfg = tmp_path / "routes.json"
-    cfg.write_text(json.dumps({"routes": {"repos/OWNER/REPO#1": "repo.json"}, "fixtures": FIXTURES, "log": str(tmp_path / "log.jsonl")}), encoding="utf-8")
-    monkeypatch.setattr(guard.bridge_env, "GH_COMMAND", [sys.executable, str(standin), str(cfg)])
+    import test_program_ready as R                     # TASK-083: the same check as ready first, on a head READY on main
+    R.use_standin(guard.bridge_env, monkeypatch, tmp_path, R.ready_routes(head), head)
     monkeypatch.chdir(str(repo))
     rc = guard.cmd_premerge_records(str(repo), "12")
     out = capsys.readouterr().out

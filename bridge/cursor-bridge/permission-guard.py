@@ -2054,6 +2054,7 @@ def shell_inner(w, slash_ok=False):
 
 
 def gh_words(w):
+    """Before the group is found, and after any group other than api before the subcommand is found, only a command's name (`[A-Za-z0-9][A-Za-z0-9-]*`) is read as one. A word beginning with `-` other than `-R`, `--repo` or `--hostname`, where any word follows it, and any other word that is not such a name, make the command unreadable: (INNER_UNREADABLE, word, [])."""
     found, rest, i = [], [], 1
     while i < len(w):
         tok = w[i]
@@ -2061,14 +2062,21 @@ def gh_words(w):
             opt = tok.split("=", 1)[0]
             if opt in ("-R", "--repo", "--hostname"):
                 i += 2 if "=" not in tok else 1; continue
-            if tok in GH_API_OPTS:
-                if "=" in tok:
+            if len(found) == 1 and found[0] == "api":
+                if tok in GH_API_OPTS:
+                    if "=" in tok:
+                        i += 1; continue
+                    i += 2 if i + 1 < len(w) else 1; continue
+                if opt in ("-X", "--method") and tok.startswith("-") and len(tok) > 2 and "=" not in tok:
                     i += 1; continue
-                i += 2 if i + 1 < len(w) else 1; continue
-            if opt in ("-X", "--method") and tok.startswith("-") and len(tok) > 2 and "=" not in tok:
+                if tok.startswith("-"):
+                    i += 1; continue
+            elif tok.startswith("-"):
+                if i + 1 < len(w):
+                    return INNER_UNREADABLE, tok, []
                 i += 1; continue
-            if tok.startswith("-"):
-                i += 1; continue
+            elif not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]*", tok):
+                return INNER_UNREADABLE, tok, []
             found.append(tok)
         else:
             rest.append(tok)
@@ -2308,6 +2316,10 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
             return "git worktree remove (git follows a gitignored junction or link inside the worktree into its target, forced or not): tear a worktree down with python ~/.claude/cursor-bridge/worktree-teardown.py <path>, which refuses while a link is inside"
     elif head in ("gh", "gh.exe"):
         group, sub, args = gh_words(w)
+        if group is INNER_UNREADABLE:
+            if isinstance(sub, str) and sub.startswith("-"):
+                return _cannot("an option before the gh subcommand (%s)" % sub)
+            return _cannot("a word before the gh subcommand that is not a command's name (%s)" % repr(sub))
         if group == "pr" and sub == "merge":
             r = merge_reason(args, cwd)
             if r:
@@ -2380,6 +2392,8 @@ def state_changing(w):
         return sub in STATE_GIT
     if base(w[0]) in ("gh", "gh.exe"):
         group, sub, _ = gh_words(w)
+        if group is INNER_UNREADABLE:
+            return True
         return bool(group) and group not in GH_READ and sub not in GH_READ
     return False
 def is_git(w):
@@ -2448,27 +2462,131 @@ def premerge_recorded(sha, cwd):
     return any(n.lower().startswith(sha.lower()) for n in names)
 
 
+def ready_recorded(pr, sha, cwd):
+    """True when review-guard.py ready wrote bridge/ready/<pr>-<sha> for this head (R-083).
+    A record of another pull request, or of another head, proves nothing."""
+    if not isinstance(pr, str) or not pr or any(char < "0" or char > "9" for char in pr):
+        return False
+    if not re.fullmatch(r"[0-9a-fA-F]{7,64}", sha or ""):
+        return False
+    try:
+        left = _time_left()
+        if left <= 0:
+            return False
+        p = subprocess.run(["git", "-C", cwd or ".", "-c", "core.fsmonitor=false", "rev-parse", "--git-common-dir"],
+                           capture_output=True, text=True, timeout=left, creationflags=NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if p.returncode != 0:
+        return False
+    common = p.stdout.strip()
+    if not os.path.isabs(common):
+        common = os.path.join(cwd or ".", common)
+    try:
+        names = os.listdir(os.path.join(common, "bridge", "ready"))
+    except OSError:
+        return False
+    prefix = ("%s-%s" % (pr, sha)).lower()
+    return any(name.lower().startswith(prefix) and not name.lower().endswith(".tmp") for name in names)
+
+
+def _read_merge_words(args):
+    """The words after `gh pr merge`, read once as gh reads them (pflag).
+    Returns the last `--match-head-commit` value (None when that option is absent, "" when nothing follows it), whether the `--disable-auto` exemption or the help exemption stands, and the positional words. A flag's value is never an option, and every word after `--` is a positional. The `--disable-auto` exemption stands only where the bare option `--disable-auto` is found and no `--disable-auto=<v>` is found, and the help exemption stands only where `--help` or the word `-h` is found and no `--help=<v>` and no single-dash word holding `=` whose letters before the `=` include `h` is found."""
+    long_value = tuple(flag for flag in GH_VALUE_FLAGS if flag[:2] == "--")
+    short_value = tuple(flag[1] for flag in GH_VALUE_FLAGS if len(flag) == 2 and flag[0] == "-" and flag[1] != "-")
+    sha = None
+    disable_bare = False
+    disable_eq = False
+    help_bare = False
+    help_eq = False
+    positionals = []
+    ended = False
+    i, n = 0, len(args)
+    while i < n:
+        word = args[i]
+        if ended:
+            positionals.append(word)
+            i += 1
+            continue
+        if word == "--":
+            ended = True
+            i += 1
+            continue
+        if len(word) > 1 and word[0] == "-" and word[1] == "-":
+            name, eq, value = word.partition("=")
+            if eq:
+                if name == "--match-head-commit":
+                    sha = value
+                elif name == "--disable-auto":
+                    disable_eq = True
+                elif name == "--help":
+                    help_eq = True
+                i += 1
+                continue
+            if word in long_value:
+                if i + 1 < n:
+                    value = args[i + 1]
+                    i += 2
+                else:
+                    value = ""
+                    i += 1
+                if word == "--match-head-commit":
+                    sha = value
+                continue
+            if word == "--disable-auto":
+                disable_bare = True
+            elif word == "--help":
+                help_bare = True
+            i += 1
+            continue
+        clustered = len(word) > 1 and word[0] == "-"
+        if clustered:
+            for ch in word[1:]:
+                if not (("A" <= ch <= "Z") or ("a" <= ch <= "z")):
+                    clustered = False
+                    break
+        if clustered:
+            body = word[1:]
+            k = 0
+            while k < len(body):
+                if body[k] in short_value:
+                    if body[k + 1:] or i + 1 >= n:
+                        i += 1
+                    else:
+                        i += 2
+                    break
+                k += 1
+            else:
+                i += 1
+            if word == "-h":
+                help_bare = True
+            continue
+        if len(word) > 1 and word[0] == "-" and word[1] != "-" and "=" in word and "h" in word[1:].split("=", 1)[0]:
+            help_eq = True
+        positionals.append(word)
+        i += 1
+    return sha, disable_bare and not disable_eq, help_bare and not help_eq, positionals
+
+
 def merge_reason(args, cwd):
     """The reason to refuse a gh pr merge (args = the words after `merge`), or None."""
     if any(a == "--admin" or a.startswith("--admin=") for a in args):
         return "gh pr merge --admin (merging past the repository's rules)"
-    if "--disable-auto" in args:
+    sha, disable_auto, help_opt, positionals = _read_merge_words(args)
+    if disable_auto or help_opt:
         return None
-    for i, a in enumerate(args):
-        if a in ("--help", "-h") and (i == 0 or args[i - 1] not in GH_VALUE_FLAGS):
-            return None                                    # `--subject --help` is a subject, and gh merges
-    sha = None
-    for i, a in enumerate(args):
-        if a == "--match-head-commit":
-            sha = args[i + 1] if i + 1 < len(args) else ""
-        elif a.startswith("--match-head-commit="):
-            sha = a.split("=", 1)[1]
     if sha is None:
         return "gh pr merge without --match-head-commit <sha>: the sha, and the record review-guard.py premerge writes when it prints OK, are the gate's confirmation"
     if not re.fullmatch(r"[0-9a-fA-F]{7,64}", sha):
         return "gh pr merge with an empty or malformed --match-head-commit value"
+    number = positionals[0] if len(positionals) == 1 else None
+    if number is None or number == "" or any(char < "0" or char > "9" for char in number):
+        return "gh pr merge without the pull request's number: gh pr merge <n> --squash --match-head-commit <sha>"
     if not premerge_recorded(sha, cwd):
         return "gh pr merge for %s without the pre-merge check's record: run python ~/.claude/cursor-bridge/review-guard.py premerge <nnn> <n> in the checkout first (it writes the record when it prints OK)" % sha[:12]
+    if not ready_recorded(number, sha, cwd):
+        return "gh pr merge for %s without the ready record of pull request %s: run python ~/.claude/cursor-bridge/review-guard.py ready %s after the CI watch" % (sha[:12], number, number)
     return None
 
 

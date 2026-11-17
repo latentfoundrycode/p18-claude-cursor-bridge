@@ -106,7 +106,10 @@ def test_no_instructed_command_is_refused_by_the_guard(src, cmd, program, monkey
         pytest.skip("prose, not a runnable command")
     guard = program("permission-guard")
     monkeypatch.setattr(guard, "premerge_recorded", lambda sha, cwd: True)
-    runnable = re.sub(r"<[A-Za-z][^<>\n]*>", "placeholder", cmd.replace("<sha>", "0123456789abcdef0123456789abcdef01234567"))
+    monkeypatch.setattr(guard, "ready_recorded", lambda pr, sha, cwd: True)   # TASK-083 (R-083): the ready record stands too
+    # A merge's <n> is the pull request's number, which the guard reads (TASK-083): a sample number stands for it.
+    numbered = re.sub(r"\bgh pr merge <n>", "gh pr merge 12", cmd)
+    runnable = re.sub(r"<[A-Za-z][^<>\n]*>", "placeholder", numbered.replace("<sha>", "0123456789abcdef0123456789abcdef01234567"))
     reason = guard.check(runnable, None)
     assert reason is None, "%s instructs %r, which the guard refuses: %s" % (src, cmd, reason)
 

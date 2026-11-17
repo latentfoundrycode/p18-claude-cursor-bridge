@@ -56,3 +56,11 @@
 2026-11-16 BUG-045-r4: git accepts a 3-character prefix of `--mirror` and reads the characters `4` and `6` inside a short-flag cluster, so one 4-character floor and a letters-only cluster check both let a force push through; the digit allowance is an extra argument of `_short_letters_hold` that defaults to empty, so commit's `-n` stays letters-only (`git commit -4n -m x` still exits 0). The starting-tree reading was taken by launching the guard as `tests/test_bug045.py` does, with cwd a folder under the system temporary directory, because the brief forbids this repository folder as cwd and the workspace boundary forbids a file outside it.
 
 2026-11-16 TASK-064: a 300-second wait on the six-file side-effect pytest returned while that process was still running; it was not hung and later exited 0 (about 328 seconds). The same command is in Done and has to be waited out past five minutes on this host.
+
+2026-11-17 TASK-083: `review-guard.py` and `permission-guard.py` are CRLF, so a mutation search written with `\n` only matches nothing, and a long bash heredoc of a Python driver was cut off on this host; the self-check had to be a file under `handoff/` that was deleted before the Done commands.
+
+2026-11-17 TASK-083-r2: a foreground wait of 30 seconds backgrounds the shell while `python -m pytest -p no:cacheprovider -q -rfE tests/test_permission_guard.py --tb=line` is still printing progress; that run then exited 0 (`296 passed in 30.21s`), and the Done run of the four permission-guard files was given a longer wait.
+
+2026-11-17 TASK-083-r3: a foreground wait of 30 seconds backgrounds the shell while `python -m pytest -p no:cacheprovider -q -rfE tests/test_program_ready.py -k "r083_r3 or r083_r2 or disable_auto or help" tests/test_permission_guard.py -k "r083_r3 or r083_r2 or test_allowed or test_refused"` is still printing progress; that run then exited 0 (`365 passed, 79 deselected in 41.37s`), and the Done pytest runs were given a longer wait.
+
+2026-11-17 TASK-083-r4: an empty word is falsy, so returning it as the group neither marks the command unreadable (`startswith("-")` is false) nor state-changing (`bool("")` is false); `gh_words` returns the existing `INNER_UNREADABLE` sentinel with the word beside it, and `any()` over that empty number is false so the number test refuses `""` on its own.

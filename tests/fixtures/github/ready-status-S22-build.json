@@ -1,0 +1,20 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-16 from the captured status.json by the supervisor for TASK-083: one commit status build, state success",
+ "request": "repos/OWNER/REPO/commits/1111111111111111111111111111111111111111/status",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "state": "success",
+  "total_count": 1,
+  "statuses": [
+   {
+    "id": 3,
+    "context": "build",
+    "state": "success",
+    "updated_at": "2026-11-16T10:55:00Z"
+   }
+  ]
+ }
+}

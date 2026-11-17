@@ -1,0 +1,12 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-16 from the captured protection-release-none.json by the supervisor for TASK-083: the same reply for main (a default branch with no protection)",
+ "request": "repos/OWNER/REPO/branches/main/protection/required_status_checks",
+ "status": 404,
+ "gh_exit": 1,
+ "gh_stderr": "gh: Branch not protected (HTTP 404)",
+ "body": {
+  "message": "Branch not protected",
+  "status": "404"
+ }
+}
