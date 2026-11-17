@@ -616,3 +616,43 @@ def test_r083_r3_the_records_still_decide_and_the_other_gh_forms_pass(tool, tmp_
     repo = records_repo(tmp_path)
     rc, err = pg(tool, cmd, repo)
     assert rc == 0, (cmd, err)
+
+
+
+# ---------------------------------------------------------------- round 4: a word cobra does not take for a command
+# Review A and the security audit of round 3 (2026-11-17): cobra, finding the group and the subcommand, passes over an empty word
+# (`case s != "" && !strings.HasPrefix(s, "-")`) and leaves it to the subcommand as a positional, so under Bash
+# `gh pr '' merge --squash --match-head-commit <B>` is read by gh as a merge of the current branch's pull request at head B, while
+# the guard took the empty word for the subcommand and read no merge. PowerShell already refuses an empty quoted word.
+
+
+ROUND4_REFUSED = [
+    "gh '' pr merge --squash --match-head-commit " + OTHER,
+    "gh pr '' merge --squash --match-head-commit " + OTHER,
+    'gh "" pr merge 12 --squash --match-head-commit ' + SHA,
+    "gh -R OWNER/REPO '' pr merge --squash --match-head-commit " + OTHER,
+    "gh pr --repo OWNER/REPO '' merge --squash --match-head-commit " + OTHER,
+    "gh pr merge '' --squash --match-head-commit " + SHA,
+]
+
+
+@pytest.mark.parametrize("tool", TOOLS)
+@pytest.mark.parametrize("cmd", ROUND4_REFUSED)
+def test_r083_r4_a_word_that_is_not_a_command_name_before_the_subcommand_is_refused(tool, tmp_path, cmd):
+    """enforces: T-CONTEXT: before the subcommand, the guard takes a word for the group or the subcommand only where it is a
+    command's name; any other word there (the empty word among them) makes the command unreadable, and an empty pull request number
+    is no number. The records stand for pull request 12 at SHA."""
+    repo = records_repo(tmp_path)
+    rc, err = pg(tool, cmd, repo)
+    assert rc == 2, (cmd, err)
+
+
+@pytest.mark.parametrize("tool", TOOLS)
+def test_r083_r4_an_empty_word_before_the_subcommand_is_unreadable_and_the_plain_merge_still_passes(tool, tmp_path):
+    """The refusal is the guard's cannot-read refusal, under both shells; the same merge without the empty word passes on its
+    records."""
+    repo = records_repo(tmp_path)
+    rc, err = pg(tool, "gh pr '' merge 12 --squash --match-head-commit " + SHA, repo)
+    assert rc == 2 and "cannot read" in err, err
+    rc, err = pg(tool, "gh pr merge 12 --squash --match-head-commit " + SHA, repo)
+    assert rc == 0, err

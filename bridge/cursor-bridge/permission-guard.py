@@ -2054,6 +2054,7 @@ def shell_inner(w, slash_ok=False):
 
 
 def gh_words(w):
+    """Before the group is found, and after any group other than api before the subcommand is found, a word beginning with `-` other than `-R`, `--repo` or `--hostname` makes the command unreadable where any word follows it."""
     found, rest, i = [], [], 1
     while i < len(w):
         tok = w[i]
@@ -2061,13 +2062,18 @@ def gh_words(w):
             opt = tok.split("=", 1)[0]
             if opt in ("-R", "--repo", "--hostname"):
                 i += 2 if "=" not in tok else 1; continue
-            if tok in GH_API_OPTS:
-                if "=" in tok:
+            if len(found) == 1 and found[0] == "api":
+                if tok in GH_API_OPTS:
+                    if "=" in tok:
+                        i += 1; continue
+                    i += 2 if i + 1 < len(w) else 1; continue
+                if opt in ("-X", "--method") and tok.startswith("-") and len(tok) > 2 and "=" not in tok:
                     i += 1; continue
-                i += 2 if i + 1 < len(w) else 1; continue
-            if opt in ("-X", "--method") and tok.startswith("-") and len(tok) > 2 and "=" not in tok:
-                i += 1; continue
-            if tok.startswith("-"):
+                if tok.startswith("-"):
+                    i += 1; continue
+            elif tok.startswith("-"):
+                if i + 1 < len(w):
+                    return tok, None, []
                 i += 1; continue
             found.append(tok)
         else:
@@ -2308,6 +2314,8 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
             return "git worktree remove (git follows a gitignored junction or link inside the worktree into its target, forced or not): tear a worktree down with python ~/.claude/cursor-bridge/worktree-teardown.py <path>, which refuses while a link is inside"
     elif head in ("gh", "gh.exe"):
         group, sub, args = gh_words(w)
+        if isinstance(group, str) and group.startswith("-"):
+            return _cannot("an option before the gh subcommand (%s)" % group)
         if group == "pr" and sub == "merge":
             r = merge_reason(args, cwd)
             if r:
@@ -2380,6 +2388,8 @@ def state_changing(w):
         return sub in STATE_GIT
     if base(w[0]) in ("gh", "gh.exe"):
         group, sub, _ = gh_words(w)
+        if isinstance(group, str) and group.startswith("-"):
+            return True
         return bool(group) and group not in GH_READ and sub not in GH_READ
     return False
 def is_git(w):
@@ -2478,12 +2488,14 @@ def ready_recorded(pr, sha, cwd):
 
 def _read_merge_words(args):
     """The words after `gh pr merge`, read once as gh reads them (pflag).
-    Returns the last `--match-head-commit` value (None when that option is absent, "" when nothing follows it), whether `--disable-auto` or the help (`--help`, or the word `-h` alone) stands as an option, and the positional words. A flag's value is never an option, and every word after `--` is a positional."""
+    Returns the last `--match-head-commit` value (None when that option is absent, "" when nothing follows it), whether the `--disable-auto` exemption or the help exemption stands, and the positional words. A flag's value is never an option, and every word after `--` is a positional. The `--disable-auto` exemption stands only where the bare option `--disable-auto` is found and no `--disable-auto=<v>` is found, and the help exemption stands only where `--help` or the word `-h` is found and no `--help=<v>` and no single-dash word holding `=` whose letters before the `=` include `h` is found."""
     long_value = tuple(flag for flag in GH_VALUE_FLAGS if flag[:2] == "--")
     short_value = tuple(flag[1] for flag in GH_VALUE_FLAGS if len(flag) == 2 and flag[0] == "-" and flag[1] != "-")
     sha = None
-    disable_auto = False
-    help_opt = False
+    disable_bare = False
+    disable_eq = False
+    help_bare = False
+    help_eq = False
     positionals = []
     ended = False
     i, n = 0, len(args)
@@ -2502,6 +2514,10 @@ def _read_merge_words(args):
             if eq:
                 if name == "--match-head-commit":
                     sha = value
+                elif name == "--disable-auto":
+                    disable_eq = True
+                elif name == "--help":
+                    help_eq = True
                 i += 1
                 continue
             if word in long_value:
@@ -2515,9 +2531,9 @@ def _read_merge_words(args):
                     sha = value
                 continue
             if word == "--disable-auto":
-                disable_auto = True
+                disable_bare = True
             elif word == "--help":
-                help_opt = True
+                help_bare = True
             i += 1
             continue
         clustered = len(word) > 1 and word[0] == "-"
@@ -2540,11 +2556,13 @@ def _read_merge_words(args):
             else:
                 i += 1
             if word == "-h":
-                help_opt = True
+                help_bare = True
             continue
+        if len(word) > 1 and word[0] == "-" and word[1] != "-" and "=" in word and "h" in word[1:].split("=", 1)[0]:
+            help_eq = True
         positionals.append(word)
         i += 1
-    return sha, disable_auto, help_opt, positionals
+    return sha, disable_bare and not disable_eq, help_bare and not help_eq, positionals
 
 
 def merge_reason(args, cwd):

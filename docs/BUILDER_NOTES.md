@@ -60,3 +60,5 @@
 2026-11-17 TASK-083: `review-guard.py` and `permission-guard.py` are CRLF, so a mutation search written with `\n` only matches nothing, and a long bash heredoc of a Python driver was cut off on this host; the self-check had to be a file under `handoff/` that was deleted before the Done commands.
 
 2026-11-17 TASK-083-r2: a foreground wait of 30 seconds backgrounds the shell while `python -m pytest -p no:cacheprovider -q -rfE tests/test_permission_guard.py --tb=line` is still printing progress; that run then exited 0 (`296 passed in 30.21s`), and the Done run of the four permission-guard files was given a longer wait.
+
+2026-11-17 TASK-083-r3: a foreground wait of 30 seconds backgrounds the shell while `python -m pytest -p no:cacheprovider -q -rfE tests/test_program_ready.py -k "r083_r3 or r083_r2 or disable_auto or help" tests/test_permission_guard.py -k "r083_r3 or r083_r2 or test_allowed or test_refused"` is still printing progress; that run then exited 0 (`365 passed, 79 deselected in 41.37s`), and the Done pytest runs were given a longer wait.
