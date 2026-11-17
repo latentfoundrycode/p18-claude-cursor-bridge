@@ -1,7 +1,7 @@
 ---
 record: inventory
 header: 1
-reflected_through: "2026-11-17 TASK-083: the guard reads a merge command as gh reads it, over four rounds; `gh api`'s walk drawn to BUG-046 (R-083)"
+reflected_through: "2026-11-17 BUG-046: the merge endpoint named by what it holds, not by how it is spelled, at round 3 (R-082)"
 development_data: "Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet (§15 condition 1, A1a condition 1)"
 tables:
   features:
@@ -18,7 +18,7 @@ tables:
     key: Item
 ---
 # Inventory — Claude-Cursor Bridge
-Reflected through: 2026-11-17 TASK-083: the guard reads a merge command as gh reads it, over four rounds; `gh api`'s walk drawn to BUG-046 (R-083)
+Reflected through: 2026-11-17 BUG-046: the merge endpoint named by what it holds, not by how it is spelled, at round 3 (R-082)
 Updated: 2026-11-15
 
 The bridge already exists (releases 0, A1a–A5). This inventory is opened as the bridge becomes a supervised project (release B). Features accrue to the register as release B's increments merge; the rows below record the decisions and resources release B rests on.
