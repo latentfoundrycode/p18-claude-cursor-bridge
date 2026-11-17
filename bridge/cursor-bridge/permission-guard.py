@@ -54,7 +54,6 @@ passes. ASCII-only on purpose. Never writes.
 """
 import json
 import os
-import posixpath
 import re
 import subprocess
 import sys
@@ -2334,7 +2333,8 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
             r = merge_reason(args, cwd)
             if r:
                 return r
-        if group == "api" and any(m in tok or m in _percent_decoded(tok) for tok in w for m in MERGE_MUTATIONS):
+        decoded_w = [_percent_decoded(tok) for tok in w] if group == "api" else []
+        if group == "api" and any(m in tok or m in dec for tok, dec in zip(w, decoded_w) for m in MERGE_MUTATIONS):
             return "gh api with a merge mutation (merging outside the gate)"
         if group == "api" and any(t == "--input" or t.startswith("--input=") or t.startswith("@") or "=@" in t for t in w):
             return "gh api with a body read from a file or standard input, which the guard cannot read (write the query or fields on the command line)"
@@ -2343,12 +2343,9 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
             if sub == "import" or re.match(r"^(pr\s+merge|api)\b", expansion) or "worktree" in expansion:
                 return "a gh alias for a merge or an api call (%s)" % " ".join(args)[:60]
         if group == "api":
-            for a in w:
-                decoded = _percent_decoded(a).lower()
-                q, h = decoded.find("?"), decoded.find("#")
-                cuts = [i for i in (q, h) if i >= 0]
-                path = decoded if not cuts else decoded[:min(cuts)]
-                if any(re.search(r"/pulls/[^/]+/merge", part) for part in (decoded, path, posixpath.normpath(path))):
+            for dec in decoded_w:
+                low = dec.lower()
+                if "pulls" in low and "merge" in low:
                     return "gh api on a pull request's merge endpoint (merging outside the gate)"
     return None
 

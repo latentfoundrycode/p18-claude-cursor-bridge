@@ -272,3 +272,25 @@ def test_bug046_mergeable_report_is_refused(plain, tool):
     rc, err = guard(tool, "gh api repos/o/r/pulls/5/mergeable-report", plain)
     assert rc == 2 and "refused" in err and "merge endpoint" in err, (tool, rc, err)
 
+
+# BUG-046 (R-082): the two names in one word after decoding, in reverse order, and a comments path that holds only pulls.
+@pytest.mark.parametrize("tool", TOOLS, ids=["Bash", "PowerShell"])
+def test_bug046_r3_pulls_and_merge_only_after_decoding_are_refused(plain, tool):
+    """BUG-046 (R-082): pul%6cs and m%65rge are pulls and merge only once the word is decoded."""
+    rc, err = guard(tool, "gh api repos/o/r/pul%6cs/5/m%65rge", plain)
+    assert rc == 2 and "refused" in err and "merge endpoint" in err, (tool, rc, err)
+
+
+@pytest.mark.parametrize("tool", TOOLS, ids=["Bash", "PowerShell"])
+def test_bug046_r3_merge_then_pulls_in_one_field_is_refused(plain, tool):
+    # Accepted over-refusal (BUG-046, R-082): -f sends the value as written, and body=merge the pulls holds the two names in reverse order in one word.
+    rc, err = guard(tool, "gh api repos/o/r/issues/5/comments -f 'body=merge the pulls'", plain)
+    assert rc == 2 and "refused" in err and "merge endpoint" in err, (tool, rc, err)
+
+
+@pytest.mark.parametrize("tool", TOOLS, ids=["Bash", "PowerShell"])
+def test_bug046_r3_pull_request_comments_pass(plain, tool):
+    """BUG-046 (R-082): repos/o/r/pulls/5/comments holds pulls and does not hold merge."""
+    rc, err = guard(tool, "gh api repos/o/r/pulls/5/comments", plain)
+    assert rc == 0, (tool, rc, err)
+
