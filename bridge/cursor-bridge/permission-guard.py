@@ -60,7 +60,6 @@ import subprocess
 import sys
 import time
 
-WRITE_METHODS = ("PUT", "POST", "PATCH", "DELETE")
 AROUND_THE_SHIM = ("agent", "agent.cmd", "agent.ps1", "cursor-agent.cmd", "cursor-agent.ps1", "cursor-agent.exe")
 SHELLS = ("cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe")
 PROGRAM_AFTER = ("/c", "/k", "-c", "-command", "-file")
@@ -2198,6 +2197,16 @@ def _find_brace_refusal(words, mode, depth):
     return None
 
 
+def _percent_decoded(word):
+    """Each % and two hex digits becomes that character, repeated until a pass changes nothing. A result that is not ASCII is those characters."""
+    decoded = word
+    while True:
+        nxt = re.sub(r"%([0-9A-Fa-f]{2})", lambda m: chr(int(m.group(1), 16)), decoded)
+        if nxt == decoded:
+            return decoded
+        decoded = nxt
+
+
 def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=False):
     """Every check of one command, on the word list the reader produced or a find clause."""
     if _too_long():
@@ -2325,7 +2334,7 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
             r = merge_reason(args, cwd)
             if r:
                 return r
-        if group == "api" and any(m in tok for tok in w for m in MERGE_MUTATIONS):
+        if group == "api" and any(m in tok or m in _percent_decoded(tok) for tok in w for m in MERGE_MUTATIONS):
             return "gh api with a merge mutation (merging outside the gate)"
         if group == "api" and any(t == "--input" or t.startswith("--input=") or t.startswith("@") or "=@" in t for t in w):
             return "gh api with a body read from a file or standard input, which the guard cannot read (write the query or fields on the command line)"
@@ -2335,8 +2344,11 @@ def _check_word_list(cmd_wds, command, cwd, tool, mode, depth, slash_ok, fed=Fal
                 return "a gh alias for a merge or an api call (%s)" % " ".join(args)[:60]
         if group == "api":
             for a in w:
-                path = posixpath.normpath(a.lower().replace("%2f", "/").replace("%2e", "."))
-                if re.search(r"/pulls/[^/]+/merge", path):
+                decoded = _percent_decoded(a).lower()
+                q, h = decoded.find("?"), decoded.find("#")
+                cuts = [i for i in (q, h) if i >= 0]
+                path = decoded if not cuts else decoded[:min(cuts)]
+                if any(re.search(r"/pulls/[^/]+/merge", part) for part in (decoded, path, posixpath.normpath(path))):
                     return "gh api on a pull request's merge endpoint (merging outside the gate)"
     return None
 

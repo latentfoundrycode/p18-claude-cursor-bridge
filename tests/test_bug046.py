@@ -175,28 +175,70 @@ def test_bug046_r1_ordinary_calls_with_escapes_or_queries_pass(plain, tool, comm
     assert rc == 0, (tool, command, rc, err)
 
 
+# ---------------------------------------------------------------- round 2's findings (Review A and the security audit, 2026-11-17)
+# Round 2 decoded the word and then cut it at its first `?` or `#`, where gh cuts only at a literal one: an escaped `%3F` or
+# `%23` (at any nesting) stays inside the path gh sends, and the `..` after it then resolves to the merge endpoint; and a
+# decoded `%2F` split one segment into two, so `..` removed only half of it. Each is refused under both tools, with the
+# merge endpoint in the reason (round 3: a word whose decoded, lower-cased text holds both `pulls` and `merge`).
+ROUND2_MERGE_SPELLINGS = [
+    ("escaped-hash-segment", "gh api -X PUT 'repos/o/r/pulls/5/%23/../merge'"),
+    ("escaped-question-segment", "gh api -X PUT 'repos/o/r/pulls/5/%3F/../merge'"),
+    ("escaped-question-inside-a-segment", "gh api -X PUT 'repos/o/r/pulls/5/a%3Fb/../merge'"),
+    ("doubly-escaped-question", "gh api -X PUT 'repos/o/r/pulls/5/%253F/../merge'"),
+    ("escaped-hash-full-url", "gh api -X PUT 'https://api.github.com/repos/o/r/pulls/5/%23/../merge'"),
+    ("escaped-question-before-the-number", "gh api -X PUT 'repos/o/r/pulls/x%3F/../5/merge'"),
+    ("escaped-hash-before-the-number", "gh api -X PUT 'repos/o/r/pulls/x%23/../5/merge'"),
+    ("escaped-question-and-encoded-dots", "gh api -X PUT 'repos/o/r/pulls/5/a%3f/%2e%2e/merge'"),
+    ("escaped-slash-inside-a-segment", "gh api -X PUT 'repos/o/r/pulls/5/a%2Fb/../merge'"),
+]
+
+
+@pytest.mark.parametrize("tool", TOOLS)
+@pytest.mark.parametrize("command", [c for _, c in ROUND2_MERGE_SPELLINGS], ids=[n for n, _ in ROUND2_MERGE_SPELLINGS])
+def test_bug046_r2_an_escaped_delimiter_never_hides_the_merge_endpoint(plain, tool, command):
+    rc, err = guard(tool, command, plain)
+    assert rc == 2 and "merge endpoint" in err, (tool, command, rc, err)
+
+
+# Ordinary calls that name pull requests or merges in separate words: each passes, before round 3 and after it.
+ROUND2_ORDINARY = [
+    ("pull-requests-listed-with-a-merged-filter", "gh api repos/o/r/pulls --jq '.[] | select(.merged_at)'"),
+    ("pull-request-commits", "gh api repos/o/r/pulls/5/commits"),
+    ("merged-search", "gh api 'search/issues?q=repo:o/r+is:pr+is:merged'"),
+]
+
+
+@pytest.mark.parametrize("tool", TOOLS)
+@pytest.mark.parametrize("command", [c for _, c in ROUND2_ORDINARY], ids=[n for n, _ in ROUND2_ORDINARY])
+def test_bug046_r2_pulls_and_merge_in_separate_words_pass(plain, tool, command):
+    rc, err = guard(tool, command, plain)
+    assert rc == 0, (tool, command, rc, err)
+
+
 # ---------------------------------------------------------------- the builder adds its cases below this line and edits nothing above it
 
 
 # BUG-046 (R-082): --input= and a field glued to @, on a REST path and on graphql.
+# PowerShell refuses a single-dash switch that holds a dot before the body rule, so those two rows use -Fquery=@- there. Bash keeps the dotted name.
 GLUED_UNREADABLE_BODIES = [
-    ("rest-input-equals", "gh api repos/o/r/issues/5/comments --input=body.json"),
-    ("graphql-input-equals", "gh api graphql --input=body.json"),
-    ("rest-glued-field", "gh api repos/o/r/issues/5/comments -Fquery=@q.graphql"),
-    ("graphql-glued-field", "gh api graphql -Fquery=@q.graphql"),
-    ("rest-long-field", "gh api repos/o/r/issues/5/comments --field=query=@q.graphql"),
-    ("graphql-long-field", "gh api graphql --field=query=@q.graphql"),
+    ("rest-input-equals", "gh api repos/o/r/issues/5/comments --input=body.json", "gh api repos/o/r/issues/5/comments --input=body.json"),
+    ("graphql-input-equals", "gh api graphql --input=body.json", "gh api graphql --input=body.json"),
+    ("rest-glued-field", "gh api repos/o/r/issues/5/comments -Fquery=@q.graphql", "gh api repos/o/r/issues/5/comments -Fquery=@-"),
+    ("graphql-glued-field", "gh api graphql -Fquery=@q.graphql", "gh api graphql -Fquery=@-"),
+    ("rest-long-field", "gh api repos/o/r/issues/5/comments --field=query=@q.graphql", "gh api repos/o/r/issues/5/comments --field=query=@q.graphql"),
+    ("graphql-long-field", "gh api graphql --field=query=@q.graphql", "gh api graphql --field=query=@q.graphql"),
     # Accepted over-refusal (BUG-046 F1): -f sends the value as written, and key=@x is refused with the file reads.
-    ("raw-field-at", "gh api repos/o/r/issues/5/comments -f key=@x"),
+    ("raw-field-at", "gh api repos/o/r/issues/5/comments -f key=@x", "gh api repos/o/r/issues/5/comments -f key=@x"),
 ]
 
 
 @pytest.mark.parametrize("tool", TOOLS, ids=["Bash", "PowerShell"])
-@pytest.mark.parametrize("command", [c for _, c in GLUED_UNREADABLE_BODIES], ids=["rest-input-equals", "graphql-input-equals", "rest-glued-field", "graphql-glued-field", "rest-long-field", "graphql-long-field", "raw-field-at"])
-def test_bug046_glued_and_clustered_unreadable_bodies_are_refused_on_rest_and_graphql(plain, tool, command):
+@pytest.mark.parametrize("name,bash,powershell", GLUED_UNREADABLE_BODIES, ids=[n for n, _, _ in GLUED_UNREADABLE_BODIES])
+def test_bug046_glued_and_clustered_unreadable_bodies_are_refused_on_rest_and_graphql(plain, tool, name, bash, powershell):
     """BUG-046 (R-082): a body the guard cannot read is refused on a REST path and on graphql."""
+    command = powershell if tool == "PowerShell" else bash
     rc, err = guard(tool, command, plain)
-    assert rc == 2 and "refused" in err, (tool, command, rc, err)
+    assert rc == 2 and "refused" in err and "body read from a file or standard input" in err, (tool, name, command, rc, err)
 
 
 # BUG-046 (R-082): the merge endpoint with a query, a fragment, or %2E segments. The query is quoted because an unquoted ? is a glob.
@@ -204,16 +246,17 @@ MERGE_ENDPOINT_SPELLINGS = [
     ("trailing-query", "gh api 'repos/o/r/pulls/5/merge?x=1'"),
     ("trailing-fragment", "gh api repos/o/r/pulls/5/merge#frag"),
     ("percent-2e-dot", "gh api repos/o/r/pulls/5/%2E/merge"),
-    ("percent-2e-parent", "gh api repos/o/r/%2E/pulls/5/merge"),
+    ("percent-2e-dot-before-pulls", "gh api repos/o/r/%2E/pulls/5/merge"),
+    ("doubly-escaped-letter", "gh api -X PUT repos/o/r/%2570ulls/5/merge"),
 ]
 
 
 @pytest.mark.parametrize("tool", TOOLS, ids=["Bash", "PowerShell"])
-@pytest.mark.parametrize("command", [c for _, c in MERGE_ENDPOINT_SPELLINGS], ids=["trailing-query", "trailing-fragment", "percent-2e-dot", "percent-2e-parent"])
+@pytest.mark.parametrize("command", [c for _, c in MERGE_ENDPOINT_SPELLINGS], ids=[n for n, _ in MERGE_ENDPOINT_SPELLINGS])
 def test_bug046_a_merge_endpoint_with_a_query_fragment_or_percent_2e_is_refused(plain, tool, command):
     """BUG-046 (R-082): those spellings still name a pull request's merge endpoint."""
     rc, err = guard(tool, command, plain)
-    assert rc == 2 and "refused" in err, (tool, command, rc, err)
+    assert rc == 2 and "refused" in err and "merge endpoint" in err, (tool, command, rc, err)
 
 
 @pytest.mark.parametrize("tool", TOOLS, ids=["Bash", "PowerShell"])
@@ -227,5 +270,5 @@ def test_bug046_an_issues_merge_endpoint_passes(plain, tool):
 def test_bug046_mergeable_report_is_refused(plain, tool):
     """BUG-046 (R-082): accepted over-refusal. The rule refuses a word that holds /pulls/<segment>/merge, so repos/o/r/pulls/5/mergeable-report is refused because it holds /pulls/5/merge."""
     rc, err = guard(tool, "gh api repos/o/r/pulls/5/mergeable-report", plain)
-    assert rc == 2 and "refused" in err, (tool, rc, err)
+    assert rc == 2 and "refused" in err and "merge endpoint" in err, (tool, rc, err)
 
