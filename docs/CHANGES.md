@@ -2,6 +2,12 @@
 
 Newest first. Each entry records a call the supervisor made on the record of a reviewers' split or a resolution round (Merge-Verification-Policy, Resolution round), and the reasoning that settled it.
 
+## 2026-11-18 TASK-067: the names of the configured git identity are public in the pre-push scan (R-087)
+
+- **Question:** whether the pre-push scan searches every commit for the names of the repository's configured git identity (`user.name`, the local part of `user.email`), as R-087, DESIGN C2 and the plan's TASK-067 entry said when approved.
+- **Decision.** The owner's, in the question form (2026-11-18): such names are public, dropped like the owner segment of the remote's address; the names searched are the profile folder's name, `USERNAME` or `USER`, and the lines of `~/.cursor-bridge/names.txt`. R-087's text, DESIGN C2, the plan's TASK-067 entry and INVENTORY's Decisions record it before the first brief; the acceptance tests pin it (rule 52).
+- **Reasoning.** Every pushed commit carries the configured identity, so its names are public with the repository; searching for them adds nothing a reader of the history lacks. On this computer the identity's address begins with a common word, and a trial of the current scanner with that word over the last ten commits matched dozens of lines, so the scan would refuse every push or teach its reader to ignore it. It is a change to what "correct" means for the scan, hence the owner's.
+
 ## 2026-11-17 TASK-066: the invisible-character check refuses by category, and the repository swept (R-086)
 
 - **Question:** how to read three phrases of the plan's TASK-066 entry that the code as built does not match, and where the line falls for the security audit's finding on the program's older reading path.
