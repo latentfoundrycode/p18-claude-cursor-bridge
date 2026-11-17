@@ -2233,14 +2233,14 @@ FOUR_FORMS = [
 # word filled with a no-break space, a form feed, a vertical tab or an ideographic space leaves a change heading, which
 # is (form), rather than prose. extension-points.md does not define a word; this is the program's reading, the safer
 # one (a near-form fails), pinned here (BUG-009's gate round 1: Review A, a consider).
-OTHER_SPACE = [("a tab", "\t"), ("two spaces", "  "), ("a space and a tab", " \t"), ("a no-break space", " "),
-               ("a form feed", "\x0c"), ("a vertical tab", "\x0b"), ("an ideographic space", "　")]
+OTHER_SPACE = [("a tab", "\t"), ("two spaces", "  "), ("a space and a tab", " \t"), ("a no-break space", "\u00a0"),
+               ("a form feed", "\x0c"), ("a vertical tab", "\x0b"), ("an ideographic space", "\u3000")]
 # Before `##`: one to three spaces make a heading candidate that is no form; four spaces, a tab or other white space
 # make no heading at all.
 INDENTS = [("one space", " ", True), ("two spaces", "  ", True), ("three spaces", "   ", True),
-           ("four spaces", "    ", False), ("a tab", "\t", False), ("a no-break space", " ", False)]
+           ("four spaces", "    ", False), ("a tab", "\t", False), ("a no-break space", "\u00a0", False)]
 # After the key or the kind: nothing, not even white space.
-TRAILING = [("a space", " "), ("a tab", "\t"), ("a no-break space", " "), ("a form feed", "\x0c")]
+TRAILING = [("a space", " "), ("a tab", "\t"), ("a no-break space", "\u00a0"), ("a form feed", "\x0c")]
 
 
 def _white_space_variants():

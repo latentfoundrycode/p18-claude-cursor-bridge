@@ -5,11 +5,9 @@
 
 Run from the Workspace root. Reads the text files changed against <base-ref> (default HEAD:
 the checkpoint) plus the untracked ones, or every tracked text file with --all, and lists
-each line holding a zero-width character (U+200B..U+200D, U+2060, U+FEFF after the first
-character), a bidirectional control (U+202A..U+202E, U+2066..U+2069: the "Trojan Source"
-reordering), a soft hyphen (U+00AD), a word joiner, or a space that is not U+0020 (the
-no-break spaces U+00A0, U+202F, the fixed-width spaces U+2000..U+200A, U+2007 among them,
-and U+3000; 2026-10-25 C8, FB-010). Such a character hides a token from a
+each line holding a character whose Unicode category is Cc, Cf, Zl or Zp, or Zs other than
+U+0020, except U+0009, U+000A and U+000D anywhere and U+FEFF as the file's first character
+(a character with no Unicode name is named by its code point alone). Such a character hides a token from a
 reviewer's eye and from a grep, and reorders what a reviewer reads. Exit 0 = none, 1 = at
 least one, 2 = cannot verify. ASCII output; the character is named by its code point.
 
@@ -25,14 +23,6 @@ import sys
 import unicodedata
 
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-INVISIBLE = {0x200B: "zero width space", 0x200C: "zero width non-joiner", 0x200D: "zero width joiner", 0x2060: "word joiner",
-             0xFEFF: "zero width no-break space", 0x00AD: "soft hyphen", 0x202A: "left-to-right embedding", 0x202B: "right-to-left embedding",
-             0x202C: "pop directional formatting", 0x202D: "left-to-right override", 0x202E: "right-to-left override",
-             0x2066: "left-to-right isolate", 0x2067: "right-to-left isolate", 0x2068: "first strong isolate", 0x2069: "pop directional isolate",
-             0x061C: "arabic letter mark", 0x180E: "mongolian vowel separator",
-             0x00A0: "no-break space", 0x202F: "narrow no-break space", 0x3000: "ideographic space"}
-for _cp in range(0x2000, 0x200B):                         # en quad .. hair space, U+2007 figure space among them (FB-010)
-    INVISIBLE[_cp] = unicodedata.name(chr(_cp)).lower()
 BINARY_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf", ".zip", ".gz", ".7z", ".exe", ".dll", ".so", ".dylib",
               ".woff", ".woff2", ".ttf", ".otf", ".mp3", ".mp4", ".wav", ".mov", ".bin", ".pyc", ".lockb", ".sqlite", ".db"}
 
@@ -74,8 +64,11 @@ def findings(path, non_ascii=False):
             if non_ascii:
                 if cp > 0x7F:
                     out.append((n, i + 1, cp, unicodedata.name(ch, "(no name)")))
-            elif cp in INVISIBLE and not (cp == 0xFEFF and n == 1 and i == 0):   # a byte-order mark at the start is a file's own
-                out.append((n, i + 1, cp, INVISIBLE[cp]))
+            else:
+                cat = unicodedata.category(ch)
+                if (cat == "Cc" or cat == "Cf" or cat == "Zl" or cat == "Zp" or (cat == "Zs" and cp != 0x0020)) and not (
+                        cp == 0x0009 or cp == 0x000A or cp == 0x000D or (cp == 0xFEFF and n == 1 and i == 0)):  # a byte-order mark at the start is a file's own
+                    out.append((n, i + 1, cp, unicodedata.name(ch, "").lower()))
     return out
 
 
@@ -86,7 +79,7 @@ def main(argv):
     for p in paths:
         p = p.replace("\\", "/")
         for n, col, cp, name in findings(p):
-            print("INVISIBLE: %s:%d:%d U+%04X %s" % (p, n, col, cp, name))
+            print("INVISIBLE: %s:%d:%d U+%04X%s" % (p, n, col, cp, " " + name if name else ""))
             total += 1
     if "--non-ascii" in argv:
         listed = 0

@@ -1,7 +1,7 @@
 ---
 record: inventory
 header: 1
-reflected_through: "2026-11-17 TASK-065: the watch's early start read as gh reads a failure, at round 3 (R-085)"
+reflected_through: "2026-11-17 TASK-066: the invisible-character check refuses by category, and the repository swept (R-086)"
 development_data: "Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet (§15 condition 1, A1a condition 1)"
 tables:
   features:
@@ -18,7 +18,7 @@ tables:
     key: Item
 ---
 # Inventory — Claude-Cursor Bridge
-Reflected through: 2026-11-17 TASK-065: the watch's early start read as gh reads a failure, at round 3 (R-085)
+Reflected through: 2026-11-17 TASK-066: the invisible-character check refuses by category, and the repository swept (R-086)
 Updated: 2026-11-15
 
 The bridge already exists (releases 0, A1a–A5). This inventory is opened as the bridge becomes a supervised project (release B). Features accrue to the register as release B's increments merge; the rows below record the decisions and resources release B rests on.

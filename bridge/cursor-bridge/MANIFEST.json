@@ -1,6 +1,6 @@
 {
   "version": "2026.11.12a",
-  "generated": "2026-11-17 15:40",
+  "generated": "2026-11-17 20:10",
   "files": {
     "agents/cursor-configurator.md": "a8aad7838a9bc5b4f00e13fd3749919158cbe37ec7acfa9a40960600398784bc",
     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
@@ -81,7 +81,7 @@
     "cursor-bridge/evaluate-reports.py": "4e4eb6a41b95093a62905fcc8e2fc9d9cafc74ffe41ea17cb46eb6485934e50a",
     "cursor-bridge/installer-check.ps1": "a662ab0f1d707234d5b1b58de7584b812099cddcec78274b8f15599a3e026cb5",
     "cursor-bridge/inventory-check.py": "17f71879b6cd68dd20b898d72aab70284761835376ed390a88b5ecf83abef477",
-    "cursor-bridge/invisible-check.py": "aa6f6b129546ae10c0e22b70a6bc4ed78982ac184d3b4a117a9ff04050d881e5",
+    "cursor-bridge/invisible-check.py": "5584c8f1e4099603d965c86dbdaad8f226fe373dba736c10264a88894fbb7a91",
     "cursor-bridge/lock-check.py": "f843dd5a213583d2fb9896bb269c2803511b3ea7b46a561337dc74a67b4e45fe",
     "cursor-bridge/loop-guard.py": "6444e26b2ac598d6813be75fb96c7fda7fef8bf0f8b9de1f71ac6854dd7648ef",
     "cursor-bridge/minimal-code.snapshot.md": "b822c4d7abd69971dc5fee671b8a63daa58ba62a2711c9cf07849ed82d01a215",

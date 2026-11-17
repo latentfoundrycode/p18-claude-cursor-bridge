@@ -476,11 +476,9 @@ invisible-check: characters a reader cannot see in the files a diff changed (rel
 
 Run from the Workspace root. Reads the text files changed against <base-ref> (default HEAD:
 the checkpoint) plus the untracked ones, or every tracked text file with --all, and lists
-each line holding a zero-width character (U+200B..U+200D, U+2060, U+FEFF after the first
-character), a bidirectional control (U+202A..U+202E, U+2066..U+2069: the "Trojan Source"
-reordering), a soft hyphen (U+00AD), a word joiner, or a space that is not U+0020 (the
-no-break spaces U+00A0, U+202F, the fixed-width spaces U+2000..U+200A, U+2007 among them,
-and U+3000; 2026-10-25 C8, FB-010). Such a character hides a token from a
+each line holding a character whose Unicode category is Cc, Cf, Zl or Zp, or Zs other than
+U+0020, except U+0009, U+000A and U+000D anywhere and U+FEFF as the file's first character
+(a character with no Unicode name is named by its code point alone). Such a character hides a token from a
 reviewer's eye and from a grep, and reorders what a reviewer reads. Exit 0 = none, 1 = at
 least one, 2 = cannot verify. ASCII output; the character is named by its code point.
 

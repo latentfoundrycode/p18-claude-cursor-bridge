@@ -72,3 +72,5 @@
 2026-11-17 TASK-065: a mutant that holds the wait until the 3600s default, with each poll spawning the stand-in, takes about two minutes for one case (`test_r085_a_run_that_completed_without_a_check_does_not_hold_the_wait`) and about three for the two failed-check cases; the fake clock does not make those polls free.
 
 2026-11-17 TASK-065-r2: when no time is left the loop returns before the first poll, so a limit of 0 never calls GitHub; the limit line has to read the local head itself on that path, or the head stays `?`.
+
+2026-11-17 TASK-066: the new R-086 case uses `changed_repo` and `run` in `tests/test_hotfix25a_guard_scope_invisible.py`, and those helpers call `subprocess.run` with no timeout; adding a timeout would edit an existing helper, which the brief forbids, so the case does not add its own timeout.
