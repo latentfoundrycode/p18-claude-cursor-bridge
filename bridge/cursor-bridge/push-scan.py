@@ -48,7 +48,7 @@ def say(line):
 
 
 def git(sub, args):
-    argv = ["git", "--no-pager", "-c", "color.ui=never", "-c", "log.showSignature=false", sub] + list(args)
+    argv = ["git", "--no-pager", "-c", "color.ui=never", "-c", "log.showSignature=false", "-c", "log.showRoot=true", "-c", "diff.suppressBlankEmpty=false", sub] + list(args)
     try:
         proc = subprocess.run(
             argv,
@@ -363,26 +363,6 @@ def unquote_git(token):
     return raw.decode("utf-8", errors="replace")
 
 
-def take_token(text):
-    text = text.lstrip()
-    if not text:
-        return "", ""
-    if text[0] == '"':
-        index = 1
-        while index < len(text):
-            if text[index] == "\\":
-                index += 2
-                continue
-            if text[index] == '"':
-                return unquote_git(text[:index + 1]), text[index + 1:]
-            index += 1
-        return unquote_git(text), ""
-    space = text.find(" ")
-    if space < 0:
-        return text, ""
-    return text[:space], text[space:]
-
-
 def strip_side(path, side):
     prefix = side + _SLASH
     if path.startswith(prefix):
@@ -615,7 +595,7 @@ def quote_path(path):
     """Print a path as itself, or quoted, so a control character cannot forge a line."""
     needs = False
     for ch in path:
-        if ch == '"' or ch == "\\" or unicodedata.category(ch) in ("Cc", "Zl", "Zp"):
+        if ch == '"' or ch == "\\" or unicodedata.category(ch) in ("Cc", "Cf", "Zl", "Zp"):
             needs = True
             break
     if not needs:
@@ -628,7 +608,7 @@ def quote_path(path):
     for ch in path:
         if ch in simple:
             parts.append(simple[ch])
-        elif unicodedata.category(ch) in ("Cc", "Zl", "Zp"):
+        elif unicodedata.category(ch) in ("Cc", "Cf", "Zl", "Zp"):
             for byte in ch.encode("utf-8"):
                 parts.append("\\%03o" % byte)
         else:
@@ -647,6 +627,7 @@ def scan_commit(full, names, cfg_name, cfg_email):
         "show",
         ["-z", "--name-status", "-M", "--format=", "--no-ext-diff", "--no-textconv",
          "--no-color", "--no-relative", "--src-prefix=a/", "--dst-prefix=b/",
+         "--ignore-submodules=none", "--submodule=short",
          "--end-of-options", full],
     )
     if code != 0:
@@ -655,6 +636,7 @@ def scan_commit(full, names, cfg_name, cfg_email):
         "show",
         ["-M", "--format=", "--no-ext-diff", "--no-textconv", "--no-color",
          "--no-relative", "--src-prefix=a/", "--dst-prefix=b/",
+         "--ignore-submodules=none", "--submodule=short",
          "--end-of-options", full],
     )
     records = parse_name_status(status_raw)
@@ -674,7 +656,7 @@ def scan_commit(full, names, cfg_name, cfg_email):
     seen = set()
     for position, (status, path) in enumerate(records, start=1):
         seen.add(path)
-        hidden = bool(kinds_of(path, names))
+        hidden = bool(kinds_of(path, names) or kinds_of(quote_path(path), names))
         if status[:1] in ("A", "R"):
             for kind in kinds_of(path, names):
                 hits.append(hit_line(short, "file #%d" % position, kind))

@@ -574,3 +574,30 @@ def test_r087_a_submodule_s_own_diff_is_never_inlined():
     with open(PROG, encoding="utf-8") as f:
         src = f.read()
     assert src.count("--submodule=short") >= 2 and src.count("--ignore-submodules=none") >= 2
+
+
+# ---------------------------------------------------------------- round 4: the objects a push sends (the reviews of round 3)
+
+def test_r087_a_replaced_commit_is_read_as_the_push_sends_it(tmp_path):
+    """R-087 (round 4): a replace ref changes what git shows for a commit, never what a push sends: the scan reads the
+    original object, so a hit in a commit hidden behind a clean replacement is still a hit."""
+    s = Scratch(tmp_path)
+    x_short = s.commit({"notes.md": "plain\n" + DRIVE_FWD + "\n"}, message="with a path")
+    x_full = s.git("rev-parse", "HEAD")
+    s.git("checkout", "-q", "-b", "clean", s.base)
+    s.commit({"notes.md": "plain\nclean\n"}, message="with a path")
+    y_full = s.git("rev-parse", "HEAD")
+    s.git("checkout", "-q", "main")
+    s.git("replace", x_full, y_full)
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(x_short, "line notes.md:2", "path")], out
+
+
+@pytest.mark.parametrize("attribute", ["-diff", "binary"])
+def test_r087_a_text_file_the_commit_marks_binary_is_still_read(tmp_path, attribute):
+    """R-087 (round 4): a commit's own .gitattributes is commit content: marking a text file `-diff` or `binary` hides
+    none of its added lines from the scan."""
+    s = Scratch(tmp_path)
+    h = s.commit({".gitattributes": "*.md %s\n" % attribute, "notes.md": "plain\n" + DRIVE_FWD + "\n"})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line notes.md:2", "path")], out
