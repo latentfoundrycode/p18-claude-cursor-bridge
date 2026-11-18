@@ -139,8 +139,9 @@ def has_name(text, names):
     for name in names:
         if not name:
             continue
+        raw = re.compile("(?<![^\\W_])" + re.escape(name) + "(?![^\\W_])", re.IGNORECASE)
         pattern = re.compile("(?<![^\\W_])" + re.escape(_caseless(name)) + "(?![^\\W_])")
-        if pattern.search(folded):
+        if raw.search(text) or pattern.search(folded):
             return True
     return False
 
