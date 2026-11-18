@@ -2,11 +2,11 @@
 
 Round cause: security
 
-TASK-067 ran six builder rounds and two resolution rounds; this review reads the whole increment against origin/main (667c646): `run/review/REVIEW-TASK-067-r4.diff`.
+This snapshot is the third resolution round's vote, not a review of a fix: read handoff/RESOLUTION-TASK-067.md from the heading 'The third resolution' to its end, and round 7's change, run/review/REVIEW-TASK-067-r5.diff (round 7's tree, the new cases and the question, against f4f4e11, the round-7 brief's commit, which holds round 6's code). The sections below describe the increment as round 6 left it; round 7 adds M1 and M2 (docs/CHANGES.md, the top entry).
 
-Blocking class: security - the security audit, round 5, B1: a commit adding a file whose first two bytes are a UTF-16 byte-order mark followed by plain text (git shows it as text, its path line added) made round 5's scan print OK with no note, so untrusted commit content reached a pass against R-087; round 6's builder was launched on 5ae7abb, its brief's commit, which holds round 5's code.
+Blocking class: security - Review B, the pull request's round 4: with i18n.commitEncoding=ISO-8859-1, an ordinary git commit -F whose message holds a drive path beginning with a non-ASCII letter made round 6's scan print OK; round 7's builder was launched on f4f4e11, its brief's commit, which holds round 6's code; both reviewers of round 7 confirmed it.
 
-The class lines of the earlier rounds were all security (rounds 3 to 6: round 3 at the ceiling, rounds 4 to 6 above it; each round's class line confirmed by Review A and the security audit on the round before; rounds 5 and 6 were also each preceded by a resolution round, decide.md's Stop, because the round before had caused a regression; the decisions are the two TASK-067 entries of docs/CHANGES.md dated 2026-11-18 and handoff/RESOLUTION-TASK-067.md).
+The class line of round 6 read: security - the security audit, round 5, B1, a file beginning with a UTF-16 byte-order mark followed by plain text passed round 5's scan (confirmed by Review B, round 4). The class lines of the earlier rounds were all security (rounds 3 to 6: round 3 at the ceiling, rounds 4 to 6 above it; each round's class line confirmed by Review A and the security audit on the round before; rounds 5 and 6 were also each preceded by a resolution round, decide.md's Stop, because the round before had caused a regression; the decisions are the two TASK-067 entries of docs/CHANGES.md dated 2026-11-18 and handoff/RESOLUTION-TASK-067.md).
 
 ## Where the increment ends
 

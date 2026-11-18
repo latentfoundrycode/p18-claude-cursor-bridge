@@ -146,3 +146,32 @@ Whether rule 2's claim holds for every way git leaves a listed text file out of 
 ## The decision on the second resolution
 
 Recorded in docs/CHANGES.md (2026-11-18, "a marked file read without its NULs, merges read by git's own rule, the line diff bounded, the second resolution round"): a marked blob read as its bytes with every NUL removed and as UTF-16 in the mark's order, both by the line diff; rule 2 and rule 3 as both reviewers state them, with a single-parent record with no section refused; the line diff trimmed, bounded and over-reading in place of refusing, the 1 MiB bound and its reason withdrawn.
+
+# The third resolution: round 7's regression (2026-11-18)
+
+## The question
+
+Review B, the pull request's round on round 6's tree (snapshot TASK-067-r4), rejected it: a commit whose message git records as ISO-8859-1 and holds a drive path whose first segment begins with a non-ASCII letter passed, because the commit object was decoded as UTF-8 with replacement and the replacement character began no segment; the same pass stood in an ISO-8859-1 file's added line. The supervisor decided (docs/CHANGES.md, the top entry): M1, a path's segment also begins with any non-ASCII character that is not whitespace; M2, the commit object is decoded in the encoding its `encoding` header names where Python knows it and it reads printable ASCII as ASCII, else UTF-8. Round 7 (handoff/TASK-067-r7.md) built it; both reviewers confirmed its class line on round 6's code and both found M1 right. Both rejected it on M2, a regression round 7 caused. A fix that regresses is not lifted by a class line (decide.md, "Stop"). How should M2 be corrected, or replaced, so that no header hides what round 6 found?
+
+## The findings (bridge/cursor-bridge/push-scan.py at this file's commit, round 7's tree, `_decode_commit` 314-336, used at 1137)
+
+- **G1 (security; both reviewers).** The ASCII check decodes one sample of printable ASCII, so multibyte and stateful codecs pass it and then swallow ASCII in a real message: `encoding ISO-2022-JP` with `ESC $ B` before `/Users/<seg>/x` or `/home/...` (round 6 hit, round 7 OK; the `/home/` and `AppData` forms look at no preceding character, so no UTF-8 text could hide them in round 6); `Shift_JIS`, `GBK`, `Big5` lead bytes swallowing a drive letter or a name's first letter; `unicode_escape` turning `\n` in `E:\new\...` into a line feed. The security audit counted 93 codecs that pass the check, 85 of them able to hide a path the UTF-8 reading finds.
+- **G2 (behaviour against the owner's decision of 2026-11-18; the security audit).** git writes the author and committer lines in UTF-8 whatever `i18n.commitEncoding` says; decoded as ISO-8859-1, a configured identity holding a non-ASCII letter no longer equals `user.name`, so its lines lose the exemption and a searched name in them is a false hit (round 6 OK, round 7 HIT author, HIT committer).
+- **Advisory.** `encoding idna` passes the check and the final replacing decode raises, so every such commit is refused (`internal error`, exit 2); `unicode_escape`'s check writes a DeprecationWarning carrying the program's path to stderr; several `encoding` lines, the last usable one wins where git reads the first.
+- **Held.** The supervisor's cases, the section "the third resolution: a header never hides a hit" of tests/test_program_push_scan.py and the two guard cases above it: 7 of the 11 fail on round 7's tree, all 11 pass on round 6's code (run/agent/TASK-067-r8-known-r7.out and -r6.out).
+
+## The supervisor's proposal: draw the line at M1
+
+1. **M1 stays** (a segment begins with any non-ASCII character that is not whitespace): it alone closes Review B's finding for paths, in a message and in a file, whatever the encoding, and both reviewers found it right.
+2. **M2 is withdrawn**: the commit object is decoded as UTF-8 with replacement, exactly as in round 6; `_decode_commit` goes.
+3. **Accepted limit** (R-087, DESIGN C2, replacing round 7's): a non-ASCII name in text written in an encoding other than UTF-8 is not matched, in a file's lines or in a message, whatever its header records; a path in it is found by M1.
+4. **Reasoning.** M2 served one case only, a non-ASCII account name in a message git records in a legacy encoding; every way of honouring the header adds a reading an attacker chooses, and the first try showed how wide that surface is. Withdrawing it returns to the reading rounds 1 to 6 were reviewed on.
+
+## Alternatives to weigh
+
+- **A (Review A's suggestion).** Keep M2 but accept the header's encoding only where its reading keeps this object's ASCII exactly (the decoded text's characters below U+0080, in order, equal the object's bytes below 0x80), else UTF-8. Closes G1's cases; G2 still needs the identity decided from the UTF-8 reading; the idna and warning advisories need a guarded decode.
+- **B (the security audit's suggestion).** Read the object as UTF-8 always, as round 6 did, and where the header names a usable codec read it in that codec too, reporting the union of each place's kinds; the identity exemption decided from the UTF-8 line and applied to both readings. No header can remove a hit; a non-ASCII name in a legacy-encoded message is found.
+
+## What the vote should engage
+
+Whether M1 alone leaves any route by which a path the scan should find in a message or a file passes (an encoding in which a path's ASCII bytes do not stand as ASCII is UTF-16 or UTF-32, already decided or a limit); whether the limit in 3 is acceptable for R-087's names, given that a non-ASCII account name in a legacy-encoded message is the only case it gives up; and, if not, which of A or B, with what it must add for G2 and the advisories.

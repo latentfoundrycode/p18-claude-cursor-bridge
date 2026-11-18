@@ -1,6 +1,6 @@
 {
   "version": "2026.11.12a",
-  "generated": "2026-11-18 06:52",
+  "generated": "2026-11-18 12:01",
   "files": {
     "agents/cursor-configurator.md": "a8aad7838a9bc5b4f00e13fd3749919158cbe37ec7acfa9a40960600398784bc",
     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
@@ -90,7 +90,7 @@
     "cursor-bridge/permission-guard.py": "6e85731afcca3f8fa4a71c80a3501d9875c7f4f470128ca3f10f8e089db6c31a",
     "cursor-bridge/plan-check.py": "f8167ac2793c34c7cd8ea8c5fe96ab24937dae28f8051709b9b9f6b248139405",
     "cursor-bridge/pr-activity-check.py": "7b6f59a14a52c34d14222939d5af52f677e7494e9008d702e3a5bb0bdb8a8768",
-    "cursor-bridge/push-scan.py": "651f2f792463bb0c480bc388ebd400396d7cfb7902b22781c3052d364cafc5c6",
+    "cursor-bridge/push-scan.py": "fd86943f18259393bf195ddfab28c454fd657b97beafd66fcc0e114878903e1f",
     "cursor-bridge/records-check.py": "6c5ec6e7aef58c634096bc0bf8ed94415e62d16c6a173be166d1f22d445dcd69",
     "cursor-bridge/records-migrate.py": "cbe6acb95d7d64e7ad8086754bed108511458e2de32c387433928e1f6e8470b4",
     "cursor-bridge/refactor-check.py": "4950674a1de1bccf2ac95a4bcec6ab5cc767f1c0a171c01cf164891d1c7d7c36",

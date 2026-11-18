@@ -1166,3 +1166,62 @@ def test_r087_ascii_punctuation_after_a_drive_still_begins_no_segment(tmp_path, 
     s.commit({"code.py": text + "\n"})
     rc, out = s.run()
     assert rc == 0 and hits(out) == [] and "push-scan: OK - 1 commit(s)" in out, out
+
+
+def test_r087_a_message_header_naming_an_encoding_that_changes_ascii_is_read_as_utf8(tmp_path):
+    """R-087 (round 7, the supervisor's case after its mutants): a commit whose `encoding` header names UTF-16, which
+    does not read ASCII as ASCII, is read as UTF-8, so an ASCII path in its message is still found."""
+    s = Scratch(tmp_path)
+    h = _commit_with_encoding(s, tmp_path, ("note " + DRIVE_FWD + "\n").encode("utf-8"), "UTF-16")
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "message", "path")], out
+
+
+def test_r087_a_non_ascii_name_in_an_ordinary_utf8_message_is_found(tmp_path):
+    """R-087 (round 7, the supervisor's case after its mutants): a commit with no `encoding` header is read as UTF-8, so
+    a searched name holding a non-ASCII letter matches as written."""
+    s = Scratch(tmp_path, names=(NONASCII_NAME,))
+    h = s.commit({"a.md": "plain\n"}, message="thanks " + NONASCII_NAME)
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "message", "name")], out
+    silent(out, also=(NONASCII_NAME,))
+
+
+# ---------------------------------------------------------------- the third resolution: a header never hides a hit
+
+@pytest.mark.parametrize("encoding,prefix,form", [
+    ("ISO-2022-JP", b"note \x1b$B", "users"),
+    ("ISO-2022-JP", b"note \x1b$B", "home"),
+    ("Shift_JIS", b"note \x81", "drive-back"),
+    ("Big5", b"note \xa1", "drive-back"),
+    ("unicode_escape", b"note ", "escaped-drive"),
+], ids=["iso2022jp-users", "iso2022jp-home", "shiftjis-drive", "big5-drive", "unicode-escape-drive"])
+def test_r087_an_encoding_header_never_hides_a_path_the_utf8_reading_finds(tmp_path, encoding, prefix, form):
+    """R-087 (the third resolution, round 7's regression found by both reviewers): whatever encoding a commit's header
+    names, a path the UTF-8 reading of its message finds is a hit (round 6 found each; round 7's decoding hid it)."""
+    paths = {"users": USERS, "home": HOMEP, "drive-back": DRIVE_BACK,
+             "escaped-drive": "E" + COLON + BACK + "new" + BACK + SEG}
+    s = Scratch(tmp_path)
+    h = _commit_with_encoding(s, tmp_path, prefix + paths[form].encode("ascii") + b"\n", encoding)
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "message", "path")], out
+
+
+def test_r087_an_encoding_header_never_hides_a_name_the_utf8_reading_finds(tmp_path):
+    """R-087 (the third resolution): a Shift_JIS lead byte before a searched name never hides the name."""
+    s = Scratch(tmp_path)
+    h = _commit_with_encoding(s, tmp_path, b"thanks \x81" + EXTRA.encode("ascii") + b"\n", "Shift_JIS")
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "message", "name")], out
+
+
+def test_r087_a_non_ascii_identity_stays_exempt_under_another_encoding_header(tmp_path):
+    """R-087 (the third resolution; the owner's decision of 2026-11-18): git writes the author and committer lines as
+    UTF-8 whatever i18n.commitEncoding says, so a configured identity holding a non-ASCII letter stays no finding, and
+    a searched name equal to part of it is not found in those lines."""
+    s = Scratch(tmp_path, names=("Vandrelq",))
+    s.git("config", "user.name", "Zo" + E_ACUTE + " Vandrelq")
+    s.git("config", "user.email", "zo" + "@example.invalid")
+    _commit_with_encoding(s, tmp_path, b"plain\n", "ISO-8859-1")
+    rc, out = s.run()
+    assert rc == 0 and hits(out) == [] and "push-scan: OK - 1 commit(s)" in out, out
