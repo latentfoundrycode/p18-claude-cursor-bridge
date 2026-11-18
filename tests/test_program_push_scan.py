@@ -1095,3 +1095,74 @@ def test_r087_a_binary_beginning_with_a_byte_order_mark_is_read_not_counted(tmp_
     rc, out = s.run()
     assert rc == 0 and hits(out) == [] and "push-scan: OK - 1 commit(s)" in out, out
     assert "binary file(s) not read" not in out, out
+
+# ---------------------------------------------------------------- round 7: text that is not UTF-8 (Review B, round 4)
+
+E_ACUTE = "\u00e9"
+NONASCII_NAME = "Z" + E_ACUTE + "lvarn"
+E_FORMS = {
+    "drive-forward": "D" + COLON + FWD + E_ACUTE + SEG + FWD + "x",
+    "drive-back": "E" + COLON + BACK + E_ACUTE + SEG + BACK + "x",
+    "users": FWD + "Us" + "ers" + FWD + E_ACUTE + SEG + FWD + "x",
+    "home": FWD + "ho" + "me" + FWD + E_ACUTE + SEG + FWD + "x",
+}
+
+
+def _commit_with_encoding(s, tmp_path, message_bytes, encoding, files=None):
+    s.write(files or {"a.md": "plain\n"})
+    s.git("add", "-A")
+    (tmp_path / "message.txt").write_bytes(message_bytes)
+    s.git("-c", "i18n.commitEncoding=" + encoding, "commit", "-q", "-F", str(tmp_path / "message.txt"))
+    return s.git("rev-parse", "--short", "HEAD")
+
+
+@pytest.mark.parametrize("form", sorted(E_FORMS))
+def test_r087_a_path_in_a_message_git_records_in_another_encoding_is_found(tmp_path, form):
+    """R-087 (round 7, Review B round 4): a commit whose message git records as ISO-8859-1 (its `encoding` header,
+    from i18n.commitEncoding) and whose path's first segment begins with a non-ASCII letter is a hit at message."""
+    s = Scratch(tmp_path)
+    h = _commit_with_encoding(s, tmp_path, ("note " + E_FORMS[form] + "\n").encode("latin-1"), "ISO-8859-1")
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "message", "path")], out
+
+
+def test_r087_a_non_ascii_name_in_a_message_git_records_in_another_encoding_is_found(tmp_path):
+    """R-087 (round 7, Review B round 4): a message git records as ISO-8859-1 is read in that encoding, so a searched
+    name holding a non-ASCII letter matches as written."""
+    s = Scratch(tmp_path, names=(NONASCII_NAME,))
+    h = _commit_with_encoding(s, tmp_path, ("thanks " + NONASCII_NAME + "\n").encode("latin-1"), "ISO-8859-1")
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "message", "name")], out
+    silent(out, also=(NONASCII_NAME,))
+
+
+def test_r087_a_message_whose_encoding_python_does_not_know_is_read_as_utf8(tmp_path):
+    """R-087 (round 7): a commit whose `encoding` header names an encoding Python does not know is read as UTF-8, as
+    every other commit is, so its path is still found."""
+    s = Scratch(tmp_path)
+    h = _commit_with_encoding(s, tmp_path, ("note " + E_FORMS["drive-forward"] + "\n").encode("utf-8"), "x-unknown-zq")
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "message", "path")], out
+
+
+@pytest.mark.parametrize("form", sorted(E_FORMS))
+def test_r087_a_path_in_a_file_written_in_another_encoding_is_found(tmp_path, form):
+    """R-087 (round 7, Review B round 4): a text file written in ISO-8859-1 whose added line holds a path beginning with
+    a non-ASCII letter is a hit: a byte no decoding reads still begins a path's segment."""
+    s = Scratch(tmp_path)
+    h = s.commit({"latin.txt": ("plain\n" + E_FORMS[form] + "\n").encode("latin-1")})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line latin.txt:2", "path")], out
+
+
+@pytest.mark.parametrize("text", ["drive = \"C" + COLON + BACK + BACK + "\"", "root = \"D" + COLON + FWD + "\"",
+                                  "see D" + COLON + FWD + " x"],
+                         ids=["backslash-quote", "slash-quote", "space"])
+def test_r087_ascii_punctuation_after_a_drive_still_begins_no_segment(tmp_path, text):
+    """R-087 (round 7): only a letter, a digit, `_`, `.`, `-` or a non-ASCII character that is not a space begins a
+    path's segment; ASCII punctuation and a space after a drive's separator still pass, as code that names a bare
+    drive does."""
+    s = Scratch(tmp_path)
+    s.commit({"code.py": text + "\n"})
+    rc, out = s.run()
+    assert rc == 0 and hits(out) == [] and "push-scan: OK - 1 commit(s)" in out, out
