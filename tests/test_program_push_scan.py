@@ -1290,3 +1290,26 @@ def test_r087_a_folded_name_inside_a_longer_word_is_still_no_hit(tmp_path):
     s.commit({"notes.md": "the KELSSOVANS and xkelssovan\n"})
     rc, out = s.run()
     assert rc == 0 and hits(out) == [] and "push-scan: OK - 1 commit(s)" in out, out
+
+
+MODIFIER_NAME = "\u1d2clvarn"
+
+
+def test_r087_a_name_holding_a_compatibility_letter_is_found_written_plainly(tmp_path):
+    """R-087 (round 9, the builder's uncaught mutant W2): a searched name holding a modifier capital A (U+1D2C) is the
+    same name as its plain letters under compatibility caseless matching, which normalizes before it folds."""
+    s = Scratch(tmp_path, names=(MODIFIER_NAME,))
+    h = s.commit({"notes.md": "by alvarn today\n"})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line notes.md:1", "name")], out
+    silent(out, also=(MODIFIER_NAME, "alvarn"))
+
+
+def test_r087_a_name_s_letters_before_another_letter_s_mark_are_no_hit(tmp_path):
+    """R-087 (round 9, the builder's uncaught mutant W3): j with a caron (U+01F0) folds to j and a combining caron,
+    which the last normalization composes back, so a name ending in a plain j is not found in a word ending in that
+    other letter."""
+    s = Scratch(tmp_path, names=("Tovarj",))
+    s.commit({"notes.md": "by Tovar\u01f0 today\n"})
+    rc, out = s.run()
+    assert rc == 0 and hits(out) == [] and "push-scan: OK - 1 commit(s)" in out, out

@@ -187,3 +187,32 @@ Review A measured four copies (round 6, round 7, round 7 with M2 withdrawn, and 
 ## The decision on the third resolution
 
 Review A's proposal, with Review B's routes named in the limit (docs/CHANGES.md, "2026-11-18 TASK-067: the encoding header withdrawn, ESC and SO begin a segment, the third resolution round (R-087)"): M2 withdrawn (the commit object read as UTF-8 with replacement, as in rounds 1 to 6; the identity exemption from that reading, as before); M1 stays; ESC and SO also begin a segment; the limits stated in full. Review B's union reading is not taken: every route it would close in a header-labelled message stays open in a file, where no header exists, so a commit made to hide a path loses nothing by it, while the reading adds a codec the commit chooses.
+
+# The fourth resolution: round 9's regression (2026-11-18)
+
+## The question
+
+Review B, the pull request's round on round 8's tree (snapshot TASK-067-r6), rejected it: a searched name holding a sharp s, written `SS` in a commit's added line, passed, because `has_name` matched with `re.IGNORECASE`, which folds one character to one. The supervisor decided (docs/CHANGES.md, the top entry): a name is found where the text and the name are equal under Unicode's compatibility caseless matching (each side NFKC, `casefold`, NFKC), searched as a whole word with the existing boundaries on the folded text. Round 9 (handoff/TASK-067-r9.md) built exactly that (`_caseless` and `has_name`, push-scan.py 133-147); both reviewers confirmed its class line on round 8's code, and both rejected it on a regression round 9 caused. A fix that regresses is not lifted by a class line (decide.md, "Stop"). How should the name match be corrected so that nothing round 8 found is lost and round 9's five spellings are still found?
+
+## The findings (bridge/cursor-bridge/push-scan.py at this file's commit, round 9's tree)
+
+- **H1 (security, a regression; both reviewers).** Folding the whole text changes the characters around a name, and the whole-word test is judged on the changed text: NFKC turns many symbols into letters, so a name directly beside one is no longer a whole word. Reproduced end to end, round 8 HIT and round 9 OK: a name followed by U+2122 (trade mark sign), U+2120, U+2121 or U+1F130; U+2116 (numero) or U+24D0 (circled a) before a name; a name followed by U+0345 (a combining mark that folds to iota) or by U+0301 (which NFKC composes into the name's last letter). Sweeps of every code point: Review A counted 785 characters after a name and 773 before it that round 8 catches and round 9 misses; the security audit 894 characters that are neither letter, digit nor mark but fold to contain one.
+- **H2 (security, a regression; the security audit).** `re.IGNORECASE` matches U+0130 (capital I with a dot) and U+0131 (dotless i) to `i`; `casefold` does not. A name `Ilker` written `ILKER` with a dotted capital, or `lker` after a dotless i, and a names-file name holding U+0130 written with a plain `I`: round 8 HIT, round 9 OK. A sweep against the 26 ASCII letters found exactly these two characters.
+- **Advisory (the security audit).** NFKC is quadratic on hostile text in CPython 3.12 (Unicode 15.0): alternating combining marks, 160k characters 4.9 s, 320k 20.3 s; U+FDFA repeated, 200k 6.5 s; round 8 was linear. A hang, never a pass. A spelling only folding equates beside one of H1's symbols (`KELSSOVAN` and U+2122) is missed by round 8 and round 9 alike.
+- **Held.** The supervisor reproduced every H1 and H2 case in process (run/supervisor/probe_r9_audit_067.py): round 8 finds all nine, round 9 none, the union of the two all nine; round 9's own sharp s case is found by round 9 and the union only. Round 9's builder's own mutants W2 and W3 (an NFKC pass dropped) survived its cases; the supervisor added one case for each (a name holding U+1D2C written plainly; a name ending in `j` beside j with a caron, no hit), each failing under its mutant and passing on round 9 (Review A).
+
+## The supervisor's proposal: the union, as both reviewers proposed
+
+1. **`has_name` returns true where round 8's match or the folded match finds a name**: round 8's pattern on the text as written with `re.IGNORECASE`, exactly as round 8 had it, or round 9's pattern on the folded text with the folded name. Each only adds hits, so nothing round 8 found is lost (H1 and H2 closed by construction) and round 9's five spellings stay found.
+2. **R-087's wording** changes from "a name is found where the text and the name are equal under Unicode's compatibility caseless matching" to "a name is found as a whole word in the text as written in any letter case, or as a whole word where the text and the name are equal under Unicode's compatibility caseless matching".
+3. **Leads** (docs/HARDENING.md): a spelling only folding equates beside a symbol that folds to letters (both readings miss it); NFKC's cost on hostile text (a hang, not a pass; UAX #15's stream-safe format bounds runs of combining marks); the folded reading's dependence on the interpreter's Unicode version.
+4. **Cases.** A name followed by U+2122; U+2116 before a name; a name followed by U+0345; a name followed by U+0301; `ILKER` with a dotted capital I for the name `Ilker`; each a hit.
+
+## Alternatives to weigh
+
+- **A (the security audit's raw-boundary variant).** Before folding, replace every character of the text as written that is not a letter, digit or combining mark with a space, then fold and search, and take the union with round 8's match. It also closes `KELSSOVAN` beside U+2122 (the lead in 3), at the cost of a second transformation whose own boundary cases (a mark that folds to a letter, such as U+0345, is kept and still joins the name) would need their own cases.
+- **B.** Fold per word of the text as written (split at characters that are not word characters, fold each word, compare whole words to the folded name). The boundary is then always the raw one; a name holding punctuation or spanning a split needs its own rule.
+
+## What the vote should engage
+
+Whether the union leaves any route by which a spelling round 8 or round 9 found is now missed; whether the lead in 3 (a folding-only spelling beside a symbol that folds to letters) is acceptable as a lead, or A's added transformation is worth its own boundary cases; whether the cost advisory needs a bound in this round (it is a hang, never a pass) or is a lead; and anything the proposal's wording of R-087 gets wrong.

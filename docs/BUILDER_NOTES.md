@@ -88,3 +88,5 @@
 2026-11-18 TASK-067-r7: a path whose first segment is a byte UTF-8 replaces with U+FFFD is still found by the widened segment rule when the commit object is decoded as UTF-8, so ignoring the `encoding` header still passes the ISO-8859-1 path cases; the non-ASCII name case is what requires that header.
 
 2026-11-18 TASK-067-r8: Python's `iso2022_jp` encoder writes ESC `$` `B` (bytes 1B 24 42) directly after a path separator before the non-ASCII segment, and the round-8 ISO-2022-KR file line (one designation, then the encoder's shift) puts SO (byte 0E) directly after the separator, so dropping only ESC fails the three JP cases and dropping only SO fails the KR file line.
+
+2026-11-18 TASK-067-r9: the outer NFKC is what keeps a character whose case fold is a letter plus a combining mark (U+01F0 folds to j plus U+030C) one word character; without it Python's `re` treats the mark as a boundary, so the base letters match as a whole word. The inner NFKC has to run before `casefold`, or a modifier letter such as U+1D2C becomes a capital letter (NFKC after `casefold` yields `A`) and misses the ASCII spelling.

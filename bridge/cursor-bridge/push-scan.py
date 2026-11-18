@@ -130,12 +130,17 @@ def has_path(text):
     return False
 
 
+def _caseless(text):
+    return unicodedata.normalize("NFKC", unicodedata.normalize("NFKC", text).casefold())
+
+
 def has_name(text, names):
+    folded = _caseless(text)
     for name in names:
         if not name:
             continue
-        pattern = re.compile("(?<![^\\W_])" + re.escape(name) + "(?![^\\W_])", re.IGNORECASE)
-        if pattern.search(text):
+        pattern = re.compile("(?<![^\\W_])" + re.escape(_caseless(name)) + "(?![^\\W_])")
+        if pattern.search(folded):
             return True
     return False
 
