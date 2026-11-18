@@ -1,0 +1,509 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 696461a..342d4a3 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.11.12a",
+-  "generated": "2026-11-18 06:52",
++  "generated": "2026-11-18 12:01",
+   "files": {
+     "agents/cursor-configurator.md": "a8aad7838a9bc5b4f00e13fd3749919158cbe37ec7acfa9a40960600398784bc",
+     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
+@@ -90,7 +90,7 @@
+     "cursor-bridge/permission-guard.py": "6e85731afcca3f8fa4a71c80a3501d9875c7f4f470128ca3f10f8e089db6c31a",
+     "cursor-bridge/plan-check.py": "f8167ac2793c34c7cd8ea8c5fe96ab24937dae28f8051709b9b9f6b248139405",
+     "cursor-bridge/pr-activity-check.py": "7b6f59a14a52c34d14222939d5af52f677e7494e9008d702e3a5bb0bdb8a8768",
+-    "cursor-bridge/push-scan.py": "651f2f792463bb0c480bc388ebd400396d7cfb7902b22781c3052d364cafc5c6",
++    "cursor-bridge/push-scan.py": "fd86943f18259393bf195ddfab28c454fd657b97beafd66fcc0e114878903e1f",
+     "cursor-bridge/records-check.py": "6c5ec6e7aef58c634096bc0bf8ed94415e62d16c6a173be166d1f22d445dcd69",
+     "cursor-bridge/records-migrate.py": "cbe6acb95d7d64e7ad8086754bed108511458e2de32c387433928e1f6e8470b4",
+     "cursor-bridge/refactor-check.py": "4950674a1de1bccf2ac95a4bcec6ab5cc767f1c0a171c01cf164891d1c7d7c36",
+diff --git a/bridge/cursor-bridge/push-scan.py b/bridge/cursor-bridge/push-scan.py
+index 09213a4..292da64 100644
+--- a/bridge/cursor-bridge/push-scan.py
++++ b/bridge/cursor-bridge/push-scan.py
+@@ -89,7 +89,7 @@ def _bound(ch):
+ 
+ 
+ def _segment_start(ch):
+-    return ch.isalpha() or ch.isdigit() or ch in "_.-"
++    return ch.isalpha() or ch.isdigit() or ch in "_.-" or (not ch.isascii() and not ch.isspace())
+ 
+ 
+ def has_path(text):
+@@ -311,6 +311,31 @@ def split_ident(rest):
+     return rest[:start], rest[start + 2:end]
+ 
+ 
++def _decode_commit(raw):
++    """The commit object in the encoding its header records, else UTF-8."""
++    chosen = None
++    sample = bytes(range(32, 127)) + b"\n"
++    plain = sample.decode("ascii")
++    for line in raw.split(b"\n"):
++        if line.endswith(b"\r"):
++            line = line[:-1]
++        if line == b"":
++            break
++        if not line.startswith(b"encoding "):
++            continue
++        token = line[len(b"encoding "):]
++        if any(byte < 32 or byte > 126 for byte in token):
++            continue
++        name = token.decode("ascii")
++        try:
++            same = sample.decode(name) == plain
++        except (LookupError, UnicodeError):
++            continue
++        if same:
++            chosen = name
++    return raw.decode(chosen or "utf-8", errors="replace")
++
++
+ def parse_commit(text):
+     lines = [line[:-1] if line.endswith("\r") else line for line in text.split("\n")]
+     author = ("", "")
+@@ -1106,9 +1131,10 @@ def _content_by_path(records, sections, work):
+ 
+ def scan_commit(full, names, cfg_name, cfg_email, empty_tree, hash_len, work):
+     short = _checked_short(git_need("rev-parse", ["--short", "--end-of-options", full]))
+-    code, commit_text = git_text("cat-file", ["-p", "--end-of-options", full])
++    code, commit_raw = git("cat-file", ["-p", "--end-of-options", full])
+     if code != 0:
+         raise ScanError("git cat-file failed (exit %d)" % code)
++    commit_text = _decode_commit(commit_raw)
+     author, committer, message = parse_commit(commit_text)
+     show_options = [
+         "--attr-source=" + empty_tree,
+diff --git a/docs/BUILDER_NOTES.md b/docs/BUILDER_NOTES.md
+index 3d94029..33ca38a 100644
+--- a/docs/BUILDER_NOTES.md
++++ b/docs/BUILDER_NOTES.md
+@@ -82,3 +82,7 @@
+ 2026-11-18 TASK-067-r5: a combined `Binary files differ` section has no `+++` line (its path is only on `diff --cc`), an ordinary binary `index` line omits the mode a text `index` line prints, and `git show -z --raw` of a merge is already one combined record per path (one colon per parent), empty when every file matches one parent.
+ 
+ 2026-11-18 TASK-067-r6: sending a merge record that has no patch section back through the line diff still passes the clean-merge case, because the intersection over the parents is empty and the trimmed middles stay under the pair bound; no case builds a single-parent record with no section, so dropping that refusal also passes.
++
++2026-11-18 TASK-067-r7: `b"".decode` of an unknown encoding name returns an empty string and does not raise `LookupError`, so an empty probe cannot tell whether Python knows the encoding; decoding the printable-ASCII sample does raise `LookupError`.
++
++2026-11-18 TASK-067-r7: a path whose first segment is a byte UTF-8 replaces with U+FFFD is still found by the widened segment rule when the commit object is decoded as UTF-8, so ignoring the `encoding` header still passes the ISO-8859-1 path cases; the non-ASCII name case is what requires that header.
+diff --git a/handoff/RESOLUTION-TASK-067.md b/handoff/RESOLUTION-TASK-067.md
+index 8eb52dc..5e24bd1 100644
+--- a/handoff/RESOLUTION-TASK-067.md
++++ b/handoff/RESOLUTION-TASK-067.md
+@@ -146,3 +146,32 @@ Whether rule 2's claim holds for every way git leaves a listed text file out of
+ ## The decision on the second resolution
+ 
+ Recorded in docs/CHANGES.md (2026-11-18, "a marked file read without its NULs, merges read by git's own rule, the line diff bounded, the second resolution round"): a marked blob read as its bytes with every NUL removed and as UTF-16 in the mark's order, both by the line diff; rule 2 and rule 3 as both reviewers state them, with a single-parent record with no section refused; the line diff trimmed, bounded and over-reading in place of refusing, the 1 MiB bound and its reason withdrawn.
++
++# The third resolution: round 7's regression (2026-11-18)
++
++## The question
++
++Review B, the pull request's round on round 6's tree (snapshot TASK-067-r4), rejected it: a commit whose message git records as ISO-8859-1 and holds a drive path whose first segment begins with a non-ASCII letter passed, because the commit object was decoded as UTF-8 with replacement and the replacement character began no segment; the same pass stood in an ISO-8859-1 file's added line. The supervisor decided (docs/CHANGES.md, the top entry): M1, a path's segment also begins with any non-ASCII character that is not whitespace; M2, the commit object is decoded in the encoding its `encoding` header names where Python knows it and it reads printable ASCII as ASCII, else UTF-8. Round 7 (handoff/TASK-067-r7.md) built it; both reviewers confirmed its class line on round 6's code and both found M1 right. Both rejected it on M2, a regression round 7 caused. A fix that regresses is not lifted by a class line (decide.md, "Stop"). How should M2 be corrected, or replaced, so that no header hides what round 6 found?
++
++## The findings (bridge/cursor-bridge/push-scan.py at this file's commit, round 7's tree, `_decode_commit` 314-336, used at 1137)
++
++- **G1 (security; both reviewers).** The ASCII check decodes one sample of printable ASCII, so multibyte and stateful codecs pass it and then swallow ASCII in a real message: `encoding ISO-2022-JP` with `ESC $ B` before `/Users/<seg>/x` or `/home/...` (round 6 hit, round 7 OK; the `/home/` and `AppData` forms look at no preceding character, so no UTF-8 text could hide them in round 6); `Shift_JIS`, `GBK`, `Big5` lead bytes swallowing a drive letter or a name's first letter; `unicode_escape` turning `\n` in `E:\new\...` into a line feed. The security audit counted 93 codecs that pass the check, 85 of them able to hide a path the UTF-8 reading finds.
++- **G2 (behaviour against the owner's decision of 2026-11-18; the security audit).** git writes the author and committer lines in UTF-8 whatever `i18n.commitEncoding` says; decoded as ISO-8859-1, a configured identity holding a non-ASCII letter no longer equals `user.name`, so its lines lose the exemption and a searched name in them is a false hit (round 6 OK, round 7 HIT author, HIT committer).
++- **Advisory.** `encoding idna` passes the check and the final replacing decode raises, so every such commit is refused (`internal error`, exit 2); `unicode_escape`'s check writes a DeprecationWarning carrying the program's path to stderr; several `encoding` lines, the last usable one wins where git reads the first.
++- **Held.** The supervisor's cases, the section "the third resolution: a header never hides a hit" of tests/test_program_push_scan.py and the two guard cases above it: 7 of the 11 fail on round 7's tree, all 11 pass on round 6's code (run/agent/TASK-067-r8-known-r7.out and -r6.out).
++
++## The supervisor's proposal: draw the line at M1
++
++1. **M1 stays** (a segment begins with any non-ASCII character that is not whitespace): it alone closes Review B's finding for paths, in a message and in a file, whatever the encoding, and both reviewers found it right.
++2. **M2 is withdrawn**: the commit object is decoded as UTF-8 with replacement, exactly as in round 6; `_decode_commit` goes.
++3. **Accepted limit** (R-087, DESIGN C2, replacing round 7's): a non-ASCII name in text written in an encoding other than UTF-8 is not matched, in a file's lines or in a message, whatever its header records; a path in it is found by M1.
++4. **Reasoning.** M2 served one case only, a non-ASCII account name in a message git records in a legacy encoding; every way of honouring the header adds a reading an attacker chooses, and the first try showed how wide that surface is. Withdrawing it returns to the reading rounds 1 to 6 were reviewed on.
++
++## Alternatives to weigh
++
++- **A (Review A's suggestion).** Keep M2 but accept the header's encoding only where its reading keeps this object's ASCII exactly (the decoded text's characters below U+0080, in order, equal the object's bytes below 0x80), else UTF-8. Closes G1's cases; G2 still needs the identity decided from the UTF-8 reading; the idna and warning advisories need a guarded decode.
++- **B (the security audit's suggestion).** Read the object as UTF-8 always, as round 6 did, and where the header names a usable codec read it in that codec too, reporting the union of each place's kinds; the identity exemption decided from the UTF-8 line and applied to both readings. No header can remove a hit; a non-ASCII name in a legacy-encoded message is found.
++
++## What the vote should engage
++
++Whether M1 alone leaves any route by which a path the scan should find in a message or a file passes (an encoding in which a path's ASCII bytes do not stand as ASCII is UTF-16 or UTF-32, already decided or a limit); whether the limit in 3 is acceptable for R-087's names, given that a non-ASCII account name in a legacy-encoded message is the only case it gives up; and, if not, which of A or B, with what it must add for G2 and the advisories.
+diff --git a/handoff/TASK-067-r7-report.md b/handoff/TASK-067-r7-report.md
+new file mode 100644
+index 0000000..6d24084
+--- /dev/null
++++ b/handoff/TASK-067-r7-report.md
+@@ -0,0 +1,309 @@
++# TASK-067 round 7 report
++
++## Files changed
++
++- `bridge/cursor-bridge/push-scan.py`
++- `bridge/cursor-bridge/MANIFEST.json` (only by `python tools/make-manifest.py`)
++- `docs/BUILDER_NOTES.md` (two dated lines)
++- `handoff/TASK-067-r7-report.md` (this file)
++
++`bridge/cursor-bridge/VERSION` was rewritten by `make-manifest.py` and restored with `git restore`. It reads `2026.11.12a` and is not listed by `git status --short`. `docs/CHANGES.md` and this brief do not disagree.
++
++## Summary
++
++A path's segment now begins with a letter, a digit, `_`, `.`, `-`, or any non-ASCII character that is not whitespace, so a byte no decoding reads still starts a segment, and a commit object is decoded in the encoding its header records when Python knows that encoding and it reads ASCII as ASCII, otherwise as UTF-8 with replacement.
++
++## M1 to M3
++
++- M1: `_segment_start` (lines 91-92) returns true for a letter, a digit, `_`, `.`, `-`, or `not ch.isascii() and not ch.isspace()`. `has_path` and `_bound` are unchanged.
++- M2: `_decode_commit` (lines 314-336) reads header lines up to the first empty line, strips one trailing CR, and decodes the whole object with `errors="replace"` in the last `encoding` name that is printable ASCII, that Python knows, and that decodes every printable ASCII byte plus LF to that same text; otherwise it decodes UTF-8. `scan_commit` (lines 1134-1137) reads the object with `git("cat-file", ["-p", "--end-of-options", full])` and raises the same `ScanError` on a non-zero exit before calling `_decode_commit`. `parse_commit` and `_parent_count` are unchanged.
++- M3: no new reason, output line, or note. The module docstring and `build_parser` (line 1260) are not in the diff. The disagreement check (lines 1193-1195) is the same text.
++
++## Mutation self-check
++
++Each mutant was applied to `push-scan.py`, then `python -m pytest -p no:cacheprovider -q --tb=no tests/test_program_push_scan.py` was run from `<Workspace>`, and the file was restored to the bytes from before that mutant. Step 12's diff is that restored program. Round 1's M6 was re-run because this round edits `_segment_start`. Every other mutant of rounds 1 to 6 changes code this round did not touch (T1-T10, S1-S16, N1-N9, P1-P6, Q1, M1-M5, M7-M13): code unchanged, not re-run. Q2 no longer applies (round 5 removed `--text`). The round-5 size-bound mutant no longer applies (round 6 removed the bound). N4 and the expect-survive set S8, S9, S12 and S14 were not re-run.
++
++- U1 M1's non-ASCII clause dropped (`_segment_start` as in round 6, `return ch.isalpha() or ch.isdigit() or ch in "_.-"`): caught by `test_r087_a_path_in_a_file_written_in_another_encoding_is_found[drive-back]` (and the other three forms of that test). `4 failed, 98 passed in 95.94s (0:01:35)`
++- U2 M1 widened to any non-space character (`return not ch.isspace()`): caught by `test_r087_ascii_punctuation_after_a_drive_still_begins_no_segment[backslash-quote]` (also `[slash-quote]` and `test_r087_a_placeholder_segment_in_angle_brackets_passes`). `3 failed, 99 passed in 95.92s (0:01:35)`
++- U3 M2's header ignored (`_decode_commit` returns `raw.decode("utf-8", errors="replace")` at once): caught by `test_r087_a_non_ascii_name_in_a_message_git_records_in_another_encoding_is_found`. `1 failed, 101 passed in 96.57s (0:01:36)`
++- U4 M2's ASCII check dropped (any encoding Python knows is used: `sample.decode(name)` selects the name unless it raises `LookupError`): not caught. `102 passed in 98.48s (0:01:38)`. A case that would catch it is a commit whose `encoding` header names an encoding Python knows that does not read ASCII as ASCII, whose bytes are UTF-8 and hold an ASCII path: a UTF-8 reading finds the path and that encoding hides it.
++- U5 M2's fallback to UTF-8 dropped (`LookupError` from an encoding Python does not know is not caught and leaves `_decode_commit`): caught by `test_r087_a_message_whose_encoding_python_does_not_know_is_read_as_utf8`. `1 failed, 101 passed in 100.30s (0:01:40)`
++- M6 a placeholder segment flagged (`ch in "_.-<"` on this round's `_segment_start`): caught by `test_r087_a_placeholder_segment_in_angle_brackets_passes`. `1 failed, 101 passed in 98.89s (0:01:38)`
++
++An earlier probe of U4 used `b"".decode(name)`. That call returns an empty string for an unknown name and does not raise `LookupError`, so the probe was not the mutant above. Its run failed `test_r087_a_message_whose_encoding_python_does_not_know_is_read_as_utf8` (`1 failed, 101 passed in 98.03s (0:01:38)`).
++
++### U1 output
++
++```
++........................................................................ [ 70%]
++.......................FFFF...                                           [100%]
++=========================== short test summary info ===========================
++FAILED tests/test_program_push_scan.py::test_r087_a_path_in_a_file_written_in_another_encoding_is_found[drive-back]
++FAILED tests/test_program_push_scan.py::test_r087_a_path_in_a_file_written_in_another_encoding_is_found[drive-forward]
++FAILED tests/test_program_push_scan.py::test_r087_a_path_in_a_file_written_in_another_encoding_is_found[home]
++FAILED tests/test_program_push_scan.py::test_r087_a_path_in_a_file_written_in_another_encoding_is_found[users]
++4 failed, 98 passed in 95.94s (0:01:35)
++```
++
++Exit 1.
++
++### U2 output
++
++```
++.............F.......................................................... [ 70%]
++...........................FF.                                           [100%]
++=========================== short test summary info ===========================
++FAILED tests/test_program_push_scan.py::test_r087_a_placeholder_segment_in_angle_brackets_passes
++FAILED tests/test_program_push_scan.py::test_r087_ascii_punctuation_after_a_drive_still_begins_no_segment[backslash-quote]
++FAILED tests/test_program_push_scan.py::test_r087_ascii_punctuation_after_a_drive_still_begins_no_segment[slash-quote]
++3 failed, 99 passed in 95.92s (0:01:35)
++```
++
++Exit 1.
++
++### U3 output
++
++```
++........................................................................ [ 70%]
++.....................F........                                           [100%]
++=========================== short test summary info ===========================
++FAILED tests/test_program_push_scan.py::test_r087_a_non_ascii_name_in_a_message_git_records_in_another_encoding_is_found
++1 failed, 101 passed in 96.57s (0:01:36)
++```
++
++Exit 1.
++
++### U4 output
++
++```
++........................................................................ [ 70%]
++..............................                                           [100%]
++102 passed in 98.48s (0:01:38)
++```
++
++Exit 0.
++
++### U5 output
++
++```
++........................................................................ [ 70%]
++......................F.......                                           [100%]
++=========================== short test summary info ===========================
++FAILED tests/test_program_push_scan.py::test_r087_a_message_whose_encoding_python_does_not_know_is_read_as_utf8
++1 failed, 101 passed in 100.30s (0:01:40)
++```
++
++Exit 1.
++
++### M6 output
++
++```
++.............F.......................................................... [ 70%]
++..............................                                           [100%]
++=========================== short test summary info ===========================
++FAILED tests/test_program_push_scan.py::test_r087_a_placeholder_segment_in_angle_brackets_passes
++1 failed, 101 passed in 98.89s (0:01:38)
++```
++
++Exit 1.
++
++## Commands
++
++The counts below belong to commit `f4f4e1168e711efe2b6f8d713d7811d772a912ee`. At step 13 the working tree held uncommitted changes, listed in that step. This report was written after that status, so it is not in that listing.
++
++Before the Done list, the round-7 cases were run on their own: `python -m pytest -p no:cacheprovider -q --tb=line tests/test_program_push_scan.py -k "another_encoding or does_not_know or ascii_punctuation"`.
++
++```
++...............                                                          [100%]
++15 passed, 87 deselected in 17.07s
++```
++
++Exit 0.
++
++### 1. `git status --short`
++
++```
++ M bridge/cursor-bridge/push-scan.py
++ M docs/BUILDER_NOTES.md
++```
++
++Exit 0.
++
++### 2. `python tools/dump-cli.py --check`
++
++```
++```
++
++Exit 0. The command printed no lines.
++
++### 3. `python tools/make-manifest.py`
++
++```
++make-manifest: version 2026.11.12a, 147 files hashed, VERSION + MANIFEST.json written
++```
++
++Exit 0.
++
++### 4. `git restore bridge/cursor-bridge/VERSION`
++
++```
++```
++
++Exit 0. The command printed no lines.
++
++### 5. `python -m pytest -p no:cacheprovider -q -rs --tb=short tests/test_program_push_scan.py tests/test_dump_cli.py tests/test_allowlist.py`
++
++```
++........................................................................ [ 15%]
++........................................................................ [ 31%]
++...............................................................s...ss... [ 46%]
++..sss....................s...............s.............................. [ 62%]
++.................s...........s.................s...ss.....sss........... [ 77%]
++.........s...............s.............................................. [ 93%]
++.s...........s.................                                          [100%]
++=========================== short test summary info ===========================
++SKIPPED [10] tests\test_allowlist.py:65: prose, not a runnable command
++SKIPPED [10] tests\test_allowlist.py:106: prose, not a runnable command
++443 passed, 20 skipped in 213.74s (0:03:33)
++```
++
++Exit 0.
++
++### 6. `python -m pytest -p no:cacheprovider -q tests/test_install_check.py tests/test_tests_windowless.py`
++
++```
++.........................                                                [100%]
++25 passed in 23.98s
++```
++
++Exit 0.
++
++### 7. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++```
++bridge-check: version 2026.11.12a (2026-11-18 12:01) at <Workspace>/bridge
++bridge-check: 147 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.12a
++```
++
++Exit 0. The repository folder in the first line is written `<Workspace>` here.
++
++### 8. `git grep -n -I -E --no-index "[A-Za-z]:[/\\]|/Users/|/home/|AppData" -- bridge/cursor-bridge/push-scan.py`
++
++```
++```
++
++Exit 1. The command printed no lines.
++
++### 9. `python -c "open('bridge/cursor-bridge/push-scan.py','rb').read().decode('ascii'); print('ascii ok')"`
++
++```
++ascii ok
++```
++
++Exit 0.
++
++### 10. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++
++```
++windowless-check: 40 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++Exit 0.
++
++### 11. `git diff --stat HEAD -- bridge/cursor-bridge/settings.bridge.json`
++
++```
++```
++
++Exit 0. The command printed no lines.
++
++### 12. `git diff HEAD -- bridge/cursor-bridge/push-scan.py`
++
++```
++warning: in the working copy of 'bridge/cursor-bridge/push-scan.py', LF will be replaced by CRLF the next time Git touches it
++diff --git a/bridge/cursor-bridge/push-scan.py b/bridge/cursor-bridge/push-scan.py
++index 09213a4..292da64 100644
++--- a/bridge/cursor-bridge/push-scan.py
+++++ b/bridge/cursor-bridge/push-scan.py
++@@ -89,7 +89,7 @@ def _bound(ch):
++ 
++ 
++ def _segment_start(ch):
++-    return ch.isalpha() or ch.isdigit() or ch in "_.-"
+++    return ch.isalpha() or ch.isdigit() or ch in "_.-" or (not ch.isascii() and not ch.isspace())
++ 
++ 
++ def has_path(text):
++@@ -311,6 +311,31 @@ def split_ident(rest):
++     return rest[:start], rest[start + 2:end]
++ 
++ 
+++def _decode_commit(raw):
+++    """The commit object in the encoding its header records, else UTF-8."""
+++    chosen = None
+++    sample = bytes(range(32, 127)) + b"\n"
+++    plain = sample.decode("ascii")
+++    for line in raw.split(b"\n"):
+++        if line.endswith(b"\r"):
+++            line = line[:-1]
+++        if line == b"":
+++            break
+++        if not line.startswith(b"encoding "):
+++            continue
+++        token = line[len(b"encoding "):]
+++        if any(byte < 32 or byte > 126 for byte in token):
+++            continue
+++        name = token.decode("ascii")
+++        try:
+++            same = sample.decode(name) == plain
+++        except (LookupError, UnicodeError):
+++            continue
+++        if same:
+++            chosen = name
+++    return raw.decode(chosen or "utf-8", errors="replace")
+++
+++
++ def parse_commit(text):
++     lines = [line[:-1] if line.endswith("\r") else line for line in text.split("\n")]
++     author = ("", "")
++@@ -1106,9 +1131,10 @@ def _content_by_path(records, sections, work):
++ 
++ def scan_commit(full, names, cfg_name, cfg_email, empty_tree, hash_len, work):
++     short = _checked_short(git_need("rev-parse", ["--short", "--end-of-options", full]))
++-    code, commit_text = git_text("cat-file", ["-p", "--end-of-options", full])
+++    code, commit_raw = git("cat-file", ["-p", "--end-of-options", full])
++     if code != 0:
++         raise ScanError("git cat-file failed (exit %d)" % code)
+++    commit_text = _decode_commit(commit_raw)
++     author, committer, message = parse_commit(commit_text)
++     show_options = [
++         "--attr-source=" + empty_tree,
++```
++
++Exit 0.
++
++### 13. `git rev-parse HEAD`
++
++```
++f4f4e1168e711efe2b6f8d713d7811d772a912ee
++```
++
++Exit 0.
++
++### 13. `git status --short`
++
++```
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/push-scan.py
++ M docs/BUILDER_NOTES.md
++```
++
++Exit 0. `bridge/cursor-bridge/VERSION` is not listed.
++
++## Assumed, not verified
++
++- The last `encoding` line whose name passes the ASCII check is the one used, and a line that fails the check does not clear an earlier passing line | two headers can name different encodings, and only one of them may show a non-ASCII name | a commit with two `encoding` lines and a searched name that only one decoding shows.
++- A header token that is not printable ASCII is ignored and the object is read as UTF-8 | the ISO-8859-1 tests used an ASCII name, so a non-ASCII name was not seen | a commit whose `encoding` token is not ASCII and whose message holds a non-ASCII searched name.
++- One trailing CR is removed from a header line before the name is read | the commits these tests made were LF, so a CR on that line was not seen | a commit whose `encoding` line ends in CR and whose message holds a non-ASCII searched name.
++- A codec that returns the printable-ASCII sample unchanged still shows an ASCII path when non-ASCII bytes sit beside it | the check compares one sample, and a separate probe of 356 standard-library codec names hid none of one ASCII-only path | decode, in each codec that passes the sample, an ASCII path placed after a non-ASCII byte.
+diff --git a/tests/test_program_push_scan.py b/tests/test_program_push_scan.py
+index 5b3eec6..f765267 100644
+--- a/tests/test_program_push_scan.py
++++ b/tests/test_program_push_scan.py
+@@ -1166,3 +1166,62 @@ def test_r087_ascii_punctuation_after_a_drive_still_begins_no_segment(tmp_path,
+     s.commit({"code.py": text + "\n"})
+     rc, out = s.run()
+     assert rc == 0 and hits(out) == [] and "push-scan: OK - 1 commit(s)" in out, out
++
++
++def test_r087_a_message_header_naming_an_encoding_that_changes_ascii_is_read_as_utf8(tmp_path):
++    """R-087 (round 7, the supervisor's case after its mutants): a commit whose `encoding` header names UTF-16, which
++    does not read ASCII as ASCII, is read as UTF-8, so an ASCII path in its message is still found."""
++    s = Scratch(tmp_path)
++    h = _commit_with_encoding(s, tmp_path, ("note " + DRIVE_FWD + "\n").encode("utf-8"), "UTF-16")
++    rc, out = s.run()
++    assert rc == 1 and hits(out) == [hit(h, "message", "path")], out
++
++
++def test_r087_a_non_ascii_name_in_an_ordinary_utf8_message_is_found(tmp_path):
++    """R-087 (round 7, the supervisor's case after its mutants): a commit with no `encoding` header is read as UTF-8, so
++    a searched name holding a non-ASCII letter matches as written."""
++    s = Scratch(tmp_path, names=(NONASCII_NAME,))
++    h = s.commit({"a.md": "plain\n"}, message="thanks " + NONASCII_NAME)
++    rc, out = s.run()
++    assert rc == 1 and hits(out) == [hit(h, "message", "name")], out
++    silent(out, also=(NONASCII_NAME,))
++
++
++# ---------------------------------------------------------------- the third resolution: a header never hides a hit
++
++@pytest.mark.parametrize("encoding,prefix,form", [
++    ("ISO-2022-JP", b"note \x1b$B", "users"),
++    ("ISO-2022-JP", b"note \x1b$B", "home"),
++    ("Shift_JIS", b"note \x81", "drive-back"),
++    ("Big5", b"note \xa1", "drive-back"),
++    ("unicode_escape", b"note ", "escaped-drive"),
++], ids=["iso2022jp-users", "iso2022jp-home", "shiftjis-drive", "big5-drive", "unicode-escape-drive"])
++def test_r087_an_encoding_header_never_hides_a_path_the_utf8_reading_finds(tmp_path, encoding, prefix, form):
++    """R-087 (the third resolution, round 7's regression found by both reviewers): whatever encoding a commit's header
++    names, a path the UTF-8 reading of its message finds is a hit (round 6 found each; round 7's decoding hid it)."""
++    paths = {"users": USERS, "home": HOMEP, "drive-back": DRIVE_BACK,
++             "escaped-drive": "E" + COLON + BACK + "new" + BACK + SEG}
++    s = Scratch(tmp_path)
++    h = _commit_with_encoding(s, tmp_path, prefix + paths[form].encode("ascii") + b"\n", encoding)
++    rc, out = s.run()
++    assert rc == 1 and hits(out) == [hit(h, "message", "path")], out
++
++
++def test_r087_an_encoding_header_never_hides_a_name_the_utf8_reading_finds(tmp_path):
++    """R-087 (the third resolution): a Shift_JIS lead byte before a searched name never hides the name."""
++    s = Scratch(tmp_path)
++    h = _commit_with_encoding(s, tmp_path, b"thanks \x81" + EXTRA.encode("ascii") + b"\n", "Shift_JIS")
++    rc, out = s.run()
++    assert rc == 1 and hits(out) == [hit(h, "message", "name")], out
++
++
++def test_r087_a_non_ascii_identity_stays_exempt_under_another_encoding_header(tmp_path):
++    """R-087 (the third resolution; the owner's decision of 2026-11-18): git writes the author and committer lines as
++    UTF-8 whatever i18n.commitEncoding says, so a configured identity holding a non-ASCII letter stays no finding, and
++    a searched name equal to part of it is not found in those lines."""
++    s = Scratch(tmp_path, names=("Vandrelq",))
++    s.git("config", "user.name", "Zo" + E_ACUTE + " Vandrelq")
++    s.git("config", "user.email", "zo" + "@example.invalid")
++    _commit_with_encoding(s, tmp_path, b"plain\n", "ISO-8859-1")
++    rc, out = s.run()
++    assert rc == 0 and hits(out) == [] and "push-scan: OK - 1 commit(s)" in out, out
