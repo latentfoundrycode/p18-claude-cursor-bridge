@@ -78,3 +78,5 @@
 2026-11-18 TASK-067: `test_r087_git_or_the_base_unreadable_exits_2_never_a_pass` with case `dash-base` accepts any exit 2, so a mutant that lets a base beginning with "-" through still passes when git then rejects that revision; a catch is an assertion that the output contains the dash refusal and not the missing-commit refusal.
 
 2026-11-18 TASK-067-r2: no case builds a patch path that is absent from that commit's name-status list, so dropping the disagreement check (exit 2, `the patch and the file list disagree`) still passes the scan tests.
+
+2026-11-18 TASK-067-r5: a combined `Binary files differ` section has no `+++` line (its path is only on `diff --cc`), an ordinary binary `index` line omits the mode a text `index` line prints, and `git show -z --raw` of a merge is already one combined record per path (one colon per parent), empty when every file matches one parent.

@@ -88,3 +88,33 @@ Why the set difference for a section git shows as binary: it is the combined dif
 Review B, second turn: the proposal with changes. Its blocking point: a set difference loses a duplicate added line (a parent `P, base`, a result `P, base, P`; git marks the last `P` added), in UTF-16 and in merges and octopus merges too; per-preimage line diffs, position by position, replace it. Its other changes: `--cc` asked for explicitly; the `Binary files` wording relied on nowhere; the raw parser strict (framing, modes, status, id counts, duplicates) with paths compared losslessly; a root commit's one all-zero preimage; the accepted limits stated in full (a BOM-prefixed binary that decodes strictly is read as UTF-16; UTF-32 and other encodings are not decoded). `review-guard.py verify TASK-067-r2`: OK.
 
 The supervisor's decision, with those changes, is recorded in docs/CHANGES.md (2026-11-18, "content decides how the pre-push scan reads a file, a resolution round"); R-087, DESIGN C2 and the plan's TASK-067 entry carry it.
+
+# The second resolution: round 5's regressions (2026-11-18)
+
+## The question
+
+Round 5 (handoff/TASK-067-r5.md, its class line confirmed by both reviewers against round 4's code) built the decision above. Both reviewers rejected it, and each blocking finding is a regression round 5 caused. A second fix that regresses goes to a resolution round (decide.md, "Stop"). How should the decided design be corrected so that none of the four routes below remains?
+
+## The findings (bridge/cursor-bridge/push-scan.py at this file's commit, round 5's tree)
+
+- **F1 (security; the security audit, B1).** `classify_blob` (866-876) calls a blob UTF-16 when it begins with `FF FE` or `FE FF` and the rest decodes strictly; ASCII byte pairs always decode strictly as UTF-16LE. `_by_class` (979-989) then reads only the UTF-16 decoding and ignores the hunks git showed. A commit adding `b"\xff\xfe" + b"hello\nsee <a path>\n\n"` (git shows it as text, with the path as an added line) prints `push-scan: OK`, no note; round 4 found it. Ordinary on Windows too: a file PowerShell 5.1 wrote (UTF-16LE with a byte-order mark) and then appended to in UTF-8 by another shell's `>>` (round 4 hit, round 5 OK; with an odd-length append the file falls to binary and is counted).
+- **F2 (behaviour; Review A, B1).** For a text result git lists with no section, K5 runs the line diff. A clean merge where both branches changed a text file over 1 MiB in different places (a lockfile) is listed in the raw list, but `--cc` prints no section (every hunk takes one parent's lines unchanged), so the scan ends `CANNOT SCAN - a file too large to compare`; round 4 printed OK. Under 1 MiB the same leg is slow: a 930 KB Markdown file took 127 s (round 4: 0.5 s), since `SequenceMatcher` with `autojunk=False` is close to quadratic on repeated lines.
+- **F3 (behaviour against K4; the security audit B2, Review A N1).** A type change to a gitlink (`:100644 160000 ... T lib`, a file replaced by a submodule at the same path) runs `cat-file blob` on the commit id in the `T` branch (992-995) before the submodule check: exit 2 (`git cat-file failed (exit 128)`); round 4 read it.
+- **F4 (availability; both, advisory).** Inside the 1 MiB bound, content shaped to be slow takes `SequenceMatcher` far longer (16,000 one-character lines from four values: 15 s; extrapolated to 1 MiB: about an hour), and every changed blob is read whole into memory, one process each (1,500 small files: 30 s; round 4: 0.4 s).
+
+## The supervisor's proposal
+
+1. **A UTF-16 result is read both ways** (F1): as UTF-16 (decoded, by the line diff, as now) and as the patch is read (its section's hunks where git shows them; else the same line diff over the UTF-8 view, decoded with replacement, against each preimage's UTF-8 view). The hits of both readings are reported, each by its own line number. ASCII inside real UTF-16 is NUL-interleaved and UTF-16 decodings of ASCII are not path-shaped, so neither view adds a false hit the other lacks.
+2. **A text result git lists with no section is read as nothing** (F2): git's dense combined diff leaves a listed file out only where every hunk takes one parent's lines, so no line is added against every parent; an attribute route makes git print a `Binary files differ` section instead (Review A's probes, committed and local attributes). The line diff runs only for a section git shows as `Binary files` and for UTF-16 (rule 1).
+3. **A type change to a submodule is read as a submodule** (F3): in the `T` branch, where the result mode is `160000`, the addition section's lines are taken as the submodule branch takes them, never classified.
+4. **F4 stays a lead** (docs/HARDENING.md): after rule 2 the line diff runs only for files git shows as binary by a local setting and for UTF-16, rare in ordinary use; it fails closed above 1 MiB. A bound on the line diff's work (the product of the line counts) and a bounded classification read (`cat-file -s`, the first 8000 bytes) are recorded for later.
+
+## Alternatives to weigh
+
+- For F1: classify as UTF-16 only where a NUL stands in the first 8000 bytes (so a BOM-prefixed file git treats as text is text), with or without rule 1's second reading (without it, the PowerShell-then-appended file's ASCII lines stay unread).
+- For F2: keep the line diff for a listed file with no section but bound its work, refusing above the bound (a clean merge of a large lockfile then refuses).
+- For F4: bound the line diff's work now (`len(pre) * len(result)` above a limit raises `a file too large to compare`).
+
+## What the vote should engage
+
+Whether rule 2's claim holds for every way git leaves a listed text file out of `--cc` (merges, octopus, user settings that reach the combined diff), so that reading nothing never hides an added line; whether rule 1 leaves any route by which a BOM-prefixed file's added line is neither read nor refused, or adds a false hit; whether rule 3 is complete for type changes (to and from a gitlink, a symlink); and whether F4 should be closed now.

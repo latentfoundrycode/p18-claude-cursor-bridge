@@ -855,6 +855,32 @@ def test_r087_a_sha256_repository_is_read_with_its_own_ids(tmp_path):
     assert NOTE_ONE in out, out
 
 
+LARGE = "".join("plain line %06d\n" % n for n in range(80000))   # about 1.4 MiB of text, above the 1 MiB bound
+
+
+def test_r087_a_commit_s_attribute_never_decides_how_a_large_text_file_is_read(tmp_path):
+    """R-087 (round 5): a commit's own .gitattributes marking a large text file `-diff` decides nothing: git shows it
+    as hunks to the scan (no tree's attributes reach the read), so its added line is a hit and the scan never ends on
+    the size bound because of commit content."""
+    s = Scratch(tmp_path, base_files={"big.md": LARGE})
+    h = s.commit({".gitattributes": "*.md -diff\n", "big.md": LARGE + DRIVE_FWD + "\n"})
+    assert "Binary files" in _shown(s), "precondition: git shows the file as binary under the commit's attribute"
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line big.md:80001", "path")], out
+
+
+def test_r087_a_large_text_file_a_local_setting_shows_as_binary_ends_the_scan(tmp_path):
+    """R-087 (round 5): a text file above 1 MiB that a local setting shows as binary needs a line diff the scan bounds
+    by size: the scan ends with exit 2 and the reason `a file too large to compare`, never a pass."""
+    s = Scratch(tmp_path, base_files={"big.md": LARGE})
+    _force(s, "info-nodiff")
+    s.commit({"big.md": LARGE + DRIVE_FWD + "\n"})
+    assert "Binary files" in _shown(s), "precondition: git shows the file as binary"
+    rc, out = s.run()
+    assert rc == 2 and "push-scan: CANNOT SCAN - a file too large to compare" in out, out
+    assert hits(out) == [] and "push-scan: OK" not in out, out
+
+
 def test_r087_no_attribute_decides_and_ids_are_full():
     """R-087 (round 5): the reads take no tree's attributes (--attr-source of the empty tree, an empty
     core.attributesFile), read full ids (--full-index on the patch, --no-abbrev on the raw list) and never read every
