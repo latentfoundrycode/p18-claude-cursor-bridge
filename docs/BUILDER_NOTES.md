@@ -76,3 +76,5 @@
 2026-11-17 TASK-066: the new R-086 case uses `changed_repo` and `run` in `tests/test_hotfix25a_guard_scope_invisible.py`, and those helpers call `subprocess.run` with no timeout; adding a timeout would edit an existing helper, which the brief forbids, so the case does not add its own timeout.
 
 2026-11-18 TASK-067: `test_r087_git_or_the_base_unreadable_exits_2_never_a_pass` with case `dash-base` accepts any exit 2, so a mutant that lets a base beginning with "-" through still passes when git then rejects that revision; a catch is an assertion that the output contains the dash refusal and not the missing-commit refusal.
+
+2026-11-18 TASK-067-r2: no case builds a patch path that is absent from that commit's name-status list, so dropping the disagreement check (exit 2, `the patch and the file list disagree`) still passes the scan tests.

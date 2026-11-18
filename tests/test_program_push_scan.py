@@ -475,3 +475,102 @@ def test_r087_a_commit_s_signature_is_never_read_into_a_hit():
     with open(PROG, encoding="utf-8") as f:
         src = f.read()
     assert "log.showSignature=false" in src or "--no-show-signature" in src
+
+
+# ---------------------------------------------------------------- round 3: what git shows is never narrowed (the reviews of round 2)
+
+def _index_add(s, path, text=None, mode="100644", sha=None):
+    """Adds one entry to the index by --cacheinfo (a path the file system may refuse, or a gitlink)."""
+    if sha is None:
+        (s.repo / "payload.txt").write_bytes(text.encode("utf-8"))
+        sha = s.git("hash-object", "-w", "payload.txt")
+        (s.repo / "payload.txt").unlink()
+    s.git("-c", "core.protectNTFS=false", "update-index", "--add", "--cacheinfo", "%s,%s,%s" % (mode, sha, path))
+
+
+def test_r087_a_submodule_hidden_by_the_user_s_setting_is_still_read(tmp_path):
+    """R-087 (round 3): diff.ignoreSubmodules is the user's setting, not the scan's: a submodule entry whose own name
+    holds a name is a hit at its file position."""
+    s = Scratch(tmp_path)
+    _config(s, "[diff]\n\tignoreSubmodules = all\n")
+    _index_add(s, PROFILE_NAME + "-vendor", mode="160000", sha=s.base)
+    s.git("commit", "-q", "-m", "vendor")
+    h = s.git("rev-parse", "--short", "HEAD")
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "file #1", "name")], out
+    silent(out)
+
+
+def test_r087_a_submodule_hidden_by_the_commit_s_own_gitmodules_is_still_read(tmp_path):
+    """R-087 (round 3): a commit's own .gitmodules is commit content: its `ignore = all` hides nothing from the scan,
+    so a submodule entry whose own name holds a name is a hit at its file position."""
+    s = Scratch(tmp_path)
+    split = PROFILE_NAME[:4] + '""' + PROFILE_NAME[4:]
+    gitmodules = '[submodule "v"]\n\tpath = "%s-vendor"\n\turl = ./v\n\tignore = all\n' % split
+    _index_add(s, ".gitmodules", text=gitmodules)
+    _index_add(s, PROFILE_NAME + "-vendor", mode="160000", sha=s.base)
+    s.git("commit", "-q", "-m", "vendor")
+    h = s.git("rev-parse", "--short", "HEAD")
+    rc, out = s.run()
+    assert rc == 1, out
+    assert hit(h, "file #2", "name") in hits(out), out
+    silent(out)
+
+
+def test_r087_a_root_commit_in_the_range_is_read_whatever_log_show_root_says(tmp_path):
+    """R-087 (round 3): log.showRoot is the user's setting, not the scan's: a root commit brought into the range by a
+    merge of an unrelated history is read, its added lines and its file names."""
+    s = Scratch(tmp_path)
+    _config(s, "[log]\n\tshowRoot = false\n")
+    s.git("checkout", "-q", "--orphan", "other")
+    s.git("rm", "-rq", "--cached", ".")
+    (s.repo / "README.md").unlink()
+    root = s.commit({"imported.md": "plain\n" + DRIVE_FWD + "\n"}, message="imported")
+    s.git("checkout", "-q", "-f", "main")
+    s.git("merge", "-q", "--allow-unrelated-histories", "-m", "merge", "other")
+    rc, out = s.run()
+    assert rc == 1, out
+    assert hits(out) == [hit(root, "line imported.md:2", "path")], out
+
+
+def test_r087_a_blank_context_line_is_read_whatever_diff_suppress_blank_empty_says(tmp_path):
+    """R-087 (round 3): diff.suppressBlankEmpty is the user's setting, not the scan's: a hunk whose context holds a blank
+    line is read, never refused."""
+    s = Scratch(tmp_path, base_files={"notes.md": "a\n\nb\n"})
+    _config(s, "[diff]\n\tsuppressBlankEmpty = true\n")
+    h = s.commit({"notes.md": "a\n\nb\n" + DRIVE_FWD + "\n"})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line notes.md:4", "path")], out
+
+
+def test_r087_a_path_whose_escaped_form_holds_a_name_is_placed_by_its_position(tmp_path):
+    """R-087 (round 3): the hit test on a path reads the text that would be printed too: a vertical tab before the rest
+    of a login prints as a backslash and a v, which completes the name, so the line is placed by the file's position."""
+    s = Scratch(tmp_path)
+    _index_add(s, chr(11) + LOGIN[1:] + ".md", text="plain\n" + DRIVE_FWD + "\n")
+    s.git("commit", "-q", "-m", "change")
+    h = s.git("rev-parse", "--short", "HEAD")
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line #1:2", "path")], out
+    silent(out)
+
+
+def test_r087_a_format_character_in_a_printed_path_is_escaped(tmp_path):
+    """R-087 (round 3): a format character (category Cf, such as the right-to-left override) in a printed path is
+    escaped by its UTF-8 bytes, so a terminal cannot show a hit line reordered."""
+    s = Scratch(tmp_path)
+    _index_add(s, "a" + chr(0x202E) + "b.md", text="plain\n" + DRIVE_FWD + "\n")
+    s.git("commit", "-q", "-m", "change")
+    h = s.git("rev-parse", "--short", "HEAD")
+    rc, out = s.run()
+    escaped = '"a' + chr(92) + "342" + chr(92) + "200" + chr(92) + '256b.md"'
+    assert rc == 1 and hits(out) == [hit(h, "line %s:2" % escaped, "path")], out
+    assert chr(0x202E) not in out, out
+
+
+def test_r087_a_submodule_s_own_diff_is_never_inlined():
+    """R-087 (round 3): with diff.submodule set to diff, git inlines a submodule's own changes under paths that are not
+    this repository's files; the program asks for the short form on both reads, so a submodule bump is read as one entry."""
+    with open(PROG, encoding="utf-8") as f:
+        src = f.read()
+    assert src.count("--submodule=short") >= 2 and src.count("--ignore-submodules=none") >= 2

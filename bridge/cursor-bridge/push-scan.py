@@ -22,6 +22,7 @@ import os
 import re
 import subprocess
 import sys
+import unicodedata
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -47,7 +48,7 @@ def say(line):
 
 
 def git(sub, args):
-    argv = ["git", "--no-pager", "-c", "color.ui=never", sub] + list(args)
+    argv = ["git", "--no-pager", "-c", "color.ui=never", "-c", "log.showSignature=false", sub] + list(args)
     try:
         proc = subprocess.run(
             argv,
@@ -124,23 +125,12 @@ def has_path(text):
 
 
 def has_name(text, names):
-    lowered = text.lower()
     for name in names:
-        needle = name.lower()
-        if not needle:
+        if not name:
             continue
-        start = 0
-        nlen = len(needle)
-        while True:
-            found = lowered.find(needle, start)
-            if found < 0:
-                break
-            before = text[found - 1] if found > 0 else ""
-            after_at = found + nlen
-            after = text[after_at] if after_at < len(text) else ""
-            if not _bound(before) and not _bound(after):
-                return True
-            start = found + 1
+        pattern = re.compile("(?<![^\\W_])" + re.escape(name) + "(?![^\\W_])", re.IGNORECASE)
+        if pattern.search(text):
+            return True
     return False
 
 
@@ -364,7 +354,10 @@ def unquote_git(token):
                     index += 1
                 else:
                     break
-            raw.append(int(digits, 8))
+            value = int(digits, 8)
+            if value > 255:
+                raise ScanError("the patch cannot be read")
+            raw.append(value)
         else:
             raw.extend(esc.encode("utf-8"))
     return raw.decode("utf-8", errors="replace")
@@ -397,77 +390,183 @@ def strip_side(path, side):
     return path
 
 
-def hunk_new_start(header):
-    index = 0
-    while index < len(header) and header[index] == "@":
-        index += 1
-    rest = header[index:]
-    close = rest.find("@")
-    if close >= 0:
-        rest = rest[:close]
-    last = None
-    for match in re.finditer(r"\+(\d+)", rest):
-        last = match.group(1)
-    if last is None:
-        return None
-    value = int(last)
-    if value < 1:
-        return None
-    return value
+def _patch_lines(text):
+    lines = []
+    for line in text.split("\n"):
+        if line.endswith("\r"):
+            line = line[:-1]
+        lines.append(line)
+    return lines
+
+
+def _whole_digits(text):
+    if not text:
+        return False
+    for ch in text:
+        if ch < "0" or ch > "9":
+            return False
+    return True
+
+
+def _path_from_rest(rest, strip_b):
+    """The whole rest of a header line: one trailing tab, then git quoting, then an optional b/ prefix."""
+    if rest.endswith("\t"):
+        rest = rest[:-1]
+    if len(rest) >= 2 and rest[0] == '"' and rest[-1] == '"':
+        path = unquote_git(rest)
+    else:
+        path = rest
+    if strip_b:
+        path = strip_side(path, "b")
+    return path
+
+
+def _parse_hunk_header(header):
+    """New-side start and count, and each old side's count. Raises when the numbers cannot be read."""
+    n_at = 0
+    while n_at < len(header) and header[n_at] == "@":
+        n_at += 1
+    if n_at < 2:
+        raise ScanError("the patch cannot be read")
+    rest = header[n_at:]
+    close_at = rest.find("@")
+    if close_at < 0:
+        raise ScanError("the patch cannot be read")
+    end = close_at
+    while end < len(rest) and rest[end] == "@":
+        end += 1
+    if end - close_at != n_at:
+        raise ScanError("the patch cannot be read")
+    tokens = rest[:close_at].split()
+    if not tokens:
+        raise ScanError("the patch cannot be read")
+    old_counts = []
+    new_start = None
+    new_count = None
+    for token in tokens:
+        if len(token) < 2 or token[0] not in "+-":
+            raise ScanError("the patch cannot be read")
+        sign = token[0]
+        body = token[1:]
+        if "," in body:
+            start_text, count_text = body.split(",", 1)
+            if not _whole_digits(start_text) or not _whole_digits(count_text):
+                raise ScanError("the patch cannot be read")
+            start = int(start_text, 10)
+            count = int(count_text, 10)
+        else:
+            if not _whole_digits(body):
+                raise ScanError("the patch cannot be read")
+            start = int(body, 10)
+            count = 1
+        if start < 0 or count < 0:
+            raise ScanError("the patch cannot be read")
+        if sign == "+":
+            if new_start is not None:
+                raise ScanError("the patch cannot be read")
+            new_start = start
+            new_count = count
+        else:
+            if new_start is not None:
+                raise ScanError("the patch cannot be read")
+            old_counts.append(count)
+    if new_start is None or len(old_counts) != n_at - 1:
+        raise ScanError("the patch cannot be read")
+    return len(old_counts), new_start, new_count, old_counts
 
 
 def added_lines(text):
-    """Added lines of a patch: (new path, line number in the new file, text)."""
+    """Added lines of a patch, and every new path the patch names.
+
+    Each added line is (new path, line number in the new file, text).
+    A body line is never read as a header. A line that begins with ``diff `` ends the hunk.
+    """
     found = []
+    named = []
     new_path = None
     in_hunk = False
     new_line = 1
     n_cols = 1
-    marker = "diff --git "
-    for line in text.splitlines():
-        if line.startswith(marker):
-            _old, remain = take_token(line[len(marker):])
-            new, _rest = take_token(remain)
-            new_path = strip_side(new, "b")
+    remain_new = 0
+    remain_old = []
+    for line in _patch_lines(text):
+        if line.startswith("diff "):
             in_hunk = False
+            new_path = None
+            if line.startswith("diff --cc "):
+                new_path = _path_from_rest(line[len("diff --cc "):], False)
+                named.append(new_path)
+            elif line.startswith("diff --combined "):
+                new_path = _path_from_rest(line[len("diff --combined "):], False)
+                named.append(new_path)
+            continue
+        if in_hunk:
+            if line.startswith("\\"):
+                continue
+            if len(line) < n_cols:
+                raise ScanError("the patch cannot be read")
+            prefix = line[:n_cols]
+            for ch in prefix:
+                if ch not in " +-":
+                    raise ScanError("the patch cannot be read")
+            in_result = "-" not in prefix
+            if in_result:
+                if remain_new <= 0:
+                    raise ScanError("the patch cannot be read")
+                remain_new -= 1
+                for index, ch in enumerate(prefix):
+                    if ch == " ":
+                        if remain_old[index] <= 0:
+                            raise ScanError("the patch cannot be read")
+                        remain_old[index] -= 1
+                    elif ch != "+":
+                        raise ScanError("the patch cannot be read")
+                if "+" in prefix and new_line >= 1:
+                    if new_path is None:
+                        raise ScanError("the patch cannot be read")
+                    found.append((new_path, new_line, line[n_cols:]))
+                new_line += 1
+            else:
+                if "+" in prefix:
+                    raise ScanError("the patch cannot be read")
+                for index, ch in enumerate(prefix):
+                    if ch == "-":
+                        if remain_old[index] <= 0:
+                            raise ScanError("the patch cannot be read")
+                        remain_old[index] -= 1
+                    elif ch != " ":
+                        raise ScanError("the patch cannot be read")
+            if remain_new == 0 and all(count == 0 for count in remain_old):
+                in_hunk = False
             continue
         if line.startswith("rename to "):
-            token, _rest = take_token(line[len("rename to "):])
-            new_path = token
+            new_path = _path_from_rest(line[len("rename to "):], False)
+            named.append(new_path)
             continue
         if line.startswith("+++ "):
-            token, _rest = take_token(line[len("+++ "):])
-            if token == _NULL_PATH:
+            path = _path_from_rest(line[len("+++ "):], True)
+            if path == _NULL_PATH:
                 new_path = None
             else:
-                new_path = strip_side(token, "b")
+                new_path = path
+                named.append(new_path)
             continue
         if line.startswith("@@"):
-            n_at = 0
-            while n_at < len(line) and line[n_at] == "@":
-                n_at += 1
-            n_cols = n_at - 1 if n_at > 1 else 1
-            start = hunk_new_start(line)
-            if start is None:
-                in_hunk = False
-            else:
-                in_hunk = True
-                new_line = start
+            n_cols, new_line, remain_new, remain_old = _parse_hunk_header(line)
+            in_hunk = remain_new != 0 or any(count != 0 for count in remain_old)
             continue
-        if not in_hunk or not new_path:
-            continue
-        if line.startswith("\\"):
-            continue
-        if len(line) < n_cols:
-            continue
-        prefix = line[:n_cols]
-        if "-" in prefix:
-            continue
-        content = line[n_cols:]
-        if "+" in prefix and new_line >= 1:
-            found.append((new_path, new_line, content))
-        new_line += 1
-    return found
+    if in_hunk:
+        raise ScanError("the patch cannot be read")
+    return found, named
+
+
+def _two_path_status(status):
+    if len(status) < 2 or status[0] not in ("R", "C"):
+        return False
+    for ch in status[1:]:
+        if ch < "0" or ch > "9":
+            return False
+    return True
 
 
 def parse_name_status(raw):
@@ -481,7 +580,7 @@ def parse_name_status(raw):
         index += 1
         if not status:
             continue
-        if status[0] in ("R", "C") and index + 1 < len(parts):
+        if _two_path_status(status) and index + 1 < len(parts):
             index += 1  # the old path
             new = parts[index].decode("utf-8", errors="replace")
             index += 1
@@ -499,8 +598,47 @@ def hit_line(short, place, kind):
     return "push-scan: HIT %s %s %s" % (short, place, kind)
 
 
+def _checked_short(text):
+    if text.endswith("\n"):
+        text = text[:-1]
+    if text.endswith("\r"):
+        text = text[:-1]
+    if not text:
+        raise ScanError("internal error")
+    for ch in text:
+        if ch not in "0123456789abcdef":
+            raise ScanError("internal error")
+    return text
+
+
+def quote_path(path):
+    """Print a path as itself, or quoted, so a control character cannot forge a line."""
+    needs = False
+    for ch in path:
+        if ch == '"' or ch == "\\" or unicodedata.category(ch) in ("Cc", "Zl", "Zp"):
+            needs = True
+            break
+    if not needs:
+        return path
+    simple = {
+        "\a": "\\a", "\b": "\\b", "\t": "\\t", "\n": "\\n",
+        "\v": "\\v", "\f": "\\f", "\r": "\\r", '"': '\\"', "\\": "\\\\",
+    }
+    parts = ['"']
+    for ch in path:
+        if ch in simple:
+            parts.append(simple[ch])
+        elif unicodedata.category(ch) in ("Cc", "Zl", "Zp"):
+            for byte in ch.encode("utf-8"):
+                parts.append("\\%03o" % byte)
+        else:
+            parts.append(ch)
+    parts.append('"')
+    return "".join(parts)
+
+
 def scan_commit(full, names, cfg_name, cfg_email):
-    short = git_need("log", ["-1", "--format=%h", "--end-of-options", full]).strip()
+    short = _checked_short(git_need("rev-parse", ["--short", "--end-of-options", full]))
     code, commit_text = git_text("cat-file", ["-p", "--end-of-options", full])
     if code != 0:
         raise ScanError("git cat-file failed (exit %d)" % code)
@@ -508,18 +646,21 @@ def scan_commit(full, names, cfg_name, cfg_email):
     code, status_raw = git(
         "show",
         ["-z", "--name-status", "-M", "--format=", "--no-ext-diff", "--no-textconv",
-         "--no-color", "--end-of-options", full],
+         "--no-color", "--no-relative", "--src-prefix=a/", "--dst-prefix=b/",
+         "--end-of-options", full],
     )
     if code != 0:
         raise ScanError("git show failed (exit %d)" % code)
     patch = git_need(
         "show",
         ["-M", "--format=", "--no-ext-diff", "--no-textconv", "--no-color",
+         "--no-relative", "--src-prefix=a/", "--dst-prefix=b/",
          "--end-of-options", full],
     )
     records = parse_name_status(status_raw)
+    found, named_paths = added_lines(patch)
     lines_by_path = {}
-    for path, number, content in added_lines(patch):
+    for path, number, content in found:
         lines_by_path.setdefault(path, []).append((number, content))
     hits = []
     for kind in kinds_of(message, names):
@@ -542,17 +683,11 @@ def scan_commit(full, names, cfg_name, cfg_email):
                 if hidden:
                     place = "line #%d:%d" % (position, number)
                 else:
-                    place = "line %s:%d" % (path, number)
+                    place = "line %s:%d" % (quote_path(path), number)
                 hits.append(hit_line(short, place, kind))
-    for path, pairs in lines_by_path.items():
-        if path in seen:
-            continue
-        hidden = bool(kinds_of(path, names))
-        for number, content in pairs:
-            for kind in kinds_of(content, names):
-                if hidden:
-                    continue
-                hits.append(hit_line(short, "line %s:%d" % (path, number), kind))
+    for path in named_paths:
+        if path not in seen:
+            raise ScanError("the patch and the file list disagree")
     return short, hits
 
 
@@ -628,7 +763,7 @@ def main():
         say("push-scan: CANNOT SCAN - " + err.reason)
         return 2
     except Exception:
-        say("push-scan: CANNOT SCAN - git cannot be started")
+        say("push-scan: CANNOT SCAN - internal error")
         return 2
 
 
