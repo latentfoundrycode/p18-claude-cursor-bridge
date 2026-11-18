@@ -118,3 +118,31 @@ Round 5 (handoff/TASK-067-r5.md, its class line confirmed by both reviewers agai
 ## What the vote should engage
 
 Whether rule 2's claim holds for every way git leaves a listed text file out of `--cc` (merges, octopus, user settings that reach the combined diff), so that reading nothing never hides an added line; whether rule 1 leaves any route by which a BOM-prefixed file's added line is neither read nor refused, or adds a false hit; whether rule 3 is complete for type changes (to and from a gitlink, a symlink); and whether F4 should be closed now.
+
+## Review B's vote on the second resolution (gpt-5.6-sol-high): PROPOSAL WITH CHANGES
+
+- F1 to F4 confirmed against round 5's code; F4 to be closed now (the matcher runs in process with no time limit, and UTF-16 content is the commit's).
+- Rule 1 is not safe as written: (a) a byte-order mark followed by a UTF-16 prefix and an odd-length UTF-8 append fails strict decoding, holds NULs and is counted as binary, its appended line neither read nor refused; (b) the two views are ambiguous: `FF FE` then the byte pairs of `D:/xx` decodes to non-path characters, while the byte view holds a drive path, a hit no UTF-16 reader would see. Its change: a byte-order-mark file that fails to decode refuses the scan; for one that decodes, a match only in the byte view refuses with an ambiguous-encoding reason.
+- Rule 2 holds (a line added against every parent puts `+` in every parent column and makes its hunk interesting; `--cc` cannot drop it; octopus too), implemented as: a section with no hunks takes the line-diff route; a section git does not print is skipped; never rely on the `Binary files` wording.
+- Rule 3: dispatch by the result's mode, `160000` handled before any blob read whatever the status (ordinary `T` or a combined status); a gitlink preimage contributes no line; symlinks stay classified and scanned. Cases: regular to gitlink, symlink to gitlink, gitlink to regular, regular to symlink, and combined statuses.
+- Rule 4 is wrong to defer: bound the matcher's total work across all parents before it runs; bound classification reads and batch object reads.
+
+## The supervisor's revised proposal (after Review B's vote)
+
+1. **A blob that begins with a UTF-16 byte-order mark is read both ways and never counted as binary**: the UTF-16 view decoded with replacement (so a malformed tail, such as an odd-length UTF-8 append, decodes and is read), and the byte view decoded as the patch is (the section's hunks where git shows them, else the line diff over the byte view). The hits of both are reported, each by its own line. A match only in the byte view is a hit, not a refusal: the bytes do hold the text, the push is held either way, and no new reason is added. A real binary that begins with such a mark is read both ways too: an accepted limit (its false-hit chance is the byte view's).
+2. **Rule 2 as Review B states it**: a section that shows no hunk while its result differs from every preimage takes the line diff; a listed record with no section reads nothing; the `Binary files` wording decides nothing.
+3. **Rule 3 as Review B states it**: a result of mode `160000` is handled first, before any blob read, for every status; its section's `Subproject commit` lines are read as today.
+4. **The matcher's work is bounded now**: before any `SequenceMatcher` runs for a record, the sum over its preimages of `len(preimage lines) * len(result lines)` above 50,000,000 raises `a file too large to compare` (never a pass); the 1 MiB size bound stays. Classification reads stay one `cat-file blob` per changed blob, each under git's own time limit (a blob too large to read in time ends with exit 2, never a pass); batching and prefix reads are recorded as a lead, since they change speed and memory, never the result.
+
+
+## Review A's vote on the second resolution (claude-opus-5-5): REVISED PROPOSAL WITH CHANGES
+
+- Agrees with Review B on F1 to F4, rule 2 (verified on git 2.53: a clean octopus prints no section; one that re-adds a parent's line at a new position prints `+++`; a binary section is never dropped; a mode-only merge prints a header and no hunk) and rule 3 (regular, symlink and gitlink type changes, `TM` and `MT` merges verified).
+- A hit, not a refusal, for a byte-view match: the bytes hold the text, a hit holds the push as a refusal does and names the line to fix.
+- Lenient decoding reads the odd-length append through the byte view; a route remains, reproduced with Windows PowerShell 5.1: `>` (UTF-16LE with a mark), an odd-length Git Bash `>>`, then a PowerShell `>>` appending UTF-16LE at an odd offset: no view reads its path and, never counted, the note is lost. It asked for a third view (UTF-16 from offset 3).
+- The untrimmed 50,000,000 bound refuses a one-line edit of an ordinary 0.7 MB UTF-16 file for good; trim common ends, bound the middles' product and the run's total, and over-read above the bound in place of refusing.
+- A single-parent record with no section refuses; classification reads stay a lead.
+
+## The decision on the second resolution
+
+Recorded in docs/CHANGES.md (2026-11-18, "a marked file read without its NULs, merges read by git's own rule, the line diff bounded, the second resolution round"): a marked blob read as its bytes with every NUL removed and as UTF-16 in the mark's order, both by the line diff; rule 2 and rule 3 as both reviewers state them, with a single-parent record with no section refused; the line diff trimmed, bounded and over-reading in place of refusing, the 1 MiB bound and its reason withdrawn.

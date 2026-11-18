@@ -657,7 +657,7 @@ def test_r087_a_real_binary_is_counted_and_never_read_however_git_shows_it(tmp_p
     the note counts it without naming it."""
     s = Scratch(tmp_path)
     _force(s, how)
-    s.commit({"img/blob.bin": BINARY, "img/other.bin": BINARY[::-1] + b"\x00"})
+    s.commit({"img/blob.bin": BINARY, "img/other.bin": b"\x00" + BINARY[::-1]})   # never begins with a byte-order mark
     if how is not None:
         assert "@@" in _shown(s), "precondition: git shows the binary as hunks"
     rc, out = s.run()
@@ -673,7 +673,7 @@ def test_r087_a_real_binary_a_merge_writes_is_counted_and_never_read(tmp_path, h
     the merge's)."""
     s = Scratch(tmp_path, base_files={"blob.bin": bytes(range(256)) * 8})
     s.git("checkout", "-q", "-b", "side")
-    s.commit({"blob.bin": bytes(range(255, -1, -1)) * 8}, message="side")
+    s.commit({"blob.bin": bytes(range(254, -1, -1)) * 8}, message="side")   # FE FD: not a byte-order mark
     s.git("checkout", "-q", "main")
     s.commit({"blob.bin": bytes(range(128)) * 16}, message="main")
     _force(s, how)
@@ -869,16 +869,15 @@ def test_r087_a_commit_s_attribute_never_decides_how_a_large_text_file_is_read(t
     assert rc == 1 and hits(out) == [hit(h, "line big.md:80001", "path")], out
 
 
-def test_r087_a_large_text_file_a_local_setting_shows_as_binary_ends_the_scan(tmp_path):
-    """R-087 (round 5): a text file above 1 MiB that a local setting shows as binary needs a line diff the scan bounds
-    by size: the scan ends with exit 2 and the reason `a file too large to compare`, never a pass."""
+def test_r087_a_large_text_file_a_local_setting_shows_as_binary_is_read(tmp_path):
+    """R-087 (round 6, the second resolution withdrew round 5's 1 MiB refusal): a text file above 1 MiB that a local
+    setting shows as binary is read by the trimmed line diff, its added line a hit, never a refusal."""
     s = Scratch(tmp_path, base_files={"big.md": LARGE})
     _force(s, "info-nodiff")
-    s.commit({"big.md": LARGE + DRIVE_FWD + "\n"})
+    h = s.commit({"big.md": LARGE + DRIVE_FWD + "\n"})
     assert "Binary files" in _shown(s), "precondition: git shows the file as binary"
     rc, out = s.run()
-    assert rc == 2 and "push-scan: CANNOT SCAN - a file too large to compare" in out, out
-    assert hits(out) == [] and "push-scan: OK" not in out, out
+    assert rc == 1 and hits(out) == [hit(h, "line big.md:80001", "path")], out
 
 
 def test_r087_no_attribute_decides_and_ids_are_full():
@@ -890,3 +889,197 @@ def test_r087_no_attribute_decides_and_ids_are_full():
     assert "--attr-source" in src and "core.attributesFile=" in src, src[:0]
     assert "--full-index" in src and "--no-abbrev" in src and "--raw" in src
     assert '"--text"' not in src and "'--text'" not in src
+
+
+# ---------------------------------------------------------------- round 6: the second resolution (round 5's regressions)
+
+@pytest.mark.parametrize("tail", ["", "x"])
+def test_r087_a_byte_order_mark_before_plain_text_never_hides_its_lines(tmp_path, tail):
+    """R-087 (round 6, F1): a file whose first two bytes are a UTF-16 byte-order mark but whose rest is plain text (git
+    shows it as text) is read without its NULs, so its path line is a hit, whatever the length parity."""
+    s = Scratch(tmp_path)
+    h = s.commit({"notes.txt": b"\xff\xfe" + ("hello\nsee " + DRIVE_FWD + "\n" + tail).encode("ascii")})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line notes.txt:2", "path")], out
+
+
+@pytest.mark.parametrize("tail", ["", "x"])
+def test_r087_a_utf16_file_appended_in_another_encoding_is_read(tmp_path, tail):
+    """R-087 (round 6, F1): Windows PowerShell 5.1 writes UTF-16 with a byte-order mark and another shell's `>>`
+    appends UTF-8: the appended path line is read, never counted as binary, whatever the length parity."""
+    s = Scratch(tmp_path)
+    data = b"\xff\xfe" + "Directory: x\r\n".encode("utf-16-le") + ("see " + DRIVE_FWD + "\r\n" + tail).encode("ascii")
+    h = s.commit({"out.txt": data})
+    assert "Binary files" in _shown(s), "precondition: git shows the mixed file as binary"
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line out.txt:2", "path")], out
+    assert "binary file(s) not read" not in out, out
+
+
+@pytest.mark.parametrize("with_path", [True, False])
+def test_r087_utf16_appended_at_an_odd_offset_is_read(tmp_path, with_path):
+    """R-087 (round 6, F1, Review A's sequence): PowerShell `>` (UTF-16LE with a mark), an odd-length `>>` of plain
+    bytes, then a PowerShell `>>` appending UTF-16LE at an odd offset: the path is read (a hit at line 3); without it
+    the scan passes with no note."""
+    s = Scratch(tmp_path)
+    last = (DRIVE_FWD if with_path else "plain") + "\r\n"
+    data = b"\xff\xfe" + "hello\r\n".encode("utf-16-le") + b"ab\n" + last.encode("utf-16-le")
+    h = s.commit({"f.txt": data})
+    rc, out = s.run()
+    if with_path:
+        assert rc == 1 and hits(out) == [hit(h, "line f.txt:3", "path")], out
+    else:
+        assert rc == 0 and hits(out) == [] and "binary file(s) not read" not in out, out
+
+
+@pytest.mark.parametrize("with_path", [False, True])
+def test_r087_a_clean_merge_of_a_large_text_file_passes(tmp_path, with_path):
+    """R-087 (round 6, F2): a clean merge where both branches changed a text file over 1 MiB in different places adds
+    no line against both parents, so git prints no section for it and the scan reads nothing there: OK, never refused;
+    its twin, a merge adding a path line against both parents, is a hit."""
+    lines = ["plain line %06d\n" % n for n in range(80000)]
+    s = Scratch(tmp_path, base_files={"lock.json": "".join(lines)})
+    s.git("checkout", "-q", "-b", "side")
+    side = list(lines)
+    side[1] = "side line\n"
+    s.commit({"lock.json": "".join(side)}, message="side")
+    s.git("checkout", "-q", "main")
+    main = list(lines)
+    main[-2] = "main line\n"
+    s.commit({"lock.json": "".join(main)}, message="main")
+    if with_path:
+        both = list(lines)
+        both[1] = "side line\n"
+        both[-2] = "main line\n"
+        both[40000] = DRIVE_FWD + "\n"
+        h = _merge_ours_then(s, {"lock.json": "".join(both)})
+    else:
+        s.git("merge", "-q", "--no-ff", "-m", "merge", "side")
+    rc, out = s.run()
+    if with_path:
+        assert rc == 1 and hits(out) == [hit(h, "line lock.json:40001", "path")], out
+    else:
+        assert rc == 0 and hits(out) == [] and "push-scan: OK - 3 commit(s)" in out, out
+
+
+def test_r087_an_octopus_re_adding_a_parent_s_line_elsewhere_is_read(tmp_path):
+    """R-087 (round 6, F2): an octopus merge that adds again, at a new position, a line one parent holds is a line added
+    against every parent: git prints it and the scan reads it, a hit."""
+    line = "see " + DRIVE_FWD
+    s = Scratch(tmp_path, base_files={"m.md": "a\nb\nc\n"})
+    s.git("checkout", "-q", "-b", "o1")
+    o1 = s.commit({"m.md": line + "\na\nb\nc\n"}, message="o1")
+    s.git("checkout", "-q", "-b", "o2", "main")
+    s.commit({"o2.md": "x\n"}, message="o2")
+    s.git("checkout", "-q", "main")
+    s.git("merge", "-q", "--no-ff", "--no-commit", "-s", "ours", "o1", "o2")
+    s.write({"m.md": line + "\na\nb\nc\n" + line + "\n", "o2.md": "x\n"})
+    s.git("add", "-A")
+    s.git("commit", "-q", "-m", "octopus")
+    h = s.git("rev-parse", "--short", "HEAD")
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == sorted([hit(o1, "line m.md:1", "path"), hit(h, "line m.md:5", "path")]), out
+
+
+def test_r087_type_changes_to_and_from_a_submodule_are_read(tmp_path):
+    """R-087 (round 6, F3): a result of mode 160000 is a submodule whatever the status: a file made a submodule, a
+    symbolic link made a submodule, and a submodule made a file are read without asking for a blob of a commit id, the
+    file's path line a hit."""
+    s = Scratch(tmp_path, base_files={"lib": "plain\n", "ln": "plain\n"})
+    _index_add(s, "ln", text="lib", mode="120000")
+    s.git("commit", "-q", "-m", "symlink")
+    _index_add(s, "lib", mode="160000", sha=s.base)
+    _index_add(s, "ln", mode="160000", sha=s.base)
+    s.git("commit", "-q", "-m", "to submodules")
+    assert s.git("show", "--format=", "--raw", "HEAD").count(" T\t") == 2, "precondition: two type changes"
+    _index_add(s, "lib", text="plain\n" + DRIVE_FWD + "\n")
+    s.git("commit", "-q", "-m", "back to a file")
+    h = s.git("rev-parse", "--short", "HEAD")
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line lib:2", "path")], out
+
+
+@pytest.mark.parametrize("result", ["submodule", "file"])
+def test_r087_a_merge_between_a_file_and_a_submodule_is_read(tmp_path, result):
+    """R-087 (round 6, F3): a merge where one parent has a file and the other a submodule is a combined status: a
+    submodule result is read as a submodule, never as a blob; a file result holding a path is a hit."""
+    s = Scratch(tmp_path, base_files={"lib": "plain\n"})
+    s.git("checkout", "-q", "-b", "side")
+    _index_add(s, "lib", mode="160000", sha=s.base)
+    s.git("commit", "-q", "-m", "side")
+    s.git("checkout", "-q", "-f", "main")
+    s.commit({"lib": "plain\nmain\n"}, message="main")
+    other = s.git("rev-parse", "HEAD")   # a gitlink differing from side's, so the merge lists the path
+    s.git("merge", "-q", "--no-ff", "--no-commit", "-s", "ours", "side")
+    if result == "submodule":
+        _index_add(s, "lib", mode="160000", sha=other)
+    else:
+        _index_add(s, "lib", text="plain\nmerged\n" + DRIVE_FWD + "\n")
+    s.git("commit", "-q", "-m", "merge")
+    h = s.git("rev-parse", "--short", "HEAD")
+    assert s.git("show", "--format=", "--raw", "HEAD").startswith("::"), "precondition: a combined record"
+    rc, out = s.run()
+    if result == "submodule":
+        assert rc == 0 and hits(out) == [] and "push-scan: OK - 3 commit(s)" in out, out
+    else:
+        assert rc == 1 and hits(out) == [hit(h, "line lib:3", "path")], out
+
+
+def test_r087_a_one_line_edit_of_a_large_utf16_file_is_read(tmp_path):
+    """R-087 (round 6, F4): the line diff trims the common leading and trailing lines, so a one-line edit of an ordinary
+    UTF-16 file of 7,100 unique lines (about 0.7 MB) is read quickly and never refused."""
+    lines = ["entry %05d of the exported list, padded to fifty chars\r\n" % n for n in range(7100)]
+    s = Scratch(tmp_path, base_files={"list.txt": b"\xff\xfe" + "".join(lines).encode("utf-16-le")})
+    new = list(lines)
+    new[3500] = DRIVE_BACK + "\r\n"
+    h = s.commit({"list.txt": b"\xff\xfe" + "".join(new).encode("utf-16-le")})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line list.txt:3501", "path")], out
+
+
+def test_r087_a_middle_too_costly_to_diff_is_read_whole(tmp_path):
+    """R-087 (round 6, F4): content shaped to make the line diff slow (thousands of short repeated lines) is never
+    diffed past the work bound: the whole changed middle counts as added, so a path inside it is a hit, never a
+    refusal and never a hang."""
+    pre = ["abcd"[n % 4] + "\r\n" for n in range(9000)]
+    res = ["abcd"[(n * 7) % 4] + "\r\n" for n in range(9000)]
+    res[4500] = DRIVE_BACK + "\r\n"
+    s = Scratch(tmp_path, base_files={"many.txt": b"\xff\xfe" + "".join(pre).encode("utf-16-le")})
+    h = s.commit({"many.txt": b"\xff\xfe" + "".join(res).encode("utf-16-le")})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line many.txt:4501", "path")], out
+
+
+def test_r087_a_non_ascii_name_in_a_utf16_file_is_read(tmp_path):
+    """R-087 (round 6, L1): a name holding a letter outside ASCII is read in a UTF-16 file through its UTF-16 view (the
+    NUL-removed view cannot spell it), a hit at its line, and the name is never printed."""
+    accented = "Z" + chr(0xF6) + "lvarin"
+    s = Scratch(tmp_path, names=(EXTRA, SHORT, accented))
+    h = s.commit({"list.txt": b"\xff\xfe" + ("plain\r\nby " + accented + "\r\n").encode("utf-16-le")})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line list.txt:2", "name")], out
+    silent(out, also=[accented])
+
+
+def test_r087_a_far_edit_of_a_large_repetitive_file_does_not_read_an_old_line(tmp_path):
+    """R-087 (round 6, L4): the common leading and trailing lines are trimmed before the work bound, so a one-line edit
+    far from a path line the parent already holds, in a large file of repeated lines, reads only the edit: no hit."""
+    pre = ["abcd"[n % 4] + "\r\n" for n in range(9000)]
+    pre[9] = DRIVE_BACK + "\r\n"
+    res = list(pre)
+    res[8000] = "zz\r\n"
+    s = Scratch(tmp_path, base_files={"many.txt": b"\xff\xfe" + "".join(pre).encode("utf-16-le")})
+    s.commit({"many.txt": b"\xff\xfe" + "".join(res).encode("utf-16-le")})
+    rc, out = s.run()
+    assert rc == 0 and hits(out) == [] and "push-scan: OK - 1 commit(s)" in out, out
+
+
+def test_r087_a_binary_beginning_with_a_byte_order_mark_is_read_not_counted(tmp_path):
+    """R-087 (round 6, L1 and its accepted limit): a blob whose first two bytes are a UTF-16 byte-order mark is read in
+    both views and never counted as binary, even where its bytes are a real binary's; with no path-shaped run in it,
+    the scan passes with no note."""
+    s = Scratch(tmp_path)
+    s.commit({"marked.bin": b"\xff\xfe" + bytes(range(256)) * 4})
+    rc, out = s.run()
+    assert rc == 0 and hits(out) == [] and "push-scan: OK - 1 commit(s)" in out, out
+    assert "binary file(s) not read" not in out, out
