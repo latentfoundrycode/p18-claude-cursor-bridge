@@ -1306,10 +1306,57 @@ def test_r087_a_name_holding_a_compatibility_letter_is_found_written_plainly(tmp
 
 
 def test_r087_a_name_s_letters_before_another_letter_s_mark_are_no_hit(tmp_path):
-    """R-087 (round 9, the builder's uncaught mutant W3): j with a caron (U+01F0) folds to j and a combining caron,
-    which the last normalization composes back, so a name ending in a plain j is not found in a word ending in that
-    other letter."""
+    """R-087 (round 9, the builder's uncaught mutant W3): the precomposed j with a caron (U+01F0) folds to j and a
+    combining caron, which the last normalization composes back, so a name ending in a plain j is not found in a word
+    ending in that precomposed letter (written as j and a separate combining caron, the text as written holds the name
+    as a whole word and is a hit: HARDENING, TASK-067)."""
     s = Scratch(tmp_path, names=("Tovarj",))
     s.commit({"notes.md": "by Tovar\u01f0 today\n"})
     rc, out = s.run()
     assert rc == 0 and hits(out) == [] and "push-scan: OK - 1 commit(s)" in out, out
+
+
+# ---------------------------------------------------------------- the fourth resolution: a reading never hides a name
+
+@pytest.mark.parametrize("written", [
+    EXTRA + "\u2122",
+    "\u2116" + EXTRA,
+    EXTRA + "\u0345",
+    EXTRA + "\u0301",
+    "\u24d0" + EXTRA,
+], ids=["trade-mark-after", "numero-before", "ypogegrammeni-after", "acute-after", "circled-a-before"])
+def test_r087_a_name_beside_a_character_folding_turns_into_letters_is_found(tmp_path, written):
+    """R-087 (the fourth resolution, round 9's regression H1): the name is a whole word of the text as written, so it is
+    found whatever folding would make of the character beside it (round 8 found each; round 9's folded reading alone
+    did not)."""
+    s = Scratch(tmp_path)
+    h = s.commit({"notes.md": "by " + written + " today\n"})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line notes.md:1", "name")], out
+    silent(out)
+
+
+@pytest.mark.parametrize("name,written", [
+    ("Ilker" + "son", "\u0130LKER" + "SON"),
+    ("Ilker" + "son", "\u0131lker" + "son"),
+    ("\u0130lker" + "son", "ilker" + "son"),
+], ids=["dotted-capital-in-text", "dotless-in-text", "dotted-capital-in-names-file"])
+def test_r087_a_name_whose_i_is_written_dotted_or_dotless_is_found(tmp_path, name, written):
+    """R-087 (the fourth resolution, round 9's regression H2): the engine's case rule matches a capital I with a dot
+    and a dotless i to i, which case folding does not; the reading of the text as written keeps both directions found."""
+    s = Scratch(tmp_path, names=(name,))
+    h = s.commit({"notes.md": "by " + written + " today\n"})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line notes.md:1", "name")], out
+    silent(out, also=(name,))
+
+
+def test_r087_a_punctuated_name_in_a_folding_only_spelling_is_found(tmp_path):
+    """R-087 (the fourth resolution, Review A's vote): a names-file name holding a hyphen and a sharp s, written with SS,
+    is found by the folded reading, the hyphen kept on both sides."""
+    name = SHARP_NAME + "-Smith"
+    s = Scratch(tmp_path, names=(name,))
+    h = s.commit({"notes.md": "by KELSSOVAN-SMITH today\n"})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line notes.md:1", "name")], out
+    silent(out, also=(name,))
