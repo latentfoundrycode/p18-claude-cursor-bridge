@@ -2,11 +2,11 @@
 
 Round cause: security
 
-This snapshot is the pull request's review of the increment as round 8 left it: run/review/REVIEW-TASK-067-r6.diff is the whole change against origin/main. The ruled behaviour is below; rounds 7 and 8 and the third resolution round are in docs/CHANGES.md (the two top entries) and handoff/RESOLUTION-TASK-067.md (from the heading 'The third resolution' to its end).
+This snapshot is the fourth resolution round's vote, not a review of a fix: read handoff/RESOLUTION-TASK-067.md from the heading 'The fourth resolution' to its end, and round 9's change, run/review/REVIEW-TASK-067-r7.diff (round 9's tree, the supervisor's two cases and the question, against 19dc493, the round-9 brief's commit, which holds round 8's code). The sections below describe the increment as round 8 left it; round 9 adds the folded name match (docs/CHANGES.md, the top entry).
 
-Blocking class: security - on round 7's code (4b02924), an ISO-2022-JP or ISO-2022-KR file line, or a message with no encoding header, holding a drive or /Users/ path whose first segment the encoding's shift (ESC or SO) begins, printed OK; round 8's builder was launched on 4b02924; Review A and the security audit of round 8 each confirmed it on round 7's code.
+Blocking class: security - Review B, the pull request's round on round 8's tree (snapshot TASK-067-r6): a searched name holding a sharp s written SS in a commit's added line printed OK on round 8's code; round 9's builder was launched on 19dc493, its brief's commit, which holds round 8's code; both reviewers of round 9 confirmed it.
 
-The class lines of the earlier rounds were all security (rounds 3 to 8: round 3 at the ceiling, rounds 4 to 8 above it; each confirmed by Review A and the security audit on the round before). Rounds 5, 6 and 8 were each preceded by a resolution round (decide.md's Stop), because the round before had caused a regression; round 7 was lifted by Review B's finding on round 6 (a drive path whose first segment begins with a non-ASCII letter, under i18n.commitEncoding=ISO-8859-1, passed). The decisions are the TASK-067 entries of docs/CHANGES.md dated 2026-11-18 and handoff/RESOLUTION-TASK-067.md.
+The class lines of the earlier rounds were all security (rounds 3 to 9: round 3 at the ceiling, rounds 4 to 9 above it; each confirmed by Review A and the security audit on the round before). Rounds 5, 6 and 8 were each preceded by a resolution round (decide.md's Stop), because the round before had caused a regression; round 7 was lifted by Review B's finding on round 6, and round 9 by Review B's finding on round 8. The decisions are the TASK-067 entries of docs/CHANGES.md dated 2026-11-18 and handoff/RESOLUTION-TASK-067.md.
 
 ## Where the increment ends
 

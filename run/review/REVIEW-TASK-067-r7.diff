@@ -1,0 +1,434 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 8687bb0..09198b9 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.11.12a",
+-  "generated": "2026-11-18 13:03",
++  "generated": "2026-11-18 16:51",
+   "files": {
+     "agents/cursor-configurator.md": "a8aad7838a9bc5b4f00e13fd3749919158cbe37ec7acfa9a40960600398784bc",
+     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
+@@ -90,7 +90,7 @@
+     "cursor-bridge/permission-guard.py": "6e85731afcca3f8fa4a71c80a3501d9875c7f4f470128ca3f10f8e089db6c31a",
+     "cursor-bridge/plan-check.py": "f8167ac2793c34c7cd8ea8c5fe96ab24937dae28f8051709b9b9f6b248139405",
+     "cursor-bridge/pr-activity-check.py": "7b6f59a14a52c34d14222939d5af52f677e7494e9008d702e3a5bb0bdb8a8768",
+-    "cursor-bridge/push-scan.py": "b4923af747efcf0618b5847fe38ce97f1123ae0ce9ad3c8d8fdf73848b51c2cc",
++    "cursor-bridge/push-scan.py": "236111b60a4954a354a342eccb6fd41db1eb323487822f1c468c4299a8c8eea1",
+     "cursor-bridge/records-check.py": "6c5ec6e7aef58c634096bc0bf8ed94415e62d16c6a173be166d1f22d445dcd69",
+     "cursor-bridge/records-migrate.py": "cbe6acb95d7d64e7ad8086754bed108511458e2de32c387433928e1f6e8470b4",
+     "cursor-bridge/refactor-check.py": "4950674a1de1bccf2ac95a4bcec6ab5cc767f1c0a171c01cf164891d1c7d7c36",
+diff --git a/bridge/cursor-bridge/push-scan.py b/bridge/cursor-bridge/push-scan.py
+index 2c7906d..19908a7 100644
+--- a/bridge/cursor-bridge/push-scan.py
++++ b/bridge/cursor-bridge/push-scan.py
+@@ -130,12 +130,17 @@ def has_path(text):
+     return False
+ 
+ 
++def _caseless(text):
++    return unicodedata.normalize("NFKC", unicodedata.normalize("NFKC", text).casefold())
++
++
+ def has_name(text, names):
++    folded = _caseless(text)
+     for name in names:
+         if not name:
+             continue
+-        pattern = re.compile("(?<![^\\W_])" + re.escape(name) + "(?![^\\W_])", re.IGNORECASE)
+-        if pattern.search(text):
++        pattern = re.compile("(?<![^\\W_])" + re.escape(_caseless(name)) + "(?![^\\W_])")
++        if pattern.search(folded):
+             return True
+     return False
+ 
+diff --git a/docs/BUILDER_NOTES.md b/docs/BUILDER_NOTES.md
+index 02e82c9..d7b0de9 100644
+--- a/docs/BUILDER_NOTES.md
++++ b/docs/BUILDER_NOTES.md
+@@ -88,3 +88,5 @@
+ 2026-11-18 TASK-067-r7: a path whose first segment is a byte UTF-8 replaces with U+FFFD is still found by the widened segment rule when the commit object is decoded as UTF-8, so ignoring the `encoding` header still passes the ISO-8859-1 path cases; the non-ASCII name case is what requires that header.
+ 
+ 2026-11-18 TASK-067-r8: Python's `iso2022_jp` encoder writes ESC `$` `B` (bytes 1B 24 42) directly after a path separator before the non-ASCII segment, and the round-8 ISO-2022-KR file line (one designation, then the encoder's shift) puts SO (byte 0E) directly after the separator, so dropping only ESC fails the three JP cases and dropping only SO fails the KR file line.
++
++2026-11-18 TASK-067-r9: the outer NFKC is what keeps a character whose case fold is a letter plus a combining mark (U+01F0 folds to j plus U+030C) one word character; without it Python's `re` treats the mark as a boundary, so the base letters match as a whole word. The inner NFKC has to run before `casefold`, or a modifier letter such as U+1D2C becomes a capital letter (NFKC after `casefold` yields `A`) and misses the ASCII spelling.
+diff --git a/handoff/RESOLUTION-TASK-067.md b/handoff/RESOLUTION-TASK-067.md
+index fa57ccc..538a1c1 100644
+--- a/handoff/RESOLUTION-TASK-067.md
++++ b/handoff/RESOLUTION-TASK-067.md
+@@ -187,3 +187,32 @@ Review A measured four copies (round 6, round 7, round 7 with M2 withdrawn, and
+ ## The decision on the third resolution
+ 
+ Review A's proposal, with Review B's routes named in the limit (docs/CHANGES.md, "2026-11-18 TASK-067: the encoding header withdrawn, ESC and SO begin a segment, the third resolution round (R-087)"): M2 withdrawn (the commit object read as UTF-8 with replacement, as in rounds 1 to 6; the identity exemption from that reading, as before); M1 stays; ESC and SO also begin a segment; the limits stated in full. Review B's union reading is not taken: every route it would close in a header-labelled message stays open in a file, where no header exists, so a commit made to hide a path loses nothing by it, while the reading adds a codec the commit chooses.
++
++# The fourth resolution: round 9's regression (2026-11-18)
++
++## The question
++
++Review B, the pull request's round on round 8's tree (snapshot TASK-067-r6), rejected it: a searched name holding a sharp s, written `SS` in a commit's added line, passed, because `has_name` matched with `re.IGNORECASE`, which folds one character to one. The supervisor decided (docs/CHANGES.md, the top entry): a name is found where the text and the name are equal under Unicode's compatibility caseless matching (each side NFKC, `casefold`, NFKC), searched as a whole word with the existing boundaries on the folded text. Round 9 (handoff/TASK-067-r9.md) built exactly that (`_caseless` and `has_name`, push-scan.py 133-147); both reviewers confirmed its class line on round 8's code, and both rejected it on a regression round 9 caused. A fix that regresses is not lifted by a class line (decide.md, "Stop"). How should the name match be corrected so that nothing round 8 found is lost and round 9's five spellings are still found?
++
++## The findings (bridge/cursor-bridge/push-scan.py at this file's commit, round 9's tree)
++
++- **H1 (security, a regression; both reviewers).** Folding the whole text changes the characters around a name, and the whole-word test is judged on the changed text: NFKC turns many symbols into letters, so a name directly beside one is no longer a whole word. Reproduced end to end, round 8 HIT and round 9 OK: a name followed by U+2122 (trade mark sign), U+2120, U+2121 or U+1F130; U+2116 (numero) or U+24D0 (circled a) before a name; a name followed by U+0345 (a combining mark that folds to iota) or by U+0301 (which NFKC composes into the name's last letter). Sweeps of every code point: Review A counted 785 characters after a name and 773 before it that round 8 catches and round 9 misses; the security audit 894 characters that are neither letter, digit nor mark but fold to contain one.
++- **H2 (security, a regression; the security audit).** `re.IGNORECASE` matches U+0130 (capital I with a dot) and U+0131 (dotless i) to `i`; `casefold` does not. A name `Ilker` written `ILKER` with a dotted capital, or `lker` after a dotless i, and a names-file name holding U+0130 written with a plain `I`: round 8 HIT, round 9 OK. A sweep against the 26 ASCII letters found exactly these two characters.
++- **Advisory (the security audit).** NFKC is quadratic on hostile text in CPython 3.12 (Unicode 15.0): alternating combining marks, 160k characters 4.9 s, 320k 20.3 s; U+FDFA repeated, 200k 6.5 s; round 8 was linear. A hang, never a pass. A spelling only folding equates beside one of H1's symbols (`KELSSOVAN` and U+2122) is missed by round 8 and round 9 alike.
++- **Held.** The supervisor reproduced every H1 and H2 case in process (run/supervisor/probe_r9_audit_067.py): round 8 finds all nine, round 9 none, the union of the two all nine; round 9's own sharp s case is found by round 9 and the union only. Round 9's builder's own mutants W2 and W3 (an NFKC pass dropped) survived its cases; the supervisor added one case for each (a name holding U+1D2C written plainly; a name ending in `j` beside j with a caron, no hit), each failing under its mutant and passing on round 9 (Review A).
++
++## The supervisor's proposal: the union, as both reviewers proposed
++
++1. **`has_name` returns true where round 8's match or the folded match finds a name**: round 8's pattern on the text as written with `re.IGNORECASE`, exactly as round 8 had it, or round 9's pattern on the folded text with the folded name. Each only adds hits, so nothing round 8 found is lost (H1 and H2 closed by construction) and round 9's five spellings stay found.
++2. **R-087's wording** changes from "a name is found where the text and the name are equal under Unicode's compatibility caseless matching" to "a name is found as a whole word in the text as written in any letter case, or as a whole word where the text and the name are equal under Unicode's compatibility caseless matching".
++3. **Leads** (docs/HARDENING.md): a spelling only folding equates beside a symbol that folds to letters (both readings miss it); NFKC's cost on hostile text (a hang, not a pass; UAX #15's stream-safe format bounds runs of combining marks); the folded reading's dependence on the interpreter's Unicode version.
++4. **Cases.** A name followed by U+2122; U+2116 before a name; a name followed by U+0345; a name followed by U+0301; `ILKER` with a dotted capital I for the name `Ilker`; each a hit.
++
++## Alternatives to weigh
++
++- **A (the security audit's raw-boundary variant).** Before folding, replace every character of the text as written that is not a letter, digit or combining mark with a space, then fold and search, and take the union with round 8's match. It also closes `KELSSOVAN` beside U+2122 (the lead in 3), at the cost of a second transformation whose own boundary cases (a mark that folds to a letter, such as U+0345, is kept and still joins the name) would need their own cases.
++- **B.** Fold per word of the text as written (split at characters that are not word characters, fold each word, compare whole words to the folded name). The boundary is then always the raw one; a name holding punctuation or spanning a split needs its own rule.
++
++## What the vote should engage
++
++Whether the union leaves any route by which a spelling round 8 or round 9 found is now missed; whether the lead in 3 (a folding-only spelling beside a symbol that folds to letters) is acceptable as a lead, or A's added transformation is worth its own boundary cases; whether the cost advisory needs a bound in this round (it is a hang, never a pass) or is a lead; and anything the proposal's wording of R-087 gets wrong.
+diff --git a/handoff/TASK-067-r9-report.md b/handoff/TASK-067-r9-report.md
+new file mode 100644
+index 0000000..01f2709
+--- /dev/null
++++ b/handoff/TASK-067-r9-report.md
+@@ -0,0 +1,305 @@
++# TASK-067 round 9 report
++
++## Files changed
++
++- `bridge/cursor-bridge/push-scan.py`
++- `bridge/cursor-bridge/MANIFEST.json` (only by `python tools/make-manifest.py`)
++- `docs/BUILDER_NOTES.md` (one dated line)
++- `handoff/TASK-067-r9-report.md` (this file)
++
++`bridge/cursor-bridge/VERSION` was rewritten by `make-manifest.py` and restored with `git restore`. It is not listed by `git status --short`. `docs/CHANGES.md` and this brief do not disagree.
++
++## Summary
++
++`has_name` now folds the text and each searched name with one helper, NFKC then `str.casefold` then NFKC, and searches that folded name as a whole word in the folded text, using the same lookbehind and lookahead as round 8. The regular-expression case flag is not on that pattern. Nothing else in the program changed.
++
++## P1 and P2
++
++- P1: `_caseless` (lines 133-134) returns `unicodedata.normalize("NFKC", unicodedata.normalize("NFKC", text).casefold())`. `has_name` (lines 137-145) skips an empty name, folds the text once, folds each remaining name, and searches the folded text with `(?<![^\W_])` and `(?![^\W_])`.
++- P2: the signature `def has_name(text, names):` is unchanged. No reason, output line or note was added. `has_path`, `_segment_start`, `_bound`, `select_names`, `carries_identity`, `deduped_names` and the disagreement check are not in the diff.
++
++## Diff against round 8
++
++Step 12 is one hunk, between the end of `has_path` and `kinds_of`: the new helper, one fold of the text, a fold of the name inside the existing pattern, and the search of the folded text. The body of `has_name` no longer passes `re.IGNORECASE`. The hunk is quoted under step 12.
++
++## Mutation self-check
++
++Each mutant was applied to `push-scan.py`, then `python -m pytest -p no:cacheprovider -q --tb=no tests/test_program_push_scan.py` was run from `<Workspace>`, and the file was restored to the bytes from before that mutant. The Done diffs are that restored program. M7 removes the lookaround, which this round's pattern still carries, so it was re-run as the same edit as W6. N7 replaces `has_name` with the round-1 index match on `text.lower()`, and this round rewrites `has_name`, so N7 was re-run. Every other mutant of rounds 1 to 8 changes code this round did not touch (T1-T10, S1-S16, N1-N6, N8, N9, P1-P6, Q1, M1-M6, M8-M13, U1, U2, V1-V5): code unchanged, not re-run. U3 to U5 no longer apply (round 8 removed `_decode_commit`). Q2 no longer applies (round 5 removed `--text`). The round-5 size-bound mutant no longer applies (round 6 removed the bound). N4 and the expect-survive set S8, S9, S12 and S14 were not re-run.
++
++- W1 `str.casefold` replaced by `str.lower` in `_caseless`: caught by `test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[sharp-s-upper]`.
++- W2 the inner NFKC dropped (`_caseless` case-folds the raw string, then normalizes to NFKC): not caught. A case that would catch it is a searched name of at least four characters holding U+1D2C, written in the commit as the ASCII letters that form gives only when NFKC runs before `casefold`; case-folding first leaves a capital A, so the name misses.
++- W3 the outer NFKC dropped (`_caseless` normalizes to NFKC, then case-folds, and returns that): not caught. A case that would catch it is a searched name that is the base letters of U+01F0, whose case fold is `j` plus U+030C, while the text holds that one character: the outer NFKC composes the mark back into the character, and without it the mark stays and is not a word character in `re`, so the base letters match as a whole word.
++- W4 the name searched as read (only the text folded): caught by `test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[sharp-s-upper]`.
++- W5 the text searched as read (only the name folded): caught by `test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[sharp-s-upper]`.
++- W6 the whole-word lookbehind and lookahead dropped from the pattern: caught by `test_r087_a_name_is_a_whole_word_in_any_letter_case`.
++- M7 the lookaround removed from the folded pattern (same edit as W6): caught by `test_r087_a_name_is_a_whole_word_in_any_letter_case`.
++- N7 the lower-cased index match restored (`has_name` finds in `text.lower()` and reads the neighbours in `text` at that index): caught by `test_r087_a_name_after_a_letter_that_lowercases_to_two_characters_is_found`.
++
++### W1 output
++
++```
++........................................................................ [ 60%]
++..........................................FF....                         [100%]
++=========================== short test summary info ===========================
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[sharp-s-upper]
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[sharp-s-lower]
++2 failed, 118 passed in 109.82s (0:01:49)
++```
++
++Exit 1.
++
++### W2 output
++
++```
++........................................................................ [ 60%]
++................................................                         [100%]
++120 passed in 110.63s (0:01:50)
++```
++
++Exit 0.
++
++### W3 output
++
++```
++........................................................................ [ 60%]
++................................................                         [100%]
++120 passed in 109.52s (0:01:49)
++```
++
++Exit 0.
++
++### W4 output
++
++```
++.......F..F...F.....F...FF.............................................. [ 60%]
++..............F...............F.....F.....FFFFF.                         [100%]
++=========================== short test summary info ===========================
++FAILED tests/test_program_push_scan.py::test_r087_a_path_and_a_name_in_the_message_are_two_hits_at_message
++FAILED tests/test_program_push_scan.py::test_r087_a_name_in_another_committer_is_a_hit_at_committer
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_a_whole_word_in_any_letter_case
++FAILED tests/test_program_push_scan.py::test_r087_owner_2026_11_18_a_searched_name_equal_to_an_identity_name_is_dropped
++FAILED tests/test_program_push_scan.py::test_r087_an_added_line_that_reads_like_a_file_header_is_scanned_in_its_hunk
++FAILED tests/test_program_push_scan.py::test_r087_a_changed_file_with_a_space_in_its_name_is_read_by_its_whole_name
++FAILED tests/test_program_push_scan.py::test_r087_a_non_ascii_name_in_a_utf16_file_is_read
++FAILED tests/test_program_push_scan.py::test_r087_a_non_ascii_name_in_an_ordinary_utf8_message_is_found
++FAILED tests/test_program_push_scan.py::test_r087_an_encoding_header_never_hides_a_name_the_utf8_reading_finds
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[sharp-s-upper]
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[sharp-s-lower]
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[fullwidth]
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[decomposed-in-text]
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[decomposed-in-names-file]
++14 failed, 106 passed in 111.22s (0:01:51)
++```
++
++Exit 1.
++
++### W5 output
++
++```
++.......FF.F...F.....F...FF.............................................. [ 60%]
++..............F...............F.....F.....F.FFF.                         [100%]
++=========================== short test summary info ===========================
++FAILED tests/test_program_push_scan.py::test_r087_a_path_and_a_name_in_the_message_are_two_hits_at_message
++FAILED tests/test_program_push_scan.py::test_r087_a_name_in_another_identity_s_author_name_is_a_hit_at_author
++FAILED tests/test_program_push_scan.py::test_r087_a_name_in_another_committer_is_a_hit_at_committer
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_a_whole_word_in_any_letter_case
++FAILED tests/test_program_push_scan.py::test_r087_owner_2026_11_18_a_searched_name_equal_to_an_identity_name_is_dropped
++FAILED tests/test_program_push_scan.py::test_r087_an_added_line_that_reads_like_a_file_header_is_scanned_in_its_hunk
++FAILED tests/test_program_push_scan.py::test_r087_a_changed_file_with_a_space_in_its_name_is_read_by_its_whole_name
++FAILED tests/test_program_push_scan.py::test_r087_a_non_ascii_name_in_a_utf16_file_is_read
++FAILED tests/test_program_push_scan.py::test_r087_a_non_ascii_name_in_an_ordinary_utf8_message_is_found
++FAILED tests/test_program_push_scan.py::test_r087_an_encoding_header_never_hides_a_name_the_utf8_reading_finds
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[sharp-s-upper]
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[fullwidth]
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[decomposed-in-text]
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[decomposed-in-names-file]
++14 failed, 106 passed in 111.81s (0:01:51)
++```
++
++Exit 1.
++
++### W6 output
++
++```
++..............F......................................................... [ 60%]
++...............................................F                         [100%]
++=========================== short test summary info ===========================
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_a_whole_word_in_any_letter_case
++FAILED tests/test_program_push_scan.py::test_r087_a_folded_name_inside_a_longer_word_is_still_no_hit
++2 failed, 118 passed in 113.15s (0:01:53)
++```
++
++Exit 1. M7 is this same run.
++
++### N7 output
++
++```
++...............................F........................................ [ 60%]
++..........................................FFFFF.                         [100%]
++=========================== short test summary info ===========================
++FAILED tests/test_program_push_scan.py::test_r087_a_name_after_a_letter_that_lowercases_to_two_characters_is_found
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[sharp-s-upper]
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[sharp-s-lower]
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[fullwidth]
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[decomposed-in-text]
++FAILED tests/test_program_push_scan.py::test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching[decomposed-in-names-file]
++6 failed, 114 passed in 111.42s (0:01:51)
++```
++
++Exit 1.
++
++## Done commands
++
++Counts below belong to commit `19dc493f0fca0468781d908b360864e55db551bf`. At step 13 the working tree held uncommitted changes. This report was written after that status, so its path is not in the step 13 listing.
++
++1. `git status --short`
++
++```
++ M bridge/cursor-bridge/push-scan.py
++ M docs/BUILDER_NOTES.md
++```
++
++Exit 0.
++
++2. `python tools/dump-cli.py --check`
++
++```
++```
++
++Exit 0. No output.
++
++3. `python tools/make-manifest.py`
++
++```
++make-manifest: version 2026.11.12a, 147 files hashed, VERSION + MANIFEST.json written
++```
++
++Exit 0.
++
++4. `git restore bridge/cursor-bridge/VERSION`
++
++```
++```
++
++Exit 0. No output.
++
++5. `python -m pytest -p no:cacheprovider -q -rs --tb=short tests/test_program_push_scan.py tests/test_dump_cli.py tests/test_allowlist.py`
++
++```
++........................................................................ [ 14%]
++........................................................................ [ 29%]
++........................................................................ [ 44%]
++.........s...ss.....sss....................s...............s............ [ 59%]
++...................................s...........s.................s...ss. [ 74%]
++....sss....................s...............s............................ [ 89%]
++...................s...........s.................                        [100%]
++=========================== short test summary info ===========================
++SKIPPED [10] tests\test_allowlist.py:65: prose, not a runnable command
++SKIPPED [10] tests\test_allowlist.py:106: prose, not a runnable command
++461 passed, 20 skipped in 243.83s (0:04:03)
++```
++
++Exit 0.
++
++6. `python -m pytest -p no:cacheprovider -q tests/test_install_check.py tests/test_tests_windowless.py`
++
++```
++.........................                                                [100%]
++25 passed in 24.31s
++```
++
++Exit 0.
++
++7. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++```
++bridge-check: version 2026.11.12a (2026-11-18 16:51) at <Workspace>\bridge
++bridge-check: 147 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.12a
++```
++
++Exit 0.
++
++8. `git grep -n -I -E --no-index "[A-Za-z]:[/\\]|/Users/|/home/|AppData" -- bridge/cursor-bridge/push-scan.py`
++
++```
++```
++
++No output. Exit 1.
++
++9. `python -c "open('bridge/cursor-bridge/push-scan.py','rb').read().decode('ascii'); print('ascii ok')"`
++
++```
++ascii ok
++```
++
++Exit 0.
++
++10. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++
++```
++windowless-check: 40 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++Exit 0.
++
++11. `git diff --stat HEAD -- bridge/cursor-bridge/settings.bridge.json`
++
++```
++```
++
++No output. Exit 0.
++
++12. `git diff HEAD -- bridge/cursor-bridge/push-scan.py`
++
++```
++warning: in the working copy of 'bridge/cursor-bridge/push-scan.py', LF will be replaced by CRLF the next time Git touches it
++diff --git a/bridge/cursor-bridge/push-scan.py b/bridge/cursor-bridge/push-scan.py
++index 2c7906d..19908a7 100644
++--- a/bridge/cursor-bridge/push-scan.py
+++++ b/bridge/cursor-bridge/push-scan.py
++@@ -130,12 +130,17 @@ def has_path(text):
++     return False
++ 
++ 
+++def _caseless(text):
+++    return unicodedata.normalize("NFKC", unicodedata.normalize("NFKC", text).casefold())
+++
+++
++ def has_name(text, names):
+++    folded = _caseless(text)
++     for name in names:
++         if not name:
++             continue
++-        pattern = re.compile("(?<![^\\W_])" + re.escape(name) + "(?![^\\W_])", re.IGNORECASE)
++-        if pattern.search(text):
+++        pattern = re.compile("(?<![^\\W_])" + re.escape(_caseless(name)) + "(?![^\\W_])")
+++        if pattern.search(folded):
++             return True
++     return False
++ 
++```
++
++Exit 0.
++
++13. `git rev-parse HEAD` and `git status --short`
++
++```
++19dc493f0fca0468781d908b360864e55db551bf
++```
++
++Exit 0.
++
++```
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/push-scan.py
++ M docs/BUILDER_NOTES.md
++```
++
++Exit 0. `bridge/cursor-bridge/VERSION` is not listed.
++
++## Assumed, not verified
++
++- One pass of NFKC, `casefold` and NFKC is idempotent on every string the scan can see | a second pass that changed the folded form would make a name folded once miss a text folded once | apply the helper to its own result and compare, including the five round-9 strings.
++- Dropping `re.IGNORECASE` after folding does not lose a match, and leaving it on would not add one, for a folded string longer than one character | the flag was removed so the search is exact on the folded strings; the engine's own fold could still pair two different characters inside an already folded string | search the same folded multi-character pairs with and without the flag. A probe of each code point against its own fold found no difference; strings longer than that one character were not compared.
++- `str.casefold` and `unicodedata` use this interpreter's Unicode tables | another Unicode version can fold a character the five cases do not use, so the same source can disagree across interpreters | read `unicodedata.unidata_version` and repeat the five cases, a modifier letter such as U+1D2C, and a character whose case fold is a base letter plus a combining mark, on the other interpreter.
+diff --git a/tests/test_program_push_scan.py b/tests/test_program_push_scan.py
+index e7193d2..948b8e0 100644
+--- a/tests/test_program_push_scan.py
++++ b/tests/test_program_push_scan.py
+@@ -1290,3 +1290,26 @@ def test_r087_a_folded_name_inside_a_longer_word_is_still_no_hit(tmp_path):
+     s.commit({"notes.md": "the KELSSOVANS and xkelssovan\n"})
+     rc, out = s.run()
+     assert rc == 0 and hits(out) == [] and "push-scan: OK - 1 commit(s)" in out, out
++
++
++MODIFIER_NAME = "\u1d2clvarn"
++
++
++def test_r087_a_name_holding_a_compatibility_letter_is_found_written_plainly(tmp_path):
++    """R-087 (round 9, the builder's uncaught mutant W2): a searched name holding a modifier capital A (U+1D2C) is the
++    same name as its plain letters under compatibility caseless matching, which normalizes before it folds."""
++    s = Scratch(tmp_path, names=(MODIFIER_NAME,))
++    h = s.commit({"notes.md": "by alvarn today\n"})
++    rc, out = s.run()
++    assert rc == 1 and hits(out) == [hit(h, "line notes.md:1", "name")], out
++    silent(out, also=(MODIFIER_NAME, "alvarn"))
++
++
++def test_r087_a_name_s_letters_before_another_letter_s_mark_are_no_hit(tmp_path):
++    """R-087 (round 9, the builder's uncaught mutant W3): j with a caron (U+01F0) folds to j and a combining caron,
++    which the last normalization composes back, so a name ending in a plain j is not found in a word ending in that
++    other letter."""
++    s = Scratch(tmp_path, names=("Tovarj",))
++    s.commit({"notes.md": "by Tovar\u01f0 today\n"})
++    rc, out = s.run()
++    assert rc == 0 and hits(out) == [] and "push-scan: OK - 1 commit(s)" in out, out
