@@ -89,7 +89,7 @@ def _bound(ch):
 
 
 def _segment_start(ch):
-    return ch.isalpha() or ch.isdigit() or ch in "_.-" or (not ch.isascii() and not ch.isspace())
+    return ch.isalpha() or ch.isdigit() or ch in "_.-\x1b\x0e" or (not ch.isascii() and not ch.isspace())
 
 
 def has_path(text):
@@ -309,31 +309,6 @@ def split_ident(rest):
     if start < 0 or end < 0 or end < start:
         return rest, ""
     return rest[:start], rest[start + 2:end]
-
-
-def _decode_commit(raw):
-    """The commit object in the encoding its header records, else UTF-8."""
-    chosen = None
-    sample = bytes(range(32, 127)) + b"\n"
-    plain = sample.decode("ascii")
-    for line in raw.split(b"\n"):
-        if line.endswith(b"\r"):
-            line = line[:-1]
-        if line == b"":
-            break
-        if not line.startswith(b"encoding "):
-            continue
-        token = line[len(b"encoding "):]
-        if any(byte < 32 or byte > 126 for byte in token):
-            continue
-        name = token.decode("ascii")
-        try:
-            same = sample.decode(name) == plain
-        except (LookupError, UnicodeError):
-            continue
-        if same:
-            chosen = name
-    return raw.decode(chosen or "utf-8", errors="replace")
 
 
 def parse_commit(text):
@@ -1131,10 +1106,9 @@ def _content_by_path(records, sections, work):
 
 def scan_commit(full, names, cfg_name, cfg_email, empty_tree, hash_len, work):
     short = _checked_short(git_need("rev-parse", ["--short", "--end-of-options", full]))
-    code, commit_raw = git("cat-file", ["-p", "--end-of-options", full])
+    code, commit_text = git_text("cat-file", ["-p", "--end-of-options", full])
     if code != 0:
         raise ScanError("git cat-file failed (exit %d)" % code)
-    commit_text = _decode_commit(commit_raw)
     author, committer, message = parse_commit(commit_text)
     show_options = [
         "--attr-source=" + empty_tree,
