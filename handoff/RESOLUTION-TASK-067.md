@@ -82,3 +82,9 @@ Content decides; how git shows a file never does. Reading a text file that git s
 6. Recorded as accepted in R-087 and DESIGN C2, beside a path compiled into a real binary: a BOM-less text file with a NUL in its first 8000 bytes, and UTF-16 without a BOM, are counted as binary and not read.
 
 Why the set difference for a section git shows as binary: it is the combined diff's own meaning (a line counts when it is new against every parent), and a line present in a parent is either already on the remote or was read when the commit that added it was scanned.
+
+## The second vote and the decision (2026-11-18)
+
+Review B, second turn: the proposal with changes. Its blocking point: a set difference loses a duplicate added line (a parent `P, base`, a result `P, base, P`; git marks the last `P` added), in UTF-16 and in merges and octopus merges too; per-preimage line diffs, position by position, replace it. Its other changes: `--cc` asked for explicitly; the `Binary files` wording relied on nowhere; the raw parser strict (framing, modes, status, id counts, duplicates) with paths compared losslessly; a root commit's one all-zero preimage; the accepted limits stated in full (a BOM-prefixed binary that decodes strictly is read as UTF-16; UTF-32 and other encodings are not decoded). `review-guard.py verify TASK-067-r2`: OK.
+
+The supervisor's decision, with those changes, is recorded in docs/CHANGES.md (2026-11-18, "content decides how the pre-push scan reads a file, a resolution round"); R-087, DESIGN C2 and the plan's TASK-067 entry carry it.

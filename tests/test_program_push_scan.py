@@ -58,7 +58,8 @@ class Scratch:
     a profile folder named PROFILE_NAME holding .cursor-bridge/names.txt, and a global git config holding the
     configured identity."""
 
-    def __init__(self, tmp_path, login=LOGIN, names=(EXTRA, SHORT), remote=True, base_files=None, base_message="base"):
+    def __init__(self, tmp_path, login=LOGIN, names=(EXTRA, SHORT), remote=True, base_files=None, base_message="base",
+                 object_format=None):
         self.home = tmp_path / "profiles" / PROFILE_NAME
         (self.home / ".cursor-bridge").mkdir(parents=True)
         (self.home / ".cursor-bridge" / "names.txt").write_text("".join(n + "\n" for n in names), encoding="utf-8")
@@ -68,7 +69,7 @@ class Scratch:
         self.login = login
         self.repo = tmp_path / "repo"
         self.repo.mkdir()
-        self.git("init", "-q", "-b", "main")
+        self.git("init", "-q", "-b", "main", *([("--object-format=" + object_format)] if object_format else []))
         files = base_files if base_files is not None else {"README.md": "plain\n"}
         self.write(files)
         self.git("add", "-A")
@@ -96,7 +97,7 @@ class Scratch:
         for name, text in files.items():
             path = self.repo / name
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(text.encode("utf-8"))
+            path.write_bytes(text if isinstance(text, bytes) else text.encode("utf-8"))
 
     def commit(self, files=None, message="change", author=None, committer=None, renames=()):
         for old, new in renames:
@@ -601,3 +602,250 @@ def test_r087_a_text_file_the_commit_marks_binary_is_still_read(tmp_path, attrib
     h = s.commit({".gitattributes": "*.md %s\n" % attribute, "notes.md": "plain\n" + DRIVE_FWD + "\n"})
     rc, out = s.run()
     assert rc == 1 and hits(out) == [hit(h, "line notes.md:2", "path")], out
+
+
+# ---------------------------------------------------------------- round 5: content decides how a file is read (the resolution round)
+
+NOTE_ONE = "push-scan: note - 1 binary file(s) not read"
+# a real binary by git's rule (a NUL in its first 8000 bytes) whose bytes hold a path-shaped run on a line of their own
+BINARY = b"\x89PNG\x00\x01\x02\n" + DRIVE_FWD.encode("ascii") + b"\n" + bytes(range(256)) * 4
+
+
+def _info_attributes(s, text):
+    (s.repo / ".git" / "info").mkdir(parents=True, exist_ok=True)
+    (s.repo / ".git" / "info" / "attributes").write_text(text, encoding="utf-8")
+
+
+def _shown(s, rev="HEAD"):
+    """How git itself shows a commit with the user's settings (the precondition each case states before the scan)."""
+    p = subprocess.run(["git", "show", "--format=", "--no-ext-diff", "--no-textconv", "--no-color", rev],
+                       cwd=str(s.repo), capture_output=True, env=s.env(), timeout=120)
+    assert p.returncode == 0, p.stderr
+    return p.stdout.decode("utf-8", errors="replace")
+
+
+def _force(s, how):
+    """A setting that makes git show a file another way than its content: None, or one of the routes."""
+    if how == "committed-diff":
+        s.write({".gitattributes": "*.bin diff\n*.md -diff\n"})
+    elif how == "info-diff":
+        _info_attributes(s, "*.bin diff\n")
+    elif how == "driver-text":
+        _info_attributes(s, "*.bin diff=raw\n")
+        _config(s, '[diff "raw"]\n\tbinary = false\n')
+    elif how == "info-nodiff":
+        _info_attributes(s, "*.md -diff\n")
+    elif how == "info-binary":
+        _info_attributes(s, "*.md binary\n")
+    elif how == "big-file":
+        _config(s, "[core]\n\tbigFileThreshold = 1\n")
+
+
+def _merge_ours_then(s, files, message="merge"):
+    """A merge of the branch side into main whose result is written by hand, so it differs from both parents."""
+    s.git("merge", "-q", "--no-ff", "--no-commit", "-s", "ours", "side")
+    s.write(files)
+    s.git("add", "-A")
+    s.git("commit", "-q", "-m", message)
+    return s.git("rev-parse", "--short", "HEAD")
+
+
+@pytest.mark.parametrize("how", [None, "committed-diff", "info-diff", "driver-text"])
+def test_r087_a_real_binary_is_counted_and_never_read_however_git_shows_it(tmp_path, how):
+    """R-087 (round 5): a file whose content is binary (a NUL in its first 8000 bytes) is never read, even where a
+    commit's .gitattributes, .git/info/attributes or a diff driver makes git show its bytes as hunks: no false hit, and
+    the note counts it without naming it."""
+    s = Scratch(tmp_path)
+    _force(s, how)
+    s.commit({"img/blob.bin": BINARY, "img/other.bin": BINARY[::-1] + b"\x00"})
+    if how is not None:
+        assert "@@" in _shown(s), "precondition: git shows the binary as hunks"
+    rc, out = s.run()
+    assert rc == 0 and hits(out) == [], out
+    assert "push-scan: OK - 1 commit(s)" in out and "push-scan: note - 2 binary file(s) not read" in out, out
+    assert "blob.bin" not in out and "other.bin" not in out, out
+
+
+@pytest.mark.parametrize("how", [None, "info-diff", "driver-text"])
+def test_r087_a_real_binary_a_merge_writes_is_counted_and_never_read(tmp_path, how):
+    """R-087 (round 5): a merge's combined diff is read as an ordinary diff is: a binary the merge writes is counted,
+    never read, however a local setting shows it."""
+    s = Scratch(tmp_path, base_files={"blob.bin": bytes(range(256)) * 8})
+    s.git("checkout", "-q", "-b", "side")
+    s.commit({"blob.bin": bytes(range(255, -1, -1)) * 8}, message="side")
+    s.git("checkout", "-q", "main")
+    s.commit({"blob.bin": bytes(range(128)) * 16}, message="main")
+    _force(s, how)
+    _merge_ours_then(s, {"blob.bin": BINARY})
+    if how is not None:
+        assert "@@@" in _shown(s), "precondition: git shows the merge's binary as combined hunks"
+    rc, out = s.run()
+    assert rc == 0 and hits(out) == [], out
+    assert "push-scan: OK - 3 commit(s)" in out and NOTE_ONE in out, out
+    assert "blob.bin" not in out, out
+
+
+@pytest.mark.parametrize("how", ["info-nodiff", "info-binary", "big-file"])
+def test_r087_a_text_file_a_local_setting_shows_as_binary_is_read(tmp_path, how):
+    """R-087 (round 5): .git/info/attributes and core.bigFileThreshold are local settings that make git show a text
+    file as binary; the scan reads it by its content, its added line a hit at its own line, never a pass and never a
+    refusal."""
+    s = Scratch(tmp_path, base_files={"notes.md": "plain\n"})
+    _force(s, how)
+    h = s.commit({"notes.md": "plain\n" + DRIVE_FWD + "\n"})
+    assert "Binary files" in _shown(s), "precondition: git shows the text file as binary"
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line notes.md:2", "path")], out
+
+
+@pytest.mark.parametrize("how", ["info-nodiff", "info-binary"])
+def test_r087_a_merge_s_resolved_line_in_a_text_file_shown_as_binary_is_read(tmp_path, how):
+    """R-087 (round 5, B1 of round 4): a merge's combined diff ignores --text, so a resolved line in a text file a
+    local setting shows as binary was hidden; the scan reads the file by its content, the resolved line a hit."""
+    s = Scratch(tmp_path, base_files={"m.md": "1\n2\n3\n"})
+    s.git("checkout", "-q", "-b", "side")
+    s.commit({"m.md": "1\nSIDE\n3\n"}, message="side")
+    s.git("checkout", "-q", "main")
+    s.commit({"m.md": "1\nMAIN\n3\n"}, message="main")
+    _force(s, how)
+    h = _merge_ours_then(s, {"m.md": "1\n" + DRIVE_FWD + "\n3\n"})
+    assert "Binary files" in _shown(s), "precondition: git shows the merge's text file as binary"
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line m.md:2", "path")], out
+
+
+def test_r087_a_merge_s_resolved_line_in_a_file_the_commit_marks_binary_is_read(tmp_path):
+    """R-087 (round 5, B1 of round 4): a merge whose own .gitattributes marks a text file `-diff` hides none of its
+    resolved lines."""
+    s = Scratch(tmp_path, base_files={"m.md": "1\n2\n3\n"})
+    s.git("checkout", "-q", "-b", "side")
+    s.commit({"m.md": "1\nSIDE\n3\n"}, message="side")
+    s.git("checkout", "-q", "main")
+    s.commit({"m.md": "1\nMAIN\n3\n", ".gitattributes": "*.md -diff\n"}, message="main")
+    h = _merge_ours_then(s, {"m.md": "1\n" + DRIVE_FWD + "\n3\n"})
+    assert "Binary files" in _shown(s), "precondition: git shows the merge's text file as binary"
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line m.md:2", "path")], out
+
+
+@pytest.mark.parametrize("how", [None, "info-nodiff"])
+def test_r087_a_duplicate_added_line_counts_however_git_shows_the_file(tmp_path, how):
+    """R-087 (round 5): a line added again where the parent already holds it is an added line (git's meaning): read
+    from hunks or by the scan's own line diff, it is a hit at its new line, and the old one is not."""
+    line = "see " + DRIVE_FWD
+    s = Scratch(tmp_path, base_files={"notes.md": line + "\nbase\n"})
+    _force(s, how)
+    h = s.commit({"notes.md": line + "\nbase\n" + line + "\n"})
+    if how is not None:
+        assert "Binary files" in _shown(s), "precondition: git shows the text file as binary"
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line notes.md:3", "path")], out
+
+
+def test_r087_a_duplicate_line_a_merge_adds_against_both_parents_counts(tmp_path):
+    """R-087 (round 5): in a merge a line counts where it is added against every parent, position by position, so a
+    copy of a line each parent holds once, added once more by the merge, is one hit."""
+    line = "see " + DRIVE_FWD
+    s = Scratch(tmp_path, base_files={"m.md": "a\nb\n"})
+    s.git("checkout", "-q", "-b", "side")
+    s.commit({"m.md": line + "\na\nb\n"}, message="side")
+    s.git("checkout", "-q", "main")
+    s.commit({"m.md": "a\nb\n" + line + "\n"}, message="main")
+    _force(s, "info-nodiff")
+    _merge_ours_then(s, {"m.md": line + "\na\nb\n" + line + "\n" + line + "\n"})
+    rc, out = s.run()
+    assert rc == 1, out
+    merge_hits = [x for x in hits(out) if re.match(r"^push-scan: HIT [0-9a-f]+ line m\.md:[45] path$", x)]
+    side_main = [x for x in hits(out) if x not in merge_hits]
+    assert len(merge_hits) == 1 and len(side_main) == 2, out
+
+
+@pytest.mark.parametrize("bom,codec", [(b"\xff\xfe", "utf-16-le"), (b"\xfe\xff", "utf-16-be")])
+def test_r087_a_utf16_file_with_a_byte_order_mark_is_read_as_text(tmp_path, bom, codec):
+    """R-087 (round 5): Windows PowerShell 5.1 writes UTF-16 with a byte-order mark, which git shows as binary; the scan
+    decodes it, so a path on its second line is a hit at that line."""
+    s = Scratch(tmp_path)
+    h = s.commit({"list.txt": bom + ("Directory: x\r\n" + DRIVE_BACK + "\r\n").encode(codec)})
+    assert "Binary files" in _shown(s), "precondition: git shows the UTF-16 file as binary"
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line list.txt:2", "path")], out
+
+
+def test_r087_a_changed_utf16_file_reports_only_its_new_lines(tmp_path):
+    """R-087 (round 5): a changed UTF-16 file is read by its lines added against the parent, so a path the parent
+    already held is not reported again and a new one is a hit at its line."""
+    bom, codec = b"\xff\xfe", "utf-16-le"
+    s = Scratch(tmp_path, base_files={"list.txt": bom + ("one\r\n" + DRIVE_BACK + "\r\n").encode(codec)})
+    h = s.commit({"list.txt": bom + ("one\r\n" + DRIVE_BACK + "\r\ntwo\r\n" + USERS + "\r\n").encode(codec)})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line list.txt:4", "path")], out
+
+
+def test_r087_a_utf16_file_rewritten_as_utf8_is_read_never_refused(tmp_path):
+    """R-087 (round 5): a text file whose parent was binary to git (here UTF-16) shows as binary; the scan reads the new
+    text and never ends the scan for it."""
+    bom, codec = b"\xff\xfe", "utf-16-le"
+    s = Scratch(tmp_path, base_files={"list.txt": bom + "plain\r\n".encode(codec)})
+    h = s.commit({"list.txt": "plain\n" + DRIVE_FWD + "\n"})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line list.txt:2", "path")], out
+
+
+@pytest.mark.parametrize("nul_at,binary", [(7999, True), (8000, False)])
+def test_r087_git_s_content_rule_decides_at_its_8000th_byte(tmp_path, nul_at, binary):
+    """R-087 (round 5): a NUL inside the first 8000 bytes makes a file binary (counted, not read: the accepted limit for
+    a text file holding one); a NUL after them leaves it text, its lines read."""
+    s = Scratch(tmp_path)
+    data = b"x" * nul_at + b"\x00\n" + DRIVE_FWD.encode("ascii") + b"\n"
+    h = s.commit({"data.txt": data})
+    rc, out = s.run()
+    if binary:
+        assert rc == 0 and hits(out) == [] and NOTE_ONE in out, out
+    else:
+        assert rc == 1 and hits(out) == [hit(h, "line data.txt:2", "path")], out
+
+
+def test_r087_entries_without_content_to_read_never_end_the_scan(tmp_path):
+    """R-087 (round 5): a deleted file, a mode change, a pure rename, a symbolic link, a submodule and an octopus merge
+    carry no added text a hit could stand in: the file list and the patch agree and the scan passes."""
+    s = Scratch(tmp_path, base_files={"gone.md": "x\n", "run.sh": "echo\n", "old.md": "same\n"})
+    s.git("rm", "-q", "gone.md")
+    s.git("commit", "-q", "-m", "delete")
+    s.git("update-index", "--chmod=+x", "run.sh")
+    s.git("commit", "-q", "-m", "mode")
+    s.git("mv", "old.md", "new.md")
+    s.git("commit", "-q", "-m", "rename")
+    _index_add(s, "link", text="new.md", mode="120000")
+    _index_add(s, "vendor", mode="160000", sha=s.base)
+    s.git("commit", "-q", "-m", "link and submodule")
+    s.git("checkout", "-q", "-b", "o1")
+    s.commit({"a.md": "a\n"}, message="o1")
+    s.git("checkout", "-q", "-b", "o2", "main")
+    s.commit({"b.md": "b\n"}, message="o2")
+    s.git("checkout", "-q", "main")
+    s.git("merge", "-q", "--no-ff", "-m", "octopus", "o1", "o2")
+    rc, out = s.run()
+    assert rc == 0 and hits(out) == [], out
+    assert "push-scan: OK - 7 commit(s)" in out, out
+
+
+def test_r087_a_sha256_repository_is_read_with_its_own_ids(tmp_path):
+    """R-087 (round 5): ids are the repository's hash length: in a SHA-256 repository the empty tree, the full ids and
+    the content rule work as in a SHA-1 one."""
+    s = Scratch(tmp_path, object_format="sha256", base_files={"notes.md": "plain\n"})
+    _force(s, "info-nodiff")
+    h = s.commit({"notes.md": "plain\n" + DRIVE_FWD + "\n", "blob.bin": BINARY})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line notes.md:2", "path")], out
+    assert NOTE_ONE in out, out
+
+
+def test_r087_no_attribute_decides_and_ids_are_full():
+    """R-087 (round 5): the reads take no tree's attributes (--attr-source of the empty tree, an empty
+    core.attributesFile), read full ids (--full-index on the patch, --no-abbrev on the raw list) and never read every
+    file as text."""
+    with open(PROG, encoding="utf-8") as f:
+        src = f.read()
+    assert "--attr-source" in src and "core.attributesFile=" in src, src[:0]
+    assert "--full-index" in src and "--no-abbrev" in src and "--raw" in src
+    assert '"--text"' not in src and "'--text'" not in src
