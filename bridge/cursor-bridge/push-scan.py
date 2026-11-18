@@ -807,9 +807,6 @@ def quote_path(path):
     return "".join(parts)
 
 
-_LINE_DIFF_MAX = 1024 * 1024
-
-
 def _parent_count(text):
     count = 0
     for line in text.split("\n"):
@@ -864,15 +861,9 @@ def _read_blob(oid):
 
 
 def classify_blob(data):
-    """``utf-16``, ``binary`` or ``text`` from the blob's own bytes."""
+    """``marked``, ``binary`` or ``text`` from the blob's own bytes."""
     if data.startswith(b"\xff\xfe") or data.startswith(b"\xfe\xff"):
-        codec = "utf-16-le" if data.startswith(b"\xff\xfe") else "utf-16-be"
-        try:
-            data[2:].decode(codec)
-        except UnicodeDecodeError:
-            pass
-        else:
-            return "utf-16"
+        return "marked"
     if b"\x00" in data[:8000]:
         return "binary"
     return "text"
@@ -886,54 +877,119 @@ def _zero_id(oid):
 
 
 def _blob_text_lines(data, kind):
-    if len(data) > _LINE_DIFF_MAX:
-        raise ScanError("a file too large to compare")
     if kind == "utf-16":
         codec = "utf-16-le" if data.startswith(b"\xff\xfe") else "utf-16-be"
-        try:
-            text = data[2:].decode(codec)
-        except UnicodeDecodeError:
-            raise ScanError("the patch cannot be read")
+        text = data[2:].decode(codec, "replace")
     else:
         text = data.decode("utf-8", "replace")
     return _patch_lines(text)
 
 
+def _blob_views(data, kind):
+    """Lines of each view, or ``None`` when the blob contributes no line."""
+    if kind == "binary":
+        return None
+    if kind == "marked":
+        return {
+            "nul": _blob_text_lines(data.replace(b"\x00", b""), "text"),
+            "utf16": _blob_text_lines(data, "utf-16"),
+        }
+    return {"nul": _blob_text_lines(data, "text")}
+
+
+def _lines_of(views, name):
+    if views is None:
+        return []
+    found = views.get(name)
+    if found is None:
+        return views["nul"]
+    return found
+
+
 def _preimage_lines(oid, mode):
     if _zero_id(oid) or mode == "160000":
-        return []
+        return None
     data = _read_blob(oid)
-    kind = classify_blob(data)
-    if kind == "binary":
-        return []
-    return _blob_text_lines(data, kind)
+    return _blob_views(data, classify_blob(data))
 
 
-def _added_positions(pre_lines, result_lines):
-    matcher = difflib.SequenceMatcher(None, pre_lines, result_lines, autojunk=False)
+def _trim_ends(pre_lines, result_lines):
+    """Common leading and trailing lines, one to one, never overlapping."""
+    lead = 0
+    shorter = len(pre_lines)
+    if len(result_lines) < shorter:
+        shorter = len(result_lines)
+    while lead < shorter and pre_lines[lead] == result_lines[lead]:
+        lead += 1
+    trail = 0
+    pre_left = len(pre_lines) - lead
+    result_left = len(result_lines) - lead
+    while (
+        trail < pre_left
+        and trail < result_left
+        and pre_lines[-1 - trail] == result_lines[-1 - trail]
+    ):
+        trail += 1
+    return lead, pre_lines[lead:len(pre_lines) - trail], result_lines[lead:len(result_lines) - trail]
+
+
+def _over_read(pre_count, result_count, work):
+    """True when this pair is past the line-pair bounds. An over-read adds nothing."""
+    product = pre_count * result_count
+    if product > 1000000 or work[0] + product > 10000000:
+        return True
+    work[0] = work[0] + product
+    return False
+
+
+def _added_positions(pre_lines, result_lines, work):
+    lead, pre_middle, result_middle = _trim_ends(pre_lines, result_lines)
+    if _over_read(len(pre_middle), len(result_middle), work):
+        positions = set()
+        for at in range(len(result_middle)):
+            positions.add(lead + at)
+        return positions
+    matcher = difflib.SequenceMatcher(None, pre_middle, result_middle, autojunk=False)
     positions = set()
     for tag, _i1, _i2, j1, j2 in matcher.get_opcodes():
         if tag == "insert" or tag == "replace":
             for at in range(j1, j2):
-                positions.add(at)
+                positions.add(lead + at)
     return positions
 
 
-def line_diff_added(record, result_data, result_kind):
+def line_diff_added(record, result_data, result_kind, work):
     """Result lines added against every preimage, as (1-based line, text)."""
-    result_lines = _blob_text_lines(result_data, result_kind)
-    common = None
+    result_views = _blob_views(result_data, result_kind)
+    if result_kind == "marked":
+        names = ("nul", "utf16")
+    else:
+        names = ("nul",)
+    preimages = []
     for oid, mode in zip(record["ids"][:-1], record["modes"][:-1]):
-        positions = _added_positions(_preimage_lines(oid, mode), result_lines)
+        preimages.append(_preimage_lines(oid, mode))
+    by_number = {}
+    for name in names:
+        result_lines = result_views[name]
+        common = None
+        for views in preimages:
+            positions = _added_positions(_lines_of(views, name), result_lines, work)
+            if common is None:
+                common = positions
+            else:
+                common = common & positions
         if common is None:
-            common = positions
-        else:
-            common = common & positions
-    if common is None:
-        common = set(range(len(result_lines)))
+            common = set(range(len(result_lines)))
+        for at in common:
+            text = result_lines[at]
+            held = by_number.get(at)
+            if held is None:
+                by_number[at] = [text]
+            elif text not in held:
+                held.append(text)
     found = []
-    for at in sorted(common):
-        found.append((at + 1, result_lines[at]))
+    for at in sorted(by_number):
+        found.append((at + 1, "\n".join(by_number[at])))
     return found
 
 
@@ -976,7 +1032,7 @@ def _type_change_addition(record, sections):
     return addition
 
 
-def _by_class(record, section):
+def _by_class(record, section, work):
     data = _read_blob(record["ids"][-1])
     kind = classify_blob(data)
     if kind == "binary":
@@ -986,13 +1042,30 @@ def _by_class(record, section):
     for pre in record["ids"][:-1]:
         if pre == record["ids"][-1]:
             return [], 0
-    return line_diff_added(record, data, kind), 0
+    return line_diff_added(record, data, kind, work), 0
 
 
-def _lines_for_record(record, sections):
+def _gitlink_lines(record, sections):
+    """A mode ``160000`` result, before any blob read, for every status."""
     if record["status"] == "T":
         addition = _type_change_addition(record, sections)
-        return _by_class(record, addition)
+        return list(addition["added"]), 0
+    if len(sections) > 1:
+        raise ScanError("the patch cannot be read")
+    section = sections[0] if sections else None
+    if section is not None and _needs_index(section):
+        _match_index(section, record["ids"][:-1], record["ids"][-1])
+    if section is None:
+        return [], 0
+    return list(section["added"]), 0
+
+
+def _lines_for_record(record, sections, work):
+    if record["modes"][-1] == "160000":
+        return _gitlink_lines(record, sections)
+    if record["status"] == "T":
+        addition = _type_change_addition(record, sections)
+        return _by_class(record, addition, work)
     if len(sections) > 1:
         raise ScanError("the patch cannot be read")
     section = sections[0] if sections else None
@@ -1003,18 +1076,16 @@ def _lines_for_record(record, sections):
         if section is not None and section["added"]:
             raise ScanError("the patch cannot be read")
         return [], 0
-    if record["modes"][-1] == "160000":
-        if section is not None and _needs_index(section):
-            _match_index(section, record["ids"][:-1], result)
-        if section is None:
+    if section is None:
+        if len(record["ids"]) > 2:
             return [], 0
-        return list(section["added"]), 0
-    if section is not None and _needs_index(section):
+        raise ScanError("the patch and the file list disagree")
+    if _needs_index(section):
         _match_index(section, record["ids"][:-1], result)
-    return _by_class(record, section)
+    return _by_class(record, section, work)
 
 
-def _content_by_path(records, sections):
+def _content_by_path(records, sections, work):
     grouped = {}
     known = set()
     for record in records:
@@ -1027,13 +1098,13 @@ def _content_by_path(records, sections):
     lines_by_path = {}
     binary_count = 0
     for record in records:
-        lines, binary = _lines_for_record(record, grouped[record["path"]])
+        lines, binary = _lines_for_record(record, grouped[record["path"]], work)
         lines_by_path[record["path"]] = lines
         binary_count += binary
     return lines_by_path, binary_count
 
 
-def scan_commit(full, names, cfg_name, cfg_email, empty_tree, hash_len):
+def scan_commit(full, names, cfg_name, cfg_email, empty_tree, hash_len, work):
     short = _checked_short(git_need("rev-parse", ["--short", "--end-of-options", full]))
     code, commit_text = git_text("cat-file", ["-p", "--end-of-options", full])
     if code != 0:
@@ -1067,7 +1138,7 @@ def scan_commit(full, names, cfg_name, cfg_email, empty_tree, hash_len):
     patch = patch_raw.decode("utf-8", "replace")
     records = parse_raw_records(status_raw, _parent_count(commit_text), hash_len)
     _found, named_paths, sections = added_lines(patch, hash_len)
-    lines_by_path, binary_count = _content_by_path(records, sections)
+    lines_by_path, binary_count = _content_by_path(records, sections, work)
     hits = []
     for kind in kinds_of(message, names):
         hits.append(hit_line(short, "message", kind))
@@ -1139,8 +1210,9 @@ def execute(args):
     hit_lines = []
     commits_hit = 0
     binary_total = 0
+    work = [0]
     for full in commits:
-        _short, hits, binary_count = scan_commit(full, names, cfg_name, cfg_email, empty_tree, hash_len)
+        _short, hits, binary_count = scan_commit(full, names, cfg_name, cfg_email, empty_tree, hash_len, work)
         binary_total += binary_count
         if hits:
             commits_hit += 1

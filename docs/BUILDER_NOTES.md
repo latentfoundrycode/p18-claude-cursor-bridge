@@ -80,3 +80,5 @@
 2026-11-18 TASK-067-r2: no case builds a patch path that is absent from that commit's name-status list, so dropping the disagreement check (exit 2, `the patch and the file list disagree`) still passes the scan tests.
 
 2026-11-18 TASK-067-r5: a combined `Binary files differ` section has no `+++` line (its path is only on `diff --cc`), an ordinary binary `index` line omits the mode a text `index` line prints, and `git show -z --raw` of a merge is already one combined record per path (one colon per parent), empty when every file matches one parent.
+
+2026-11-18 TASK-067-r6: sending a merge record that has no patch section back through the line diff still passes the clean-merge case, because the intersection over the parents is empty and the trimmed middles stay under the pair bound; no case builds a single-parent record with no section, so dropping that refusal also passes.

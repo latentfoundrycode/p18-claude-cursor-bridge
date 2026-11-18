@@ -451,6 +451,18 @@ def test_r087_the_user_s_diff_settings_neither_hide_nor_misplace_a_hit(tmp_path)
     assert rc == 1 and hits(out) == [hit(h, "line notes.md:2", "path")], out
 
 
+@pytest.mark.parametrize("cfg", ["[diff]\n\tnoprefix = true\n", "[diff]\n\tsrcPrefix = b/\n\tdstPrefix = a/\n"],
+                         ids=["noprefix", "swapped"])
+def test_r087_a_file_under_a_folder_named_like_a_prefix_is_read_whatever_the_user_s_prefixes(tmp_path, cfg):
+    """R-087 (round 6, the supervisor's case after mutant n08 survived): the scan sets git's own a/ and b/ prefixes, so
+    the user's diff.noprefix or swapped prefixes never make a file under a folder named b/ unreadable."""
+    s = Scratch(tmp_path)
+    _config(s, cfg)
+    h = s.commit({"b/notes.md": "plain\n" + DRIVE_FWD + "\n"})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line b/notes.md:2", "path")], out
+
+
 def test_r087_a_name_after_a_letter_that_lowercases_to_two_characters_is_found(tmp_path):
     """R-087 (round 2): a name matches in any letter case wherever it stands: a capital I with a dot above earlier in
     the line (two characters once lower-cased) moves nothing."""
