@@ -669,7 +669,8 @@ def test_r087_a_real_binary_is_counted_and_never_read_however_git_shows_it(tmp_p
 @pytest.mark.parametrize("how", [None, "info-diff", "driver-text"])
 def test_r087_a_real_binary_a_merge_writes_is_counted_and_never_read(tmp_path, how):
     """R-087 (round 5): a merge's combined diff is read as an ordinary diff is: a binary the merge writes is counted,
-    never read, however a local setting shows it."""
+    never read, however a local setting shows it; the note totals every binary result of the range (side's, main's and
+    the merge's)."""
     s = Scratch(tmp_path, base_files={"blob.bin": bytes(range(256)) * 8})
     s.git("checkout", "-q", "-b", "side")
     s.commit({"blob.bin": bytes(range(255, -1, -1)) * 8}, message="side")
@@ -681,7 +682,7 @@ def test_r087_a_real_binary_a_merge_writes_is_counted_and_never_read(tmp_path, h
         assert "@@@" in _shown(s), "precondition: git shows the merge's binary as combined hunks"
     rc, out = s.run()
     assert rc == 0 and hits(out) == [], out
-    assert "push-scan: OK - 3 commit(s)" in out and NOTE_ONE in out, out
+    assert "push-scan: OK - 3 commit(s)" in out and "push-scan: note - 3 binary file(s) not read" in out, out
     assert "blob.bin" not in out, out
 
 
@@ -806,9 +807,9 @@ def test_r087_git_s_content_rule_decides_at_its_8000th_byte(tmp_path, nul_at, bi
 
 
 def test_r087_entries_without_content_to_read_never_end_the_scan(tmp_path):
-    """R-087 (round 5): a deleted file, a mode change, a pure rename, a symbolic link, a submodule and an octopus merge
-    carry no added text a hit could stand in: the file list and the patch agree and the scan passes."""
-    s = Scratch(tmp_path, base_files={"gone.md": "x\n", "run.sh": "echo\n", "old.md": "same\n"})
+    """R-087 (round 5): a deleted file, a mode change, a pure rename, a symbolic link, a type change, a submodule and an
+    octopus merge carry no added text a hit could stand in: the file list and the patch agree and the scan passes."""
+    s = Scratch(tmp_path, base_files={"gone.md": "x\n", "run.sh": "echo\n", "old.md": "same\n", "t.md": "plain\n"})
     s.git("rm", "-q", "gone.md")
     s.git("commit", "-q", "-m", "delete")
     s.git("update-index", "--chmod=+x", "run.sh")
@@ -818,6 +819,8 @@ def test_r087_entries_without_content_to_read_never_end_the_scan(tmp_path):
     _index_add(s, "link", text="new.md", mode="120000")
     _index_add(s, "vendor", mode="160000", sha=s.base)
     s.git("commit", "-q", "-m", "link and submodule")
+    _index_add(s, "t.md", text="new.md", mode="120000")
+    s.git("commit", "-q", "-m", "type change")
     s.git("checkout", "-q", "-b", "o1")
     s.commit({"a.md": "a\n"}, message="o1")
     s.git("checkout", "-q", "-b", "o2", "main")
@@ -826,7 +829,19 @@ def test_r087_entries_without_content_to_read_never_end_the_scan(tmp_path):
     s.git("merge", "-q", "--no-ff", "-m", "octopus", "o1", "o2")
     rc, out = s.run()
     assert rc == 0 and hits(out) == [], out
-    assert "push-scan: OK - 7 commit(s)" in out, out
+    assert "push-scan: OK - 8 commit(s)" in out, out
+
+
+def test_r087_a_type_change_reads_the_new_entry(tmp_path):
+    """R-087 (round 5): a type change (a file made a symbolic link) is one record and two patch sections, a deletion and
+    an addition: the scan reads the new entry by its class, its target a hit at line 1, and never ends the scan."""
+    s = Scratch(tmp_path, base_files={"t.md": "plain\n"})
+    _index_add(s, "t.md", text=DRIVE_FWD, mode="120000")
+    s.git("commit", "-q", "-m", "type change")
+    h = s.git("rev-parse", "--short", "HEAD")
+    assert " T" in s.git("show", "--format=", "--raw", "HEAD"), "precondition: git lists a type change"
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line t.md:1", "path")], out
 
 
 def test_r087_a_sha256_repository_is_read_with_its_own_ids(tmp_path):
