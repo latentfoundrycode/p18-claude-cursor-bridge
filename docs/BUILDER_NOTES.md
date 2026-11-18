@@ -74,3 +74,21 @@
 2026-11-17 TASK-065-r2: when no time is left the loop returns before the first poll, so a limit of 0 never calls GitHub; the limit line has to read the local head itself on that path, or the head stays `?`.
 
 2026-11-17 TASK-066: the new R-086 case uses `changed_repo` and `run` in `tests/test_hotfix25a_guard_scope_invisible.py`, and those helpers call `subprocess.run` with no timeout; adding a timeout would edit an existing helper, which the brief forbids, so the case does not add its own timeout.
+
+2026-11-18 TASK-067: `test_r087_git_or_the_base_unreadable_exits_2_never_a_pass` with case `dash-base` accepts any exit 2, so a mutant that lets a base beginning with "-" through still passes when git then rejects that revision; a catch is an assertion that the output contains the dash refusal and not the missing-commit refusal.
+
+2026-11-18 TASK-067-r2: no case builds a patch path that is absent from that commit's name-status list, so dropping the disagreement check (exit 2, `the patch and the file list disagree`) still passes the scan tests.
+
+2026-11-18 TASK-067-r5: a combined `Binary files differ` section has no `+++` line (its path is only on `diff --cc`), an ordinary binary `index` line omits the mode a text `index` line prints, and `git show -z --raw` of a merge is already one combined record per path (one colon per parent), empty when every file matches one parent.
+
+2026-11-18 TASK-067-r6: sending a merge record that has no patch section back through the line diff still passes the clean-merge case, because the intersection over the parents is empty and the trimmed middles stay under the pair bound; no case builds a single-parent record with no section, so dropping that refusal also passes.
+
+2026-11-18 TASK-067-r7: `b"".decode` of an unknown encoding name returns an empty string and does not raise `LookupError`, so an empty probe cannot tell whether Python knows the encoding; decoding the printable-ASCII sample does raise `LookupError`.
+
+2026-11-18 TASK-067-r7: a path whose first segment is a byte UTF-8 replaces with U+FFFD is still found by the widened segment rule when the commit object is decoded as UTF-8, so ignoring the `encoding` header still passes the ISO-8859-1 path cases; the non-ASCII name case is what requires that header.
+
+2026-11-18 TASK-067-r8: Python's `iso2022_jp` encoder writes ESC `$` `B` (bytes 1B 24 42) directly after a path separator before the non-ASCII segment, and the round-8 ISO-2022-KR file line (one designation, then the encoder's shift) puts SO (byte 0E) directly after the separator, so dropping only ESC fails the three JP cases and dropping only SO fails the KR file line.
+
+2026-11-18 TASK-067-r9: the outer NFKC is what keeps a character whose case fold is a letter plus a combining mark (U+01F0 folds to j plus U+030C) one word character; without it Python's `re` treats the mark as a boundary, so the base letters match as a whole word. The inner NFKC has to run before `casefold`, or a modifier letter such as U+1D2C becomes a capital letter (NFKC after `casefold` yields `A`) and misses the ASCII spelling.
+
+2026-11-18 TASK-067-r10: with both readings kept, dropping the outer NFKC makes the folded reading hit a name ending in `j` before U+01F0 (the raw reading does not), and dropping the inner NFKC misses a name holding U+1D2C written in plain letters (the raw reading misses it too). Replacing only the raw reading with the lower-cased index match still finds an ASCII name after U+0130, because the folded reading matches that name; a dotted or dotless `i` in the name's own letters is what that mutant misses.
