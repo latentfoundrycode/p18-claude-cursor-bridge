@@ -46,3 +46,39 @@ A class line never lifts a round for a regression the previous fix caused (decid
 - Whether A's unread real binaries (counted, not named) are acceptable where rounds 1 to 3 also left them unread, against B's reading of them at a residual false-hit rate and a second reading of merges.
 - Whether C's refusals are tolerable in ordinary use (images, fonts, lockfiles in a push).
 - Any route A leaves by which a text file's added line is neither read nor refused.
+
+## The first votes (2026-11-18)
+
+### Review B (gpt-5.6-sol-high): VOTE NONE
+
+- A neutralises committed and user attributes; ordinary and combined text diffs show their added lines; a combined `index` line reads `parent1,parent2..result`.
+- Local `-diff`, binary drivers and `core.bigFileThreshold` can hide text; A's result-blob check can refuse them.
+- Blocking gap in A: `.git/info/attributes` with `diff`, or a driver with `binary=false`, forces a real NUL-bearing binary into a text hunk under A's options; A checks only sections shown as binary, so it gives a false hit.
+- B keeps a false-hit risk and reads merges a second, divergent way; C refuses ordinary binaries and committed `diff` attributes defeat its claim.
+- Required: classify every result blob by content before reading its hunks; skip and count NUL blobs even when forced to text; refuse non-NUL blobs shown as binary; fail closed on missing or malformed result ids; test ordinary and combined diffs in both forced directions; accept git's binary definition explicitly.
+
+The supervisor's launch named its error file after the round, not the snapshot, so `review-guard.py verify` raised GATE-INTEGRITY on it (the file held only the launcher's three lines; the tree was restored). This round's second Review B vote is launched under a matching name.
+
+### Review A (claude-opus-5-5): VOTE A-EXTENDED
+
+- Agrees with each of Review B's points, checked on git 2.53: `--full-index` expands the combined `index` line to full ids; the combined `index` line carries no mode; `core.bigFileThreshold` hides text in an ordinary diff but not in a combined one; `log.diffMerges` does not change `git show` of a merge.
+- New: a UTF-16 text file (what Windows PowerShell 5.1 `>` and `Out-File` and `reg export` write) shows as binary, so under A, extended or not, a profile path in it is pushed with exit 0. Ordinary use on Windows.
+- Refinements: submodule entries (mode 160000) and deleted files (an all-zero result id) are not classified; ids are full (`--full-index` on the patch, `--no-abbrev` on a raw read, since `--full-index` does not expand raw output); a text result shown as binary only because an old or parent blob holds a NUL is read, never refused (else a UTF-16-to-UTF-8 conversion ends exit 2 for good); a UTF-16 file starting with a BOM that decodes strictly is text.
+- The content rule is reproduced in Python (`b"\0" in data[:8000]`), since no git option turns off `.git/info/attributes`; git's size threshold is left out of it on purpose.
+- Residual: a BOM-less text file with a NUL in its first 8000 bytes is counted, not read; to be recorded in words as accepted.
+
+## The supervisor's proposed decision: A extended, a text file is always read
+
+Content decides; how git shows a file never does. Reading a text file that git shows as binary is chosen over refusing it: it never passes the file and never refuses a push on a local setting.
+
+1. The patch read: `git --attr-source=<the empty tree> -c core.attributesFile= show --full-index` with today's options, without `--text`. A git without `--attr-source` fails the call, exit 2.
+2. The file list: `show -z --raw --no-abbrev -M` under the same attribute options, replacing `--name-status`. Every id must be the repository's hash length (`rev-parse --show-object-format`) and lower-case hex, else exit 2. The check that every patch path is a listed path stays.
+3. Every patch section with hunks or a `Binary files ... differ` line has an `index` line with one id per parent and a result id equal to the raw record's, else exit 2. A deleted file (an all-zero result id) has no added line (else exit 2) and is not classified; a submodule (result mode 160000) is not classified and its `Subproject commit` lines are read as today.
+4. Every other result blob is read with `git cat-file` and classified: UTF-16 when it starts with `FF FE` or `FE FF` and decodes strictly as UTF-16; else binary when a NUL is in its first 8000 bytes; else text. A failed read ends with exit 2.
+5. By class, never by how git shows the section:
+   - text shown as hunks: the hunks' added lines are read, as today;
+   - text shown as `Binary files ... differ` (any cause), and UTF-16 however shown: every line of the result blob not present in any parent's blob is read, each placed by its line in the result; a parent is decoded as the result is (UTF-16 as UTF-16, text as the patch lines are decoded), and a binary or absent parent contributes no line;
+   - binary: its hunks, if any, are never read; it is counted in `push-scan: note - <n> binary file(s) not read`, never named.
+6. Recorded as accepted in R-087 and DESIGN C2, beside a path compiled into a real binary: a BOM-less text file with a NUL in its first 8000 bytes, and UTF-16 without a BOM, are counted as binary and not read.
+
+Why the set difference for a section git shows as binary: it is the combined diff's own meaning (a line counts when it is new against every parent), and a line present in a parent is either already on the remote or was read when the commit that added it was scanned.
