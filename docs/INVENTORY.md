@@ -1,7 +1,7 @@
 ---
 record: inventory
 header: 1
-reflected_through: "2026-11-18 TASK-067: a byte no decoding reads begins a path's segment, a message read in the encoding git records (R-087)"
+reflected_through: "2026-11-18 TASK-067: the encoding header withdrawn, ESC and SO begin a segment, the third resolution round (R-087)"
 development_data: "Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet (§15 condition 1, A1a condition 1)"
 tables:
   features:
@@ -18,7 +18,7 @@ tables:
     key: Item
 ---
 # Inventory — Claude-Cursor Bridge
-Reflected through: 2026-11-18 TASK-067: a byte no decoding reads begins a path's segment, a message read in the encoding git records (R-087)
+Reflected through: 2026-11-18 TASK-067: the encoding header withdrawn, ESC and SO begin a segment, the third resolution round (R-087)
 Updated: 2026-11-18
 
 The bridge already exists (releases 0, A1a–A5). This inventory is opened as the bridge becomes a supervised project (release B). Features accrue to the register as release B's increments merge; the rows below record the decisions and resources release B rests on.

@@ -1126,16 +1126,6 @@ def test_r087_a_path_in_a_message_git_records_in_another_encoding_is_found(tmp_p
     assert rc == 1 and hits(out) == [hit(h, "message", "path")], out
 
 
-def test_r087_a_non_ascii_name_in_a_message_git_records_in_another_encoding_is_found(tmp_path):
-    """R-087 (round 7, Review B round 4): a message git records as ISO-8859-1 is read in that encoding, so a searched
-    name holding a non-ASCII letter matches as written."""
-    s = Scratch(tmp_path, names=(NONASCII_NAME,))
-    h = _commit_with_encoding(s, tmp_path, ("thanks " + NONASCII_NAME + "\n").encode("latin-1"), "ISO-8859-1")
-    rc, out = s.run()
-    assert rc == 1 and hits(out) == [hit(h, "message", "name")], out
-    silent(out, also=(NONASCII_NAME,))
-
-
 def test_r087_a_message_whose_encoding_python_does_not_know_is_read_as_utf8(tmp_path):
     """R-087 (round 7): a commit whose `encoding` header names an encoding Python does not know is read as UTF-8, as
     every other commit is, so its path is still found."""
@@ -1225,3 +1215,41 @@ def test_r087_a_non_ascii_identity_stays_exempt_under_another_encoding_header(tm
     _commit_with_encoding(s, tmp_path, b"plain\n", "ISO-8859-1")
     rc, out = s.run()
     assert rc == 0 and hits(out) == [] and "push-scan: OK - 1 commit(s)" in out, out
+
+
+# ---------------------------------------------------------------- the third resolution: ESC and SO begin a segment
+
+JAPAN = "\u65e5\u672c"
+HAN = "\ud55c"
+
+
+@pytest.mark.parametrize("where,codec,text", [
+    ("message-header", "iso2022_jp", "D" + COLON + FWD + JAPAN + SEG + FWD + "x"),
+    ("message-plain", "iso2022_jp", FWD + "Us" + "ers" + FWD + JAPAN + SEG + FWD + "x"),
+    ("file", "iso2022_jp", "D" + COLON + BACK + JAPAN + SEG + BACK + "x"),
+    ("file", "iso2022_kr", FWD + "Us" + "ers" + FWD + HAN + SEG + FWD + "x"),
+], ids=["jp-message-with-header", "jp-message-without-header", "jp-file-line", "kr-file-line"])
+def test_r087_a_path_whose_segment_an_iso2022_shift_begins_is_found(tmp_path, where, codec, text):
+    """R-087 (the third resolution, Review A's vote): the ISO-2022 encodings write a segment's non-ASCII first
+    character after an ASCII shift (ESC, or SO), so ESC and SO begin a segment: the path is a hit in a message, with or
+    without an encoding header, and in a file's added line."""
+    s = Scratch(tmp_path)
+    data = text.encode(codec)
+    if codec == "iso2022_kr":
+        # real ISO-2022-KR text designates once, at its start, so SO itself follows the separator
+        data = b"\x1b$)C" + data.replace(b"\x1b$)C", b"")
+    if where == "file":
+        h = s.commit({"jp.txt": b"plain\n" + data + b"\n"})
+        place = "line jp.txt:2"
+    elif where == "message-header":
+        h = _commit_with_encoding(s, tmp_path, b"note " + data + b"\n", "ISO-2022-JP")
+        place = "message"
+    else:
+        s.write({"a.md": "plain\n"})
+        s.git("add", "-A")
+        (tmp_path / "message.txt").write_bytes(b"note " + data + b"\n")
+        s.git("commit", "-q", "-F", str(tmp_path / "message.txt"))
+        h = s.git("rev-parse", "--short", "HEAD")
+        place = "message"
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, place, "path")], out
