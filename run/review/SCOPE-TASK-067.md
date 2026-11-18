@@ -4,7 +4,9 @@ Round cause: security
 
 TASK-067 ran six builder rounds and two resolution rounds; this review reads the whole increment against origin/main (667c646): `run/review/REVIEW-TASK-067-r4.diff`.
 
-Blocking class: security (rounds 3 to 6: round 3 at the ceiling, rounds 4 to 6 above it; each round's class line confirmed by Review A and the security audit on the round before; rounds 5 and 6 were also each preceded by a resolution round, decide.md's Stop, because the round before had caused a regression; the decisions are the two TASK-067 entries of docs/CHANGES.md dated 2026-11-18 and handoff/RESOLUTION-TASK-067.md).
+Blocking class: security - the security audit, round 5, B1: a commit adding a file whose first two bytes are a UTF-16 byte-order mark followed by plain text (git shows it as text, its path line added) made round 5's scan print OK with no note, so untrusted commit content reached a pass against R-087; round 6's builder was launched on 5ae7abb, its brief's commit, which holds round 5's code.
+
+The class lines of the earlier rounds were all security (rounds 3 to 6: round 3 at the ceiling, rounds 4 to 6 above it; each round's class line confirmed by Review A and the security audit on the round before; rounds 5 and 6 were also each preceded by a resolution round, decide.md's Stop, because the round before had caused a regression; the decisions are the two TASK-067 entries of docs/CHANGES.md dated 2026-11-18 and handoff/RESOLUTION-TASK-067.md).
 
 ## Where the increment ends
 
