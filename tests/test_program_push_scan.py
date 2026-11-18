@@ -1253,3 +1253,40 @@ def test_r087_a_path_whose_segment_an_iso2022_shift_begins_is_found(tmp_path, wh
         place = "message"
     rc, out = s.run()
     assert rc == 1 and hits(out) == [hit(h, place, "path")], out
+
+
+# ---------------------------------------------------------------- round 9: a name under Unicode's caseless matching
+
+SHARP_NAME = "Kel" + "\u00df" + "ovan"
+DECOMPOSED_NAME = "Ze\u0301lvarn"
+
+
+def _fullwidth(text):
+    return "".join(chr(ord(c) + 0xFEE0) if "!" <= c <= "~" else c for c in text)
+
+
+@pytest.mark.parametrize("name,written", [
+    (SHARP_NAME, "KELSSOVAN"),
+    (SHARP_NAME, "kelssovan"),
+    (EXTRA, _fullwidth(EXTRA)),
+    (NONASCII_NAME, DECOMPOSED_NAME),
+    (DECOMPOSED_NAME, NONASCII_NAME),
+], ids=["sharp-s-upper", "sharp-s-lower", "fullwidth", "decomposed-in-text", "decomposed-in-names-file"])
+def test_r087_a_name_is_found_under_unicode_compatibility_caseless_matching(tmp_path, name, written):
+    """R-087 (round 9, Review B on round 8's tree): a searched name is found written in any case or compatibility form
+    Unicode's caseless matching equates with it (sharp s and SS, fullwidth letters, a letter and its combining accent),
+    in an added line, the hit never printing the name."""
+    s = Scratch(tmp_path, names=(name,))
+    h = s.commit({"notes.md": "by " + written + " today\n"})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line notes.md:1", "name")], out
+    silent(out, also=(name, written))
+
+
+def test_r087_a_folded_name_inside_a_longer_word_is_still_no_hit(tmp_path):
+    """R-087 (round 9): matching under caseless folding keeps the whole-word rule: a folded name inside a longer word is
+    no hit."""
+    s = Scratch(tmp_path, names=(SHARP_NAME,))
+    s.commit({"notes.md": "the KELSSOVANS and xkelssovan\n"})
+    rc, out = s.run()
+    assert rc == 0 and hits(out) == [] and "push-scan: OK - 1 commit(s)" in out, out
