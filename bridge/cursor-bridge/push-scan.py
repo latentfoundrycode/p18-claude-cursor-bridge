@@ -48,7 +48,7 @@ def say(line):
 
 
 def git(sub, args):
-    argv = ["git", "--no-pager", "-c", "color.ui=never", "-c", "log.showSignature=false", "-c", "log.showRoot=true", "-c", "diff.suppressBlankEmpty=false", sub] + list(args)
+    argv = ["git", "--no-pager", "--no-replace-objects", "-c", "color.ui=never", "-c", "log.showSignature=false", "-c", "log.showRoot=true", "-c", "diff.suppressBlankEmpty=false", sub] + list(args)
     try:
         proc = subprocess.run(
             argv,
@@ -634,7 +634,7 @@ def scan_commit(full, names, cfg_name, cfg_email):
         raise ScanError("git show failed (exit %d)" % code)
     patch = git_need(
         "show",
-        ["-M", "--format=", "--no-ext-diff", "--no-textconv", "--no-color",
+        ["-M", "--format=", "--no-ext-diff", "--no-textconv", "--text", "--no-color",
          "--no-relative", "--src-prefix=a/", "--dst-prefix=b/",
          "--ignore-submodules=none", "--submodule=short",
          "--end-of-options", full],
