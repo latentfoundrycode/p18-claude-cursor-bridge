@@ -24,6 +24,7 @@ push-scan.py. The static cases read the program's source.
 KP-052: no character outside printable ASCII is typed in this file."""
 import ast
 import os
+import re
 import subprocess
 import sys
 
@@ -164,6 +165,9 @@ def test_r087_git_or_the_base_unreadable_exits_2_never_a_pass(tmp_path, case):
         rc, out = s.run()
     assert rc == 2, out
     assert "push-scan: OK" not in out and hits(out) == [], out
+    if case == "dash-base":
+        # refused by its first character, before git reads it: not merely git's later "not a commit"
+        assert 'the base must not begin with "-"' in out and "not a commit" not in out, out
 
 
 def test_r087_names_are_never_taken_from_the_command_line(tmp_path):
@@ -363,3 +367,111 @@ def test_r087_d004_every_child_process_is_bounded_by_a_timeout():
     for c in calls:
         kw = {k.arg for k in c.keywords}
         assert c.func.attr != "Popen" and "timeout" in kw, "line %d: an unbounded child process" % c.lineno
+
+
+# ---------------------------------------------------------------- round 2: the patch read as git writes it (the reviews of round 1)
+
+def _config(s, extra=""):
+    s.gitconfig.write_text("[user]\n\tname = %s\n\temail = %s\n[core]\n\tautocrlf = false\n%s" % (IDENT_NAME, IDENT_MAIL, extra),
+                           encoding="utf-8")
+
+
+def test_r087_an_added_line_that_reads_like_a_file_header_is_scanned_in_its_hunk(tmp_path):
+    """R-087 (round 2): an added line whose text begins with `++ ` is an added line of its hunk, never a file header:
+    its path is a hit at its own line, and the lines after it stay placed in their file."""
+    s = Scratch(tmp_path)
+    h = s.commit({"notes.md": "ok\n++ " + DRIVE_FWD + "\nand " + EXTRA + "\n"})
+    rc, out = s.run()
+    assert rc == 1, out
+    assert hits(out) == sorted([hit(h, "line notes.md:2", "path"), hit(h, "line notes.md:3", "name")]), out
+    silent(out)
+
+
+def test_r087_a_changed_file_with_a_space_in_its_name_is_read_by_its_whole_name(tmp_path):
+    """R-087 (round 2): git writes an unquoted path that holds a space whole, so a file is named by its whole path;
+    where its own name holds a name, its lines are placed by its position, never dropped."""
+    hidden_name = PROFILE_NAME + " notes.md"
+    s = Scratch(tmp_path, base_files={hidden_name: "plain\n", "other file.md": "plain\n"})
+    h = s.commit({hidden_name: "plain\n" + DRIVE_FWD + "\n", "other file.md": "plain\nby " + EXTRA + "\n"})
+    rc, out = s.run()
+    assert rc == 1, out
+    assert hits(out) == sorted([hit(h, "line other file.md:2", "name"), hit(h, "line #2:2", "path")]), out
+    silent(out)
+
+
+def test_r087_a_merge_where_one_side_renamed_a_file_reads_each_file_by_its_own_position(tmp_path):
+    """R-087 (round 2): a merge's file list holds one path per combined status, a rename on one side included, so a
+    line the merge itself adds to a file whose own name holds a name is a hit placed by that file's position."""
+    hidden_name = LOGIN + "-notes.md"
+    body = "".join("%d\n" % n for n in range(1, 9))
+    s = Scratch(tmp_path, base_files={"old.md": body, hidden_name: "x\n"})
+    s.git("checkout", "-q", "-b", "side")
+    s.commit({"new.md": body + "9\n"}, renames=[("old.md", "new.md")], message="side")
+    s.git("checkout", "-q", "main")
+    # both sides change the renamed file, so the merge lists it with a combined status (RM) before the hidden file
+    s.commit({"old.md": "0\n" + body[2:], hidden_name: "x\ny\n"}, message="main")
+    s.git("merge", "-q", "--no-ff", "--no-commit", "side")
+    s.write({hidden_name: "x\ny\n" + DRIVE_FWD + "\n"})
+    s.git("add", "-A")
+    s.git("commit", "-q", "-m", "merge")
+    rc, out = s.run()
+    assert rc == 1, out
+    found = hits(out)
+    assert len(found) == 1 and re.match(r"^push-scan: HIT [0-9a-f]+ line #[0-9]+:3 path$", found[0]), out
+    silent(out)
+
+
+def test_r087_a_control_character_in_a_printed_path_is_escaped(tmp_path):
+    """R-087 (round 2): a file name is untrusted: a newline in a printed path is escaped, never written raw, so every
+    line of the output is one of the program's own."""
+    s = Scratch(tmp_path)
+    (s.repo / "payload.txt").write_bytes(("plain\n" + DRIVE_FWD + "\n").encode("utf-8"))
+    blob = s.git("hash-object", "-w", "payload.txt")
+    (s.repo / "payload.txt").unlink()
+    # git for Windows refuses a control character in a path while core.protectNTFS is on; the index takes it otherwise
+    s.git("-c", "core.protectNTFS=false", "update-index", "--add", "--cacheinfo",
+          "100644,%s,evil\npush-scan: OK - 9 commit(s)\nx.md" % blob)
+    s.git("-c", "core.protectNTFS=false", "commit", "-q", "-m", "change")
+    rc, out = s.run()
+    assert rc == 1, out
+    lines = [line for line in out.splitlines() if line.strip()]
+    assert lines and all(line.startswith("push-scan: ") for line in lines), out
+    assert "push-scan: OK - 9 commit(s)" not in lines, out
+    assert len(hits(out)) == 1 and hits(out)[0].endswith(":2 path"), out
+
+
+def test_r087_the_user_s_diff_settings_neither_hide_nor_misplace_a_hit(tmp_path):
+    """R-087 (round 2): diff.relative, run from a subfolder, and diff.noprefix are the user's settings, not the scan's:
+    every file of the commit is read and placed by its path."""
+    s = Scratch(tmp_path, base_files={"sub/keep.md": "x\n"})
+    _config(s, "[diff]\n\trelative = true\n\tnoprefix = true\n")
+    h = s.commit({"notes.md": "plain\n" + DRIVE_FWD + "\n"})
+    rc, out = s.run(cwd=s.repo / "sub")
+    assert rc == 1 and hits(out) == [hit(h, "line notes.md:2", "path")], out
+
+
+def test_r087_a_name_after_a_letter_that_lowercases_to_two_characters_is_found(tmp_path):
+    """R-087 (round 2): a name matches in any letter case wherever it stands: a capital I with a dot above earlier in
+    the line (two characters once lower-cased) moves nothing."""
+    s = Scratch(tmp_path)
+    h = s.commit({"notes.md": "\u0130stanbul by " + PROFILE_NAME + "\n"})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line notes.md:1", "name")], out
+    silent(out)
+
+
+def test_r087_a_form_feed_inside_an_added_line_moves_no_line_number(tmp_path):
+    """R-087 (round 2): a patch's lines end at a newline only: a form feed or another separator inside an added line
+    neither splits it nor moves the numbers of the lines after it."""
+    s = Scratch(tmp_path)
+    h = s.commit({"notes.md": "a\x0cb\x1cc\u2028d\n" + DRIVE_FWD + "\n"})
+    rc, out = s.run()
+    assert rc == 1 and hits(out) == [hit(h, "line notes.md:2", "path")], out
+
+
+def test_r087_a_commit_s_signature_is_never_read_into_a_hit():
+    """R-087 (round 2): with log.showSignature set, git prints a signature check before a commit's hash and its file
+    list, text that can hold a path or a signer's name; the program turns it off for every git call."""
+    with open(PROG, encoding="utf-8") as f:
+        src = f.read()
+    assert "log.showSignature=false" in src or "--no-show-signature" in src

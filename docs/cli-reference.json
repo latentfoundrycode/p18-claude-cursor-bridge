@@ -927,6 +927,40 @@
       "usage": "pr-activity-check: prove that nobody wrote to a pull request as the owner during a run.\n\n  python ~/.claude/cursor-bridge/pr-activity-check.py <pr-number> --since <ISO-8601 UTC> [--repo owner/name]\n\nWhy (KP-032): the cross-family reviewer and the builder run as `cursor-agent` processes on\nthe owner's machine. Before release 2026.10.04a they inherited the owner's GitHub login, and\na reviewer twice posted its verdict on a pull request under the owner's name. The shim and\nbridge-run.py now withhold that login; this check is the proof, run after every Review B\nand before every merge: it lists every comment, review and review comment on the pull\nrequest created at or after --since and flags any written by the account `gh` is logged\nin as (the owner); it then reads the owner's own GitHub events since --since and flags, in\nthe same repository, what an agent would do and a supervisor would not during a review: a\ncomment or review on any other pull request or issue, a merge, a push straight to main.\nThe supervisor's own pushes to task branches and its opening of pull requests, which go on\nwhile a review runs, are not flagged. A read-only check: `gh api` GET calls only.\n\n--since must carry a time zone (`2026-10-04T13:14:33Z`): the launcher prints exactly that\nas its first stderr line, `bridge-run: started <time>Z`. A timestamp without a zone is\nrefused, because a local time read as UTC would open the window hours late (fail open).\n\nExit 0 = nothing written as the owner since --since; 1 = GATE-INTEGRITY, something was;\n2 = cannot verify (gh not logged in, API error, bad timestamp) - never treat as clean.\nWhat it cannot see: edits to an older comment, a change of title or body, a label; the\nidentity withheld from the agents (KP-032) is what stops those, this check is the proof\nfor the likely cases, not a boundary.\nASCII-only on purpose (cp1252 consoles).\n"
     },
     {
+      "description": "Read each commit of a range and report a path of this computer or an account name, by the place it was found, without printing the text.",
+      "name": "push-scan.py",
+      "options": [
+        {
+          "choices": null,
+          "default": "==SUPPRESS==",
+          "dest": "help",
+          "help": "show this help message and exit",
+          "nargs": 0,
+          "option_strings": [
+            "-h",
+            "--help"
+          ],
+          "required": false,
+          "type": null
+        }
+      ],
+      "path": "bridge/cursor-bridge/push-scan.py",
+      "positionals": [
+        {
+          "choices": null,
+          "default": null,
+          "dest": "base",
+          "help": "revision the range starts after; when omitted, the remote-tracking branch origin's HEAD names",
+          "nargs": "?",
+          "option_strings": [],
+          "required": false,
+          "type": null
+        }
+      ],
+      "source": "argparse",
+      "subcommands": []
+    },
+    {
       "description": "Every TASK/BUG/FIX id merged since a commit has its docs/CHANGES.md line.",
       "name": "records-check.py",
       "options": [

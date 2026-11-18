@@ -707,6 +707,22 @@ for the likely cases, not a boundary.
 ASCII-only on purpose (cp1252 consoles).
 ```
 
+## push-scan.py
+
+Path: `bridge/cursor-bridge/push-scan.py`
+
+```
+Read each commit of a range and report a path of this computer or an account name, by the place it was found, without printing the text.
+```
+
+### Positionals
+
+- `base`; default: null; required: false; revision the range starts after; when omitted, the remote-tracking branch origin's HEAD names
+
+### Options
+
+- `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
+
 ## records-check.py
 
 Path: `bridge/cursor-bridge/records-check.py`
