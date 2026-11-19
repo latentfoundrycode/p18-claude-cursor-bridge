@@ -2460,18 +2460,9 @@ def _git_rev_parse(folder, *args):
         return None
 
 
-def _git_dir(folder):
-    raw = _git_rev_parse(folder, "--git-dir")
-    if raw is None:
-        return None
-    if os.path.isabs(raw):
-        return os.path.normpath(raw)
-    return os.path.normpath(os.path.join(os.path.abspath(folder or "."), raw))
-
-
-def _git_resolved_path(folder, git_path_name):
-    """Absolute path for `git rev-parse --git-path <name>`; relative answers resolve against the worktree top."""
-    raw = _git_rev_parse(folder, "--git-path", git_path_name)
+def _git_rev_parse_path(folder, *args):
+    """Absolute path of a git rev-parse answer. A relative answer is resolved against the launch folder (folder, or the current folder). None where git gives none."""
+    raw = _git_rev_parse(folder, *args)
     if raw is None:
         return None
     if os.path.isabs(raw):
@@ -2544,20 +2535,18 @@ class GitConfigWatch(object):
             self._files.append((os.path.join(common, "config"), _git_display_path(os.path.join(common, "config"), parent)))
             attrs = os.path.join(common, "info", "attributes")
             self._files.append((attrs, _git_display_path(attrs, parent)))
-            git_dir = _git_dir(folder)
+            git_dir = _git_rev_parse_path(folder, "--git-dir")
             if git_dir:
                 wt_cfg = os.path.join(git_dir, "config.worktree")
                 self._files.append((wt_cfg, _git_display_path(wt_cfg, parent)))
                 commondir = os.path.join(git_dir, "commondir")
                 self._files.append((commondir, _git_display_path(commondir, parent)))
-            top = _git_rev_parse(folder, "--show-toplevel")
+            top = _git_rev_parse_path(folder, "--show-toplevel")
             if top:
-                if not os.path.isabs(top):
-                    top = os.path.normpath(os.path.join(os.path.abspath(folder or "."), top))
                 dot_git = os.path.join(top, ".git")
                 self._files.append((dot_git, _git_display_path(dot_git, parent)))
             seen = set()
-            for hooks in (_git_resolved_path(folder, "hooks"), os.path.join(common, "hooks")):
+            for hooks in (_git_rev_parse_path(folder, "--git-path", "hooks"), os.path.join(common, "hooks")):
                 if not hooks:
                     continue
                 key = os.path.normcase(os.path.normpath(hooks))
@@ -2599,13 +2588,7 @@ class GitConfigWatch(object):
         except Exception:
             return None
 
-    def after(self):
-        if not self.active:
-            return None
-        try:
-            return self._snapshot()
-        except Exception:
-            return None
+    after = before
 
 
 def git_config_changes(before, after):
