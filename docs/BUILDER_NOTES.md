@@ -92,3 +92,7 @@
 2026-11-18 TASK-067-r9: the outer NFKC is what keeps a character whose case fold is a letter plus a combining mark (U+01F0 folds to j plus U+030C) one word character; without it Python's `re` treats the mark as a boundary, so the base letters match as a whole word. The inner NFKC has to run before `casefold`, or a modifier letter such as U+1D2C becomes a capital letter (NFKC after `casefold` yields `A`) and misses the ASCII spelling.
 
 2026-11-18 TASK-067-r10: with both readings kept, dropping the outer NFKC makes the folded reading hit a name ending in `j` before U+01F0 (the raw reading does not), and dropping the inner NFKC misses a name holding U+1D2C written in plain letters (the raw reading misses it too). Replacing only the raw reading with the lower-cased index match still finds an ASCII name after U+0130, because the folded reading matches that name; a dotted or dotless `i` in the name's own letters is what that mutant misses.
+
+2026-11-19 REFAC-008: `git grep -n -w -e app_id_of -e suite_id -e is_int_id` matches the committed brief in handoff/REFAC-008.md, and `git grep` of `_check_app` also matches tests/test_loop_guard.py's `test_the_run_sheet_check_applies_in_every_phase_and_blocks_the_stop` because that name contains the substring `_check_app`; the helpers themselves are only in the three programs.
+
+2026-11-19 REFAC-009: `git grep -n -w -e reply_bits -e rule_contexts` matches only the committed brief in handoff/REFAC-009.md; the two names are unused in bridge, tools, tests and docs, so the move continued.

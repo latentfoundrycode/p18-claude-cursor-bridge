@@ -2029,12 +2029,7 @@ def _watch_plain(text):
 
 def _watch_bits(got, fallback):
     """(source, reason) as the reader clipped them, or the fallback when the reply has neither."""
-    source, reason = fallback, "cannot read"
-    if isinstance(got, dict):
-        if isinstance(got.get("source"), str) and got.get("source"):
-            source = got["source"]
-        if isinstance(got.get("reason"), str) and got.get("reason"):
-            reason = got["reason"]
+    source, reason = bridge_env.reply_bits(got, fallback)
     return _watch_plain(source), _watch_plain(reason)
 
 
@@ -2081,25 +2076,11 @@ def _watch_head12(local, github):
     return _watch_plain(shown)[:12]
 
 
-def _watch_contexts(rule):
-    """The rule's contexts, [] where it names none, or None where it cannot be read (never a pass)."""
-    if not isinstance(rule, dict):
-        return None
-    if rule.get("answer") == bridge_env.ANSWER_NONE:
-        return []
-    if rule.get("answer") != bridge_env.ANSWER_VALUE:
-        return None
-    contexts = rule.get("contexts")
-    if not isinstance(contexts, list) or not contexts:
-        return None
-    return contexts
-
-
 def _watch_name(base, folder):
     """What this run waits for, read once, in the same order as prove_ci. A rule that cannot be read waits on the runs."""
     base_shown = _watch_plain(base)
     rule = bridge_env.branch_rule(_WATCH_REPO, base, cwd=folder)
-    contexts = _watch_contexts(rule)
+    contexts = bridge_env.rule_contexts(rule)
     if contexts:
         return {"kind": "base", "reading": "the base branch's required contexts (%s)" % base_shown,
                 "contexts": contexts, "why": None}
@@ -2121,7 +2102,7 @@ def _watch_name(base, folder):
         return {"kind": "runs", "reading": "the workflow runs", "contexts": None, "why": why}
     default_shown = _watch_plain(default)
     other = bridge_env.branch_rule(_WATCH_REPO, default, cwd=folder)
-    contexts = _watch_contexts(other)
+    contexts = bridge_env.rule_contexts(other)
     if contexts:
         why = "the base branch %s names no required context" % base_shown
         return {"kind": "default", "reading": "the default branch's required contexts (%s)" % default_shown,
@@ -2134,31 +2115,12 @@ def _watch_name(base, folder):
     return {"kind": "runs", "reading": "the workflow runs", "contexts": None, "why": why}
 
 
-def _watch_suite(item):
-    suite = item.get("check_suite") if isinstance(item, dict) else None
-    if not isinstance(suite, dict):
-        return None
-    value = suite.get("id")
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
-
-
-def _run_suite(run):
-    if not isinstance(run, dict):
-        return None
-    value = run.get("check_suite_id")
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
-
-
 def _checks_of_run(run, checks):
     """Latest checks whose suite is this run's. A check no run made never counts."""
-    suite = _run_suite(run)
+    suite = bridge_env.suite_id(run, "check_suite_id")
     if suite is None:
         return []
-    return [item for item in checks if isinstance(item, dict) and _watch_suite(item) == suite]
+    return [item for item in checks if isinstance(item, dict) and bridge_env.suite_id(item, "check_suite") == suite]
 
 
 def _watch_runs(latest):
@@ -2179,21 +2141,6 @@ def _failed_check(latest, named):
     return None
 
 
-def _watch_app(item):
-    """The check's app id, an int. A bool is not an id. A commit status has no app."""
-    app = item.get("app") if isinstance(item, dict) else None
-    if not isinstance(app, dict):
-        return None
-    value = app.get("id")
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
-
-
-def _watch_app_tied(app_id):
-    return isinstance(app_id, int) and not isinstance(app_id, bool)
-
-
 def _check_holds(item, entry):
     """A latest check holds this context when its name matches, and its app where the rule names one."""
     if not isinstance(item, dict) or not isinstance(entry, dict):
@@ -2201,8 +2148,8 @@ def _check_holds(item, entry):
     name = entry.get("context")
     if not isinstance(name, str) or item.get("name") != name:
         return False
-    if _watch_app_tied(entry.get("app_id")):
-        return _watch_app(item) == entry.get("app_id")
+    if bridge_env.is_int_id(entry.get("app_id")):
+        return bridge_env.app_id_of(item) == entry.get("app_id")
     return True
 
 
@@ -2217,7 +2164,7 @@ def _missing_contexts(contexts, latest):
             missing.append("unreadable")
             continue
         held = any(_check_holds(item, entry) for item in checks)
-        if not held and isinstance(entry, dict) and not _watch_app_tied(entry.get("app_id")):
+        if not held and isinstance(entry, dict) and not bridge_env.is_int_id(entry.get("app_id")):
             held = any(isinstance(item, dict) and item.get("context") == name for item in statuses)
         if not held:
             missing.append(name)
@@ -2299,7 +2246,7 @@ def _watch_decision(named, latest, restart):
     every check, and the first such failure starts the watch.
     """
     failed = _failed_check(latest, named)
-    if failed is not None and (named["kind"] != "base" or any(_check_holds(failed, entry) for entry in named["contexts"] or [])):
+    if failed is not None:
         what = "check %s failed (%s)" % (_watch_plain(failed.get("name")), _watch_plain(failed.get("conclusion")))
         return True, what, None
     if named["kind"] == "runs":
@@ -2390,8 +2337,6 @@ def watch_loop(argv, folder, limit, start):
                 _watch_say(line)
         if polled["kind"] == "fail":
             head12 = _watch_head12(polled.get("local"), polled.get("github") if polled.get("base") else None)
-            if not polled.get("base"):
-                head12 = _watch_head12(polled.get("local"), None)
             if not told_fail:
                 _watch_say("a poll failed (%s: %s); retrying every %ds until the limit" % (polled["source"], polled["reason"], WATCH_POLL))
                 told_fail = True
@@ -2513,18 +2458,9 @@ def _git_rev_parse(folder, *args):
         return None
 
 
-def _git_dir(folder):
-    raw = _git_rev_parse(folder, "--git-dir")
-    if raw is None:
-        return None
-    if os.path.isabs(raw):
-        return os.path.normpath(raw)
-    return os.path.normpath(os.path.join(os.path.abspath(folder or "."), raw))
-
-
-def _git_resolved_path(folder, git_path_name):
-    """Absolute path for `git rev-parse --git-path <name>`; relative answers resolve against the worktree top."""
-    raw = _git_rev_parse(folder, "--git-path", git_path_name)
+def _git_rev_parse_path(folder, *args):
+    """Absolute path of a git rev-parse answer. A relative answer is resolved against the launch folder (folder, or the current folder). None where git gives none."""
+    raw = _git_rev_parse(folder, *args)
     if raw is None:
         return None
     if os.path.isabs(raw):
@@ -2597,20 +2533,18 @@ class GitConfigWatch(object):
             self._files.append((os.path.join(common, "config"), _git_display_path(os.path.join(common, "config"), parent)))
             attrs = os.path.join(common, "info", "attributes")
             self._files.append((attrs, _git_display_path(attrs, parent)))
-            git_dir = _git_dir(folder)
+            git_dir = _git_rev_parse_path(folder, "--git-dir")
             if git_dir:
                 wt_cfg = os.path.join(git_dir, "config.worktree")
                 self._files.append((wt_cfg, _git_display_path(wt_cfg, parent)))
                 commondir = os.path.join(git_dir, "commondir")
                 self._files.append((commondir, _git_display_path(commondir, parent)))
-            top = _git_rev_parse(folder, "--show-toplevel")
+            top = _git_rev_parse_path(folder, "--show-toplevel")
             if top:
-                if not os.path.isabs(top):
-                    top = os.path.normpath(os.path.join(os.path.abspath(folder or "."), top))
                 dot_git = os.path.join(top, ".git")
                 self._files.append((dot_git, _git_display_path(dot_git, parent)))
             seen = set()
-            for hooks in (_git_resolved_path(folder, "hooks"), os.path.join(common, "hooks")):
+            for hooks in (_git_rev_parse_path(folder, "--git-path", "hooks"), os.path.join(common, "hooks")):
                 if not hooks:
                     continue
                 key = os.path.normcase(os.path.normpath(hooks))
@@ -2652,13 +2586,7 @@ class GitConfigWatch(object):
         except Exception:
             return None
 
-    def after(self):
-        if not self.active:
-            return None
-        try:
-            return self._snapshot()
-        except Exception:
-            return None
+    after = before
 
 
 def git_config_changes(before, after):
