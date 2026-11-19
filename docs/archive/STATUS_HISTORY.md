@@ -273,3 +273,13 @@ Last accepted: TASK-051 (PR #146, at its merge): records-migrate.py, R-062's pro
 ## Moved 2026-11-11 (BUG-044's records, PR #148)
 
 Last accepted: TASK-052 (PR #147, at its merge): R-062's text half, the eight templates' headers, the core's header rule, calibrate-bridge.md's migration item, step 3b's header refusal; before it TASK-051 (PR #146), records-migrate.py; earlier: docs/archive/STATUS_HISTORY.md; main holds TASK-001 to TASK-052, BUG-001 to BUG-043, the refactoring passes of B2 to B5, T1, T2 and H1, HOTFIX-001 to HOTFIX-003, CFG-B3, CONFIG-B3b, FIX-001 to FIX-004
+
+## Moved 2026-11-19 (stage P2's close): the section "Release B — notes for a resuming session"
+
+- This is the first release the bridge's own supervisor builds, as a supervised project (§15 condition 6). The design is the Restructuring Plan (Documents/Claude-Cursor Bridge Restructuring Plan.md), release B, §16 and §6.
+- Roster: the native profile (builder composer-2.5, Review A claude-opus-5-5, Review B grok-4.7-medium) since 2026-10-18, on the owner's word ("use the alternative roster") after Cursor's Other Models pool was used up (ISS-008); the full profile (builder grok-4.7-medium, Review B gpt-5.6-sol-high) returns on 2026-11-16 UTC, or earlier if the owner says *usage reset*.
+- The owner's re-plan of 2026-10-18 (the design critique's ceiling as hotfix 2026.10.18a first, then release B) is complete: the hotfix on main as e1a97de (PR #40), stage B2 closed 2026-10-19.
+- `security floor` is a required check on main since 2026-10-13 (the owner's yes).
+- Merge authority = supervisor — the supervisor completes each gated merge with bare `gh pr merge --squash --match-head-commit` (piped/compound forms fall to the classifier; --admin/force stay refused).
+- One writer at a time (§15 condition 2): while this supervisor builds, the maintainer session must not touch this repo.
+- Governance text is authored by the supervisor and gated by the two-critic design review; programs are delegated to the builder and gated by the delegation loop (§15 condition 3).
