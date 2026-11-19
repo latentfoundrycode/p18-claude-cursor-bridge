@@ -1,4 +1,6 @@
-# SCOPE — TASK-082, round 1
+# SCOPE — TASK-082, round 2
+
+Round 2 fixes Review B's two round-1 findings (docs/HARDENING.md, TASK-082, "Review B, round 1"): step 4's GIT-CONFIG sentence names the word `unreadable` beside the other three, and the sentinel reports each push-scan hit by its commit and its place as the program prints it. Commits 27083f5 (the fix and its two pins), a2f6bb4 (the records, round 1's review files removed), then the GIT-CONFIG sentence reworded on Review A's round-2 note to what the launcher prints (a line only where a file's state differs before and after the run) and its record. No class line: round 2 is below the ceiling.
 
 TASK-082 is a supervisor-authored text increment: no builder, no brief. Its specification is the plan entry, quoted below from docs/BUILD_PLAN.md (### TASK-082). The increment ends at the texts and records listed in its Scope; the programs those texts name merged earlier in stage P2 (TASK-059, TASK-062, TASK-064, TASK-065, TASK-067, TASK-083, TASK-084) and are not under review here.
 
@@ -25,7 +27,7 @@ docs/INVENTORY.md, Decisions: "The bridge's threat model as a whole" (outside in
 - tests/test_allowlist.py: the ordinary-command example takes the direct merge form (the armed form retired); every instructed command, `review-guard.py ready <n>` and `push-scan.py origin/<the base>` among them, is collected and checked against the allow rules and the guard by the existing parametrized tests.
 - tests/test_release_t_merge.py: P5 pins the sentinel's new push-scan sentence and step 8's push-scan sentence; P4 pins step 8's "arm no merge" sentence and that step 8 holds no `--auto`.
 - tests/test_a5_followups.py: the watch test pins "A watch's return is never the proof that CI passed", `ready`'s command and KP-051's pointer, and that step 8 holds no `statusCheckRollup`.
-- tests/test_bug043.py: step 4's sentence pinned with the GIT-CONFIG sentence in place of "the launcher's comparison ... is a program item".
+- tests/test_bug043.py: step 4's sentence pinned with the GIT-CONFIG sentence (its four words since round 2) in place of "the launcher's comparison ... is a program item".
 
 No mutants file and no mutation driver: the increment changes no program; its tests are pins of text.
 
