@@ -4257,7 +4257,25 @@ def _last_by(group, time_key, id_only_when_any_time_missing):
     return best
 
 
-def _suite_id(item, key):
+def is_int_id(value):
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def app_id_of(item):
+    if not isinstance(item, dict):
+        return None
+    app = item.get("app")
+    if not isinstance(app, dict):
+        return None
+    value = app.get("id")
+    if not is_int_id(value):
+        return None
+    return value
+
+
+def suite_id(item, key):
+    if not isinstance(item, dict):
+        return None
     if key == "check_suite":
         suite = item.get("check_suite")
         if not isinstance(suite, dict):
@@ -4265,17 +4283,7 @@ def _suite_id(item, key):
         value = suite.get("id")
     else:
         value = item.get(key)
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
-
-
-def _app_id_of(item):
-    app = item.get("app")
-    if not isinstance(app, dict):
-        return None
-    value = app.get("id")
-    if isinstance(value, bool) or not isinstance(value, int):
+    if not is_int_id(value):
         return None
     return value
 
@@ -4293,7 +4301,7 @@ def latest_of_each(state):
     for index, run in enumerate(runs):
         if not isinstance(run, dict):
             continue
-        sid = _suite_id(run, "check_suite_id")
+        sid = suite_id(run, "check_suite_id")
         if sid is not None:
             all_suites.add(sid)
         key = (_freeze(run.get("workflow_id")), _freeze(run.get("event")))
@@ -4306,7 +4314,7 @@ def latest_of_each(state):
     latest_runs = [best[key][1] for key in order]
     latest_suites = set()
     for run in latest_runs:
-        sid = _suite_id(run, "check_suite_id")
+        sid = suite_id(run, "check_suite_id")
         if sid is not None:
             latest_suites.add(sid)
     made = {}
@@ -4316,14 +4324,14 @@ def latest_of_each(state):
     for item in checks:
         if not isinstance(item, dict):
             continue
-        sid = _suite_id(item, "check_suite")
+        sid = suite_id(item, "check_suite")
         if sid is not None and sid in all_suites:
             if sid not in latest_suites:
                 continue
             key = (sid, _freeze(item.get("name")))
             store, store_order = made, made_order
         else:
-            key = (_freeze(item.get("name")), _app_id_of(item))
+            key = (_freeze(item.get("name")), app_id_of(item))
             store, store_order = free, free_order
         if key not in store:
             store_order.append(key)

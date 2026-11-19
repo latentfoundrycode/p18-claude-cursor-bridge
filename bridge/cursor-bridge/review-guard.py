@@ -1535,20 +1535,6 @@ def _rule_contexts(got, which):
     return contexts, None
 
 
-def _check_app(item):
-    app = item.get("app") if isinstance(item, dict) else None
-    if not isinstance(app, dict):
-        return None
-    value = app.get("id")
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
-
-
-def _named_app(app_id):
-    return isinstance(app_id, int) and not isinstance(app_id, bool)
-
-
 def _failure_beside(latest):
     """A latest check or a latest run of the head that ci_class calls failed."""
     for item in latest.get("checks") or []:
@@ -1562,10 +1548,10 @@ def _failure_beside(latest):
 
 def _context_result(name, app_id, latest):
     """(class, note or None) of one required context. passed, missing, pending or failed."""
-    named = _named_app(app_id)
+    named = bridge_env.is_int_id(app_id)
     checks, statuses = [], []
     for item in latest.get("checks") or []:
-        if isinstance(item, dict) and item.get("name") == name and (not named or _check_app(item) == app_id):
+        if isinstance(item, dict) and item.get("name") == name and (not named or bridge_env.app_id_of(item) == app_id):
             checks.append(item)
     for item in latest.get("statuses") or []:
         if isinstance(item, dict) and item.get("context") == name:
@@ -1688,7 +1674,7 @@ def prove_ci(pr, head, cwd):
             if not isinstance(entry, dict) or not isinstance(entry.get("context"), str) or not entry.get("context"):
                 return 2, _cannot(pr, "a required context cannot be read"), ""
             app_id = entry.get("app_id")
-            if app_id is not None and not _named_app(app_id):
+            if app_id is not None and not bridge_env.is_int_id(app_id):
                 return 2, _cannot(pr, "a required context cannot be read"), ""
             klass, note = _context_result(entry["context"], app_id, latest)
             if klass == "passed":

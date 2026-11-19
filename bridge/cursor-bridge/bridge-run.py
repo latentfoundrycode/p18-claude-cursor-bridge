@@ -2134,31 +2134,12 @@ def _watch_name(base, folder):
     return {"kind": "runs", "reading": "the workflow runs", "contexts": None, "why": why}
 
 
-def _watch_suite(item):
-    suite = item.get("check_suite") if isinstance(item, dict) else None
-    if not isinstance(suite, dict):
-        return None
-    value = suite.get("id")
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
-
-
-def _run_suite(run):
-    if not isinstance(run, dict):
-        return None
-    value = run.get("check_suite_id")
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
-
-
 def _checks_of_run(run, checks):
     """Latest checks whose suite is this run's. A check no run made never counts."""
-    suite = _run_suite(run)
+    suite = bridge_env.suite_id(run, "check_suite_id")
     if suite is None:
         return []
-    return [item for item in checks if isinstance(item, dict) and _watch_suite(item) == suite]
+    return [item for item in checks if isinstance(item, dict) and bridge_env.suite_id(item, "check_suite") == suite]
 
 
 def _watch_runs(latest):
@@ -2179,21 +2160,6 @@ def _failed_check(latest, named):
     return None
 
 
-def _watch_app(item):
-    """The check's app id, an int. A bool is not an id. A commit status has no app."""
-    app = item.get("app") if isinstance(item, dict) else None
-    if not isinstance(app, dict):
-        return None
-    value = app.get("id")
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
-
-
-def _watch_app_tied(app_id):
-    return isinstance(app_id, int) and not isinstance(app_id, bool)
-
-
 def _check_holds(item, entry):
     """A latest check holds this context when its name matches, and its app where the rule names one."""
     if not isinstance(item, dict) or not isinstance(entry, dict):
@@ -2201,8 +2167,8 @@ def _check_holds(item, entry):
     name = entry.get("context")
     if not isinstance(name, str) or item.get("name") != name:
         return False
-    if _watch_app_tied(entry.get("app_id")):
-        return _watch_app(item) == entry.get("app_id")
+    if bridge_env.is_int_id(entry.get("app_id")):
+        return bridge_env.app_id_of(item) == entry.get("app_id")
     return True
 
 
@@ -2217,7 +2183,7 @@ def _missing_contexts(contexts, latest):
             missing.append("unreadable")
             continue
         held = any(_check_holds(item, entry) for item in checks)
-        if not held and isinstance(entry, dict) and not _watch_app_tied(entry.get("app_id")):
+        if not held and isinstance(entry, dict) and not bridge_env.is_int_id(entry.get("app_id")):
             held = any(isinstance(item, dict) and item.get("context") == name for item in statuses)
         if not held:
             missing.append(name)
