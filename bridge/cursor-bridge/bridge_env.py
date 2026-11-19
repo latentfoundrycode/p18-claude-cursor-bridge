@@ -4288,6 +4288,29 @@ def suite_id(item, key):
     return value
 
 
+def reply_bits(got, fallback):
+    source, reason = fallback, "cannot read"
+    if isinstance(got, dict):
+        if isinstance(got.get("source"), str) and got.get("source"):
+            source = got["source"]
+        if isinstance(got.get("reason"), str) and got.get("reason"):
+            reason = got["reason"]
+    return source, reason
+
+
+def rule_contexts(got):
+    if not isinstance(got, dict):
+        return None
+    if got.get("answer") == ANSWER_NONE:
+        return []
+    if got.get("answer") != ANSWER_VALUE:
+        return None
+    contexts = got.get("contexts")
+    if not isinstance(contexts, list) or not contexts:
+        return None
+    return contexts
+
+
 def latest_of_each(state):
     """The latest run of each workflow and event, and the latest check or status of each source."""
     if not isinstance(state, dict):

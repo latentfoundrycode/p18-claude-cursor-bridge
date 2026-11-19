@@ -1475,16 +1475,6 @@ def _cannot(pr, reason):
     return "review-guard: CANNOT CHECK - pull request %s: %s" % (pr, reason)
 
 
-def _reader_bits(got, fallback):
-    source, reason = fallback, "cannot read"
-    if isinstance(got, dict):
-        if isinstance(got.get("source"), str) and got.get("source"):
-            source = got["source"]
-        if isinstance(got.get("reason"), str) and got.get("reason"):
-            reason = got["reason"]
-    return source, reason
-
-
 def _premerge_stands(common, head):
     """The premerge record for this head, present and readable as a JSON object. Anything else is no record."""
     if not isinstance(head, str) or not head or head in (".", "..") or "/" in head or "\\" in head:
@@ -1523,14 +1513,9 @@ def _write_ready_record(common, pr, head, reading):
 
 def _rule_contexts(got, which):
     """(contexts, None) or (None, the CANNOT CHECK reason). An empty list is a rule that names none."""
-    if not isinstance(got, dict) or got.get("answer") not in (bridge_env.ANSWER_VALUE, bridge_env.ANSWER_NONE):
-        source, reason = _reader_bits(got, "protection")
-        return None, "the %s branch's rule cannot be read (%s: %s)" % (which, source, reason)
-    if got.get("answer") == bridge_env.ANSWER_NONE:
-        return [], None
-    contexts = got.get("contexts")
-    if not isinstance(contexts, list) or not contexts:
-        source, reason = _reader_bits(got, "protection")
+    contexts = bridge_env.rule_contexts(got)
+    if contexts is None:
+        source, reason = bridge_env.reply_bits(got, "protection")
         return None, "the %s branch's rule cannot be read (%s: %s)" % (which, source, reason)
     return contexts, None
 
@@ -1608,7 +1593,7 @@ def _await_pull(pr, head, cwd):
     def read():
         got = bridge_env.pull_refs(repo, pr, cwd=cwd)
         if not isinstance(got, dict) or got.get("answer") != bridge_env.ANSWER_VALUE:
-            source, reason = _reader_bits(got, "pull")
+            source, reason = bridge_env.reply_bits(got, "pull")
             return None, "the pull request cannot be read (%s: %s)" % (source, reason)
         return got, None
 
@@ -1648,7 +1633,7 @@ def prove_ci(pr, head, cwd):
     else:
         settings = bridge_env.repo_settings(repo, cwd=cwd)
         if not isinstance(settings, dict) or settings.get("answer") != bridge_env.ANSWER_VALUE:
-            source, reason = _reader_bits(settings, "repo")
+            source, reason = bridge_env.reply_bits(settings, "repo")
             return 2, _cannot(pr, "the default branch cannot be read (%s: %s)" % (source, reason)), ""
         default = settings.get("default_branch")
         if not isinstance(default, str) or not default:
@@ -1665,7 +1650,7 @@ def prove_ci(pr, head, cwd):
                 reading, required = "the workflow runs", None
     state = bridge_env.head_state(repo, remote, cwd=cwd)
     if not isinstance(state, dict) or state.get("answer") != bridge_env.ANSWER_VALUE:
-        source, reason = _reader_bits(state, "checks")
+        source, reason = bridge_env.reply_bits(state, "checks")
         return 2, _cannot(pr, "the head cannot be read (%s: %s)" % (source, reason)), ""
     latest = bridge_env.latest_of_each(state)
     if required is not None:

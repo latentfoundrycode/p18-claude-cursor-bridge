@@ -2029,12 +2029,7 @@ def _watch_plain(text):
 
 def _watch_bits(got, fallback):
     """(source, reason) as the reader clipped them, or the fallback when the reply has neither."""
-    source, reason = fallback, "cannot read"
-    if isinstance(got, dict):
-        if isinstance(got.get("source"), str) and got.get("source"):
-            source = got["source"]
-        if isinstance(got.get("reason"), str) and got.get("reason"):
-            reason = got["reason"]
+    source, reason = bridge_env.reply_bits(got, fallback)
     return _watch_plain(source), _watch_plain(reason)
 
 
@@ -2081,25 +2076,11 @@ def _watch_head12(local, github):
     return _watch_plain(shown)[:12]
 
 
-def _watch_contexts(rule):
-    """The rule's contexts, [] where it names none, or None where it cannot be read (never a pass)."""
-    if not isinstance(rule, dict):
-        return None
-    if rule.get("answer") == bridge_env.ANSWER_NONE:
-        return []
-    if rule.get("answer") != bridge_env.ANSWER_VALUE:
-        return None
-    contexts = rule.get("contexts")
-    if not isinstance(contexts, list) or not contexts:
-        return None
-    return contexts
-
-
 def _watch_name(base, folder):
     """What this run waits for, read once, in the same order as prove_ci. A rule that cannot be read waits on the runs."""
     base_shown = _watch_plain(base)
     rule = bridge_env.branch_rule(_WATCH_REPO, base, cwd=folder)
-    contexts = _watch_contexts(rule)
+    contexts = bridge_env.rule_contexts(rule)
     if contexts:
         return {"kind": "base", "reading": "the base branch's required contexts (%s)" % base_shown,
                 "contexts": contexts, "why": None}
@@ -2121,7 +2102,7 @@ def _watch_name(base, folder):
         return {"kind": "runs", "reading": "the workflow runs", "contexts": None, "why": why}
     default_shown = _watch_plain(default)
     other = bridge_env.branch_rule(_WATCH_REPO, default, cwd=folder)
-    contexts = _watch_contexts(other)
+    contexts = bridge_env.rule_contexts(other)
     if contexts:
         why = "the base branch %s names no required context" % base_shown
         return {"kind": "default", "reading": "the default branch's required contexts (%s)" % default_shown,
