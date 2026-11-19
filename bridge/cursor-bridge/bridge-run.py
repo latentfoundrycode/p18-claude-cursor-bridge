@@ -2246,7 +2246,7 @@ def _watch_decision(named, latest, restart):
     every check, and the first such failure starts the watch.
     """
     failed = _failed_check(latest, named)
-    if failed is not None and (named["kind"] != "base" or any(_check_holds(failed, entry) for entry in named["contexts"] or [])):
+    if failed is not None:
         what = "check %s failed (%s)" % (_watch_plain(failed.get("name")), _watch_plain(failed.get("conclusion")))
         return True, what, None
     if named["kind"] == "runs":
@@ -2337,8 +2337,6 @@ def watch_loop(argv, folder, limit, start):
                 _watch_say(line)
         if polled["kind"] == "fail":
             head12 = _watch_head12(polled.get("local"), polled.get("github") if polled.get("base") else None)
-            if not polled.get("base"):
-                head12 = _watch_head12(polled.get("local"), None)
             if not told_fail:
                 _watch_say("a poll failed (%s: %s); retrying every %ds until the limit" % (polled["source"], polled["reason"], WATCH_POLL))
                 told_fail = True
