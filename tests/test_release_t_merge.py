@@ -74,7 +74,7 @@ def test_r045_p5_every_pushed_commit_scanned():
     (step 8 and secret-sentinel)."""
     assert "a leak in a commit not yet pushed is removed from that commit, by rewriting it before the push, never covered by a later commit (P5)" in step8()
     # TASK-082 (R-087): the scan is push-scan.py, with one range form, in place of the hand-run `git log -p`
-    assert flat('\n**Before a push, every commit it publishes.** When the supervisor asks before a push, run `python ~/.claude/cursor-bridge/push-scan.py origin/<the base>`, which reads every commit the push publishes, not only the staged diff, for those paths and for the owner\'s account names, and prints each hit\'s place, never its text: a commit not yet pushed is rewritten to remove the leak, never covered by a later commit, so report each hit by its commit and line (P5).\n').strip() in flat(read(SENTINEL))
+    assert flat('\n**Before a push, every commit it publishes.** When the supervisor asks before a push, run `python ~/.claude/cursor-bridge/push-scan.py origin/<the base>`, which reads every commit the push publishes, not only the staged diff, for those paths and for the owner\'s account names, and prints each hit\'s place, never its text: a commit not yet pushed is rewritten to remove the leak, never covered by a later commit, so report each hit as the program prints it, by its commit and its place: the message, the author or committer, a file\'s own name by its position, or a line (P5).\n').strip() in flat(read(SENTINEL))
     assert "by `python ~/.claude/cursor-bridge/push-scan.py origin/<the base>`, which reads `origin/<the base>..HEAD`" in step8()
 
 
