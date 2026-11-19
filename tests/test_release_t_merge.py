@@ -73,13 +73,16 @@ def test_r045_p5_every_pushed_commit_scanned():
     """P5: every commit a push publishes is read for computer paths and account names, a leak removed from the commit
     (step 8 and secret-sentinel)."""
     assert "a leak in a commit not yet pushed is removed from that commit, by rewriting it before the push, never covered by a later commit (P5)" in step8()
-    assert flat('\n**Before a push, every commit it publishes.** When the supervisor asks before a push, scan every commit the push publishes (`git log -p <the base>..HEAD`), not only the staged diff, for those paths and for the account names the supervisor gives you: a commit not yet pushed is rewritten to remove the leak, never covered by a later commit, so report each by its commit and line (P5).\n').strip() in flat(read(SENTINEL))
+    # TASK-082 (R-087): the scan is push-scan.py, with one range form, in place of the hand-run `git log -p`
+    assert flat('\n**Before a push, every commit it publishes.** When the supervisor asks before a push, run `python ~/.claude/cursor-bridge/push-scan.py origin/<the base>`, which reads every commit the push publishes, not only the staged diff, for those paths and for the owner\'s account names, and prints each hit\'s place, never its text: a commit not yet pushed is rewritten to remove the leak, never covered by a later commit, so report each hit as the program prints it, by its commit and its place: the message, the author or committer, a file\'s own name by its position, or a line (P5).\n').strip() in flat(read(SENTINEL))
+    assert "by `python ~/.claude/cursor-bridge/push-scan.py origin/<the base>`, which reads `origin/<the base>..HEAD`" in step8()
 
 
 def test_r045_p4_the_merged_branch_deleted_and_the_armed_form_skipped():
-    """P4's text: the armed form skipped where the repository refuses auto-merge; the merged branch deleted locally and
-    on the remote with the two bare commands."""
-    assert flat(', or, where the repository refuses auto-merge (its `allow_auto_merge` setting off), skip the armed form, the direct merge after the green watch being the merge,') in step8()
+    """P4's text: the merged branch deleted locally and on the remote with the two bare commands. The armed form P4
+    skipped where the repository refuses auto-merge is retired everywhere by TASK-082 (R-083): no merge is armed."""
+    assert flat('Under `supervisor` (the default), arm no merge: one set before the watch is refused without the ready record (below)') in step8()
+    assert "--auto" not in step8()
     assert flat(' Then delete the merged branch, locally and on the remote, each command bare: `git branch -D <branch>`, then `git push origin --delete <branch>` (P4).') in step8()
 
 

@@ -288,10 +288,7 @@ open gate-integrity flag.** Anything else does not merge, the records-only short
 carries none of the three verdicts is a failed launch, never a verdict of any kind: the
 supervisor re-runs it once and then takes the roster's failure path (release A5).
 
-**CI green means the run of the pushed head.** A watch started right after a push can
-report the previous commit's finished run; before the merge the supervisor confirms that
-the green run's head equals the pushed head (`gh pr view <n> --json statusCheckRollup,headRefOid`),
-which `premerge` checks for the pull request's head as well (the TDP's TASK-117-r2, KP-051).
+**CI green means the run of the pushed head**, proven by `review-guard.py ready`, never by a watch's return (the merge step, `~/.claude/cursor-bridge/workflow/phases/delegation-loop/merge.md`; KP-051).
 
 **A vulnerability newly published in a pinned library nobody touched** fails every pull
 request of the project at once, since the scanner reads the lock. The procedure (the TDP's
@@ -386,7 +383,7 @@ It answers in the critic's grades, Blocking, Should fix and Consider, each findi
 
 The gate decides *whether* a branch may merge; the owner's `Merge authority` run parameter
 (`docs/RUN_PARAMETERS.md`, set once after the plan is approved) decides *who* completes it.
-Under `supervisor` (the default) the supervisor arms and completes the merge as described
+Under `supervisor` (the default) the supervisor completes the merge as described
 below. Under `owner` the supervisor does everything up to the merge and then stops with
 **READY TO MERGE** — the PR link, the four conditions with their evidence, and a one-line
 run sheet — and never arms auto-merge. The parameter changes the last step only: the four
@@ -402,32 +399,16 @@ the model reviews. Using it raw would silently defeat this policy.
 The composition that keeps the gate intact:
 
 1. The supervisor opens the PR and runs Review A and Review B on the PR's diff.
-2. **Only if both APPROVE and no gate-integrity flag is open** does the supervisor arm the
-   merge — `gh pr merge <n> --squash --auto --match-head-commit <sha>`, the sha that `review-guard.py premerge` printed — and then watch the required `gate` check with **one background command** (`gh pr checks <n> --watch --required --fail-fast`, run in the background). Its completion is what wakes the supervisor; the desktop app's CI monitor reports failures and review comments only, never a green gate, so it cannot be the wake-up (KP-028).
+2. **Only if both APPROVE and no gate-integrity flag is open** does the supervisor watch the required `gate` check, arming no merge, and merge directly (`gh pr merge <n> --squash --match-head-commit <sha>`) once `review-guard.py ready <n>` prints `READY`; the watch, `ready` and the merge are the merge step's (`~/.claude/cursor-bridge/workflow/phases/delegation-loop/merge.md`).
 3. The merge lands only when the required CI check is green — which, thanks to branch
    protection on the Team plan, is a *required* check, so a red or missing CI run blocks
    the merge at the repo level as a hard backstop.
 
-**Completing the merge — do not depend on GitHub's auto-merge queue.** GitHub's auto-merge
-queue frequently lags by minutes after the check goes green; that is a known GitHub-side
-delay with no reliable fix. Do not sit polling it. Once the merge is **authorised** — both
-reviews APPROVE, no gate-integrity flag, the required `gate` check green, and the PR
-mergeable/`CLEAN` — the supervisor may **complete the squash directly** (`gh pr merge <n>
---squash --match-head-commit <sha>`). This is safe and equivalent to the queue landing it: branch protection enforces
-the required check regardless of *who* triggers the merge, so a direct `gh pr merge` cannot
-bypass CI any more than auto-merge can. The armed `--auto` form (with the same `--match-head-commit`) is still set first,
-as a **safety net** in case the session ends before the check is green; it is not the
-mechanism to wait on. Never complete a merge before the required check is green or before
-both reviews have APPROVED (the short gate: its one read) — the direct path is a convenience over the queue, never a
-shortcut around the gate.
-
 So the model reviews gate the *authorisation*; the required CI check gates the *merge*; and
-branch protection guarantees CI can't be skipped whether the queue or the supervisor lands
-it. All four conditions are enforced, and the merge still lands hands-off.
+branch protection guarantees CI can't be skipped whoever lands it.
 
 **Do not use the CI status bar's blanket Auto-merge toggle.** That toggle enables
-auto-merge on PRs up front, on CI alone, which bypasses Reviews A and B. Let the
-supervisor enable auto-merge per-PR *after* the reviews instead. (The same caveat applies
+auto-merge on PRs up front, on CI alone, which bypasses Reviews A and B. (The same caveat applies
 to Auto-fix: it can push CI-passing changes on its own, so keep the gate-integrity checks
 in force so it can't go green by weakening a test.)
 

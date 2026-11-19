@@ -83,8 +83,10 @@ def test_a_suite_over_ten_minutes_runs_through_the_launcher():
 
 def test_the_ci_watch_that_returns_at_once_confirms_the_head():
     step8 = section(SV, "### 8. Merge (the verified gate)", "### 9. Refactoring")
-    assert "wait for the first check to appear" in step8
-    assert "statusCheckRollup,headRefOid" in step8 and "(KP-051)" in step8
+    # TASK-082 (R-083, R-085): the launcher waits out the early return, and `ready` replaces the hand-typed confirmation
+    assert "A watch's return is never the proof that CI passed" in step8
+    assert "`python ~/.claude/cursor-bridge/review-guard.py ready <n>`" in step8 and "(KP-051)" in step8
+    assert "statusCheckRollup" not in step8
 
 
 def test_the_changelog_entry_exists_and_the_digest_is_unchanged_in_size():

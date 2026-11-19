@@ -86,7 +86,7 @@ def test_deny_rules_catch_the_override_and_force_push(cmd):
 @pytest.mark.parametrize("cmd", [
     "cursor-agent -p --force --model grok-4.7-high \"Read handoff/TASK-012.md and implement exactly what it specifies.\"",
     "git push -u origin task-012",
-    "gh pr merge 12 --squash --auto --match-head-commit 0123456789abcdef0123456789abcdef01234567",
+    "gh pr merge 12 --squash --match-head-commit 0123456789abcdef0123456789abcdef01234567",   # TASK-082 (R-083): the armed form retired
     "git worktree add ../Worktrees/TASK-012 task-012",
     "npx --yes jscpd@4.0.5 src --min-lines 5",
 ])
