@@ -1,0 +1,25 @@
+# SCOPE - CLOSE-P2 (stage P2's close records, pull request #183, round 3)
+
+## What this is
+The records of stage P2's close (bridge/cursor-bridge/workflow/phases/reflection.md, "At a stage close", items 1 to 5): no program, no test, no instruction text changes. It takes the full gate because `review-guard.py premerge-records` names docs/REQUIREMENTS.md (the text of the built rows R-080, R-081 and R-082) and docs/INVENTORY.md (a threat-model row, the strip's limits). The diff is run/review/CLOSE-P2-r3.diff, `git diff origin/main HEAD` at round 3's fix commit (the pull request's whole change, seven files); round 3's own change alone is run/review/CLOSE-P2-r3-fix.diff (one line of docs/INVENTORY.md).
+
+## Round 3 is the review ceiling's round
+This is the third round the guard counts. Grade every finding by the five blocking classes first: behaviour against the brief or the register (docs/REQUIREMENTS.md), security, data integrity, a defeated safety mechanism the change relies on, a failing test. Only a finding of the five, with its path stated, sends the work back; every other finding, a records finding included, is recorded in docs/HARDENING.md under stage P2's close and merges with it. No `Blocking class:` line: this round is at the ceiling, not above it.
+
+## What rounds 1 and 2 found and what changed
+- Round 1 (CLOSE-P2-r1): Review A APPROVE with four records findings (R-080, R-081 with DESIGN J17, R-082, HARDENING least-confident item 2); Review B REJECT on one records finding, the CI watch's wait row in docs/INVENTORY.md ("a failed check starts the watch at once" unqualified). Round 2 fixed all five.
+- Round 2 (CLOSE-P2-r2): Review B REJECT on one records finding: round 2's qualifier ("a failed check holding a required context") is too narrow, since it holds only under the base branch's rule; under the default branch's list and the runs every failed check starts the watch. Review B confirmed every other round-2 change. Review A's read ended at a usage limit before a verdict, so this round's Review A also reads round 2's changes (see run/review/CLOSE-P2-r3.diff).
+- Round 3 changes one clause of the wait row: "a failed check starts the watch at once (under the base's rule, only one holding a context that rule names)". Check against bridge/cursor-bridge/bridge-run.py `_failed_check` (about line 2134) and `_watch_decision`'s docstring (about line 2240), and tests/test_program_watch_wait.py (about lines 432 to 446).
+
+## What each change of the pull request claims, and what to check it against
+- docs/REQUIREMENTS.md, three built rows' text (Status and Evidence unchanged): R-080, a secret-like `CURSOR_` name withheld from every stripped run other than a builder or review run (bridge-run.py about line 2849; bridge_env.py `secret_like`, `stripped_env`); R-081, the files the git-config watch reads (including `commondir` and the worktree's `.git` file) and the four words, `unreadable` a path that could not be read as a regular file or a hooks folder that could not be listed (bridge-run.py `_git_file_state`, `GitConfigWatch`, about lines 2495 to 2575); R-082, the flat grammar TASK-063's two resolution rounds chose, its backtick clause the Bash reader's and the PowerShell reader's line-ending backtick a continuation (permission-guard.py; tests/test_program_permission_guard.py about lines 114 to 131; docs/CHANGES.md, the two TASK-063 resolution entries). A row's text must say what the code does and must not narrow or widen what it requires beyond the built behaviour.
+- docs/INVENTORY.md: six Features rows for what stage P2 built; the strip-limits threat-model row says the git-config comparison is built by R-081, a detection that restores nothing, its Revisit column without the trigger that fired. Check that no boundary is widened or narrowed.
+- docs/DESIGN.md: J17 as R-081; the context data-flow paragraph says the comparison is built.
+- docs/HARDENING.md: the refactoring pass's gate end; stage P2's review, round 1; the demonstration (43 of 44); least confident (three items). Inputs: the local tag stage-review/P2-1 (git cat-file -p stage-review/P2-1:run/review/SCOPE-STAGE-P2.md); run/agent/demo-p2.out.
+- docs/PROJECT_STATUS.md and project.json: stage P2 closed, stage P3 next, header and prose agreeing; the section "Release B - notes for a resuming session" moved word for word to docs/archive/STATUS_HISTORY.md.
+
+## Checks already run (round 3)
+`inventory-check.py` OK (status 28 lines, 11104 characters); invisible-check OK; six test files that read the changed records, stripped through the launcher: "213 passed, 5 skipped". Round 2: `completion-check.py --mode plan` OK (89 built, 2 deferred, 14 planned); fourteen record-reading test files "368 passed, 11 skipped".
+
+## Out of this pull request
+The Documents/ folder lies outside the repository. Round 1's notes not taken (R-082's kept clause on run-time expansion; the wait row's exit 1 after a completed failed run) say less than the code, never more about what passes. Stage P3 and TASK-078's Scope notes are later work.
