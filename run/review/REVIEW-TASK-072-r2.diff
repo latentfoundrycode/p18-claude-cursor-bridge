@@ -1,0 +1,1576 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 1a09a5c..5498b04 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.11.12a",
+-  "generated": "2026-11-21 16:16",
++  "generated": "2026-11-21 19:38",
+   "files": {
+     "agents/cursor-configurator.md": "a8aad7838a9bc5b4f00e13fd3749919158cbe37ec7acfa9a40960600398784bc",
+     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
+@@ -35,7 +35,7 @@
+     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
+     "cursor-bridge/bridge_env.py": "c45d9194fc5344ecb537d6f24a4278b05f7a0aad40217d61edb4b0420bd7a108",
+     "cursor-bridge/completion-check.py": "27bfc126a40986f16347307126d909738ce90d71a6d29caa05b898654419249b",
+-    "cursor-bridge/conformance-check.py": "3dde6c1edee5ec706c6fa7ac30fbb0bfde11aa53f622e5c4238c3c46f5b484ae",
++    "cursor-bridge/conformance-check.py": "0b44e7857c2e2c60c119095595a62070e679288cf9b2f43816513f4e55dfbddc",
+     "cursor-bridge/cursor-agent.shim": "a524585b139ce42a15edc3ea1e6f6d0ce83dee9c41c5ace7e71e3958e5c73ad7",
+     "cursor-bridge/design-seeds/airbnb/DESIGN.md": "add34130d67209ad105346d60fe2b290728b9711683969db4b7760e29477a5fe",
+     "cursor-bridge/design-seeds/airbnb/README.md": "9ecfc8b2441c9d0e483e82c60cc9948d4c0abefe66beaeb08e674eb5ad11248d",
+diff --git a/bridge/cursor-bridge/conformance-check.py b/bridge/cursor-bridge/conformance-check.py
+index 4aa2c66..369d31a 100644
+--- a/bridge/cursor-bridge/conformance-check.py
++++ b/bridge/cursor-bridge/conformance-check.py
+@@ -74,8 +74,17 @@ What it checks, with the file it reads (the 0b review corrected several of these
+     "not through an environment variable", "no longer ...") is not one;
+   - the private memory notes Claude Code keeps for this project (names only; calibration
+     step 2b reviews them, rule 41);
+-  - the recorded bridge version against the installed one (calibration due).
+-Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace.
++  - the recorded bridge version against the installed one (calibration due);
++  - the weekly dependency scan, found by its triggers and its OSV-Scanner step, never by a
++    file name: OK where a workflow with a schedule: trigger and an OSV-Scanner step has the
++    same --lockfile= values, as a set, as the workflows triggered by push or pull_request;
++    NOTE where the inventory Decisions table holds a row whose first cell begins "Weekly scan:",
++    the note quoting that cell, or where the local git configuration names no GitHub remote;
++    MISSING where no workflow file runs OSV-Scanner on a schedule: trigger, where an
++    OSV-Scanner workflow has no schedule: trigger, or where the lock-file lists differ and the
++    row names the lock files apart; pins, permissions and exit handling are not compared, and
++    a workflow disabled on GitHub is the evaluation's read.
++Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace, or a malformed record header (HEADER MALFORMED, the status file's or the inventory's).
+ ASCII-only on purpose (cp1252 consoles). Never writes.
+ """
+ import configparser
+@@ -491,6 +500,206 @@ def workflow_steps(text):
+     return out
+ 
+ 
++_OSV_STEP = re.compile(next(pattern for name, pattern in SCANNERS if name == "OSV-Scanner"), re.I)
++_LOCKFILE_ARG = re.compile(r"--lockfile=(\S+)")
++
++
++def _lock_token(raw):
++    """One --lockfile= value, with one pair of matching surrounding quotes removed."""
++    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in ("'", '"'):
++        return raw[1:-1]
++    return raw
++
++
++def _inline_trigger_names(rest):
++    if rest.startswith("["):
++        end = rest.find("]")
++        if end < 0:
++            return []
++        names = []
++        for part in rest[1:end].split(","):
++            name = part.strip().strip("'\"")
++            if name and re.fullmatch(r"[A-Za-z0-9_-]+", name):
++                names.append(name)
++        return names
++    name = rest.strip("'\"")
++    if name and re.fullmatch(r"[A-Za-z0-9_-]+", name):
++        return [name]
++    return []
++
++
++def _workflow_triggers(text):
++    """Trigger names from a top-level on: (block keys, `on: push`, or `on: [push, pull_request]`)."""
++    lines = text.splitlines()
++    for i, line in enumerate(lines):
++        m = re.match(r"""^(?:"on"|'on'|on):\s*(.*?)\s*$""", line)
++        if not m:
++            continue
++        rest = m.group(1).split("#", 1)[0].strip()
++        if rest.startswith(("{", "|", ">")):
++            return set()
++        if rest:
++            return set(_inline_trigger_names(rest))
++        names = set()
++        for sub in lines[i + 1:]:
++            if not sub.strip() or sub.lstrip().startswith("#"):
++                continue
++            if sub[0] not in " \t":
++                break
++            key = re.match(r"^[ \t]+[\"']?([A-Za-z0-9_-]+)[\"']?\s*:", sub)
++            if key and not sub.lstrip().startswith("-"):
++                names.add(key.group(1))
++        return names
++    return set()
++
++
++def _osv_lock_list(text):
++    """(saw an OSV-Scanner step, --lockfile= values in step order)."""
++    found = []
++    saw = False
++    for _body, _guarded, commands in workflow_steps(text):
++        if not _OSV_STEP.search(commands):
++            continue
++        saw = True
++        for m in _LOCKFILE_ARG.finditer(commands):
++            found.append(_lock_token(m.group(1)))
++    return saw, found
++
++
++def _extend_unique(into, values):
++    for value in values:
++        if value not in into:
++            into.append(value)
++
++
++def _weekly_decision_cell(sections):
++    rows = sections.get("Decisions") if isinstance(sections, dict) else None
++    if not rows:
++        return None
++    for row in rows:
++        if isinstance(row, (list, tuple)) and row and str(row[0]).startswith("Weekly scan:"):
++            return str(row[0])
++    return None
++
++
++def _own_git_dir(ws):
++    """This folder's git dir, or None. A parent folder's repository is not used."""
++    git_path = os.path.join(ws, ".git")
++    try:
++        if os.path.isdir(git_path):
++            return os.path.abspath(git_path)
++        if not os.path.isfile(git_path):
++            return None
++    except OSError:
++        return None
++    text = read(git_path) or ""
++    raw = None
++    for line in text.splitlines():
++        m = re.match(r"gitdir:[ \t]*(.*)$", line)
++        if m:
++            raw = m.group(1).strip(" \t")
++            break
++    if not raw or raw.startswith("-") or "\x00" in raw:
++        return None
++    # Two leading slashes, either direction, name another host. Do not touch the path.
++    if len(raw) >= 2 and raw[0] in "/\\" and raw[1] in "/\\":
++        return None
++    if not os.path.isabs(raw):
++        raw = os.path.join(ws, raw)
++    try:
++        if os.path.isdir(raw):
++            return os.path.abspath(raw)
++    except OSError:
++        return None
++    return None
++
++
++def _url_is_github(url):
++    url = (url or "").strip()
++    if not url:
++        return False
++    host = None
++    m = re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://(?:[^/?#@\s]+@)?([^/:?#\s]+)", url)
++    if m:
++        host = m.group(1)
++    else:
++        m = re.match(r"^(?:[^@\s]+@)?([^:\s]+):", url)
++        if m:
++            host = m.group(1)
++    if not host:
++        return False
++    host = host.lower().rstrip(".")
++    return host == "github.com" or host.endswith(".github.com")
++
++
++def _has_github_remote(ws):
++    """True when this Workspace's own git configuration names a github.com remote. No gh, no network."""
++    git_dir = _own_git_dir(ws)
++    if not git_dir or git_dir.startswith("-"):
++        return False
++    env = os.environ.copy()
++    env["GIT_DIR"] = git_dir
++    env.pop("GIT_WORK_TREE", None)
++    for name in list(env):
++        if name.startswith("GIT_CONFIG"):
++            del env[name]
++    try:
++        p = subprocess.run(
++            ["git", "-c", "core.fsmonitor=false", "--git-dir=" + git_dir, "config", "--local", "--no-includes", "--get-regexp", r"^remote\..*\.url$"],
++            cwd=ws, capture_output=True, timeout=GH_TIMEOUT, creationflags=NO_WINDOW, env=env)
++    except (OSError, subprocess.TimeoutExpired):
++        return False
++    if p.returncode != 0 or not p.stdout:
++        return False
++    for line in p.stdout.decode("utf-8", "replace").splitlines():
++        bits = line.split(None, 1)
++        if len(bits) == 2 and _url_is_github(bits[1]):
++            return True
++    return False
++
++
++def _fmt_locks(names):
++    if not names:
++        return "(none)"
++    return ", ".join(_escape_field(name) for name in sorted(names))
++
++
++def weekly_dependency_scan(ws, workflows, sections):
++    """(verdict, detail) for the one Weekly dependency scan row. Workflows are told apart by triggers and steps."""
++    gate = []
++    weekly = []
++    unscheduled_osv = False
++    for path in workflows:
++        text = read(path) or ""
++        triggers = _workflow_triggers(text)
++        saw, locks = _osv_lock_list(text)
++        if not saw:
++            continue
++        if "push" in triggers or "pull_request" in triggers:
++            _extend_unique(gate, locks)
++        if "schedule" in triggers:
++            weekly.append(locks)
++        elif "push" not in triggers and "pull_request" not in triggers:
++            unscheduled_osv = True
++    gate_set = set(gate)
++    for locks in weekly:
++        if set(locks) == gate_set:
++            return ("OK", "pins, permissions and exit handling are not compared; "
++                    "a workflow disabled on GitHub is the evaluation's read")
++    cell = _weekly_decision_cell(sections)
++    if cell is not None:
++        return "NOTE", _escape_field(cell)
++    if not _has_github_remote(ws):
++        return "NOTE", "the repository has no GitHub remote"
++    if weekly:
++        locks = weekly[0]
++        return ("MISSING", "the lock files differ: the gate alone has %s; the weekly scan alone has %s"
++                % (_fmt_locks(gate_set - set(locks)), _fmt_locks(set(locks) - gate_set)))
++    if unscheduled_osv:
++        return "MISSING", "an OSV-Scanner workflow has no schedule: trigger"
++    return "MISSING", "no workflow file runs OSV-Scanner on a schedule: trigger"
++
++
+ def gh(args, cwd):
+     try:
+         p = subprocess.run(["gh"] + args, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=GH_TIMEOUT, creationflags=NO_WINDOW)
+@@ -1279,6 +1488,8 @@ def main():
+         parsed = bridge_env.inventory_parse_tables(inv_body_for_dev)
+         for name, block in parsed.items():
+             sections[name] = block[1]
++    weekly_verdict, weekly_detail = weekly_dependency_scan(ws, workflows, sections)
++    add(weekly_verdict, "Weekly dependency scan", weekly_detail)
+     if inv:
+         # a spending limit at every provider, API or account that can charge: its Resources row says so
+         if not inv_can_read:
+diff --git a/docs/BUILDER_NOTES.md b/docs/BUILDER_NOTES.md
+index b2de2fc..402f6ec 100644
+--- a/docs/BUILDER_NOTES.md
++++ b/docs/BUILDER_NOTES.md
+@@ -112,3 +112,5 @@
+ 2026-11-21 TASK-070-r3: the round 2 note above misreads that case. `not applied` is checked only on the mutant line (`_mutant_lines`), so the counts line's `not applied=0` does not fail it. With the baseline in its own copy the case passes, exit 0, `m1: killed (ran)`.
+ 
+ 2026-11-21 TASK-070-r3: a foreground pytest of the three mutation files was killed (exit 143, Terminated) after about five minutes even though the wait was longer, so that command was started again and left running until it finished. The partial dot line from the killed run is not a result.
++
++2026-11-21 TASK-072-r2: Git for Windows 2.53's `git config --local` already skips include directives, the global file, and `GIT_CONFIG_COUNT` / `GIT_CONFIG_PARAMETERS` (those pairs show up only when no file scope is given), so dropping `--local`, `--no-includes`, or the `GIT_CONFIG*` strip one at a time leaves the round-2 remote cases green; all three stay, as the brief requires.
+diff --git a/docs/CLI_REFERENCE.md b/docs/CLI_REFERENCE.md
+index 0d97225..f43824f 100644
+--- a/docs/CLI_REFERENCE.md
++++ b/docs/CLI_REFERENCE.md
+@@ -363,8 +363,17 @@ What it checks, with the file it reads (the 0b review corrected several of these
+     "not through an environment variable", "no longer ...") is not one;
+   - the private memory notes Claude Code keeps for this project (names only; calibration
+     step 2b reviews them, rule 41);
+-  - the recorded bridge version against the installed one (calibration due).
+-Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace.
++  - the recorded bridge version against the installed one (calibration due);
++  - the weekly dependency scan, found by its triggers and its OSV-Scanner step, never by a
++    file name: OK where a workflow with a schedule: trigger and an OSV-Scanner step has the
++    same --lockfile= values, as a set, as the workflows triggered by push or pull_request;
++    NOTE where the inventory Decisions table holds a row whose first cell begins "Weekly scan:",
++    the note quoting that cell, or where the local git configuration names no GitHub remote;
++    MISSING where no workflow file runs OSV-Scanner on a schedule: trigger, where an
++    OSV-Scanner workflow has no schedule: trigger, or where the lock-file lists differ and the
++    row names the lock files apart; pins, permissions and exit handling are not compared, and
++    a workflow disabled on GitHub is the evaluation's read.
++Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace, or a malformed record header (HEADER MALFORMED, the status file's or the inventory's).
+ ASCII-only on purpose (cp1252 consoles). Never writes.
+ ```
+ 
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 35f59eb..63dbfb1 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -2360,3 +2360,13 @@ Each is fixed by the next increment that edits its record.
+ - **Release B2's leads whose "next edit" trigger this increment fires, each ruled on by name** (DESIGN.md, Change: the program release, line 307; run/supervisor/program-scout-c.md, 4.9 to 4.11 and 4.19 to 4.23): TASK-071 widens no fallback and edits none of the lines they name, so each stays a lead: 4.9 (TASK-048's plan-reader residue), 4.10 (TASK-049's inventory-reader cases), 4.11 (TASK-050's run-parameters readers, Review B's prose-body lead among them: the fallback is not widened, so its condition does not hold), 4.19 (TASK-051's migration windows and private names), 4.20 (the migration tests' weak assertions), 4.21 (the core's "Project state" text), 4.22 (the migration's column-position read and a merged increment's unbalanced parenthesis; the other projects have migrated), 4.23 (the unescaped plan globs and BUG-044's rest).
+ - **Leads, recorded, not fixed.** (1) Removing `empty_run_parameters` from inventory-check's `_INVENTORY_BRIDGE_NAMES` survives every test: the guard's test stubs a module lacking every name (Review A). (2) A headed file whose empty header value also disagrees with a plain line gives both `HEADER DISAGREES` and `RUN PARAMETERS ... is empty` for one key; no test pins it (Review A). (3) The helper's `isinstance(values, dict)` branch is unreachable by both callers and would report nothing for another type (Review A). (4) The report's line numbers for the guard list and the headed skip are off by one to three, and its H1-H3 test ids rest on summary counts without the FAILED lines (Review A). (5) Under `--check` a field-form record now exits 0 (`cannot read`) where it exited 1 (`would write`): calibration's text, which reads the run's lines, names the new reason with TASK-078 (R-091's last clause, J7).
+ - **The mutation sweep.** run/supervisor/TASK-071-mutants.json, five mutants (one value exempted in the helper, the label keeping its colon, the header check skipped, the header-less check skipped, the migration's refusal removed): every mutant killed ("counts: run=2 cached=3 killed=5 survived=0 not applied=0 error=0 expected survive=0", the second run; the first errored m4 and m5 on expected-failure lists that named too few of the ids they killed, completed before the second).
++
++### TASK-072: the conformance check knows the weekly scan (2026-11-21, two builder rounds)
++- **The reproduction (before the tests).** `conformance-check.py --offline` on this repository printed no weekly row (24 OK, 0 MISSING, 5 NOTE); the docstring's exit line named exit 2 for a missing workspace alone, where `main()` also returns 2 for a malformed record header (J14).
++- **The supervisor's tests and rulings.** tests/test_program_weekly_floor.py (drafted by a subagent, reviewed), 16 cases, on the checkpoint stripped "11 failed, 5 passed", the five green ones holding what stands (the all-omitted diagram index in diagram-check's three modes and the conformance diagram floor; a scheduled scan never read as the gate). Rulings: the row named `Weekly dependency scan`; workflows told apart by triggers and steps, never a file name; the gate set the union of the OSV-Scanner `--lockfile=` values in push or pull_request workflows; one pair of matching quotes stripped; sets compared; OK first, then NOTE for a `Weekly scan:` Decisions row, then NOTE for no GitHub remote read locally, else MISSING saying which.
++- **The plan's Scope missed the command reference.** `tools/dump-cli.py` records `conformance-check.py` from its docstring, so the docstring change (the new floor, J14) made `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` stale, and the plan's Scope did not name them; a brief naming them would have failed plan-check's BRIEF rule. The spec-packager's reality check found it; the builder reported the stale check and the supervisor regenerated the reference (`python tools/dump-cli.py`) with round 1's commit. A plan entry whose increment changes a program's docstring names the two reference files (a lead for the next plan revision).
++- **Round 1** (launch 17:26:46Z). SCOPE CLEAN; no fixture edited (the reality check: no existing conformance test sets a git remote, so every one lands on the no-remote NOTE). The stripped run of every test file that runs, loads or reads the program: "1 failed, 1445 passed, 6 skipped", the failure the stale reference. Review A: REJECT, B1 a .git file's `gitdir:` path cut at its first space (a worktree under a path with a space read no remote), B2 `git config` read every scope (system, global, the environment's pairs, includes), S1 a quoted `"on":` key read no trigger (a false MISSING). The security audit: APPROVE, advising `--local --no-includes` and refusing a network `gitdir`.
++- **Round 2** (the supervisor's nine `test_r2_` cases, on round 1 "6 failed, 19 passed", each red on its status assertion; launch 18:31:15Z). The four corrections and nothing else; SCOPE CLEAN; the stripped run "1455 passed, 6 skipped" (the skips are platform: a symbolic link's privilege, POSIX modes, a trailing space in a name). Review A and the security audit: APPROVE, no blocking finding. The builder's note: on git 2.53 `--local` alone already reads one file, no include, no global file, no environment pair, so each of the three layers alone is redundant (its R2-M2 to R2-M4 `not caught`); the mutants drop the three together.
++- **The builder's assumptions, dispositioned.** Round 1: several scheduled workflows differing names the first in glob order; a workflow with an OSV-Scanner step and only another trigger (`release`) is the `has no schedule:` MISSING; `Weekly scan:` matched case-sensitively, the first row quoted; a host is GitHub's when it is `github.com` or ends `.github.com`; `on:` as a flow mapping or block scalar reads no trigger: accepted. Its gitfile item was the B1 defect, fixed in round 2. Round 2: `"on" :` with a space before the colon is not read; the first `gitdir:` line wins; the four two-slash prefixes refused: accepted.
++- **Leads, recorded, not fixed (none of the five on an ordinary layout).** (1) An empty gate set equals an empty weekly set, so OSV-Scanner steps that give their lock files as `--lockfile <path>` (a space) or `-L` read OK whatever they list, and a gate in the space form beside a weekly in the `=` form reads a false MISSING; the configurator writes the `=` form, the conformant fixture of tests/test_conformance_check.py the space form (Review A, round 1). (2) A workflow triggered by both push and schedule counts as gate and weekly at once, so it is OK against itself, and a gate of {a} beside it with {a, b} reads OK by the union (Review A, round 1; ruling 2's letter). (3) Trigger keys are read at any depth under `on:`, so a `workflow_dispatch` input named `schedule` makes a workflow weekly; `on:` as a block list or flow mapping reads no trigger; a `--lockfile=` inside a comment of a run block is counted (Review A, round 1). (4) The gate reader still leaves out `dependency-scan.yml` by name, so a weekly workflow named otherwise is read as gate steps (ruling 4, kept; BUG-042's test pins the name). (5) Precedence where a `Weekly scan:` row and a matching weekly workflow both stand (OK wins) has no test. (6) `git` itself still follows a `commondir` file in the git folder, which may name another host or repository; `GIT_COMMON_DIR`, `GIT_TRACE*` and `GIT_OBJECT_DIRECTORY` are passed on from the owner's environment (Review A and the security audit, round 2: a hand-made git folder or the owner's own environment, outside the threat model). (7) A `gitdir:` value in the `\??\` form passes the two-slash refusal and `os.path.isdir` checks the raw value while the function returns its absolute form (the security audit, round 2; only an agent as the owner can plant it). (8) The `gitdir:` line is taken from anywhere in the .git file, where git requires it first; git's own failure then reads as no remote (Review A, round 2). (9) R-092's configurator words for the row are TASK-078's.
++- **The mutation sweep.** run/supervisor/TASK-072-mutants.json, twelve mutants (quotes kept, lists compared in order, the Decisions row unread, a dispatch-only workflow counted weekly, the remote never and always GitHub, any host GitHub, an unscheduled OSV-Scanner workflow unseen, the docstring's exit 2 narrowed, the gitdir cut at a space, the three config-scope layers dropped together, a quoted `on` unread): every mutant killed ("counts: run=3 cached=9 killed=12 survived=0 not applied=0 error=0 expected survive=0", the second run; the first errored m1, m5 and m6 on expected-failure lists written before the round-2 cases, which they also failed, completed before the second).
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index 1c3bcd3..b90bc3d 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -83,6 +83,8 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | The pre-push scan | `push-scan.py [<base>]` reads every commit between the base (default origin's HEAD branch) and HEAD, never the base itself: the message, the author and committer lines, each added or renamed file's name and each added line, in two readings of a file where its content marks it, for a path of this computer (a drive and a segment, a Users or home folder and a segment, the application-data segment beside a slash; an angle-bracket segment a placeholder) and an account name as a whole word under caseless compatibility matching (from the profile folder, the login and the per-computer names file, never the command line); each hit printed as `HIT <commit> <place> <kind>` with its place (`message`, `author`, `committer`, `file #k`, `line <path>:<n>` or `line #k:<n>`) and never its value; exit 0 clean, 1 a hit, 2 the range, git or the names file unreadable; its allow entry in settings.bridge.json | bridge/cursor-bridge/push-scan.py; .../settings.bridge.json | tests/test_program_push_scan.py; tests/test_release_t_merge.py | the program release, stage P2 (TASK-067) |
+ | The in-flight program | `in-flight.py <text>` or `in-flight.py --file <path>` appends one line, `<UTC time to the minute, with Z> <text>`, to run/supervisor/in-flight.md of the Workspace the current folder belongs to (the nearest folder holding docs/PROJECT_STATUS.md), creating the folder and the file, with LF line ends, under a lock it waits at most 10 seconds for (on Windows the byte at 2**31, so a reader still reads), and prints it; `--file` takes a file under that Workspace's run/supervisor/, read through no link, at most 65,536 bytes, its line breaks made spaces but a `Paused:` line kept as a line of its own; `--pass <name> <reviewer> [--round <n>] [--cause <cause>]` writes `<time> PASS <name> r<n> <reviewer> <cause>`, the reviewers seven, the causes `bridge_env.ROUND_CAUSES`, the one list the launcher and the pace report read; a text whose first word is PASS, a control or format character, both sources or none, a word outside a list, a log or a folder of it reached through a link, and a log with more than one link are refused, `in-flight: REFUSED - <reason>`, exit 2, nothing written; a short write prints `INCOMPLETE`, exit 1; the loop guard reads the log's last `Paused:` line, an empty one lifting the pause, and its refusal names the log and this program; its allow entry in settings.bridge.json | bridge/cursor-bridge/in-flight.py; .../loop-guard.py; .../bridge_env.py; .../bridge-run.py; .../pace-report.py; .../settings.bridge.json | tests/test_program_in_flight.py; tests/test_loop_guard.py (test_r088_); tests/test_allowlist.py; tests/test_dump_cli.py | the program release, stage P3 (TASK-068); its texts TASK-078 |
+ 
++| The conformance check's weekly-scan row | `conformance-check.py` prints one row, `Weekly dependency scan`, found by the workflows' triggers and OSV-Scanner steps, never by a file name: the gate's lock files are the union of the `--lockfile=` values of the OSV-Scanner steps in workflows triggered by push or pull_request (the trigger key bare or quoted, in the block form, `on: <name>` or `on: [<names>]`), each value with one pair of matching quotes removed, compared as sets with each weekly workflow's (one with an OSV-Scanner step and a `schedule:` trigger); OK where one equals (its detail: pins, permissions and exit handling not compared, a workflow disabled on GitHub the evaluation's read), else NOTE quoting an inventory Decisions cell that begins `Weekly scan:`, else NOTE where the Workspace's own git configuration names no github.com remote (read by `git config --local --no-includes` with the environment's `GIT_CONFIG*` withheld, a .git file's whole `gitdir:` value followed and a network path refused, no parent folder's repository, no `gh`), else MISSING saying which (no scheduled OSV-Scanner workflow, an OSV-Scanner workflow with no `schedule:` trigger, or the lock files apart on each side); no path or remote URL printed; the docstring's exit 2 names a malformed record header (J14) | bridge/cursor-bridge/conformance-check.py (weekly_dependency_scan) | tests/test_program_weekly_floor.py | the program release, stage P3 (TASK-072) |
++
+ ## Resources
+ | Name | Kind | Where it lives | Used by | Provided |
+ |---|---|---|---|---|
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index b2bd144..a13cf32 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -17,7 +17,7 @@ Phase: changing
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable, External services
+ Change cycle: the program release (begun 2026-11-13, the owner's word in this chat; its intake's read-back confirmed by the owner 2026-11-13; the field finding F7 added to it by the owner 2026-11-13; its design revision and plan addendum, one subject, `program`, approved by the owner at the design gate 2026-11-13, seven decisions in the question form, the trait External services approved and the carry comparison kept a recorded lead; its scoped revision for F7, one subject with its plan revision, `program-f7`, approved by the owner at its gate 2026-11-14, five decisions in the question form; step: the loop, stage P2 closed 2026-11-19 (twelve increments, its refactoring pass, its review approved by both, its demonstration live), stage P3 next from TASK-068, on Opus 5.5; the owner placed one more item into it 2026-11-14, the diagram design-decision Feedback entry, planned at the next plan revision (INVENTORY, Decisions)); before it release B2, begun 2026-11-04, complete 2026-11-11 (Claude-Cursor Bridge 2026.11.11a)
+ Awaiting user on: nothing
+-Next: stage P3 from TASK-072 (TASK-068's in-flight program, TASK-069's pass and cause counting, TASK-070's mutation baseline and TASK-071's empty run parameter merged, their rows R-088 to R-091 planned until TASK-078's texts, which name exit 5 in step 7 and the migration's new `cannot read` reason in calibration; the loop writes its in-flight lines with `in-flight.py` and its review passes with `in-flight.py --pass`; stage P2's least-confident item 3's `git --version` floor on the install's machines and CI's images is the install's, stage P4); the CI watch's wait for a required context not yet listed is still unexercised live (HARDENING, TASK-069); when TASK-078 is packaged its Scope notes take KP-051's Correction, run-parameters.md's `supervisor` gloss and step 8's and the sentinel's reading of a push-scan hit at its place (HARDENING, Stage P2's demonstration); the next plan revision also places the owner's two rules of 2026-11-15, and release G's widening waits for G's planning (both INVENTORY, Decisions); the plan revision that places the owner's diagram design-decision item (2026-11-14) into a later stage, a records pull request of its own; stage P1 (TASK-055 to TASK-058, REFAC-007) closed 2026-11-14, then P2 to P4 (docs/BUILD_PLAN.md, The program release — the plan addendum; docs/DESIGN.md, Change: the program release); each brief names its calls' time and retry limits (the trait External services); the release ends with the owner's install from a run sheet, Context7's setup a step of it. The order after it (INVENTORY, Decisions): the prototype meta workflow (the owner, 2026-11-20; its design on the owner's word), the progress graph, W, G, F, then C, which waits for the TDP's code-map command, D, the trial of the code map, and E last (the owner, 2026-11-15). reAngle and the video factory calibrate when the owner resumes them (R-031, R-037), the TDP in its own session; release T's field items on the TDP (the first stripped suite at its TASK-172; the weekly workflow, rewritten from the frozen block, v7.0.1 since 2026.11.12a, at its next configuration touch) stand in HARDENING, Correction to project end. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++Next: stage P3 from TASK-073 (TASK-068's in-flight program, TASK-069's pass and cause counting, TASK-070's mutation baseline, TASK-071's empty run parameter and TASK-072's weekly-scan row merged, their rows R-088 to R-092 planned until TASK-078's texts, which name exit 5 in step 7, the migration's new `cannot read` reason in calibration and the weekly row's opening words in the configurator's text; the loop writes its in-flight lines with `in-flight.py` and its review passes with `in-flight.py --pass`; stage P2's least-confident item 3's `git --version` floor on the install's machines and CI's images is the install's, stage P4); the CI watch's wait for a required context not yet listed is still unexercised live (HARDENING, TASK-069); when TASK-078 is packaged its Scope notes take KP-051's Correction, run-parameters.md's `supervisor` gloss and step 8's and the sentinel's reading of a push-scan hit at its place (HARDENING, Stage P2's demonstration); the next plan revision also places the owner's two rules of 2026-11-15, and release G's widening waits for G's planning (both INVENTORY, Decisions); the plan revision that places the owner's diagram design-decision item (2026-11-14) into a later stage, a records pull request of its own; stage P1 (TASK-055 to TASK-058, REFAC-007) closed 2026-11-14, then P2 to P4 (docs/BUILD_PLAN.md, The program release — the plan addendum; docs/DESIGN.md, Change: the program release); each brief names its calls' time and retry limits (the trait External services); the release ends with the owner's install from a run sheet, Context7's setup a step of it. The order after it (INVENTORY, Decisions): the prototype meta workflow (the owner, 2026-11-20; its design on the owner's word), the progress graph, W, G, F, then C, which waits for the TDP's code-map command, D, the trial of the code map, and E last (the owner, 2026-11-15). reAngle and the video factory calibrate when the owner resumes them (R-031, R-037), the TDP in its own session; release T's field items on the TDP (the first stripped suite at its TASK-172; the weekly workflow, rewritten from the frozen block, v7.0.1 since 2026.11.12a, at its next configuration touch) stand in HARDENING, Correction to project end. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
+ Deviations accepted: none; told to the owner (rule 58): stage P2's demonstration line expected push-scan to exit 0 on the stage's own commits, which hold 18 generic drive paths R-087 counts (exit 1; drawn, the texts' reading in TASK-078; HARDENING, Stage P2's demonstration); stage H2's refactoring pass recorded its twelve candidates as next-release leads, nothing merged after the stamp (HARDENING, stage H2's close); TASK-054's viewer check made on GitHub only, Typora not opened (HARDENING, TASK-054); TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions); stage T2's demonstration ran after the install, where the plan says before (HARDENING, Stage T2's demonstration)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -26,7 +26,7 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/working-files.md lists this project's local working files under run/supervisor/ (gitignored), in-flight.md first, the scratch log a resume reads before anything else.
+ Delegated gates: none
+-Remote sync: main at the merge of this pull request, TASK-071's, in sync with origin/main at that merge; local main is fast-forwarded after every merge
++Remote sync: main at the merge of this pull request, TASK-072's, in sync with origin/main at that merge; local main is fast-forwarded after every merge
+ Stage: the program release's stage P2 closed 2026-11-19, stage P1 2026-11-14 (HARDENING, The program release, Stage P1 and Stage P2); release B2 complete 2026-11-11 (its stages H1 and H2 and its project end; HARDENING, Project end of release B2); release T's T1 closed 2026-11-02, T2 2026-11-04, its project end 2026-11-04; release B's stages and project end: docs/archive/STATUS_HISTORY.md. Last reflection: stage P2's close, 2026-11-19 (its review approved by both, Review B on its one permitted re-run after its provider's safety refusal; demonstration live on main c4a3763, 43 of 44 checks, push-scan's exit on the stage's own commits the one item drawn; conformance 25 OK, 0 MISSING, 5 NOTE; ISS-001 recurred, counter 2; ISS-037 opened; ISS-031 closed; Feedback FB-109 to FB-117; Project Summary and User Manual patched); before it the design gate of the scoped revision program-f7, 2026-11-14 (conformance 25 OK, 0 MISSING, 5 NOTE; Feedback FB-107, FB-108); stage P1's close, 2026-11-14 (22 of 22 checks; Feedback FB-102 to FB-106)
+ Deferred increments: none; TASK-027's calibrations of reAngle and the video factory deferred by the owner on 2026-10-31 until they resume (INVENTORY, Deferred)
+ Open issues: ISS-037 worked around (Review B's provider stopped a review of the guards as security activity; one re-run with context approved). ISS-001 recurred, counter 2 (a review log named apart from its snapshot). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-024 recurred, counter 3. ISS-036 recurred, counter 3 (fixed each time; stage P1). ISS-013 mitigated (the plan check's rule, TASK-033, installed). Every other issue fixed or closed: the Issues file in Documents/, and docs/archive/STATUS_HISTORY.md
+diff --git a/docs/cli-reference.json b/docs/cli-reference.json
+index b5692da..72df21d 100644
+--- a/docs/cli-reference.json
++++ b/docs/cli-reference.json
+@@ -102,7 +102,7 @@
+       "name": "conformance-check.py",
+       "path": "bridge/cursor-bridge/conformance-check.py",
+       "source": "docstring",
+-      "usage": "conformance-check: does this project's configuration carry the floors the bridge requires?\n\n  python ~/.claude/cursor-bridge/conformance-check.py [<project root or Workspace>] [--screens] [--installable] [--offline] [--quiet]\n\nWhy (plan review R4): the bridge added floors over time (the security scanners in the gate,\nSHA-pinned actions, the workspace boundary, the records), and nothing compared a project\nconfigured before a floor existed with what the bridge now requires; the video factory ran\nits gate with no scanner and actions pinned by tag while the Project Summary said the floor\napplied everywhere. This check reads the project's files and reports, per floor, OK, MISSING\nor NOTE. It runs at every calibration and every reflection point; each MISSING is a\ncalibration item, applied as configuration work in the next stage. It never changes anything.\n\nWhat it checks, with the file it reads (the 0b review corrected several of these):\n  - the gate workflows (.github/workflows/*.yml), step by step, except the weekly\n    dependency-scan file (dependency-scan.yml or dependency-scan.yaml), which is not read for\n    gate steps or scanner version lines: a step runs Semgrep,\n    OSV-Scanner and Socket; a scanner step guarded by `if:` is MISSING (it is skipped\n    silently when its condition is false); Semgrep runs the bridge rules or the Pro engine\n    (`semgrep ci`), not public rulesets alone (Cursor-Project-Configuration.md 5c); a scanner\n    without a pinned version is a NOTE (rule 14); every `uses:` is pinned by a 40-character\n    commit; the runner is Linux (a note otherwise);\n  - every workflow's steps, the weekly dependency-scan file included, for the two Socket\n    key-exposure floors: `socket ci` without `--no-banner` is MISSING (its banner prints part\n    of the key, ISS-005), and so is a step that installs the Socket CLI while its `env:` holds\n    the Socket key (the install scripts see it, FB-007);\n  - on GitHub, read-only through `gh` unless --offline: the default branch has a required\n    status check (N6), and the repository's visibility (a public repository is a NOTE);\n  - the workspace boundary (.cursor/rules/workspace-boundary.mdc, the boundary-check hook in\n    .cursor/hooks.json), the windowless check in the hooks (rule 24), and the frozen\n    secure-coding rule (.cursor/rules/secure-coding.mdc); a configured boundary-check hook is\n    a NOTE (configured, not engaging) unless this computer's probe record\n    ~/.cursor-bridge/boundary-probe.json says it fired ({\"fired\": true, \"when\": ..., \"launch\":\n    ...}; ISS-010: it never ran in a headless builder run launched the bridge's way; no program\n    writes the record yet), and it is MISSING while docs/BOUNDARY_VIOLATIONS.md, its log of\n    absolute paths, is not gitignored (FB-031);\n  - the windowless pytest default (R-039, FIX-001 snapshot in windowless-default.snapshot.md):\n    pytest.ini, then pyproject.toml's [tool.pytest.ini_options], then setup.cfg's [tool:pytest],\n    else tests/test_*.py; test roots from testpaths inside the Workspace or tests/, dropping any\n    root reached through a link; each root's conftest.py (or the rootdir's conftest.py) must hold\n    windowless_kwargs, Popen.__init__ and CREATE_NO_WINDOW\n  - a lockfile beside each manifest (package.json, pyproject.toml), and a transitive lock for\n    a root requirements.txt (direct pins alone are not a lock; KP-018);\n  - the records: docs/PROJECT_STATUS.md, INVENTORY.md, REQUIREMENTS.md, RUN_PARAMETERS.md,\n    ROSTER.json, DESIGN.md (a design under other names is a NOTE naming them), and\n    docs/diagrams/INDEX.md (missing = a diagram retrofit item); a tracked (or, outside a git\n    repository, any) docs/PROJECT_STATUS.md holding an absolute path (a drive letter\n    followed by a colon and a backslash or a slash, or a macOS home under root Users, or a\n    Linux home under root home) is MISSING (rule 54: no computer path enters a commit; FB-026);\n  - the Workflows: line in docs/PROJECT_STATUS.md: missing, malformed, or misplaced is MISSING\n    (R-015); a line naming an unwritten product type or sub-type is MISSING; an unwritten trait\n    is a NOTE `Unwritten trait`; `not yet classified` past intake is a NOTE `Workflows\n    classification` (calibration step 4b; R-027, R-033);\n  - with --screens (or a docs/mockups folder): the design detector in the gate;\n  - release A1b: a spending limit recorded for every key, account or provider that can charge\n    (the inventory's Resources rows); the inventory's `Development data:` decision; every\n    adapter of a listed provider tested against recorded replies (the providers from the\n    inventory's chargeable rows, one word each; the adapters among the project's own tracked\n    files, naming the provider in a string of code, not a comment; the evidence a cassette or\n    fixture file the adapter's test loads, a recording library, or a test that names cassettes\n    in a repository that tracks a cassettes folder); `run/` ignored (a NOTE);\n  - release A2: project.json at the Workspace root (name, purpose, kind, version, state), its\n    keys and its phase against the status file;\n  - with --installable (or docs/cli-reference.json present): the CLI reference and a check\n    of it, in CI or in the test suite;\n  - secrets within the builder's reach: variable NAMES in Workspace/.env, .env.* (not the\n    examples) and <folder>/.env that look like account keys or tokens are MISSING; local\n    service passwords the tests need (POSTGRES_PASSWORD, MINIO_ROOT_PASSWORD, ...) are a\n    NOTE; values are never read or printed (KP-032); the advice is a key file outside the\n    Workspace, never the Windows user environment; key-like variable NAMES in the session's\n    own environment are a NOTE (the launcher withholds them from builder and reviewer runs);\n    an inventory row that says a secret arrives through an environment variable is MISSING,\n    a row whose only mention is negated (\"never an environment variable the owner sets\",\n    \"not through an environment variable\", \"no longer ...\") is not one;\n  - the private memory notes Claude Code keeps for this project (names only; calibration\n    step 2b reviews them, rule 41);\n  - the recorded bridge version against the installed one (calibration due).\nExit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace.\nASCII-only on purpose (cp1252 consoles). Never writes.\n"
++      "usage": "conformance-check: does this project's configuration carry the floors the bridge requires?\n\n  python ~/.claude/cursor-bridge/conformance-check.py [<project root or Workspace>] [--screens] [--installable] [--offline] [--quiet]\n\nWhy (plan review R4): the bridge added floors over time (the security scanners in the gate,\nSHA-pinned actions, the workspace boundary, the records), and nothing compared a project\nconfigured before a floor existed with what the bridge now requires; the video factory ran\nits gate with no scanner and actions pinned by tag while the Project Summary said the floor\napplied everywhere. This check reads the project's files and reports, per floor, OK, MISSING\nor NOTE. It runs at every calibration and every reflection point; each MISSING is a\ncalibration item, applied as configuration work in the next stage. It never changes anything.\n\nWhat it checks, with the file it reads (the 0b review corrected several of these):\n  - the gate workflows (.github/workflows/*.yml), step by step, except the weekly\n    dependency-scan file (dependency-scan.yml or dependency-scan.yaml), which is not read for\n    gate steps or scanner version lines: a step runs Semgrep,\n    OSV-Scanner and Socket; a scanner step guarded by `if:` is MISSING (it is skipped\n    silently when its condition is false); Semgrep runs the bridge rules or the Pro engine\n    (`semgrep ci`), not public rulesets alone (Cursor-Project-Configuration.md 5c); a scanner\n    without a pinned version is a NOTE (rule 14); every `uses:` is pinned by a 40-character\n    commit; the runner is Linux (a note otherwise);\n  - every workflow's steps, the weekly dependency-scan file included, for the two Socket\n    key-exposure floors: `socket ci` without `--no-banner` is MISSING (its banner prints part\n    of the key, ISS-005), and so is a step that installs the Socket CLI while its `env:` holds\n    the Socket key (the install scripts see it, FB-007);\n  - on GitHub, read-only through `gh` unless --offline: the default branch has a required\n    status check (N6), and the repository's visibility (a public repository is a NOTE);\n  - the workspace boundary (.cursor/rules/workspace-boundary.mdc, the boundary-check hook in\n    .cursor/hooks.json), the windowless check in the hooks (rule 24), and the frozen\n    secure-coding rule (.cursor/rules/secure-coding.mdc); a configured boundary-check hook is\n    a NOTE (configured, not engaging) unless this computer's probe record\n    ~/.cursor-bridge/boundary-probe.json says it fired ({\"fired\": true, \"when\": ..., \"launch\":\n    ...}; ISS-010: it never ran in a headless builder run launched the bridge's way; no program\n    writes the record yet), and it is MISSING while docs/BOUNDARY_VIOLATIONS.md, its log of\n    absolute paths, is not gitignored (FB-031);\n  - the windowless pytest default (R-039, FIX-001 snapshot in windowless-default.snapshot.md):\n    pytest.ini, then pyproject.toml's [tool.pytest.ini_options], then setup.cfg's [tool:pytest],\n    else tests/test_*.py; test roots from testpaths inside the Workspace or tests/, dropping any\n    root reached through a link; each root's conftest.py (or the rootdir's conftest.py) must hold\n    windowless_kwargs, Popen.__init__ and CREATE_NO_WINDOW\n  - a lockfile beside each manifest (package.json, pyproject.toml), and a transitive lock for\n    a root requirements.txt (direct pins alone are not a lock; KP-018);\n  - the records: docs/PROJECT_STATUS.md, INVENTORY.md, REQUIREMENTS.md, RUN_PARAMETERS.md,\n    ROSTER.json, DESIGN.md (a design under other names is a NOTE naming them), and\n    docs/diagrams/INDEX.md (missing = a diagram retrofit item); a tracked (or, outside a git\n    repository, any) docs/PROJECT_STATUS.md holding an absolute path (a drive letter\n    followed by a colon and a backslash or a slash, or a macOS home under root Users, or a\n    Linux home under root home) is MISSING (rule 54: no computer path enters a commit; FB-026);\n  - the Workflows: line in docs/PROJECT_STATUS.md: missing, malformed, or misplaced is MISSING\n    (R-015); a line naming an unwritten product type or sub-type is MISSING; an unwritten trait\n    is a NOTE `Unwritten trait`; `not yet classified` past intake is a NOTE `Workflows\n    classification` (calibration step 4b; R-027, R-033);\n  - with --screens (or a docs/mockups folder): the design detector in the gate;\n  - release A1b: a spending limit recorded for every key, account or provider that can charge\n    (the inventory's Resources rows); the inventory's `Development data:` decision; every\n    adapter of a listed provider tested against recorded replies (the providers from the\n    inventory's chargeable rows, one word each; the adapters among the project's own tracked\n    files, naming the provider in a string of code, not a comment; the evidence a cassette or\n    fixture file the adapter's test loads, a recording library, or a test that names cassettes\n    in a repository that tracks a cassettes folder); `run/` ignored (a NOTE);\n  - release A2: project.json at the Workspace root (name, purpose, kind, version, state), its\n    keys and its phase against the status file;\n  - with --installable (or docs/cli-reference.json present): the CLI reference and a check\n    of it, in CI or in the test suite;\n  - secrets within the builder's reach: variable NAMES in Workspace/.env, .env.* (not the\n    examples) and <folder>/.env that look like account keys or tokens are MISSING; local\n    service passwords the tests need (POSTGRES_PASSWORD, MINIO_ROOT_PASSWORD, ...) are a\n    NOTE; values are never read or printed (KP-032); the advice is a key file outside the\n    Workspace, never the Windows user environment; key-like variable NAMES in the session's\n    own environment are a NOTE (the launcher withholds them from builder and reviewer runs);\n    an inventory row that says a secret arrives through an environment variable is MISSING,\n    a row whose only mention is negated (\"never an environment variable the owner sets\",\n    \"not through an environment variable\", \"no longer ...\") is not one;\n  - the private memory notes Claude Code keeps for this project (names only; calibration\n    step 2b reviews them, rule 41);\n  - the recorded bridge version against the installed one (calibration due);\n  - the weekly dependency scan, found by its triggers and its OSV-Scanner step, never by a\n    file name: OK where a workflow with a schedule: trigger and an OSV-Scanner step has the\n    same --lockfile= values, as a set, as the workflows triggered by push or pull_request;\n    NOTE where the inventory Decisions table holds a row whose first cell begins \"Weekly scan:\",\n    the note quoting that cell, or where the local git configuration names no GitHub remote;\n    MISSING where no workflow file runs OSV-Scanner on a schedule: trigger, where an\n    OSV-Scanner workflow has no schedule: trigger, or where the lock-file lists differ and the\n    row names the lock files apart; pins, permissions and exit handling are not compared, and\n    a workflow disabled on GitHub is the evaluation's read.\nExit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace, or a malformed record header (HEADER MALFORMED, the status file's or the inventory's).\nASCII-only on purpose (cp1252 consoles). Never writes.\n"
+     },
+     {
+       "description": "Check the normative design diagrams.",
+diff --git a/handoff/TASK-072-r1-report.md b/handoff/TASK-072-r1-report.md
+new file mode 100644
+index 0000000..58753d3
+--- /dev/null
++++ b/handoff/TASK-072-r1-report.md
+@@ -0,0 +1,201 @@
++# TASK-072 round 1 report
++
++## Files changed or created
++
++- `bridge/cursor-bridge/conformance-check.py` (the weekly row, its readers, and the docstring)
++- `bridge/cursor-bridge/MANIFEST.json` (rewritten by `python tools/make-manifest.py` in the Done list, not by hand)
++- `handoff/TASK-072-r1-report.md` (this report)
++
++No fixture was edited. `docs/BUILDER_NOTES.md` was not changed. No file under `.github/` was changed. `bridge/cursor-bridge/VERSION` is restored after the manifest rewrite and must not remain listed.
++
++## Summary
++
++`conformance-check.py` now prints one `Weekly dependency scan` row on every run that finishes `main()`: OK when some workflow with a `schedule:` trigger and an OSV-Scanner step has the same `--lockfile=` set as the workflows triggered by `push` or `pull_request`, NOTE when a Decisions cell begins `Weekly scan:` or the Workspace's own git configuration names no GitHub remote, and MISSING otherwise, saying which of the three failures it is. The module docstring lists that floor and the exits `main()` returns, including a malformed record header. This repository's weekly workflow and gate already match, so the row reads OK without any workflow edit.
++
++## R1-R7
++
++- R1. `weekly_dependency_scan` (lines 659-692) returns the verdict and detail, and `main` adds them once through `add` (lines 1483-1484) after the inventory sections are filled, including when `workflows` is empty. `--quiet` and a MISSING exit follow the existing print loop.
++- R2. `_workflow_triggers` (lines 531-553) reads a top-level `on:` as a block of indented keys, as `on: push`, or as `on: [push, pull_request]` (names may be quoted). `_osv_lock_list` (lines 556-566) uses `workflow_steps` and the `OSV-Scanner` pattern from `SCANNERS` (`_OSV_STEP`, line 503). `_lock_token` (lines 507-511) keeps the text after `--lockfile=` up to whitespace and strips one matching quote pair. The gate list is the union of those values from workflows whose triggers include `push` or `pull_request` (lines 670-671); a weekly workflow is any scanned `.yml` or `.yaml` with an OSV-Scanner step and `schedule` (line 672). Comparison is `set(locks) == gate_set` (line 678). No file name is read.
++- R3. On a matching set, lines 678-680 return OK with detail `pins, permissions and exit handling are not compared; a workflow disabled on GitHub is the evaluation's read`.
++- R4. Otherwise `_weekly_decision_cell` (lines 575-582) returns the first Decisions cell that begins `Weekly scan:` (case-sensitive), and line 683 returns NOTE of that cell through `_escape_field`. Otherwise `_has_github_remote` (lines 630-650) is false and line 685 returns NOTE `the repository has no GitHub remote`. The remote is `git config --get-regexp` on this folder's own git dir only: `_own_git_dir` (lines 585-609) returns None when `Workspace/.git` is absent, so `git` is not run and a parent repository is not searched; a missing, unreadable, or failing git dir is no remote. The URL is not printed. No `gh` call was added.
++- R5. Otherwise lines 686-692 return MISSING. No scheduled OSV workflow: `no workflow file runs OSV-Scanner on a schedule: trigger`. An OSV workflow that is not a `push` or `pull_request` workflow and has no `schedule`: `an OSV-Scanner workflow has no schedule: trigger`. A scheduled list that differs: `the lock files differ: the gate alone has <names>; the weekly scan alone has <names>`, each name through `_escape_field`, or `(none)` when that side is empty. OK detail: `pins, permissions and exit handling are not compared; a workflow disabled on GitHub is the evaluation's read`. Decision NOTE: the Decisions cell alone, passed through `_escape_field`. No-remote NOTE: `the repository has no GitHub remote`.
++- R6. The "What it checks" list gains the weekly floor at lines 78-86 (triggers and the OSV-Scanner step, never a file name, with the OK, NOTE, and MISSING readings). The gate-workflow bullet and its file-name exclusion are unchanged. Line 87 names exit 0 (every floor present), exit 1 (at least one MISSING), and exit 2 (not a workspace, or a malformed record header, `HEADER MALFORMED`, the status file's or the inventory's). The docstring is ASCII.
++- R7. No option, configuration key, environment variable, or dependency was added. Exits remain 0, 1, and 2. No `.github` file was edited. `test_this_repository_prints_the_weekly_row_ok` requires this Workspace's row to be OK.
++
++## Fixture changes
++
++none
++
++## Mutation self-check
++
++Each mutant was applied in `bridge/cursor-bridge/conformance-check.py`, then `python -m pytest -p no:cacheprovider -q tests/test_program_weekly_floor.py --tb=no` was run, then the edit was reverted. `--tb=no` was added so a failure trace would not print a temporary-folder path. After the M1 revert, `git diff --stat` showed only the feature edit. After each later revert, the file hash matched the hash taken at that point.
++
++- M1 the surrounding quotes are not stripped from a `--lockfile=` value. `_lock_token` returned its argument unchanged. Caught by `test_ok_on_the_repository_like_pair`.
++
++```
++4 failed, 12 passed in 7.42s
++```
++
++- M2 the two lists are compared in order instead of as sets. `set(locks) == gate_set` was replaced by `locks == gate`. Caught by `test_ok_where_the_weekly_lists_two_lock_files_in_another_order`.
++
++```
++1 failed, 15 passed in 7.13s
++```
++
++- M3 the `Weekly scan:` Decisions row is not read. `_weekly_decision_cell` returned None immediately. Caught by `test_note_by_a_weekly_scan_decision_row_quoting_its_cell`.
++
++```
++1 failed, 15 passed in 6.99s
++```
++
++- M4 the `schedule:` trigger is not required of a weekly workflow (a `workflow_dispatch`-only workflow counts as weekly). The weekly test became `schedule` or `workflow_dispatch`. Caught by `test_missing_with_a_workflow_dispatch_only_scan`.
++
++```
++1 failed, 15 passed in 7.02s
++```
++
++- M5 the remote reading always answers "no GitHub remote". `_has_github_remote` returned False immediately. Caught by `test_missing_with_no_weekly_file_and_a_github_remote`.
++
++```
++3 failed, 13 passed in 7.01s
++```
++
++## Commands before the Done list
++
++`python -m pytest -p no:cacheprovider -q tests/test_program_weekly_floor.py` (before the mutants):
++
++```
++................                                                         [100%]
++16 passed in 6.94s
++```
++
++## Done commands
++
++Run from `<Workspace>` after the last code edit, in order. Absolute paths printed by a command are written `<Workspace>` or `<tmp>` here. The counts belong to commit `72f8bd03cb0470ebe6b9d6e54129d7109cfb9d90`. At step 12 the working tree held uncommitted changes: `bridge/cursor-bridge/MANIFEST.json`, `bridge/cursor-bridge/conformance-check.py`, and `handoff/TASK-072-r1-report.md`. `bridge/cursor-bridge/VERSION` was not listed. No `.github` file was listed.
++
++1. `git status --short`
++
++```
++ M bridge/cursor-bridge/conformance-check.py
++?? handoff/TASK-072-r1-report.md
++```
++
++2. `python tools/make-manifest.py`
++
++```
++make-manifest: version 2026.11.12a, 148 files hashed, VERSION + MANIFEST.json written
++```
++
++3. `git restore bridge/cursor-bridge/VERSION` (run together with `git status --short`; restore printed no line)
++
++```
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/conformance-check.py
++?? handoff/TASK-072-r1-report.md
++```
++
++4. `python -m pytest -p no:cacheprovider -q -rs tests/test_program_weekly_floor.py tests/test_conformance_check.py tests/test_conformance_check_a4.py tests/test_diagram_check.py tests/test_bug042.py`
++
++```
++.............................................................            [100%]
++61 passed in 25.85s
++```
++
++5. `python -m pytest -p no:cacheprovider -q -rs tests/test_hotfix25a_conformance_semgrep.py tests/test_a4_followups.py tests/test_a4_review_fixes.py tests/test_b2_least_confident.py tests/test_program_branch_rule.py tests/test_calibrate_program.py tests/test_conformance_windowless.py`
++
++```
++........................................................................ [ 24%]
++........................................................................ [ 49%]
++........................................................................ [ 74%]
++......................................................s.s............... [ 98%]
++...                                                                      [100%]
++=========================== short test summary info ===========================
++SKIPPED [1] tests\test_conformance_windowless.py:526: creating a file symbolic link needs a privilege here
++SKIPPED [1] tests\test_conformance_windowless.py:551: Windows collapses `..` before it follows a link
++289 passed, 2 skipped in 78.76s (0:01:18)
++```
++
++6. `python -m pytest -p no:cacheprovider -q -rs tests/test_workflows_line_check.py tests/test_header_status.py tests/test_header_tables.py tests/test_header_tables_r2.py tests/test_header_currency.py tests/test_program_strip_names.py tests/test_loop_text_windowless.py tests/test_running_projects_classify.py`
++
++```
++.............................................ss......................... [ 14%]
++........................................................................ [ 29%]
++........................................................................ [ 44%]
++........................................................................ [ 59%]
++........................................................................ [ 73%]
++........................................................................ [ 88%]
++........................................................                 [100%]
++=========================== short test summary info ===========================
++SKIPPED [1] tests\test_workflows_line_check.py:496: cannot create a symbolic link here: [WinError 1314] A required privilege is not held by the client: '<tmp>' -> '<tmp>'
++SKIPPED [1] tests\test_workflows_line_check.py:496: cannot create a symbolic link here: [WinError 1314] A required privilege is not held by the client: '<tmp>' -> '<tmp>'
++486 passed, 2 skipped in 74.05s (0:01:14)
++```
++
++7. `python -m pytest -p no:cacheprovider -q -rs tests/test_dump_cli.py`. The expected failure is `tests/test_dump_cli.py::test_cfgb3b_committed_reference_is_current`: the docstring change makes the committed command reference stale. No other test in this file failed. The reference files were not regenerated.
++
++```
++.......................................F................................ [ 71%]
++.............................                                            [100%]
++================================== FAILURES ===================================
++_________________ test_cfgb3b_committed_reference_is_current __________________
++
++    def test_cfgb3b_committed_reference_is_current():
++        """Criterion 10: the repository's own `--check` passes (the committed docs/cli-reference.json and
++        docs/CLI_REFERENCE.md equal a fresh generation); conformance-check.py looks for this file's --check."""
++        p = subprocess.run([sys.executable, str(GEN), "--check"], cwd=str(ROOT), capture_output=True, text=True,
++                           encoding="utf-8", timeout=120)
++>       assert p.returncode == 0, p.stdout + p.stderr
++E       AssertionError: docs/cli-reference.json
++E         docs/CLI_REFERENCE.md
++E         
++E       assert 1 == 0
++E        +  where 1 = CompletedProcess(args=['<python>', '<Workspace>/tools/dump-cli.py', '--check'], returncode=1, stdout='docs/cli-reference.json\ndocs/CLI_REFERENCE.md\n', stderr='').returncode
++
++tests\test_dump_cli.py:414: AssertionError
++1 failed, 100 passed in 125.03s (0:02:05)
++```
++
++8. `python tools/dump-cli.py --check` (stale command reference, not regenerated)
++
++```
++docs/cli-reference.json
++docs/CLI_REFERENCE.md
++```
++
++9. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++```
++bridge-check: version 2026.11.12a (2026-11-21 18:38) at <Workspace>\bridge
++bridge-check: 148 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.12a
++```
++
++10. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++
++```
++windowless-check: 41 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++11. `python -c "open('bridge/cursor-bridge/conformance-check.py','rb').read().decode('ascii'); print('ascii ok')"`
++
++```
++ascii ok
++```
++
++12. `git rev-parse HEAD` and `git status --short`
++
++```
++72f8bd03cb0470ebe6b9d6e54129d7109cfb9d90
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/conformance-check.py
++?? handoff/TASK-072-r1-report.md
++```
++
++## Assumed, not verified
++
++- When several scheduled OSV-Scanner workflows differ from the gate and none equals it, the detail names the first of those workflows in the sorted glob order, not a union of them. The brief says the weekly's lock files apart and does not say which file when there are several. A scratch project with two differing scheduled workflows would confirm which names appear.
++- An OSV-Scanner workflow that has neither `push`, `pull_request`, nor `schedule` (for example `release` only, not only `workflow_dispatch`) is the "has no schedule: trigger" MISSING, and that message loses to a differing scheduled workflow when both exist. R5 names the dispatch-only case and the three messages, and does not rank a mix. A workflow triggered only by `release`, and one scheduled workflow that differs beside a dispatch-only workflow, would confirm the wording.
++- A `.git` file is a worktree gitfile: the `gitdir:` token is passed to `git --git-dir`, and a missing line, a path that is not a directory, or a token that starts with `-` is no remote. The brief requires no crash and no parent search when `.git` is absent, and does not say how a gitfile is read. A worktree whose gitfile points at a GitHub remote, and a gitfile whose path contains a space, would confirm it.
++- `Weekly scan:` is matched case-sensitively, and the first Decisions row in table order is the one quoted. The brief writes that exact prefix and says a row, not which row or which case. A cell `weekly scan:` and two `Weekly scan:` rows would confirm it.
++- A remote URL counts as GitHub when its host is `github.com` or ends with `.github.com`, compared case-insensitively, including userinfo and the `git@host:path` form; a path that only contains the text `github.com` does not. The brief says a remote URL on github.com and does not give a host grammar. `git@github.com:owner/repo.git`, `https://user:token@github.com/owner/repo.git`, and `https://example.com/github.com/repo` would confirm it.
++- A top-level `on:` written as a flow mapping (`on: {push: ...}`), a literal block (`on: |`), or a folded scalar is read as no triggers. The brief requires the block form and the inline forms `on: push` and `on: [push, pull_request]`. One workflow in each unsupported form would confirm the reading.
+diff --git a/handoff/TASK-072-r2-report.md b/handoff/TASK-072-r2-report.md
+new file mode 100644
+index 0000000..6465d97
+--- /dev/null
++++ b/handoff/TASK-072-r2-report.md
+@@ -0,0 +1,175 @@
++# TASK-072 round 2 report
++
++## Files changed or created
++
++- `bridge/cursor-bridge/conformance-check.py` (the four corrections, inside `_workflow_triggers`, `_own_git_dir`, and `_has_github_remote`)
++- `bridge/cursor-bridge/MANIFEST.json` (rewritten by `python tools/make-manifest.py` in the Done list, not by hand)
++- `docs/BUILDER_NOTES.md` (one dated line on Git for Windows 2.53 and `git config --local`)
++- `handoff/TASK-072-r2-report.md` (this report)
++
++No test file was edited. No file under `.github/` was changed. The module docstring is unchanged. `bridge/cursor-bridge/VERSION` was restored after the manifest rewrite and is not listed by `git status --short`.
++
++## Summary
++
++The weekly row still reads a GitHub remote only from this Workspace's own git configuration, and it now keeps a `gitdir:` path that contains spaces, ignores a remote that arrives from the global file, from `GIT_CONFIG*` environment pairs, or from an included file, and treats a `gitdir:` value that names another host as no git folder. A top-level trigger key written `"on":` or `'on':` is read the same way as a bare `on:`.
++
++## Corrections
++
++- Correction 1. `_own_git_dir` (lines 596-602) takes the first `gitdir:` line, keeps the rest of that line, and strips surrounding spaces and tabs; `splitlines` drops the line ending, so a path may hold spaces.
++- Correction 2. `_has_github_remote` (lines 643-648) deletes every copied environment name that begins `GIT_CONFIG`, and the `config` call passes `--local` and `--no-includes`. The call still sets `GIT_DIR`, drops `GIT_WORK_TREE`, passes `-c core.fsmonitor=false`, is windowless, uses `timeout=GH_TIMEOUT`, and reads a failure as no remote.
++- Correction 3. `_own_git_dir` (lines 604-606) returns None, before any `os.path` call, when the `gitdir:` value begins with two slashes of either direction (`/`, `\`, or one of each).
++- Correction 4. `_workflow_triggers` (line 535) matches a top-level key that is `on:`, `"on":`, or `'on':`, with the quotes matching.
++
++## Mutation self-check
++
++Each mutant was applied in `bridge/cursor-bridge/conformance-check.py`, then the weekly-floor file was run, then the edit was reverted. R2-M1 used `python -m pytest -p no:cacheprovider -q tests/test_program_weekly_floor.py`. R2-M2 added `--tb=no`, and R2-M3, R2-M4, and R2-M5 added `--tb=line`, so a failure trace would not be copied here. After R2-M1, `git diff` on that file was only the four corrections. After R2-M2, R2-M3, and R2-M4 the restored `--local --no-includes` call and the `GIT_CONFIG` loop were back. After R2-M5, `git diff --stat` was `1 file changed, 14 insertions(+), 6 deletions(-)` and the diff was the four corrections only.
++
++- R2-M1 the `gitdir:` value is cut at its first space again. The value was split on the first space after the surrounding spaces and tabs were stripped. Caught by `test_r2_a_git_dir_whose_path_holds_a_space_is_read`.
++
++```
++1 failed, 24 passed in 11.36s
++```
++
++- R2-M2 `--local` is dropped from the `config` call. not caught. `test_r2_a_remote_outside_this_repository_config_is_not_read[global-file]` would catch it if `GIT_CONFIG_GLOBAL` were still passed to git; with those variables removed, the system and global files git then reads on this computer name no github.com remote, and the case stays NOTE.
++
++```
++25 passed in 10.94s
++```
++
++- R2-M3 `--no-includes` is dropped from the `config` call. not caught. `test_r2_an_included_config_file_is_not_read` would catch it if the call had no file scope; Git for Windows 2.53 leaves includes off when `--local` is set, so the case stays NOTE.
++
++```
++25 passed in 11.10s
++```
++
++- R2-M4 the `GIT_CONFIG*` variables are passed on. not caught. `test_r2_a_remote_outside_this_repository_config_is_not_read[environment-pairs]` would catch it if `git config --local` applied `GIT_CONFIG_COUNT` pairs; on Git for Windows 2.53 those pairs are applied only when no file scope is given, so the case stays NOTE while `--local` remains.
++
++```
++25 passed in 11.09s
++```
++
++- R2-M5 only a bare `on:` is matched. The trigger pattern was restored to `^on:`. Caught by `test_r2_a_quoted_on_key_is_read[double-quoted]` (and `[single-quoted]`).
++
++```
++2 failed, 23 passed in 11.05s
++```
++
++## Commands before the Done list
++
++`python -m pytest -p no:cacheprovider -q tests/test_program_weekly_floor.py` (after the four corrections, before the mutants):
++
++```
++.........................                                                [100%]
++25 passed in 11.11s
++```
++
++## Done commands
++
++Run from `<Workspace>` after the last code edit, in order. Absolute paths printed by a command are written `<Workspace>` or `<tmp>` here. Commands 8 to 12 ran in one foreground shell, in that order, each after the previous had exited. The counts belong to commit `506640688a7a517f3b5766db1ad43eb65f97f353`. At step 12 the working tree held uncommitted changes: `bridge/cursor-bridge/MANIFEST.json`, `bridge/cursor-bridge/conformance-check.py`, and `docs/BUILDER_NOTES.md`. `bridge/cursor-bridge/VERSION` was not listed. No `.github` file was listed. This report was written after step 12, so that listing does not name it.
++
++1. `git status --short`
++
++```
++ M bridge/cursor-bridge/conformance-check.py
++ M docs/BUILDER_NOTES.md
++```
++
++2. `python tools/make-manifest.py`
++
++```
++make-manifest: version 2026.11.12a, 148 files hashed, VERSION + MANIFEST.json written
++```
++
++3. `git restore bridge/cursor-bridge/VERSION`
++
++The command printed nothing and exited 0. A following `git status --short` limited to `VERSION` and `MANIFEST.json` printed:
++
++```
++ M bridge/cursor-bridge/MANIFEST.json
++```
++
++4. `python -m pytest -p no:cacheprovider -q -rs tests/test_program_weekly_floor.py tests/test_conformance_check.py tests/test_conformance_check_a4.py tests/test_diagram_check.py tests/test_bug042.py`
++
++```
++......................................................................   [100%]
++70 passed in 29.45s
++```
++
++5. `python -m pytest -p no:cacheprovider -q -rs tests/test_hotfix25a_conformance_semgrep.py tests/test_a4_followups.py tests/test_a4_review_fixes.py tests/test_b2_least_confident.py tests/test_program_branch_rule.py tests/test_calibrate_program.py tests/test_conformance_windowless.py`
++
++```
++........................................................................ [ 24%]
++........................................................................ [ 49%]
++........................................................................ [ 74%]
++......................................................s.s............... [ 98%]
++...                                                                      [100%]
++=========================== short test summary info ===========================
++SKIPPED [1] tests\test_conformance_windowless.py:526: creating a file symbolic link needs a privilege here
++SKIPPED [1] tests\test_conformance_windowless.py:551: Windows collapses `..` before it follows a link
++289 passed, 2 skipped in 75.28s (0:01:15)
++```
++
++6. `python -m pytest -p no:cacheprovider -q -rs tests/test_workflows_line_check.py tests/test_header_status.py tests/test_header_tables.py tests/test_header_tables_r2.py tests/test_header_currency.py tests/test_program_strip_names.py tests/test_loop_text_windowless.py tests/test_running_projects_classify.py`
++
++The two skip lines below replace the temporary-folder prefix with `<tmp>`.
++
++```
++.............................................ss......................... [ 14%]
++........................................................................ [ 29%]
++........................................................................ [ 44%]
++........................................................................ [ 59%]
++........................................................................ [ 73%]
++........................................................................ [ 88%]
++........................................................                 [100%]
++=========================== short test summary info ===========================
++SKIPPED [1] tests\test_workflows_line_check.py:496: cannot create a symbolic link here: [WinError 1314] A required privilege is not held by the client: '<tmp>\bin\inventory-check.py' -> '<tmp>\elsewhere\inventory-check.py'
++SKIPPED [1] tests\test_workflows_line_check.py:496: cannot create a symbolic link here: [WinError 1314] A required privilege is not held by the client: '<tmp>\bin\conformance-check.py' -> '<tmp>\elsewhere\conformance-check.py'
++486 passed, 2 skipped in 72.82s (0:01:12)
++```
++
++7. `python -m pytest -p no:cacheprovider -q -rs tests/test_dump_cli.py`
++
++```
++........................................................................ [ 71%]
++.............................                                            [100%]
++101 passed in 120.83s (0:02:00)
++```
++
++8. `python tools/dump-cli.py --check`
++
++The command printed no lines and exited 0.
++
++9. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++```
++bridge-check: version 2026.11.12a (2026-11-21 19:38) at <Workspace>\bridge
++bridge-check: 148 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.12a
++```
++
++10. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++
++```
++windowless-check: 41 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++11. `python -c "open('bridge/cursor-bridge/conformance-check.py','rb').read().decode('ascii'); print('ascii ok')"`
++
++```
++ascii ok
++```
++
++12. `git rev-parse HEAD` and `git status --short`
++
++```
++506640688a7a517f3b5766db1ad43eb65f97f353
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/conformance-check.py
++ M docs/BUILDER_NOTES.md
++```
++
++## Assumed, not verified
++
++- A quoted `on` key with a space before the colon (`"on" :` or `'on' :`) is not matched. The brief and the cases use the colon immediately after the key, as the bare `on:` form does. A workflow line `"on" :` would confirm it.
++- The first `gitdir:` line in a `.git` file is the value used. Git writes one such line, and the space case uses that file. A second `gitdir:` line later in the file would confirm which line is used.
++- A network path includes the mixed prefixes `/\` and `\/` as well as `//` and `\\`. The brief says two slashes or two backslashes, in either order of slash, and there is no test. A reviewer reading those four prefixes in `_own_git_dir` confirms the reading.
+diff --git a/handoff/TASK-072-r2.md b/handoff/TASK-072-r2.md
+new file mode 100644
+index 0000000..8e74c62
+--- /dev/null
++++ b/handoff/TASK-072-r2.md
+@@ -0,0 +1,59 @@
++---
++record: brief
++header: 1
++id: "TASK-072"
++round: 2
++satisfies: [R-092]
++scope: ["bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/TASK-072-r2-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# TASK-072 round 2: the remote is this repository's own, and a quoted on: key is read (R-092)
++
++Round cause: defect - bridge/cursor-bridge/conformance-check.py:596 and 630-641, the remote reading cuts a .git file's gitdir path at its first space and asks git config for every scope (system, global, the environment's GIT_CONFIG_* pairs and included files), so a worktree under a path with a space reads no remote and a remote in the user's global configuration reads as this repository's, against R-092's local configuration alone (behaviour)
++
++## Objective
++This is round 2 of TASK-072. Round 1's code is committed as the builder left it; Review A's round 1 rejected it for the two remote-reading defects above and asked for the quoted `on:` key, and the security audit of round 1 asked for the two hardening points in Correction 3 and 4. The supervisor's new cases are at the end of `tests/test_program_weekly_floor.py`, after the comment `# ---------------------------------------------------------------- round 2: the remote is this repository's own`, each named `test_r2_...`. Make the four corrections below, keep every test green, and edit nothing in the acceptance file. Round 1's brief, `handoff/TASK-072.md`, stays in force for everything this brief does not change: its rulings 1-7, R1-R7, its Context, its Constraints and its Done list.
++
++Satisfies: R-092 - as round 1's brief.
++
++## Scope
++Files you may create or modify:
++- bridge/cursor-bridge/conformance-check.py
++- bridge/cursor-bridge/MANIFEST.json
++- docs/BUILDER_NOTES.md
++- handoff/TASK-072-r2-report.md
++
++Limits on these files: `conformance-check.py`, the four corrections alone, inside the functions round 1 added (`_workflow_triggers`, `_own_git_dir`, `_has_github_remote`); `MANIFEST.json` only through its generator, as round 1 (`python tools/make-manifest.py`, then `git restore bridge/cursor-bridge/VERSION`). Every other file is read only, every test file among them (`tests/test_program_weekly_floor.py` is the supervisor's). **The module docstring does not change this round**: it already says the remote is read from the local git configuration, which the corrections make true; the command reference (`docs/cli-reference.json`, `docs/CLI_REFERENCE.md`) was regenerated by the supervisor from round 1's docstring, and `python tools/dump-cli.py --check` must stay green.
++
++## Out of scope
++As round 1's brief. Nothing beyond the four corrections: no refactoring, no other finding (the supervisor records the rest in `docs/HARDENING.md`: the empty set against the empty set, the `--lockfile` space form and `-L`, a workflow triggered by both push and schedule, trigger keys read at any depth under `on:`, a `--lockfile=` inside a comment of a run block), no option, no environment variable, no new dependency, no change to the gate reader's file-name exclusion.
++
++## Correction
++1. **A .git file's gitdir path is read whole (behaviour; Review A round 1, B1).** `_own_git_dir` (line 596) reads the `gitdir:` value with `(\S+)`, so a path holding a space is cut at the space, the cut path is no folder, and the row reads NOTE where the repository's origin is on github.com. Read the rest of the `gitdir:` line, with the surrounding spaces and tabs and the line ending removed (a value may hold spaces). Case: `test_r2_a_git_dir_whose_path_holds_a_space_is_read` (round 1: NOTE where MISSING is right).
++2. **Only this repository's own configuration file is read (behaviour; Review A round 1, B2, and the security audit).** `_has_github_remote` (lines 630-641) runs `git config --get-regexp` with no scope, so git reads the system and global files, configuration passed by the environment (`GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_<n>` / `GIT_CONFIG_VALUE_<n>`, `GIT_CONFIG_PARAMETERS`) and every file an `include.path` or `includeIf` names. Read the repository's own configuration alone and follow no include: add `--local` and `--no-includes` to the `config` call, and do not pass on the environment's `GIT_CONFIG*` variables (remove every variable whose name begins `GIT_CONFIG` from the copied `env`). Keep the call's other properties as round 1 has them (`GIT_DIR`, no `GIT_WORK_TREE`, `-c core.fsmonitor=false`, windowless, `timeout=GH_TIMEOUT`, its failures read as no remote). Cases: `test_r2_a_remote_outside_this_repository_config_is_not_read[global-file]` and `[environment-pairs]` (round 1: MISSING where NOTE is right), `test_r2_an_included_config_file_is_not_read` (round 1: MISSING where NOTE is right).
++3. **A gitdir on another host is not followed (security; the security audit, advisory).** A `gitdir:` value naming a network path (beginning with two slashes or two backslashes, in either order of slash) is read as no git folder, before any `os.path` call touches it, so that reading the row never opens a network connection. No test case: a network path cannot be tested without the network; the reviewers read it in the code.
++4. **A quoted `on` key is read (behaviour; Review A round 1, S1).** `_workflow_triggers` (line 535) matches only a bare `on:` at the start of a line, so a workflow written as `"on":` or `'on':` (the form yamllint's truthy rule asks for) reads no trigger, and a project whose two workflows both write it reads a false MISSING. Accept the key bare, in double quotes or in single quotes, the quotes matching. Cases: `test_r2_a_quoted_on_key_is_read[double-quoted]` and `[single-quoted]` (round 1: MISSING where OK is right).
++
++## Context
++Round 2's cases are red on round 1's code; the supervisor's stripped run of the acceptance file is quoted in the commit that added them ("TASK-072 r2: Review A's findings as tests"). Three of the new cases already pass on round 1's code and hold what stands: `test_r2_a_parent_folder_repository_is_not_read` (a Workspace with no .git of its own inside a repository whose origin is on github.com reads NOTE), `test_r2_the_remote_url_is_never_printed`, and `test_r2_the_row_stands_where_there_is_no_workflow`; keep them green. `git config --local` reads `$GIT_DIR/config` (for a worktree, the repository's shared config, which is where its remotes stand); `--no-includes` is a `git config` option of the git versions this project supports (CI's ubuntu image and the owner's Git for Windows), and the round's tests run it on this computer.
++
++## Acceptance criteria
++- [ ] Every test in `tests/test_program_weekly_floor.py` passes, unedited.
++- [ ] Every test of round 1's Done list passes, unedited, `tests/test_dump_cli.py` whole among them (the reference is current again; nothing in it is expected to fail now).
++- [ ] `python tools/dump-cli.py --check` passes; the module docstring is unchanged from round 1.
++- [ ] The four corrections and nothing else; no new option, environment variable or dependency; no `.github` file changed.
++- [ ] MANIFEST regenerated; `bridge/cursor-bridge/VERSION` not listed by `git status --short`; `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` prints `RESULT: SOURCES MATCH`.
++- [ ] `conformance-check.py` stays ASCII.
++
++## Constraints
++As round 1's brief, every one of them; among them: do not run the whole `tests/` tree; no path of this computer or user name in anything you write (`<Workspace>`, `<tmp>`); the git commands that are not yours to run; the mutation self-check by hand, in process, no script in the diff, this round's labels being:
++- R2-M1 the `gitdir:` value is cut at its first space again.
++- R2-M2 `--local` is dropped from the `config` call.
++- R2-M3 `--no-includes` is dropped from the `config` call.
++- R2-M4 the `GIT_CONFIG*` variables are passed on.
++- R2-M5 only a bare `on:` is matched.
++Apply each by hand, one at a time, run `python -m pytest -p no:cacheprovider -q tests/test_program_weekly_floor.py`, revert, confirm the revert with `git diff`, and list each in the report with its pytest summary line and the id of a case it made fail, or `not caught` with one line on the case that would catch it (add none).
++
++## Done
++Your report is the file `handoff/TASK-072-r2-report.md`, written as you go, holding what round 1's Done section asks of its report (the files changed, a summary, one line per correction naming the function and its lines, the mutation self-check list, every command with its output, and the `Assumed, not verified` section as the last section). Run round 1's Done list (commands 1 to 12) after your last edit, in its order, with one change: command 7 (`tests/test_dump_cli.py`) and command 8 (`python tools/dump-cli.py --check`) are now expected to pass whole. Your last message is the summary and the report file's path, and nothing follows it.
+diff --git a/handoff/TASK-072.md b/handoff/TASK-072.md
+new file mode 100644
+index 0000000..7ba7227
+--- /dev/null
++++ b/handoff/TASK-072.md
+@@ -0,0 +1,188 @@
++---
++record: brief
++header: 1
++id: "TASK-072"
++round: 1
++satisfies: [R-092]
++scope: ["bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_program_weekly_floor.py", "tests/test_conformance_check.py", "tests/test_conformance_check_a4.py", "tests/test_diagram_check.py", "tests/fixtures/", "docs/BUILDER_NOTES.md", "handoff/TASK-072-r1-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# TASK-072: The conformance check knows the weekly scan (R-092)
++
++Round cause: first round (no earlier round)
++
++## Objective
++`bridge/cursor-bridge/conformance-check.py` reports, per floor, OK, MISSING or NOTE for a project's configuration. Every project receives a second workflow beside its gate, the weekly dependency scan (`.github/workflows/dependency-scan.yml` in this repository): an OSV-Scanner run on a `schedule:` trigger over the same lock files the gate scans. Today the check prints no row for it, so a project that lacks the weekly scan, or whose weekly scan reads other lock files than the gate, passes unseen. This increment adds one row, `Weekly dependency scan`, which finds the weekly workflow by its triggers and its steps (never by a file name), compares its `--lockfile=` values with the gate's as sets, and reads OK, NOTE or MISSING by the rulings below. It also makes the module docstring true: the new floor in its "What it checks" list, and its exit line naming every exit `main()` returns (J14). This repository's own run must print the new row OK.
++
++Satisfies: R-092 - The conformance check knows the weekly dependency scan (C12, C10): rows for the weekly workflow, the file present, a `schedule:` trigger, its `--lockfile=` list equal to the gate's OSV-Scanner step's; a NOTE without a GitHub remote or with an inventory Decisions row that begins `Weekly scan:`, otherwise MISSING for a missing file or a differing list; the configurator's text names that row's opening words; a diagram index with every kind omitted passes `diagram-check.py`'s three modes and the conformance check, held by tests; the check's docstring lists its exits as the code has them (J14). (Its row in `docs/REQUIREMENTS.md` is line 118. This brief serves the row, the docstring and this repository's run. The configurator's text belongs to the supervisor, not to this brief. The diagram half is held by four tests in the acceptance file that already pass.)
++
++## Scope
++Files and directories you may create or modify:
++- bridge/cursor-bridge/conformance-check.py
++- bridge/cursor-bridge/MANIFEST.json
++- tests/test_program_weekly_floor.py
++- tests/test_conformance_check.py
++- tests/test_conformance_check_a4.py
++- tests/test_diagram_check.py
++- tests/fixtures/
++- docs/BUILDER_NOTES.md
++- handoff/TASK-072-r1-report.md
++
++Limits on these paths:
++- `tests/test_program_weekly_floor.py`: the supervisor's acceptance tests, committed at HEAD (16 cases). Read it whole and run it. **Do not edit it.** If a case seems wrong, stop and report it by its test id.
++- `tests/test_conformance_check.py`, `tests/test_conformance_check_a4.py`, `tests/fixtures/` (the plan's Scope notes): "the conformant fixtures gain the weekly file or have no remote, so that every existing conformance test stays green, each changed fixture named in the report". The supervisor's reality check (Context) found no existing case that the new row turns red, so no edit is expected. Edit a fixture only if a case in them goes red because of the new row, and only that fixture: give it the weekly file or leave it without a remote. Name each such change in the report with the test id, why, and the diff.
++- `tests/test_diagram_check.py`: the plan lists it for the diagram half. This brief asks no change to it. Run it (Done, command 6).
++- `bridge/cursor-bridge/MANIFEST.json` changes only by running `python tools/make-manifest.py` (Done), never by hand. `bridge/cursor-bridge/VERSION` is outside Scope. `make-manifest.py` rewrites its line endings, so restore it with `git restore bridge/cursor-bridge/VERSION` right after (Done).
++
++Do not modify anything else.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration: **every file under `.github/`**, `dependency-scan.yml` and `tests.yml` included. This repository's run must turn OK by your code, never by editing a workflow.
++- docs/ and handoff/, except the files the Scope section names. Every record under docs/ is the supervisor's.
++- `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` (see Context, "The command reference"). Do not regenerate them.
++- Every other program under `bridge/cursor-bridge/` (`bridge_env.py` and `diagram-check.py` included), the texts under `bridge/commands/`, `bridge/agents/` (the configurator's text, which R-092 also names, is the supervisor's) and `bridge/cursor-bridge/workflow/`, and `bridge/cursor-bridge/CHANGELOG.md`.
++- `tools/make-manifest.py` and `tools/dump-cli.py`: you run them and edit neither.
++- Every test file not named in Scope. Those named in the Done list's commands must pass unedited (one known exception, Context, "The command reference"). Report a failure there by its test id.
++- `run/` (the supervisor's working files; you may read them and write nothing there).
++- Any mutation script or mutants file. The mutants file and the mutation run are the supervisor's, after your run.
++- Recorded as leads, not built in this increment: (1) the existing gate reader still excludes `dependency-scan.yml` / `.yaml` by file name, so a weekly workflow named otherwise is still read by the gate reader as gate steps; do not change that (ruling 4). (2) Precedence where a `Weekly scan:` Decisions row and a matching weekly workflow both exist (OK wins by ruling 3) is not tested by the acceptance file; implement the order, add no test for it.
++
++## Context
++**The design that binds this increment.** `docs/DESIGN.md` line 358, the bullet `*C12 and C10.*`: "`conformance-check.py` gains rows for the weekly dependency scan: the file present, a `schedule:` trigger, its `--lockfile=` list equal to the gate's OSV-Scanner step's. Without a GitHub remote, or with an inventory Decisions row that begins `Weekly scan:` (the recorded reason the configurator's stop asks for), the row is a NOTE; otherwise a missing file or a differing list is MISSING. Pins and permissions are not compared, the text leaving a block change to the project's next configuration touch. A diagram index with every kind omitted already passes both programs; C10 adds the regression tests that hold it." The plan entry is `docs/BUILD_PLAN.md`, `### TASK-072` (line 1914). Its Done when: "`conformance-check.py` prints one row for the weekly dependency scan: `OK` where a workflow file under `.github/workflows/` carries a `schedule:` trigger and an OSV-Scanner step whose `--lockfile=` list equals, as a set, the gate workflow's OSV-Scanner step's; `NOTE` where the repository has no GitHub remote, read from the local configuration alone, or where the inventory's Decisions holds a row whose first cell begins `Weekly scan:`, the note quoting that cell; `MISSING` where the file is absent, has no `schedule:` trigger, or its list differs, the row saying which and naming the lock files apart; pins, permissions and exit handling are not compared, and a workflow disabled on GitHub is the evaluation's read, both said in the row's text; the row is found by the steps' own commands, never by a file name, so a project that names its workflow otherwise passes; a diagram index with every kind omitted, each with its reason, passes `diagram-check.py --mode design`, `--mode code` and `--mode done` and the conformance check's diagram floor, held by four tests that are green on the checkpoint (the design found main right; the tests hold it); `tests/test_program_weekly_floor.py` names R-092; the check's docstring lists its exits as the code has them (J14); this repository's own conformance run prints the new row `OK`; MANIFEST regenerated; no option added; no new dependency."
++
++**The supervisor's rulings (they bind; R1-R7 restate them).**
++1. The new row is named exactly `Weekly dependency scan`, printed once per run, in the program's usual row form (`  <STATUS>  Weekly dependency scan  - <detail>`).
++2. Workflows are told apart by their triggers and steps, never by a file name. The gate set is the union of the OSV-Scanner `--lockfile=` values in workflows triggered by `pull_request` or `push`. A weekly workflow is any file under `.github/workflows/` (`.yml` or `.yaml`) with an OSV-Scanner step and a `schedule:` trigger. One pair of surrounding quotes (single or double, matching) is stripped from each value, and the lists are compared as sets.
++3. Order: OK if some weekly workflow's set equals the gate set; its detail says that pins, permissions and exit handling are not compared and that a workflow disabled on GitHub is the evaluation's read (the tests look for the words `not compared` and `disabled`). Otherwise NOTE where the inventory's Decisions (`docs/INVENTORY.md`) holds a row whose first cell begins `Weekly scan:`, the note quoting that cell. Otherwise NOTE where the repository has no GitHub remote, read from the local git configuration alone (no remote, or a non-GitHub remote; a workspace with no `.git` at all counts as no remote and must not crash). Otherwise MISSING, the row saying which: no workflow file with an OSV step and a `schedule:` trigger (the text must contain `no workflow file` and `schedule:`); an OSV workflow with `workflow_dispatch` only (`has no schedule: trigger`); or a scheduled one whose list differs, naming the lock files apart (on each side). MISSING sets exit 1 like every MISSING; OK and NOTE leave the exit as it is.
++4. The existing gate reader's exclusion of `dependency-scan.yml` / `.yaml` by file name (docstring lines 14-17 and the code behind them, lines 847-853) is NOT changed in this increment; the new row's own reading uses no file name. The docstring must still be made true: add the new floor to the "What it checks" list, describing the row as found by triggers and steps.
++5. J14: the docstring's exit line (line 78, `Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace.`) must list the exits `main()` actually returns: 2 is also returned for a malformed record header (`HEADER MALFORMED`, the returns at lines 841, 1270 and 1276).
++6. This repository's own run must print the row OK: its `.github/workflows/dependency-scan.yml` has `schedule:` (cron) and `--lockfile=requirements.txt:requirements.lock` unquoted; the gate `.github/workflows/tests.yml` (`on:` with `push:` and `pull_request:`) has `--lockfile='requirements.txt:requirements.lock'` quoted. You must not edit any `.github` file.
++7. No option added, no new dependency, MANIFEST regenerated by `python tools/make-manifest.py`.
++
++**`conformance-check.py` as it stands.**
++- `main()` (line 814) parses `sys.argv` by hand (`--quiet`, `--screens`, `--installable`, `--offline`, one positional), resolves the Workspace with `resolve_workspace` (line 439: the path or its `Workspace/` child holding `docs/` or `.git/`), and collects rows through `add(verdict, floor, detail="")` into `results`. At the end (lines 1398-1410) it prints `conformance-check: <ws>`, one line per row as `"  %-8s %s%s" % (verdict, floor, ("  - " + detail) if detail else "")` (OK rows are skipped under `--quiet`), the count line `conformance-check: <n> OK, <n> MISSING, <n> NOTE`, then `RESULT: CONFORMANT` and returns 0, or `RESULT: <n> floor(s) missing - ...` and returns 1 when any row is MISSING. A MISSING row added through `add` therefore gives exit 1 by itself.
++- The workflow section (lines 844-903): `workflows` is the sorted glob of `.github/workflows/*.yml` and `*.yaml`; `gate_workflows` leaves out `dependency-scan.yml` / `.yaml` by name (ruling 4: unchanged); `workflow_steps(text)` (lines 449-491) returns each step as `(body, guarded, commands)`, where `commands` is the step's `run:` / `uses:` lines and its block-scalar continuation lines. `SCANNERS` (line 130) holds the OSV-Scanner pattern `r"osv-scanner"`, matched with `re.I` against `commands` (line 864). An OSV-Scanner step for this row is a step whose commands match that pattern. When there is no workflow at all, the section adds `CI gate` MISSING and nothing else; the weekly row is still printed once (ruling 1).
++- The inventory section (lines 1250-1281) reads `docs/INVENTORY.md` (`read_header` / `check_header` first, `HEADER MALFORMED` and return 2 for a bad header), then fills `sections` from `bridge_env.inventory_parse_tables(...)`: `sections["Decisions"]` is the list of the Decisions table's rows, each a list of stripped cells, so `row[0]` is the first cell. Where the loaded `bridge_env` lacks the readers (`inv_can_read` false), `sections` stays empty. `bridge_env.inventory_development_data` (bridge_env.py line 3281) is the existing reading of a Decisions row by its first cell, for comparison.
++- `_escape_field(value)` (line 707) turns any non-printable or non-ASCII character into a backslash escape and leaves printable ASCII as it is. A value read from a project file (a Decisions cell, a lock-file name) is printed through it.
++- The subprocess helpers `git_ignored` / `git_tracked` (lines 504-517) show the program's convention for a local `git` call: `cwd=ws`, `capture_output=True`, `timeout=GH_TIMEOUT` (25 s), `creationflags=NO_WINDOW`, `OSError` and `TimeoutExpired` caught, no retry. `gh(...)` (line 494) is the only GitHub call and runs only without `--offline`; the new row never calls `gh` and never reaches the network, with or without `--offline`.
++- The module docstring (lines 2-80) is the program's usage text. Line 78 is the exit line (ruling 5).
++
++**The acceptance tests.** `tests/test_program_weekly_floor.py` (16 cases) fixes the interface. Read it whole. `make_project` builds a scratch Workspace under `tmp_path` that the check finds conformant but for the weekly row, runs `git init` in it, and adds `origin` = `https://github.com/example-owner/thing.git` unless told otherwise (`remote=None`: no remote; `OTHER_REMOTE` = a gitlab URL). Every run is `conformance-check.py <ws> --offline`. `rows(out, name)` reads `^  (OK|MISSING|NOTE) +(.*)$` and requires the detail after `<name>  - `; `weekly_row` requires exactly one row named `Weekly dependency scan`. `plain(detail)` removes backticks before some checks. `assert_ok` requires the row OK, its detail holding `not compared` and `disabled`, exit 0 and `RESULT: CONFORMANT`. `test_ok_with_a_weekly_workflow_named_otherwise` uses `nightly-deps.yaml` (schedule + workflow_dispatch). `test_the_docstring_lists_the_exits_the_code_has` parses the program with `ast`: the integer constants returned in `main()` plus every `<x>.exit(<int constant>)` call anywhere must equal `{0, 1, 2}` (so add no other exit), and in the module docstring every single digit not preceded by a word character, `.` or `-`, and not followed by a word character or `.`, then optional spaces and `=`, `:` or `-`, is read as an exit mark; the text up to the next mark (at most 250 characters) is that exit's meaning. Exit 0's meaning must hold `every floor` or `conformant`; exit 1's `missing`; exit 2's `workspace` and also `header` or `malformed`. A digit followed by `=`, `:` or `-` in the text you add elsewhere in the docstring becomes a mark too, and can cut a meaning short. `test_this_repository_prints_the_weekly_row_ok` runs the check over this Workspace (`cwd` the Workspace, `--offline`) and requires the row OK; it does not require exit 0.
++
++On the checkpoint, 11 of the 16 fail and 5 pass. The five that pass today hold what stands and must keep passing: `test_a_scheduled_scan_is_never_read_as_the_gate`, `test_an_all_omitted_index_passes_diagram_check[design]`, `[code]`, `[done]`, and `test_an_all_omitted_index_passes_the_conformance_diagram_floor`. After your change all 16 pass.
++
++**The existing tests the supervisor read against the rulings (the reality check before this brief).** Each was read, not run.
++- No existing conformance test sets a git remote, and no fixture under `tests/fixtures/` holds a workflow or an OSV-Scanner step. The shared fixture `make_workspace` (`tests/test_conformance_check.py` line 63) writes no `.git` at all; `tests/test_hotfix25a_conformance_semgrep.py` (lines 101, 198) and `test_second_pass_residue` (line 289) run `git init` without a remote. All of them land on the no-remote NOTE, which leaves the exit as it is. They stay green **only if** a Workspace with no `.git` of its own is read as no remote: never let `git` search the parent folders of a scratch Workspace (`tmp_path` can sit inside some other repository), and never ask `gh`.
++- `tests/test_conformance_check.py::test_a_conformant_workspace_passes_from_workspace_and_from_root` requires exit 0, `RESULT: CONFORMANT`, `0 MISSING` and no `  MISSING` line; its gate is `on: [pull_request]` (the inline list form) with `--lockfile package-lock.json` (a space, no `=`). No `.git`, so the NOTE.
++- `test_r083_the_required_check_row_follows_the_branch_rule`, `test_r083_a_bridge_env_without_branch_rule_does_not_invent_a_row` (`tests/test_conformance_check.py`) and `tests/test_program_branch_rule.py::test_r083_r2_the_none_row_is_true_for_both_causes_of_none` load the program in-process, run it **without** `--offline`, replace `gh` with a stub that answers `OWNER/REPO` to any call, and require exit 0 for the value and cannot-read cases. A remote read through `gh` would make those MISSING; read the remote from the local git configuration only.
++- `tests/test_b2_least_confident.py::test_fix002_conformance_check_judges_a_shaped_status_file_by_its_line_alone` and `test_fix002_a_broken_line_in_a_shaped_file_is_the_one_finding` require the NOTE lines of two runs on two different scratch folders to be equal, and the MISSING lines to be the `Workflows line` rows only. The row's detail therefore names no path and nothing that differs between two scratch folders.
++- `tests/test_conformance_windowless.py::run_check` fails any output line other than the first that holds the fixture's folder name; its fixtures hold `docs/` alone (no workflow, no `.git`). Same consequence: the detail names no path.
++- `tests/test_bug042.py` pins the gate reader's file-name exclusion (`test_bug042_the_weekly_file_is_known_by_its_name_in_either_form`, `test_bug042_the_same_steps_under_another_name_are_a_gate`: the weekly text in `security-scan.yml` answers `OSV-Scanner in the gate` OK). It checks the scanner rows only, never the exit. It stays green as long as ruling 4 holds.
++- `tests/test_calibrate_program.py` and `tests/test_workflows_line_check.py` run a copy of the program (with `bridge_env.py` beside it) on `make_workspace` fixtures and require exit 0 in several cases: no `.git`, so the NOTE.
++- `tests/test_header_currency.py` (reading 4, the `Phase: ` reading in `conformance-check.py`), `tests/test_header_status.py` (`test_r058_retired_3_...`, `test_r058_retired_4_...`) and `tests/test_program_strip_names.py::test_r080_conformance_check_holds_no_copy_of_the_name_test` read the program's source: add no reading of `Phase:`, `Bridge version:` or `Stage:`, and no copy of the secret-name test.
++- No test counts the conformance check's rows or its OK/NOTE totals over a scratch project. `tests/test_release_b2_stamp.py` quotes `conformance-check: 24 OK, 0 MISSING, 2 NOTE` from a record's text, not from a run; it is unaffected.
++
++**The command reference (a known consequence, the supervisor's to settle).** `tools/dump-cli.py` records `conformance-check.py` from its module docstring (`docs/cli-reference.json`, `"source": "docstring"`), and `docs/CLI_REFERENCE.md` is rendered from it. Rulings 4 and 5 change that docstring, so after your change `python tools/dump-cli.py --check` reports the reference stale and `tests/test_dump_cli.py::test_cfgb3b_committed_reference_is_current` fails. Both reference files are outside your Scope: do not regenerate them. Run the two commands of the Done list that show it, quote their output, and name it in the report as the expected consequence. Any other failure in `tests/test_dump_cli.py` is reported by test id.
++
++**External services.** None in this increment. The row makes no network call, with or without `--offline`; the GitHub read the program already makes stays behind `--offline` as today. A local `git` call, if you make one, follows the program's convention (above): windowless, `timeout=GH_TIMEOUT`, no retry, its failure read as no remote.
++
++**Trust boundaries and security context.** ASVS level 2 (`docs/INVENTORY.md`, Decisions, line 140). `.cursor/rules/secure-coding.mdc` is in force for you. Outside input crossing into the program: the project's workflow files, its inventory and its git configuration (any bytes). A value read from them (a lock-file name, a Decisions cell, a remote URL) is printed only through `_escape_field`; a remote URL is never printed at all (it can hold a credential). No exception may escape as a traceback; the program keeps its exits 0, 1 and 2 and adds none. The program never writes (docstring: "Never writes.").
++
++**Development data.** The inventory's decision (`docs/INVENTORY.md`, Decisions, line 135) reads: "the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet". For you: run `conformance-check.py` only through the tests (scratch Workspaces under `tmp_path`, and the one read-only `--offline` run over this Workspace in `test_this_repository_prints_the_weekly_row_ok`). Never install anything, and never read or copy anything under `~/.claude` or `~/.cursor-bridge`.
++
++**Host.** Windows 11 with the owner's Python. CI also runs on Linux.
++
++## Diagrams
++None. The plan entry names no diagram for this increment.
++
++## Requirements
++1. **R1. One row.** Every run that reaches the end of `main()` prints exactly one row named `Weekly dependency scan`, OK, NOTE or MISSING, also when the project has no workflow at all. It is added through `add`, so `--quiet` hides it when OK and a MISSING counts in the totals and gives exit 1.
++2. **R2. Found by triggers and steps.** A workflow's triggers are read from its top-level `on:`: at least the block form (`on:` followed by indented keys such as `push:`, `pull_request:`, `schedule:`, `workflow_dispatch:`) and the inline forms `on: push` and `on: [push, pull_request]`. The gate set is the union of the `--lockfile=` values of the OSV-Scanner steps in every workflow triggered by `push` or `pull_request`. A weekly workflow is any `.github/workflows/*.yml` or `*.yaml` with an OSV-Scanner step and a `schedule:` trigger; its set is the union of its OSV-Scanner steps' `--lockfile=` values. No file name decides either reading. Each value is the text after `--lockfile=` up to the next whitespace, with one pair of matching surrounding quotes (`'...'` or `"..."`) removed. Sets are compared, never ordered lists.
++3. **R3. OK.** Where some weekly workflow's set equals the gate set, the row is OK and its detail says that pins, permissions and exit handling are not compared and that a workflow disabled on GitHub is the evaluation's read (the words `not compared` and `disabled` appear in it).
++4. **R4. NOTE.** Otherwise, where `docs/INVENTORY.md`'s Decisions table holds a row whose first cell begins `Weekly scan:`, the row is NOTE and its detail quotes that cell (through `_escape_field`). Otherwise, where the Workspace's own git configuration names no GitHub remote (no `.git` in the Workspace, no remote, or no remote URL on `github.com`), the row is NOTE, its detail saying the repository has no GitHub remote. The remote is read from the local configuration alone: no `gh`, no network, no parent folder's repository, no crash on a missing or unreadable `.git`.
++5. **R5. MISSING, saying which.** Otherwise the row is MISSING and its detail says which of the three it is: no workflow file runs OSV-Scanner on a `schedule:` trigger (the detail holds `no workflow file` and `schedule:`); a workflow with an OSV-Scanner step has no `schedule:` trigger (the detail holds `has no schedule: trigger`, backticks around `schedule:` allowed); or a scheduled OSV-Scanner workflow's list differs from the gate's, the detail naming the lock files on each side apart (the gate's alone and the weekly's alone), each through `_escape_field`.
++6. **R6. The docstring.** The "What it checks" list gains the weekly floor, described as found by its triggers and its OSV-Scanner step (no file name), with its OK, NOTE and MISSING readings. The bullet on the gate workflows (lines 15-17) and its file-name exclusion stay as they are. The exit line names exit 0 (every floor present), 1 (at least one MISSING) and 2 (not a workspace, or a malformed record header, `HEADER MALFORMED`, the status file's or the inventory's), so that `test_the_docstring_lists_the_exits_the_code_has` passes. The docstring stays ASCII.
++7. **R7. No interface change.** No option, configuration key, environment variable or dependency is added; the program's arguments and its exits 0, 1, 2 are unchanged; no `.github` file changes; this repository's run prints the row OK.
++
++## Acceptance criteria
++- [ ] `tests/test_program_weekly_floor.py` passes whole, unedited (16 cases).
++- [ ] `tests/test_conformance_check.py`, `tests/test_conformance_check_a4.py` and `tests/test_diagram_check.py` pass. Any edit to a fixture is of the kind Scope allows and is named in the report.
++- [ ] Every other test file in the Done list's commands passes unedited, except `tests/test_dump_cli.py::test_cfgb3b_committed_reference_is_current`, reported as the expected stale reference (Context).
++- [ ] One `Weekly dependency scan` row per run; OK, NOTE and MISSING as R2-R5 say; the reading uses no file name (R1-R5).
++- [ ] The no-remote NOTE holds for a Workspace with no `.git`, no remote, or a non-GitHub remote, read locally, with no `gh` call and no crash (R4).
++- [ ] The docstring lists the weekly floor and every exit `main()` returns (R6, J14).
++- [ ] `python bridge/cursor-bridge/conformance-check.py . --offline` over this Workspace (through its test) prints the row OK; no `.github` file changed (R7).
++- [ ] MANIFEST is regenerated. `bridge/cursor-bridge/VERSION` is not listed by `git status --short`. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` prints `RESULT: SOURCES MATCH`.
++- [ ] `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks` passes.
++- [ ] `conformance-check.py` stays ASCII, and every line you add anywhere is ASCII.
++- [ ] R-092 (the parts this brief serves) is fully met, with no stand-in, placeholder or "later" text. The tests naming R-092 are the supervisor's acceptance tests.
++- [ ] No new dependency, option, configuration key or environment variable. No new Semgrep high finding. No exception escapes as a traceback (ASVS L2).
++
++## Constraints
++- Do not add dependencies (the standard library and the pytest already used only).
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it, and everything you produce goes inside it.
++- Do not edit `tests/test_program_weekly_floor.py`, any `.github` file, or anything else outside Scope. If a test case seems wrong, stop and report it by its test id instead of working around it.
++- If the brief, the rules, or the tooling got in your way (an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason), append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item. One paragraph is one line. Line breaks only between blocks.
++- **No owner's names, no paths.** Nothing you write (code, the notes line, the report) holds a path of this computer or a user name. In the report write `<Workspace>` for the repository folder and `<tmp>` for a temporary folder, including in quoted command output.
++- This increment talks to no external service. Add no call to any service or the network; the existing `gh` read stays behind `--offline` as it is.
++- Any console process your code launches on Windows is created windowless (`creationflags=NO_WINDOW`, the program's constant: `subprocess.CREATE_NO_WINDOW` on Windows, `0` elsewhere). A `git` call, if you make one, carries `timeout=GH_TIMEOUT`, catches `OSError` and `subprocess.TimeoutExpired`, and is not retried.
++- Never start a server, a watcher or a daemon that outlives a test. Run every command synchronously, in the foreground, and wait for it to end. Leave nothing running when you finish.
++- Do not refactor code outside the scope, even if it looks wrong. The gate reader's file-name exclusion stays (ruling 4).
++- Never run the product, a migration, a seed or a test against the owner's live data (Context, "Development data").
++- A value the brief marks as the owner's: none in this increment.
++- Follow existing conventions in the file you touch: ASCII program text, rows through `add`, details through `_escape_field` for read values, `main()` returning the exit code, `glob` for the workflow files, `workflow_steps` for the steps.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`. You read with `git status`, `git diff` and `git log` only. The single exception is `git restore bridge/cursor-bridge/VERSION` in the Done section.
++- Numbers: none are parsed by this increment. Lock-file values are strings compared as sets.
++- Every verification command the Done section asks you to run is written there in full. Run exactly those. **Do NOT run the whole `tests/` tree** (`python -m pytest`, `python -m pytest tests`, or any command that collects all of it): the whole suite is CI's run.
++- **Mutation self-check (by hand, in process, no script in the diff).** The supervisor's mutants file sweeps your change after your run. Before you finish, apply each of these by hand, one at a time, run `python -m pytest -p no:cacheprovider -q tests/test_program_weekly_floor.py`, and revert. Confirm with `git diff` that each revert is exact. List each in the report by its label and text, with the pytest summary line and the id of a test it made fail. If one is not caught, write `not caught` and one line on the case that would catch it (do not add that case):
++  - M1 the surrounding quotes are not stripped from a `--lockfile=` value.
++  - M2 the two lists are compared in order instead of as sets.
++  - M3 the `Weekly scan:` Decisions row is not read.
++  - M4 the `schedule:` trigger is not required of a weekly workflow (a `workflow_dispatch`-only workflow counts as weekly).
++  - M5 the remote reading always answers "no GitHub remote".
++- **Known failures.** Context lists the acceptance cases that fail before your change, and the one expected failure after it (the stale command reference). If a case fails that your change did not cause, report it by its test id with its failure lines and fix none.
++- Prefer reuse over new code: `workflow_steps`, `SCANNERS`' OSV-Scanner pattern, the `sections` dict the inventory section already fills, `_escape_field`, `add`, and the existing `git` call convention. Write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a security, observability or accessibility requirement stated above.
++- Rules in force for you: `.cursor/rules/secure-coding.mdc`, `.cursor/rules/workspace-boundary.mdc` and the frozen `minimal-code.mdc`.
++
++## Done
++Your report is the file `handoff/TASK-072-r1-report.md`, which you write as you go: what you did, what you changed, what you ran and what it printed, and what you could not do, so that nothing of it is lost if your run ends early. It names no computer path and no user name: write `<Workspace>` for the repository folder and `<tmp>` for a temporary folder, including in quoted command output.
++
++When you finish, it holds:
++- a list of every file you changed or created;
++- a one-paragraph summary of what you did;
++- for R1-R7, one line each on what meets it, naming the functions and their lines as the file stands after your change. For R2, the trigger forms you read; for R4, how the remote is read and how a Workspace without `.git` is handled; for R5, the exact detail texts of the three MISSING cases, the NOTE cases and the OK row;
++- every fixture change in `tests/test_conformance_check.py`, `tests/test_conformance_check_a4.py` or `tests/fixtures/`: the test id, why, and the diff (or `none`);
++- the mutation self-check list, M1-M5, each with its pytest summary line and the test id that caught it (or `not caught` and the case that would);
++- every command of the list below with its output;
++- a section headed exactly `Assumed, not verified`, as the report's last section.
++
++The `Assumed, not verified` section lists every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. Examples: how a workflow triggered by both `push` and `schedule:` is read; whether an empty gate set and an empty weekly set count as equal; which weekly workflow a differing-list detail names when there are several; whether a `--lockfile` value given with a space instead of `=` should count; how a `.git` file (a worktree) is read; whether `Weekly scan:` is matched case-sensitively. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Run these from the Workspace root, in this order, after your last edit, each on its own, synchronously in the foreground, with no `PYTHONPATH` or other environment change:
++1. `git status --short`
++2. `python tools/make-manifest.py`
++3. `git restore bridge/cursor-bridge/VERSION`
++4. `python -m pytest -p no:cacheprovider -q -rs tests/test_program_weekly_floor.py tests/test_conformance_check.py tests/test_conformance_check_a4.py tests/test_diagram_check.py tests/test_bug042.py`
++5. `python -m pytest -p no:cacheprovider -q -rs tests/test_hotfix25a_conformance_semgrep.py tests/test_a4_followups.py tests/test_a4_review_fixes.py tests/test_b2_least_confident.py tests/test_program_branch_rule.py tests/test_calibrate_program.py tests/test_conformance_windowless.py`
++6. `python -m pytest -p no:cacheprovider -q -rs tests/test_workflows_line_check.py tests/test_header_status.py tests/test_header_tables.py tests/test_header_tables_r2.py tests/test_header_currency.py tests/test_program_strip_names.py tests/test_loop_text_windowless.py tests/test_running_projects_classify.py`
++7. `python -m pytest -p no:cacheprovider -q -rs tests/test_dump_cli.py` (expect `test_cfgb3b_committed_reference_is_current` to fail on the stale reference, and nothing else)
++8. `python tools/dump-cli.py --check` (expect it to name the command reference stale; do not regenerate)
++9. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` (expect `RESULT: SOURCES MATCH`)
++10. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++11. `python -c "open('bridge/cursor-bridge/conformance-check.py','rb').read().decode('ascii'); print('ascii ok')"` (expect `ascii ok`)
++12. `git rev-parse HEAD` and `git status --short` (`bridge/cursor-bridge/VERSION` must not be listed, and no `.github` file; if either is, report it)
++
++Commands 4 to 7 cover every test file that runs `conformance-check.py`, loads it, or reads its source. Every file in them outside Scope is reported by test id on failure, never fixed in that file.
++
++Quoting rules:
++- Every command you ran is quoted in the report with the lines it printed, verbatim, in a fenced block.
++- Each pytest summary line is quoted verbatim in a fenced block. Never restate a count in prose.
++- A claim that a check passed quotes the output line that shows it. A number of failing or skipped cases is backed by the pytest lines naming them (`-rs` prints each skip's reason).
++- Each mutation is listed by its label and text, with what caught it.
++- A command you did not run is written `not run`, never described as run.
++- Write the report's results after step 12, naming the commit its counts belong to (`git rev-parse HEAD`) and whether the working tree then held uncommitted changes (`git status --short`).
++
++Your last message is the summary and the report file's path, and nothing follows it. The supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/tests/test_program_weekly_floor.py b/tests/test_program_weekly_floor.py
+new file mode 100644
+index 0000000..4f1c349
+--- /dev/null
++++ b/tests/test_program_weekly_floor.py
+@@ -0,0 +1,562 @@
++"""TASK-072, the supervisor's acceptance tests (R-092): the conformance check knows the weekly scan.
++
++enforces: docs/REQUIREMENTS.md R-092; docs/BUILD_PLAN.md, TASK-072's Done when (J14 for the docstring's exits).
++
++The forms these tests pin:
++- conformance-check.py prints exactly one row named `Weekly dependency scan`, in its usual row form
++  (`  <STATUS>  Weekly dependency scan  - <detail>`), its status OK, NOTE or MISSING.
++- Workflows are told apart by their triggers and steps, never by a file name. An OSV-Scanner step is a step
++  whose run text matches the program's OSV-Scanner pattern. The gate's lock files are the union, as a set, of
++  the `--lockfile=` values of the OSV-Scanner steps in workflows triggered by pull_request or push; a weekly
++  workflow is a workflow file under .github/workflows/ with an OSV-Scanner step and a `schedule:` trigger.
++  A value is compared after one pair of matching surrounding quotes is removed; values compare as sets.
++- OK where some weekly workflow's set equals the gate's; else NOTE for an inventory Decisions row whose first
++  cell begins `Weekly scan:` (the detail quotes that cell); else NOTE where the local git configuration names
++  no github.com remote; else MISSING, saying which: no workflow file runs OSV-Scanner on a `schedule:` trigger,
++  a workflow with an OSV-Scanner step that "has no schedule: trigger", or a list that differs, naming the lock
++  files apart. The OK detail says pins, permissions and exit handling are "not compared" and that a workflow
++  "disabled" on GitHub is the evaluation's read.
++- An index with every diagram kind omitted, each with its reason, passes diagram-check.py's three modes and
++  the conformance check's diagram floor (green on the checkpoint: the design found main right).
++- The check's docstring names every exit code main() returns, with its meaning (J14).
++- This repository's own run prints the row OK.
++
++Every conformance run here passes --offline, so nothing reaches the network. Each test builds its own scratch
++project under tmp_path; nothing here is shared with another test module.
++"""
++import ast
++import os
++import re
++import subprocess
++import sys
++
++import pytest
++
++import conftest as suite_conftest
++
++ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++BRIDGE = os.path.join(ROOT, "bridge", "cursor-bridge")
++CONFORMANCE = os.path.join(BRIDGE, "conformance-check.py")
++DIAGRAM = os.path.join(BRIDGE, "diagram-check.py")
++with open(os.path.join(BRIDGE, "VERSION"), encoding="utf-8") as _f:
++    BRIDGE_VERSION = _f.read().strip()
++
++ROW_NAME = "Weekly dependency scan"
++PIN = "3d3c42e5aac5ba805825da76410c181273ba90b1"
++GITHUB_REMOTE = "https://github.com/example-owner/thing.git"
++OTHER_REMOTE = "https://gitlab.example.invalid/team/thing.git"
++OSV_FETCH = ('curl -fsSL -o osv-scanner "https://github.com/google/osv-scanner/releases/download/v2.7.0/'
++             'osv-scanner_linux_amd64"')
++
++GATE = """name: tests
++on:
++  push:
++    branches: [main]
++  pull_request:
++permissions:
++  contents: read
++jobs:
++  security-floor:
++    name: security floor
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@%(pin)s
++        with:
++          persist-credentials: false
++      - name: Semgrep
++        run: pipx run semgrep==1.176.1 scan --config .semgrep.yml --error .
++%(osv)s      - name: Socket
++        run: npx socket@1.2.3 ci --no-banner
++"""
++
++OSV_STEP = """      - name: OSV-Scanner
++        shell: bash
++        run: |
++          %(fetch)s
++          chmod +x osv-scanner
++          ./osv-scanner scan source --config=osv-scanner.toml %(locks)s
++"""
++
++SCAN = """name: %(name)s
++on:
++%(on)spermissions:
++  contents: read
++jobs:
++  dependency-scan:
++    name: dependency scan
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@%(pin)s
++        with:
++          persist-credentials: false
++%(osv)s"""
++
++SCHEDULED = "  schedule:\n    - cron: '17 6 * * 0'\n  workflow_dispatch:\n"
++DISPATCH_ONLY = "  workflow_dispatch:\n"
++
++INVENTORY = """# Inventory - Thing
++Reflected through: none
++Updated: 2026-11-21
++
++## Features
++| Feature | What it does | Where | Tests | Since |
++|---|---|---|---|---|
++| Search | finds things | app/search.py | tests/test_search.py | TASK-001 |
++
++## Resources
++| Name | Kind | Where it lives | Used by | Provided |
++|---|---|---|---|---|
++
++## Decisions
++| Decision | Reason | Settled | Revisit only if |
++|---|---|---|---|
++| Development data: a development build reads `data/dev.sqlite` and refuses the installed product's store | two live stores were upgraded by development builds | 2026-11-01, owner | the product gains a second store |
++%(extra)s
++## Deferred
++| Item | Why deferred | Since | Owner decision needed |
++|---|---|---|---|
++"""
++
++KINDS = (("use-case", 1), ("operational-activity", 1), ("system-architecture", 2), ("deployment", 2),
++         ("context-dfd", 2), ("inter-system-sequence", 2), ("infrastructure-state", 2), ("component", 3),
++         ("inter-component-sequence", 3), ("component-dfd", 3), ("component-state", 3), ("class", 4),
++         ("erd", 4), ("domain-dfd", 4), ("object", 5), ("micro-sequence", 5), ("algorithmic-activity", 5),
++         ("object-state", 5))
++
++
++# ---------------------------------------------------------------- the scratch project
++
++def put(ws, rel, text):
++    path = os.path.join(str(ws), *rel.split("/"))
++    os.makedirs(os.path.dirname(path), exist_ok=True)
++    with open(path, "wb") as f:
++        f.write(text.encode("ascii"))
++
++
++def git(ws, *args):
++    kw = suite_conftest.windowless_kwargs({"capture_output": True, "text": True, "timeout": 60})
++    p = subprocess.run(["git", "-C", str(ws).replace("\\", "/"), "-c", "core.autocrlf=false",
++                        "-c", "user.name=t", "-c", "user.email=t@example.invalid"] + list(args), **kw)
++    assert p.returncode == 0, p.stdout + p.stderr
++
++
++def osv_step(locks):
++    return OSV_STEP % {"fetch": OSV_FETCH, "locks": locks}
++
++
++def gate(locks):
++    """The gate workflow (push and pull_request), its OSV-Scanner step running with `locks`, or no
++    OSV-Scanner step when `locks` is None."""
++    return GATE % {"pin": PIN, "osv": "" if locks is None else osv_step(locks)}
++
++
++def scan(locks, on=SCHEDULED, name="dependency-scan"):
++    return SCAN % {"name": name, "on": on, "pin": PIN, "osv": osv_step(locks)}
++
++
++def make_project(tmp_path, gate_text, workflows=(), remote=GITHUB_REMOTE, decision="", index="# Diagrams\n"):
++    """A scratch Workspace the conformance check finds conformant but for the weekly row: the records,
++    project.json, the builder's rules and hooks, .gitignore, the gate workflow `gate_text` (as tests.yml),
++    the extra workflows `workflows` ((file name, text) pairs), an inventory with `decision` as an extra
++    Decisions row, and a git repository whose origin is `remote` (None: no remote)."""
++    ws = tmp_path / "proj" / "Workspace"
++    os.makedirs(str(ws))
++    for rel in ("docs/REQUIREMENTS.md", "docs/RUN_PARAMETERS.md", "docs/ROSTER.json", "docs/DESIGN.md"):
++        put(ws, rel, "x\n")
++    put(ws, "docs/PROJECT_STATUS.md", "# Project Status\nBridge version: %s\nPhase: building\n"
++                                      "Workflows: not yet classified\n" % BRIDGE_VERSION)
++    put(ws, "docs/INVENTORY.md", INVENTORY % {"extra": decision})
++    put(ws, "docs/diagrams/INDEX.md", index)
++    put(ws, "project.json", '{"name": "Thing", "purpose": "finds things", "kind": "private", "version": "0.0.0", '
++                            '"state": {"phase": "building", "stage": "Stage 1", "bridge": "%s", '
++                            '"updated": "2026-11-21"}}' % BRIDGE_VERSION)
++    put(ws, ".cursor/rules/workspace-boundary.mdc", "rule\n")
++    put(ws, ".cursor/rules/secure-coding.mdc", "rule\n")
++    put(ws, ".cursor/hooks.json", '{"hooks": ["boundary-check.py", "windowless-check.py"]}')
++    put(ws, ".gitignore", "docs/BOUNDARY_VIOLATIONS.md\nrun/\n")
++    put(ws, ".github/workflows/tests.yml", gate_text)
++    for name, text in workflows:
++        put(ws, ".github/workflows/" + name, text)
++    git(ws, "init", "-q")
++    if remote is not None:
++        git(ws, "remote", "add", "origin", remote)
++    return ws
++
++
++def conformance(ws, cwd=None):
++    kw = suite_conftest.windowless_kwargs({"capture_output": True, "text": True, "encoding": "utf-8",
++                                           "errors": "replace", "timeout": 300})
++    p = subprocess.run([sys.executable, CONFORMANCE, str(ws), "--offline"], cwd=str(cwd or ws), **kw)
++    return p.returncode, p.stdout + p.stderr
++
++
++def rows(out, name):
++    """[(status, detail)] for every row of the check's output named exactly `name`."""
++    found = []
++    for line in out.splitlines():
++        m = re.match(r"^  (OK|MISSING|NOTE) +(.*)$", line)
++        if not m:
++            continue
++        rest = m.group(2)
++        if rest == name:
++            found.append((m.group(1), ""))
++        elif rest.startswith(name + "  - "):
++            found.append((m.group(1), rest[len(name) + 4:]))
++    return found
++
++
++def weekly_row(out):
++    found = rows(out, ROW_NAME)
++    assert len(found) == 1, "exactly one row named %r: %s" % (ROW_NAME, out)
++    return found[0]
++
++
++def plain(detail):
++    return detail.replace("`", "")
++
++
++def assert_ok(rc, out):
++    status, detail = weekly_row(out)
++    assert status == "OK", out
++    assert "not compared" in detail and "disabled" in detail, out
++    assert rc == 0 and "RESULT: CONFORMANT" in out, out
++
++
++# ---------------------------------------------------------------- the weekly row
++
++def test_ok_on_the_repository_like_pair(tmp_path):
++    """R-092, TASK-072 Done when (`OK` where a workflow file under `.github/workflows/` carries a `schedule:`
++    trigger and an OSV-Scanner step whose `--lockfile=` list equals, as a set, the gate workflow's): the gate
++    quotes its value (--lockfile='requirements.txt:requirements.lock'), the weekly does not, as in this
++    repository. Today's code prints no weekly row, so this fails."""
++    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"),
++                      [("dependency-scan.yml", scan("--lockfile=requirements.txt:requirements.lock"))])
++    rc, out = conformance(ws)
++    assert_ok(rc, out)
++
++
++def test_ok_with_a_weekly_workflow_named_otherwise(tmp_path):
++    """R-092, TASK-072 Done when (the row is found by the steps' own commands, never by a file name, so a
++    project that names its workflow otherwise passes): the weekly is .github/workflows/nightly-deps.yaml.
++    Today's code prints no weekly row (and reads that file as a gate workflow), so this fails."""
++    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"),
++                      [("nightly-deps.yaml", scan("--lockfile=requirements.txt:requirements.lock", name="nightly deps"))])
++    rc, out = conformance(ws)
++    assert_ok(rc, out)
++
++
++def test_ok_where_the_weekly_lists_two_lock_files_in_another_order(tmp_path):
++    """R-092, TASK-072 Done when (the `--lockfile=` list equals, as a set, the gate workflow's): the gate lists
++    package-lock.json then requirements.txt:requirements.lock, quoted two ways; the weekly lists them unquoted in
++    the other order. Today's code prints no weekly row, so this fails."""
++    ws = make_project(tmp_path, gate("--lockfile=\"package-lock.json\" --lockfile='requirements.txt:requirements.lock'"),
++                      [("dependency-scan.yml", scan("--lockfile=requirements.txt:requirements.lock --lockfile=package-lock.json"))])
++    rc, out = conformance(ws)
++    assert_ok(rc, out)
++
++
++def test_note_by_a_weekly_scan_decision_row_quoting_its_cell(tmp_path):
++    """R-092, TASK-072 Done when (`NOTE` where the inventory's Decisions holds a row whose first cell begins
++    `Weekly scan:`, the note quoting that cell): no weekly workflow, a GitHub remote, and a Decisions row
++    `Weekly scan: not kept, the gate scans every pull request`. Today's code prints no weekly row, so this
++    fails."""
++    cell = "Weekly scan: not kept, the gate scans every pull request"
++    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"),
++                      decision="| %s | a short-lived project | 2026-11-21, owner | the project ships |\n" % cell)
++    rc, out = conformance(ws)
++    status, detail = weekly_row(out)
++    assert status == "NOTE", out
++    assert cell in detail, "the note quotes the Decisions cell: " + out
++    assert rc == 0, out
++
++
++@pytest.mark.parametrize("remote", [None, OTHER_REMOTE], ids=["no-remote", "non-github-remote"])
++def test_note_without_a_github_remote(tmp_path, remote):
++    """R-092, TASK-072 Done when (`NOTE` where the repository has no GitHub remote, read from the local
++    configuration alone): no weekly workflow, no Decisions row, and a scratch repository with no remote or
++    with a remote that is not on github.com. Today's code prints no weekly row, so this fails."""
++    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"), remote=remote)
++    rc, out = conformance(ws)
++    status, _detail = weekly_row(out)
++    assert status == "NOTE", out
++    assert rc == 0, out
++
++
++def test_missing_with_no_weekly_file_and_a_github_remote(tmp_path):
++    """R-092, TASK-072 Done when (`MISSING` where the file is absent, the row saying which): the gate alone, a
++    GitHub remote, no Decisions row; the detail says no workflow file runs OSV-Scanner on a `schedule:`
++    trigger. Today's code prints no weekly row, so this fails."""
++    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"))
++    rc, out = conformance(ws)
++    status, detail = weekly_row(out)
++    assert status == "MISSING", out
++    assert "no workflow file" in plain(detail).lower() and "schedule:" in plain(detail), out
++    assert rc == 1, out
++
++
++def test_missing_with_a_workflow_dispatch_only_scan(tmp_path):
++    """R-092, TASK-072 Done when (`MISSING` where the file has no `schedule:` trigger, the row saying which):
++    an OSV-Scanner workflow triggered by workflow_dispatch alone, its list equal to the gate's; the detail says
++    it "has no schedule: trigger" (backticks around schedule: allowed). Today's code prints no weekly row, so
++    this fails."""
++    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"),
++                      [("dependency-scan.yml", scan("--lockfile=requirements.txt:requirements.lock", on=DISPATCH_ONLY))])
++    rc, out = conformance(ws)
++    status, detail = weekly_row(out)
++    assert status == "MISSING", out
++    assert "has no schedule: trigger" in plain(detail), out
++    assert rc == 1, out
++
++
++def test_missing_with_a_scheduled_scan_whose_list_differs(tmp_path):
++    """R-092, TASK-072 Done when (`MISSING` where its list differs, the row naming the lock files apart): the
++    gate scans requirements.txt:requirements.lock and package-lock.json, the weekly
++    requirements.txt:requirements.lock and poetry.lock; the detail names package-lock.json (the gate's alone)
++    and poetry.lock (the weekly's alone). Today's code prints no weekly row, so this fails."""
++    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock' --lockfile=package-lock.json"),
++                      [("dependency-scan.yml", scan("--lockfile=requirements.txt:requirements.lock --lockfile=poetry.lock"))])
++    rc, out = conformance(ws)
++    status, detail = weekly_row(out)
++    assert status == "MISSING", out
++    assert "package-lock.json" in detail and "poetry.lock" in detail, out
++    assert rc == 1, out
++
++
++def test_a_scheduled_scan_is_never_read_as_the_gate(tmp_path):
++    """R-092, TASK-072 Done when (workflows told apart by their triggers and steps): the gate has no
++    OSV-Scanner step and the scheduled dependency-scan.yml has one; `OSV-Scanner in the gate` stays MISSING.
++    Today's code already holds this, by the file name dependency-scan.yml, so this passes today."""
++    ws = make_project(tmp_path, gate(None),
++                      [("dependency-scan.yml", scan("--lockfile=requirements.txt:requirements.lock"))])
++    rc, out = conformance(ws)
++    found = rows(out, "OSV-Scanner in the gate")
++    assert found and found[0][0] == "MISSING", out
++    assert rc == 1, out
++
++
++# ---------------------------------------------------------------- an index with every kind omitted
++
++def omitted_index():
++    lines = ["# Diagrams", "",
++             "| ID | Level | Kind | Status | File | Refines | Realizes | Enforced by | Why |",
++             "|---|---|---|---|---|---|---|---|---|"]
++    for kind, level in KINDS:
++        lines.append("| - | %d | %s | omitted | - | - | - | - | a single script; no %s carries a decision here |"
++                     % (level, kind, kind))
++    return "\n".join(lines) + "\n"
++
++
++def diagram_project(tmp_path):
++    ws = tmp_path / "proj" / "Workspace"
++    put(ws, "docs/diagrams/INDEX.md", omitted_index())
++    put(ws, "docs/REQUIREMENTS.md", "| ID | Requirement |\n|---|---|\n| R-001 | things |\n")
++    put(ws, "app/main.py", "print('thing')\n")
++    git(ws, "init", "-q")
++    git(ws, "add", "-A")
++    git(ws, "commit", "-q", "-m", "scratch")
++    return ws
++
++
++def diagram_check(ws, mode):
++    kw = suite_conftest.windowless_kwargs({"capture_output": True, "text": True, "encoding": "utf-8",
++                                           "errors": "replace", "timeout": 120})
++    p = subprocess.run([sys.executable, DIAGRAM, "--mode", mode], cwd=str(ws), **kw)
++    return p.returncode, p.stdout + p.stderr
++
++
++@pytest.mark.parametrize("mode", ["design", "code", "done"])
++def test_an_all_omitted_index_passes_diagram_check(tmp_path, mode):
++    """R-092, TASK-072 Done when (a diagram index with every kind omitted, each with its reason, passes
++    `diagram-check.py --mode design`, `--mode code` and `--mode done`): every catalogue kind omitted with a
++    reason in Why. Today's code passes it (the design found main right; the test holds it)."""
++    ws = diagram_project(tmp_path)
++    rc, out = diagram_check(ws, mode)
++    assert rc == 0 and "RESULT: OK" in out, out
++
++
++def test_an_all_omitted_index_passes_the_conformance_diagram_floor(tmp_path):
++    """R-092, TASK-072 Done when (a diagram index with every kind omitted, each with its reason, passes the
++    conformance check's diagram floor): the `docs/diagrams/INDEX.md` row is OK. Today's code passes it (the
++    design found main right; the test holds it)."""
++    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"),
++                      [("dependency-scan.yml", scan("--lockfile=requirements.txt:requirements.lock"))],
++                      index=omitted_index())
++    _rc, out = conformance(ws)
++    found = rows(out, "docs/diagrams/INDEX.md")
++    assert found == [("OK", "")], out
++
++
++# ---------------------------------------------------------------- the docstring's exits (J14)
++
++EXIT_MEANINGS = {
++    0: (("every floor", "conformant"),),
++    1: (("missing",),),
++    2: (("workspace",), ("header", "malformed")),
++}
++
++
++def _main_exit_codes(tree):
++    codes = set()
++    for node in tree.body:
++        if isinstance(node, ast.FunctionDef) and node.name == "main":
++            for sub in ast.walk(node):
++                if isinstance(sub, ast.Return) and isinstance(sub.value, ast.Constant) and isinstance(sub.value.value, int) \
++                        and not isinstance(sub.value.value, bool):
++                    codes.add(sub.value.value)
++    for sub in ast.walk(tree):
++        if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Attribute) and sub.func.attr == "exit" \
++                and sub.args and isinstance(sub.args[0], ast.Constant) and isinstance(sub.args[0].value, int):
++            codes.add(sub.args[0].value)
++    return codes
++
++
++def test_the_docstring_lists_the_exits_the_code_has(tmp_path):
++    """R-092, TASK-072 Done when (the check's docstring lists its exits as the code has them, J14): main()
++    returns 0 (conformant), 1 (a MISSING floor), and 2 both for a folder that is not a workspace and for a
++    malformed record header (HEADER MALFORMED, the status file's or the inventory's); the entry passes main's
++    value to sys.exit. Today's docstring says `2 = not a workspace` only, so this fails."""
++    with open(CONFORMANCE, encoding="utf-8") as f:
++        tree = ast.parse(f.read())
++    assert _main_exit_codes(tree) == set(EXIT_MEANINGS), "the exits main() returns changed: update this test"
++    doc = ast.get_docstring(tree) or ""
++    marks = list(re.finditer(r"(?<![\w.\-])([0-9])(?![\w.])\s*(?:=|:|-)\s*", doc))
++    meaning = {}
++    for i, m in enumerate(marks):
++        end = marks[i + 1].start() if i + 1 < len(marks) else len(doc)
++        meaning.setdefault(int(m.group(1)), []).append(doc[m.end():min(end, m.end() + 250)].lower())
++    for code, keys in sorted(EXIT_MEANINGS.items()):
++        text = " ".join(meaning.get(code, []))
++        assert text, "the docstring names no exit %d" % code
++        for alternatives in keys:
++            assert any(word in text for word in alternatives), \
++                "the docstring's exit %d does not say %s: %r" % (code, " or ".join(alternatives), text)
++
++
++# ---------------------------------------------------------------- this repository
++
++def test_this_repository_prints_the_weekly_row_ok():
++    """R-092, TASK-072 Done when (this repository's own conformance run prints the new row `OK`): a read-only
++    --offline run over this Workspace; tests.yml's OSV-Scanner step quotes
++    --lockfile='requirements.txt:requirements.lock', dependency-scan.yml's does not. Today's code prints no
++    weekly row, so this fails."""
++    rc, out = conformance(ROOT, cwd=ROOT)
++    status, detail = weekly_row(out)
++    assert status == "OK", out
++    assert "not compared" in detail and "disabled" in detail, out
++
++
++# ---------------------------------------------------------------- round 2: the remote is this repository's own
++
++def conformance_env(ws, env):
++    """The check over `ws`, --offline, with `env` as its whole environment."""
++    kw = suite_conftest.windowless_kwargs({"capture_output": True, "text": True, "encoding": "utf-8",
++                                           "errors": "replace", "timeout": 300, "env": env})
++    p = subprocess.run([sys.executable, CONFORMANCE, str(ws), "--offline"], cwd=str(ws), **kw)
++    return p.returncode, p.stdout + p.stderr
++
++
++def test_r2_a_git_dir_whose_path_holds_a_space_is_read(tmp_path):
++    """R-092, TASK-072 Done when (`NOTE` where the repository has no GitHub remote, read from the local
++    configuration alone; otherwise `MISSING` where the file is absent): Review A round 1, B1. The Workspace's
++    .git is a file (`git init --separate-git-dir`, as a worktree's is) naming a folder whose path holds a space;
++    the repository's origin is on github.com and no weekly workflow exists, so the row is MISSING. Round 1 cut
++    the gitdir path at its first space and read NOTE."""
++    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"))
++    git(ws, "init", "-q", "--separate-git-dir", str(tmp_path / "git dir with space").replace("\\", "/"))
++    assert os.path.isfile(os.path.join(str(ws), ".git"))
++    rc, out = conformance(ws)
++    status, detail = weekly_row(out)
++    assert status == "MISSING", out
++    assert "no workflow file" in plain(detail).lower(), out
++    assert rc == 1, out
++
++
++@pytest.mark.parametrize("how", ["global-file", "environment-pairs"])
++def test_r2_a_remote_outside_this_repository_config_is_not_read(tmp_path, how):
++    """R-092, TASK-072 Done when (`NOTE` where the repository has no GitHub remote, read from the local
++    configuration alone): Review A round 1, B2. The repository has no remote; a github.com remote stands in
++    the user's global configuration (GIT_CONFIG_GLOBAL) or in configuration passed by the environment
++    (GIT_CONFIG_COUNT); neither is this repository's, so the row is NOTE. Round 1 read both and said MISSING."""
++    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"), remote=None)
++    env = dict(os.environ)
++    if how == "global-file":
++        cfg = tmp_path / "global.gitconfig"
++        cfg.write_text('[remote "x"]\n\turl = %s\n' % GITHUB_REMOTE, encoding="ascii")
++        env["GIT_CONFIG_GLOBAL"] = str(cfg)
++    else:
++        env["GIT_CONFIG_COUNT"] = "1"
++        env["GIT_CONFIG_KEY_0"] = "remote.y.url"
++        env["GIT_CONFIG_VALUE_0"] = GITHUB_REMOTE
++    rc, out = conformance_env(ws, env)
++    status, _detail = weekly_row(out)
++    assert status == "NOTE", out
++    assert rc == 0, out
++
++
++def test_r2_an_included_config_file_is_not_read(tmp_path):
++    """R-092, TASK-072 Done when (`NOTE` where the repository has no GitHub remote, read from the local
++    configuration alone): the security audit of round 1. The repository's own config names no remote but
++    includes (include.path) a file outside it that names a github.com remote; an include is not this
++    repository's configuration, and following one lets a project's config make the check read any file, so the
++    row is NOTE. Round 1 followed the include and said MISSING."""
++    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"), remote=None)
++    inc = tmp_path / "included.gitconfig"
++    inc.write_text('[remote "origin"]\n\turl = %s\n' % GITHUB_REMOTE, encoding="ascii")
++    git(ws, "config", "include.path", str(inc).replace("\\", "/"))
++    rc, out = conformance(ws)
++    status, _detail = weekly_row(out)
++    assert status == "NOTE", out
++    assert rc == 0, out
++
++
++@pytest.mark.parametrize("key", ['"on":', "'on':"], ids=["double-quoted", "single-quoted"])
++def test_r2_a_quoted_on_key_is_read(tmp_path, key):
++    """R-092, TASK-072 Done when (`OK` where a workflow file carries a `schedule:` trigger and an OSV-Scanner
++    step whose list equals the gate's): Review A round 1, S1. Both workflows write their trigger key quoted, as
++    yamllint's truthy rule asks; the lists are equal and the remote is on github.com, so the row is OK. Round 1
++    read no trigger under a quoted key and said MISSING."""
++    gate_text = gate("--lockfile='requirements.txt:requirements.lock'").replace("\non:\n", "\n%s\n" % key)
++    scan_text = scan("--lockfile=requirements.txt:requirements.lock").replace("\non:\n", "\n%s\n" % key)
++    assert key in gate_text and key in scan_text
++    ws = make_project(tmp_path, gate_text, [("dependency-scan.yml", scan_text)])
++    rc, out = conformance(ws)
++    assert_ok(rc, out)
++
++
++def test_r2_a_parent_folder_repository_is_not_read(tmp_path):
++    """R-092, TASK-072 Done when (`NOTE` where the repository has no GitHub remote, read from the local
++    configuration alone): Review A round 1, a gap no test held. The Workspace has no .git of its own; the
++    folder above it is a repository whose origin is on github.com. That repository is not the Workspace's, so
++    the row is NOTE."""
++    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"))
++    os.rename(os.path.join(str(ws), ".git"), os.path.join(os.path.dirname(str(ws)), ".git"))
++    assert not os.path.exists(os.path.join(str(ws), ".git"))
++    rc, out = conformance(ws)
++    status, _detail = weekly_row(out)
++    assert status == "NOTE", out
++    assert rc == 0, out
++
++
++def test_r2_the_remote_url_is_never_printed(tmp_path):
++    """R-092, TASK-072 (the brief's trust boundary: a remote URL can hold a credential and is never printed):
++    Review A round 1, a gap no test held. The origin carries a user name; the row is MISSING and no part of the
++    URL appears in the output."""
++    remote = "https://example-user@github.com/example-owner/thing.git"
++    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"), remote=remote)
++    rc, out = conformance(ws)
++    status, _detail = weekly_row(out)
++    assert status == "MISSING", out
++    assert "example-user" not in out and "example-owner" not in out, out
++
++
++def test_r2_the_row_stands_where_there_is_no_workflow(tmp_path):
++    """R-092, TASK-072 Done when (`MISSING` where the file is absent, the row saying which): Review A round 1,
++    a gap no test held. The project has no workflow at all and a github.com remote; the one row still stands,
++    MISSING, saying no workflow file runs OSV-Scanner on a schedule: trigger."""
++    ws = make_project(tmp_path, gate(None))
++    os.remove(os.path.join(str(ws), ".github", "workflows", "tests.yml"))
++    rc, out = conformance(ws)
++    status, detail = weekly_row(out)
++    assert status == "MISSING", out
++    assert "no workflow file" in plain(detail).lower() and "schedule:" in plain(detail), out
++    assert rc == 1, out
