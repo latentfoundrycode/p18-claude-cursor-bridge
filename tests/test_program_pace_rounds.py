@@ -666,3 +666,37 @@ def test_r089_r2_a_long_scope_line_never_stalls_the_snapshot(tmp_path):
     assert rc == 0, out
     assert took < 20, "the snapshot took %.1f s" % took
     assert round_entry(repo, 2).get("cause") == "unstated"
+
+
+# ---------------------------------------------------------------- Round 3 (TASK-069-r3): Review B round 1's two
+# behaviour findings.
+
+
+def test_r089_r3_a_pull_request_is_merged_by_its_closing_number_alone(tmp_path):
+    """R-089 (round 3, Review B finding 1, behaviour): PR-<n> is merged by a squash closing `(#<n>)` alone. A PR-<n>
+    the subject reader finds in a subject is no name that subject names: `PR-2: follow-up (#1)` merges PR-1, which
+    starts at its commit, and leaves PR-2, counted from its pass line, started and not merged."""
+    p = MiniProject(tmp_path)
+    tracked_old_brief(p)
+    p.pass_line(at(2, day=1, hour=9), "PASS PR-2 r1 review-b")
+    p.commit("PR-2: follow-up (#1)", at(2, day=2, hour=12))
+    out = p.report(tmp_path)
+    row = table(out)[label(2)]
+    assert row[1:3] == ["2", "1"], "started (PR-2, PR-1) and merged (PR-1 alone): %r\n%s" % (row, out)
+
+
+def test_r089_r3_a_pass_line_naming_a_word_outside_the_causes_is_unstated(tmp_path):
+    """R-089 (round 3, Review B finding 2, behaviour): a pass line whose cause is a word outside the round causes'
+    list is still a pass and still a record of its round, its cause read as `unstated`, never dropped."""
+    p = MiniProject(tmp_path)
+    tracked_old_brief(p)
+    p.brief("TASK-801")
+    p.commit("records: the brief", at(6))
+    p.builder("TASK-801", 1, at(2, day=0, hour=9))
+    p.pass_line(at(2, day=1, hour=9), "PASS TASK-801 r2 review-a weather")
+    out = p.report(tmp_path)
+    lines = cause_lines(out)
+    assert len(lines) == 1, out
+    assert lines[0].startswith("Round causes (1 rounds after the first): "), lines[0]
+    assert cause_counts(lines[0]) == {"unstated": 1}, lines[0]
+    assert kind_count(passes_line(out, 2), "review-a") == 1, out
