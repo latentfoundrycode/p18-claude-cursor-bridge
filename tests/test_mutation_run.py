@@ -1496,6 +1496,7 @@ def test_hold_pipes():
             # TASK-070 r3: the baseline runs in a copy of its own, work_sub / "base", and the list times out there,
             # so the holder's cwd is inside the baseline copy, which stays while the holder lives.
             assert (work_sub / "base").is_dir(), "the baseline copy stays while the holder's cwd is inside it"
+            assert not (work_sub / "base" / ".env").exists(), "the baseline copy's .env must be absent while the holder lives"
     finally:
         if pid_file.is_file():
             try:

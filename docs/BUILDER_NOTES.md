@@ -108,3 +108,7 @@
 2026-11-21 TASK-069-r3: `tracked_old_brief` already commits `TASK-001 (#1)`, so `PR-2: follow-up (#1)` is a second close of the same number. The earliest close folds into TASK-001. PR-1 is its own name only when a close that names no counted name still counts, and it merges at that commit rather than at the earliest close.
 
 2026-11-21 TASK-070-r2: `test_r090_r2_baseline_that_rewrites_the_mutated_file_leaves_it_pristine` asserts the substring `not applied` is absent from the whole of stdout, and the counts line always contains `not applied=0`, so that case stays red after the copy is put back and m1 is killed with exit 0. The acceptance file is not edited. Round 1's R8 keeps that counts line.
+
+2026-11-21 TASK-070-r3: the round 2 note above misreads that case. `not applied` is checked only on the mutant line (`_mutant_lines`), so the counts line's `not applied=0` does not fail it. With the baseline in its own copy the case passes, exit 0, `m1: killed (ran)`.
+
+2026-11-21 TASK-070-r3: a foreground pytest of the three mutation files was killed (exit 143, Terminated) after about five minutes even though the wait was longer, so that command was started again and left running until it finished. The partial dot line from the killed run is not a result.

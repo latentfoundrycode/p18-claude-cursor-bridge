@@ -1627,8 +1627,13 @@ def main(argv=None):
         run_resolution_check(plugin_dir, copy_root, mutants, res_tests, tracked_set, workspace, env, timeout_sec)
         mutant_keys = {m["id"]: compute_key(copy_root, m, tracked_set) for m in mutants}
         base_lists = uncached_test_lists(mutants, cache, mutant_keys, args.all)
+        base_root = copy_root
+        if base_lists:
+            base_root = os.path.join(work_sub, "base")
+            os.makedirs(base_root, exist_ok=True)
+            copy_tracked(workspace, base_root, tracked_list, untracked)
         base_failures, base_timed, base_alive = run_baselines(
-            plugin_dir, copy_root, base_lists, env, timeout_sec)
+            plugin_dir, base_root, base_lists, env, timeout_sec)
         originals = {}
         pytest_still_alive = False
         if base_alive is not None:
@@ -1642,8 +1647,6 @@ def main(argv=None):
         elif base_failures:
             print_baseline_failures(base_failures)
             return 5
-        elif base_lists:
-            copy_tracked(workspace, copy_root, tracked_list, untracked)
         for mut_idx, m in enumerate(mutants):
             if pytest_still_alive:
                 break

@@ -528,3 +528,37 @@ def test_r090_r3_baseline_that_adds_a_conftest_leaves_the_mutants_copy_alone(tmp
     assert _mutant_lines(p, "m1") and "killed" in _mutant_lines(p, "m1")[0], p.stdout
     assert [c.get("outcome") for c in _cache_outcomes(ws, "brc")] == ["killed"]
     assert not (ws / "tests" / "conftest.py").exists()
+
+
+NEEDS_ENV_TEST = (
+    "import os\n"
+    "import mod\n"
+    "\n"
+    "ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\n"
+    "\n"
+    "\n"
+    "def test_double():\n"
+    "    with open(os.path.join(ROOT, 'data', 'fixture.txt'), encoding='utf-8') as f:\n"
+    "        assert f.read().strip() == 'four'\n"
+    "    with open(os.path.join(ROOT, '.env'), encoding='utf-8') as f:\n"
+    "        assert 'R090_ENV=1' in f.read()\n"
+    "    assert mod.double(2) == 4\n"
+)
+
+
+def test_r090_r3_baseline_copy_holds_env_and_untracked_entries(tmp_path):
+    """R-090, TASK-070 Done when (each distinct tests list runs once on the unmutated copy, under a mutant's
+    limit and environment), round 3 (Review A r3, mutation H9): the baseline copy holds what the mutants' copy
+    holds, `.env` and the mutants file's untracked entries included. A test that reads an untracked
+    data/fixture.txt and the .env passes unmutated, so the baseline passes and m1 is killed, exit 0; a baseline
+    copy built from the tracked files alone fails that list, exit 5."""
+    ws = _fixture(tmp_path, {"mod.py": MOD, "tests/test_mod.py": NEEDS_ENV_TEST})
+    _write(ws, "data/fixture.txt", "four\n")
+    _write(ws, ".env", "R090_ENV=1\n")
+    body = {"mutants": [_mutant("m1", "x * 2", "x * 3", ["tests/test_mod.py"], ["tests/test_mod.py::test_double"])],
+            "untracked": ["data"]}
+    mf = _mutants(ws, "benv", body)
+    p = _run(ws, mf)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert _mutant_lines(p, "m1") and "killed" in _mutant_lines(p, "m1")[0], p.stdout
+    assert [c.get("outcome") for c in _cache_outcomes(ws, "benv")] == ["killed"]
