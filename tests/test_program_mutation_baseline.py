@@ -469,3 +469,62 @@ def test_r090_r2_baseline_that_rewrites_a_test_file_leaves_it_pristine(tmp_path)
     assert _mutant_lines(p, "m1") and "killed" in _mutant_lines(p, "m1")[0], p.stdout
     assert [c.get("outcome") for c in _cache_outcomes(ws, "brs")] == ["killed"]
     assert (ws / "tests" / "test_mod.py").read_text(encoding="utf-8") == REWRITE_SELF_TEST
+
+
+# --- round 3: the baseline runs in a copy of its own ---------------------------------------------------------
+
+REPLACE_SELF_WITH_DIR_TEST = (
+    "import os\n"
+    "import mod\n"
+    "\n"
+    "\n"
+    "def test_double():\n"
+    "    assert mod.double(2) == 4\n"
+    "    path = os.path.abspath(__file__)\n"
+    "    os.remove(path)\n"
+    "    os.mkdir(path)\n"
+)
+
+ADD_CONFTEST_TEST = (
+    "import os\n"
+    "import mod\n"
+    "\n"
+    "\n"
+    "def test_double():\n"
+    "    assert mod.double(2) == 4\n"
+    "    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'conftest.py')\n"
+    "    with open(path, 'w', encoding='utf-8', newline='\\n') as f:\n"
+    "        f.write('import pytest' + chr(10) + chr(10) + chr(10) + 'def pytest_runtest_setup(item):' + chr(10)\n"
+    "                + '    pytest.skip(' + repr('added by the baseline') + ')' + chr(10))\n"
+)
+
+
+def test_r090_r3_baseline_that_replaces_a_test_file_with_a_folder_leaves_the_mutants_copy_alone(tmp_path):
+    """R-090, TASK-070 Done when (each distinct tests list runs once on the unmutated copy; the mutants then run as
+    before), round 3 (Review B r2): a baseline test that passes and replaces its own file with a folder of the same
+    name must not change what the mutants run on. m1 is killed by the test as committed, exit 0, its cache line
+    `killed`. On round 2's code the rebuild copies the file into that folder, the recorded id no longer matches, and
+    m1 reads `error (expected id absent)`, exit 3."""
+    ws = _fixture(tmp_path, {"mod.py": MOD, "tests/test_mod.py": REPLACE_SELF_WITH_DIR_TEST})
+    mf = _mutants(ws, "brd", {"mutants": [_mutant(
+        "m1", "x * 2", "x * 3", ["tests/test_mod.py"], ["tests/test_mod.py::test_double"])]})
+    p = _run(ws, mf)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert _mutant_lines(p, "m1") and "killed" in _mutant_lines(p, "m1")[0], p.stdout
+    assert [c.get("outcome") for c in _cache_outcomes(ws, "brd")] == ["killed"]
+    assert (ws / "tests" / "test_mod.py").is_file()
+
+
+def test_r090_r3_baseline_that_adds_a_conftest_leaves_the_mutants_copy_alone(tmp_path):
+    """R-090, TASK-070 Done when (the mutants then run as before, on the copy the cache key read), round 3 (Review B
+    r2; HARDENING lead 9): a baseline test that passes and adds a tests/conftest.py skipping every test must not
+    change what the mutants run on. m1 is killed, exit 0, its cache line `killed`. On round 2's code the added
+    conftest stays in the copy, the mutant's test is skipped, and m1 survives, exit 1."""
+    ws = _fixture(tmp_path, {"mod.py": MOD, "tests/test_mod.py": ADD_CONFTEST_TEST})
+    mf = _mutants(ws, "brc", {"mutants": [_mutant(
+        "m1", "x * 2", "x * 3", ["tests/test_mod.py"], ["tests/test_mod.py::test_double"])]})
+    p = _run(ws, mf)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert _mutant_lines(p, "m1") and "killed" in _mutant_lines(p, "m1")[0], p.stdout
+    assert [c.get("outcome") for c in _cache_outcomes(ws, "brc")] == ["killed"]
+    assert not (ws / "tests" / "conftest.py").exists()

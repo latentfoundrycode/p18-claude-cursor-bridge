@@ -1493,7 +1493,9 @@ def test_hold_pipes():
         assert not (work_sub / "tree" / ".env").exists(), "copied .env must be absent while the holder lives"
         if sys.platform == "win32":
             assert work_sub.is_dir(), "holder cwd should keep mutation-run-phc on disk until the holder ends"
-            assert (work_sub / "tree").is_dir(), "the copy root stays while the holder's cwd is inside it"
+            # TASK-070 r3: the baseline runs in a copy of its own, work_sub / "base", and the list times out there,
+            # so the holder's cwd is inside the baseline copy, which stays while the holder lives.
+            assert (work_sub / "base").is_dir(), "the baseline copy stays while the holder's cwd is inside it"
     finally:
         if pid_file.is_file():
             try:
