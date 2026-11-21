@@ -987,7 +987,7 @@ def outside_target(argv, folder=None):
     return None
 
 
-ROUND_CAUSES = ("defect", "security", "fix-induced", "no external path", "records", "builder incomplete", "brief error")
+ROUND_CAUSES = bridge_env.ROUND_CAUSES
 ROUND_CAUSE_RE = re.compile(r"^Round cause:[ \t]*(.*?)[ \t]*$", re.M)
 
 

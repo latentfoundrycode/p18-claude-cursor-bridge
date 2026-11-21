@@ -293,3 +293,102 @@ def test_r088_the_loop_guard_s_refusal_names_the_in_flight_log_and_the_program()
         src = f.read()
     assert "in-flight.py" in src and "run/supervisor/in-flight.md" in src
     assert "status file's `In flight:` line" not in src
+
+
+# Round 2 (TASK-068-r2): the reviewers' findings on round 1, each held by a test.
+
+def _guard():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("loop_guard_r088_r2", os.path.join(BRIDGE, "loop-guard.py"))
+    lg = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lg)
+    return lg
+
+
+def test_r088_r2_every_line_the_program_writes_ends_with_lf_alone(tmp_path):
+    """R-088 (round 2, Review A's B1): the log's raw bytes hold no carriage return, whatever the platform's text mode."""
+    ws = scratch(tmp_path)
+    (ws / "run" / "supervisor").mkdir(parents=True)
+    src = ws / "run" / "supervisor" / "pause.txt"
+    src.write_text("a line\nPaused: until the owner\n", encoding="utf-8")
+    assert run(ws, "plain text")[0] == 0
+    assert run(ws, "--file", str(src))[0] == 0
+    assert run(ws, "--pass", "TASK-068", "review-a", "--round", "1", "--cause", "defect")[0] == 0
+    raw = log_of(ws).read_bytes()
+    assert b"\r" not in raw and raw.endswith(b"\n"), raw
+
+
+def test_r088_r2_a_later_paused_line_lifts_or_replaces_an_earlier_one(tmp_path):
+    """R-088 (round 2, convergent: Review A's B2 and the security review's blocking finding): the loop guard reads the
+    last `Paused:` line of the log, so a pause written through the program can be lifted through it, and set again."""
+    ws = scratch(tmp_path)
+    lg = _guard()
+    assert run(ws, "Paused: the owner's word to resume")[0] == 0
+    assert lg.paused_in_flight(str(ws)) == "the owner's word to resume"
+    assert run(ws, "Paused: resumed 11-21")[0] == 0
+    assert lg.paused_in_flight(str(ws)) is None
+    assert run(ws, "an ordinary line after the resume")[0] == 0
+    assert lg.paused_in_flight(str(ws)) is None
+    assert run(ws, "Paused: the install run sheet")[0] == 0
+    assert lg.paused_in_flight(str(ws)) == "the install run sheet"
+    assert run(ws, "Paused: no")[0] == 0
+    assert lg.paused_in_flight(str(ws)) is None
+
+
+def test_r088_r2_an_empty_file_option_beside_a_text_is_two_sources(tmp_path):
+    """R-088 (round 2, Review A's SF1): `--file ""` beside a text is two sources, refused, nothing written."""
+    ws = scratch(tmp_path)
+    rc, out, err = run(ws, "--file", "", "free text")
+    assert rc == 2, out + err
+    assert lines(ws) == []
+
+
+@pytest.mark.parametrize("text", ["PASS TASK-1 r9 review-a defect", "pass PR-3 r1 review-b records", "Pass X"])
+def test_r088_r2_a_free_text_cannot_forge_a_pass_line(tmp_path, text):
+    """R-088 (round 2, convergent: Review A and the security review): a text, or a --file text, whose first word is
+    PASS in any letter case is refused, so a tagged line comes from --pass alone."""
+    ws = scratch(tmp_path)
+    (ws / "run" / "supervisor").mkdir(parents=True)
+    rc, out, err = run(ws, text)
+    assert rc == 2, out + err
+    src = ws / "run" / "supervisor" / "line.txt"
+    src.write_text(text + "\nmore\n", encoding="utf-8")
+    rc, out, err = run(ws, "--file", str(src))
+    assert rc == 2, out + err
+    assert lines(ws) == []
+
+
+def _junction(target, link):
+    try:
+        import _winapi
+        _winapi.CreateJunction(str(target), str(link))
+        return True
+    except Exception:
+        try:
+            os.symlink(str(target), str(link), target_is_directory=True)
+            return True
+        except (OSError, NotImplementedError):
+            return False
+
+
+@pytest.mark.parametrize("where", ["run", "supervisor"])
+def test_r088_r2_a_log_folder_that_is_a_link_is_refused(tmp_path, where):
+    """R-088 (round 2, convergent: Review A's note and the security review): where `run/` or `run/supervisor/` is a
+    junction or link leading out of the Workspace, the program refuses and appends nothing there."""
+    ws = scratch(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    if where == "run":
+        made = _junction(outside, ws / "run")
+    else:
+        (ws / "run").mkdir()
+        made = _junction(outside, ws / "run" / "supervisor")
+    if not made:
+        pytest.skip("this account can create neither a junction nor a link")
+    try:
+        rc, out, err = run(ws, "a text")
+        assert rc == 2, out + err
+        assert list(outside.rglob("*.md")) == []
+    finally:
+        os.rmdir(str(ws / "run")) if where == "run" else os.rmdir(str(ws / "run" / "supervisor"))
+

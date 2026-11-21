@@ -428,7 +428,7 @@ def _lift_map(ws, common, id_part):
     return lifts
 
 
-ROUND_CAUSES = ("defect", "security", "fix-induced", "no external path", "records", "builder incomplete", "brief error", "unstated")
+ROUND_CAUSES = bridge_env.ROUND_CAUSES + ("unstated",)
 
 
 def _builder_rounds(ws, weeks):

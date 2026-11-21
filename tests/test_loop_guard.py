@@ -280,6 +280,24 @@ def test_the_refusal_prints_the_ceiling_on_the_computers_clock(lg, tmp_path, mon
     assert e.value.code == 2 and "The computer's clock reads" in err and "KP-043" in err and "wake-timer" in err, err
 
 
+def test_r088_the_refusal_names_the_in_flight_log_and_the_program(lg, tmp_path, monkeypatch, capsys):
+    """R-088: a background agent with no timer is refused, and the refusal names the in-flight log and in-flight.py."""
+    from datetime import datetime as dt
+    root = tmp_path / "proj" / "Workspace"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\nAwaiting user on: nothing\n", encoding="utf-8")
+    agent = {"id": "a1", "type": "background_subagent", "status": "running", "description": "Review A", "command": "Agent", "started_at": ts(-600)}
+    late = dt.fromtimestamp(NOW - 600 + 3600 + 3600)
+    cron = {"id": "c1", "schedule": "%d %d %d %d *" % (late.minute, late.hour, late.day, late.month), "description": "an hour late", "command": "", "last_run_at": None}
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps({"cwd": str(root), "transcript_path": str(root / "none"), "hook_event_name": "Stop", "background_tasks": [agent], "session_crons": [cron]})))
+    with pytest.raises(SystemExit) as e:
+        lg.main()
+    err = capsys.readouterr().err
+    first = "Loop guard (Claude-Cursor Bridge, rule 43): you are waiting on a background agent with no timer running to its ceiling:"
+    assert e.value.code == 2 and err.startswith(first), err
+    assert "run/supervisor/in-flight.md" in err and "in-flight.py" in err, err
+
+
 def test_the_hook_input_is_read_in_its_live_forms(lg, tmp_path, monkeypatch):
     """reAngle, 2026-10-10 (field observation on 2026.10.10a): a start as epoch milliseconds, a one-shot
     cron with its schedule only, a command task under another type name."""
