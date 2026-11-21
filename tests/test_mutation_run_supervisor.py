@@ -293,12 +293,15 @@ def test_task031_r4_b3_each_listed_test_is_judged_alone_at_the_checkpoint(tmp_pa
 def test_task031_r4_b4_a_kill_is_keyed_by_the_bytes_that_ran(tmp_path):
     """R-041 (a kill is kept only for keyed inputs byte-identical to those of the run that killed it; handoff/TASK-031-
     r4.md, B4): a keyed file edited in the Workspace while a run is under way leaves no later mutant kept as killed
-    under the edited bytes, which never ran; the next run runs every mutant whose keyed bytes changed."""
+    under the edited bytes, which never ran; the next run runs every mutant whose keyed bytes changed. The gate writes
+    `started`, waits for `go` and fails only on mutated code, so that TASK-070's baseline, which runs the list
+    unmutated, passes."""
     started = tmp_path / "gate-started"
     go = tmp_path / "gate-go"
     files = dict(CALC)
     files["tests/test_gate.py"] = (
-        "import time\nfrom pathlib import Path\n\ndef test_gate():\n    Path(%r).write_text('x')\n"
+        "import time\nfrom pathlib import Path\n\nfrom demo.calc import add\n\ndef test_gate():\n"
+        "    if add(1, 2) == 3:\n        return\n    Path(%r).write_text('x')\n"
         "    while not Path(%r).is_file():\n        time.sleep(0.05)\n    assert False\n"
         % (str(started), str(go)))
     ws = _fixture(tmp_path, files)

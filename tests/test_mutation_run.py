@@ -769,14 +769,18 @@ def test_r041_namespace_package_resolution_refused(tmp_path):
 
 
 def test_r041_killed_run_keeps_partial_cache(tmp_path, home_of_the_tests):
-    """R-041, TASK-031 Done when (d): a run stopped after N mutants keeps N cache lines, leaves the tree unchanged, and a relaunch runs only the rest."""
+    """R-041, TASK-031 Done when (d): a run stopped after N mutants keeps N cache lines, leaves the tree unchanged, and a relaunch runs only the rest.
+    The gate waits and fails only on mutated code, so that TASK-070's baseline, which runs the list unmutated, passes."""
     ws = workspace(tmp_path)
     init_pkg(ws)
     marker = tmp_path / "continue.marker"
     write(ws, "tests/test_gate.py", textwrap.dedent("""
 import time
 from pathlib import Path
+from demo.calc import add
 def test_gate():
+    if add(1, 1) == 2:
+        return
     p = Path(%r)
     while not p.is_file():
         time.sleep(0.05)
@@ -1148,7 +1152,8 @@ def test_env():
 
 
 def test_r041_pytest_setup_error_is_run_error(tmp_path):
-    """R-041, TASK-031 Requirement 4 (M25): a pytest ERROR in setup makes the mutant outcome error, not killed."""
+    """R-041, TASK-031 Requirement 4 (M25): a pytest ERROR in setup makes the mutant outcome error, not killed.
+    The fixture errors only on mutated code, so that TASK-070's baseline, which runs the list unmutated, passes."""
     ws = workspace(tmp_path)
     init_pkg(ws)
     write(ws, "tests/test_setup_err.py", textwrap.dedent("""
@@ -1156,7 +1161,9 @@ import pytest
 
 @pytest.fixture
 def broken():
-    raise RuntimeError("setup failed")
+    from demo.calc import add
+    if add(1, 1) != 2:
+        raise RuntimeError("setup failed")
 
 def test_broken(broken):
     pass
@@ -1486,7 +1493,10 @@ def test_hold_pipes():
         assert not (work_sub / "tree" / ".env").exists(), "copied .env must be absent while the holder lives"
         if sys.platform == "win32":
             assert work_sub.is_dir(), "holder cwd should keep mutation-run-phc on disk until the holder ends"
-            assert (work_sub / "tree").is_dir(), "the copy root stays while the holder's cwd is inside it"
+            # TASK-070 r3: the baseline runs in a copy of its own, work_sub / "base", and the list times out there,
+            # so the holder's cwd is inside the baseline copy, which stays while the holder lives.
+            assert (work_sub / "base").is_dir(), "the baseline copy stays while the holder's cwd is inside it"
+            assert not (work_sub / "base" / ".env").exists(), "the baseline copy's .env must be absent while the holder lives"
     finally:
         if pid_file.is_file():
             try:
