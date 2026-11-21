@@ -448,3 +448,14 @@ def test_a_rollback_killed_part_way_is_finished_with_the_release_folders_install
     note = (target / "cursor-bridge" / "ROLLED-BACK.md").read_text(encoding="utf-8")
     assert "## " + NEW_VERSION in note, "the note written before the files changed survives the repeated run"
     assert not (target / "cursor-bridge-previous").exists()
+
+
+# ---- builder's cases below this line
+
+
+def test_r094_keep_with_rollback_is_refused(tmp_path, installed_old_then_new):
+    """R-094: --keep given together with --rollback is refused with exit 2 and changes nothing."""
+    target, _ = installed_old_then_new
+    rc, out = run(NEW_INSTALLER, tmp_path, "--rollback", "--target", str(target), "--keep", OLD_VERSION)
+    assert rc == 2 and "Traceback" not in out, out
+    assert "--keep" in out and "--rollback" in out
