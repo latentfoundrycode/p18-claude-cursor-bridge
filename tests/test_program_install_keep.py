@@ -441,3 +441,105 @@ def test_r094_a_dry_run_of_each_new_form_says_what_it_would_do_and_changes_nothi
     else:
         assert "none" in said.lower() or A in said, "the dry run of --keep none says nothing of what it would clear: " + out
     assert snapshot(sb.root) == before, "a dry run of %r changed something" % words
+
+
+# ---------------------------------------------------------------- round 2
+
+def marker_files(target):
+    """The files directly under <target>/cursor-bridge-previous/ (the marker among them; its name is not pinned)."""
+    base = os.path.join(target, PREVIOUS)
+    return [os.path.join(base, n) for n in os.listdir(base) if os.path.isfile(os.path.join(base, n))]
+
+
+def spoil_markers(target, make):
+    """Rewrite every marker file's bytes with `make(old_bytes)`; at least one marker must be there."""
+    markers = marker_files(target)
+    assert markers, "no marker file beside the kept copies after --keep"
+    for m in markers:
+        with open(m, "rb") as f:
+            data = f.read()
+        with open(m, "wb") as f:
+            f.write(make(data))
+
+
+NOT_TEXT = b"\xff\xfe\x00not text\x80\x81"
+
+
+def test_r2_keep_given_with_the_install_of_a_new_version_keeps_the_named_copy(world, sb):
+    """R-094, TASK-073 Done when (`--keep <version>` keeps the named earlier copy under `cursor-bridge-previous/`
+    beside the one previous release): round 1 removed the named copy when `--keep` came with the install of a new
+    version (the copies rotated before the mark was written). B installed with A kept; C installed with `--keep A`:
+    A is still whole beside B; D installed after it: A beside C."""
+    out = install(world, sb, C, "--keep", A)
+    assert kept_versions(sb.target) == [A, B], "the install of C with --keep A did not keep A beside B: %s" % out
+    assert whole_copy(sb.target, A) and whole_copy(sb.target, B)
+    install(world, sb, D)
+    assert kept_versions(sb.target) == [A, C], "the copy named at the install of C did not stay over the install of D"
+    assert whole_copy(sb.target, A)
+
+
+def test_r2_a_marker_that_is_not_text_never_stops_an_install(world, sb):
+    """R-094, TASK-073 Done when (a marker file beside the copy keeping it over every later install): a marker
+    edited by hand into bytes that are not text never makes an install fail. A named, the marker's bytes replaced,
+    C installs: exit 0, no traceback, B kept as the one previous release."""
+    rc, out = run(sb, world.installer(B), "--target", sb.target, "--keep", A)
+    assert rc == 0, out
+    spoil_markers(sb.target, lambda data: NOT_TEXT)
+    rc, out = run(sb, world.installer(C), "--target", sb.target)
+    assert "Traceback" not in out, out
+    assert rc == 0 and "MATCHES bridge " + C in out, "an install stopped on a marker that is not text: %s" % out
+    assert B in kept_versions(sb.target) and whole_copy(sb.target, B)
+
+
+def test_r2_a_marker_that_is_not_text_never_stops_a_rollback(world, sb):
+    """R-094, TASK-073 Done when (`--rollback [<version>]` restores the previous release where no version is given,
+    as today): a marker that is not text never makes a rollback fail, before or after the copies are removed. A
+    named, C and D installed, the marker's bytes replaced; `--rollback` restores C, exit 0, no traceback."""
+    keep_a_then_install_c_and_d(world, sb)
+    spoil_markers(sb.target, lambda data: NOT_TEXT)
+    rc, out = run(sb, world.installer(D), "--rollback", "--target", sb.target)
+    assert "Traceback" not in out, out
+    assert rc == 0 and "MATCHES bridge " + C in out, "a rollback stopped on a marker that is not text: %s" % out
+    assert installed_version(sb.target) == C
+
+
+def test_r2_a_marker_saved_with_a_byte_order_mark_still_keeps_its_copy(world, sb):
+    """R-094, TASK-073 Done when (a marker file beside the copy keeping it over every later install): a marker
+    saved again by a Windows editor gains a byte order mark and still names the same copy. A named, a byte order
+    mark put before the marker's text, C installed: A is still beside B."""
+    rc, out = run(sb, world.installer(B), "--target", sb.target, "--keep", A)
+    assert rc == 0, out
+    spoil_markers(sb.target, lambda data: b"\xef\xbb\xbf" + data)
+    install(world, sb, C)
+    assert kept_versions(sb.target) == [A, B], "a marker with a byte order mark did not keep A over the install of C"
+
+
+def test_r2_an_interrupted_copy_is_cleared_when_the_copies_rotate(world, sb):
+    """R-094, TASK-073 Done when (an unmarked copy is removed at the next install by the one-previous rule, as
+    today): a half-written copy left by an interrupted run (a folder ending .partial) is removed when the copies
+    rotate, as the one-previous rule removed it before this increment."""
+    stale = os.path.join(sb.target, PREVIOUS, "2026.01.00a.partial")
+    os.makedirs(os.path.join(stale, "cursor-bridge"))
+    with open(os.path.join(stale, "cursor-bridge", "half.md"), "w", encoding="utf-8") as f:
+        f.write("half written\n")
+    install(world, sb, C)
+    assert not os.path.exists(stale), "a stale .partial copy stayed after the copies rotated"
+    assert kept_versions(sb.target) == [B]
+
+
+def test_r2_a_kept_copy_of_a_version_with_no_letter_is_still_rolled_back_to(world, tmp_path):
+    """R-094, TASK-073 Done when (`--rollback [<version>]` restores the previous release where no version is given,
+    as today): the bridge's own changelog has versions with no letter (2026.09.20 to 2026.09.27); today a kept copy
+    of one is restored by `--rollback`, and round 1's version filter hid it ("nothing to roll back to")."""
+    norm_hash = suite_conftest.load_program("bridge-check").norm_hash
+    plain_version = "2026.01.00"
+    release = os.path.join(str(tmp_path), "release-plain")
+    make_release(release, plain_version, norm_hash)
+    s = make_computer(tmp_path / "computer")
+    rc, out = run(s, os.path.join(release, "cursor-bridge", "bridge-install.py"), "--target", s.target)
+    assert rc == 0 and "MATCHES bridge " + plain_version in out, out
+    install(world, s, B)
+    assert os.path.isdir(os.path.join(s.target, PREVIOUS, plain_version)), "the plain version was not kept"
+    rc, out = run(s, world.installer(B), "--rollback", "--target", s.target)
+    assert rc == 0 and "MATCHES bridge " + plain_version in out, "the kept copy of a version with no letter was not restored: %s" % out
+    assert installed_version(s.target) == plain_version
