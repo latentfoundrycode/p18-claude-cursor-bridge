@@ -473,3 +473,16 @@ def test_r061_agent_ceiling_by_header_matches_line_when_agreeing(lg, tmp_path):
     (ws / "docs" / "RUN_PARAMETERS.md").write_text(header + line_text, encoding="utf-8")
     (ws / "docs" / "PROJECT_STATUS.md").write_text("# Status\nPhase: building\nAwaiting user on: none\n", encoding="utf-8")
     assert lg.agent_ceiling(str(ws)) == 9900
+
+
+def test_r088_the_last_paused_line_decides(lg, tmp_path):
+    """R-088 round 2: the last Paused: line decides, so a later resume is no wait and a later pause is that pause."""
+    root = tmp_path / "proj" / "Workspace"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\n", encoding="utf-8")
+    log = root / "run" / "supervisor" / "in-flight.md"
+    log.parent.mkdir(parents=True)
+    log.write_text("Paused: the owner's word\nPaused: resumed\n", encoding="utf-8")
+    assert lg.paused_in_flight(str(root)) is None
+    log.write_text("Paused: resumed\nPaused: the install run sheet\n", encoding="utf-8")
+    assert lg.paused_in_flight(str(root)) == "the install run sheet"

@@ -4430,4 +4430,3 @@ def workspace_of(start):
             return None
         current = parent
     return None
-

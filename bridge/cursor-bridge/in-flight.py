@@ -15,6 +15,7 @@ import datetime
 import errno
 import os
 import re
+import stat
 import sys
 import time
 import unicodedata
@@ -51,6 +52,11 @@ def say(line):
 def refuse(reason):
     sys.stderr.buffer.write(("in-flight: REFUSED - %s\n" % reason).encode("utf-8"))
     return 2
+
+
+def incomplete(written, total):
+    sys.stderr.buffer.write(("in-flight: INCOMPLETE - %d of %d bytes written\n" % (written, total)).encode("utf-8"))
+    return 1
 
 
 def stamp():
@@ -98,6 +104,11 @@ def _file_lines(text):
     return lines
 
 
+def _first_word_is_pass(line):
+    parts = line.split(None, 1)
+    return bool(parts) and parts[0].lower() == "pass"
+
+
 def _paused_body(line):
     i = 0
     while i < len(line) and unicodedata.category(line[i]) == "Zs":
@@ -138,14 +149,18 @@ def _at_or_under(child, parent):
 
 
 def _reparse(path):
+    """A symbolic link or a junction. isjunction where the platform has it, else the reparse point."""
     try:
         if os.path.islink(path):
             return True
-        if os.path.isjunction(path):
-            return True
+        isjunction = getattr(os.path, "isjunction", None)
+        if isjunction is not None:
+            return bool(isjunction(path))
+        info = os.lstat(path)
+        mark = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+        return bool(getattr(info, "st_file_attributes", 0) & mark)
     except OSError:
         return False
-    return False
 
 
 def _through_link(supervisor, given):
@@ -201,10 +216,18 @@ def _read_source(workspace, given):
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
-        fd = os.open(os.path.abspath(given), flags)
+        fd = os.open(file_real, flags)
     except OSError:
         return None, "the file cannot be read"
     try:
+        opened = os.fstat(fd)
+        named = os.stat(file_real)
+        if opened.st_dev and named.st_dev and opened.st_dev != named.st_dev:
+            return None, "the file is not the file checked"
+        if opened.st_ino and named.st_ino and opened.st_ino != named.st_ino:
+            return None, "the file is not the file checked"
+        if opened.st_nlink != 1:
+            return None, "the file is not the file checked"
         data = b""
         while len(data) <= FILE_LIMIT:
             piece = os.read(fd, FILE_LIMIT + 1 - len(data))
@@ -248,11 +271,13 @@ def prepare(args):
     if args.round is not None or args.cause is not None:
         if args.pass_name is None:
             return None, None, "a round or a cause needs --pass"
-    sources = (args.text is not None, bool(args.file), args.pass_name is not None)
+    sources = (args.text is not None, args.file is not None, args.pass_name is not None)
     if sum(sources) == 0:
         return None, None, "no text"
     if sum(sources) > 1:
         return None, None, "more than one source"
+    if args.file == "" and args.text is None and args.pass_name is None:
+        return None, None, "no text"
     try:
         cwd = os.getcwd()
     except OSError:
@@ -269,9 +294,14 @@ def prepare(args):
         raw, err = _read_source(workspace, args.file)
         if err:
             return None, None, err
+        rows = _file_lines(raw)
+        if rows and _first_word_is_pass(rows[0]):
+            return None, None, "a pass line needs --pass"
         text, pauses = _text_and_pauses(raw, True)
     else:
         text, pauses = _text_and_pauses(args.text, False)
+    if _first_word_is_pass(text):
+        return None, None, "a pass line needs --pass"
     if text == "":
         return None, None, "no text"
     if _forbidden(text):
@@ -291,7 +321,7 @@ def _acquire(fd, seconds):
         try:
             if sys.platform == "win32":
                 import msvcrt
-                os.lseek(fd, 0, os.SEEK_SET)
+                os.lseek(fd, 2 ** 31, os.SEEK_SET)
                 msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
             else:
                 import fcntl
@@ -310,7 +340,7 @@ def _release(fd):
     try:
         if sys.platform == "win32":
             import msvcrt
-            os.lseek(fd, 0, os.SEEK_SET)
+            os.lseek(fd, 2 ** 31, os.SEEK_SET)
             msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
         else:
             import fcntl
@@ -319,15 +349,52 @@ def _release(fd):
         pass
 
 
+def _log_blocked(path):
+    """A reason when run/, run/supervisor/ or the log is a link, or the real folder leaves the Workspace."""
+    supervisor = os.path.dirname(path)
+    run = os.path.dirname(supervisor)
+    workspace = os.path.dirname(run)
+    for item in (run, supervisor, path):
+        if _reparse(item):
+            return "the log path is a link"
+    try:
+        ws_real = os.path.realpath(workspace)
+        sup_real = os.path.realpath(supervisor)
+    except OSError:
+        return "the log cannot be written"
+    if not _at_or_under(sup_real, ws_real):
+        return "the log path leaves the Workspace"
+    return None
+
+
+def _write_all(fd, payload):
+    """None when every byte is written, else (written, total)."""
+    written = 0
+    total = len(payload)
+    while written < total:
+        try:
+            n = os.write(fd, payload[written:])
+        except OSError:
+            return written, total
+        if n == 0:
+            return written, total
+        written += n
+    return None
+
+
 def append_log(path, lines):
-    """Append every line of this run in one write. None on success, otherwise a reason."""
+    """Append every line of this run. None on success, (written, total) when the write stops short, else a reason."""
+    blocked = _log_blocked(path)
+    if blocked:
+        return blocked
     payload = "".join(line + "\n" for line in lines).encode("utf-8")
     folder = os.path.dirname(path)
     held = False
     fd = None
     try:
         os.makedirs(folder, exist_ok=True)
-        fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_APPEND, 0o666)
+        flags = os.O_RDWR | os.O_CREAT | os.O_APPEND | getattr(os, "O_BINARY", 0)
+        fd = os.open(path, flags, 0o666)
         if not _acquire(fd, LOCK_SECONDS):
             return "the log was busy"
         held = True
@@ -336,7 +403,9 @@ def append_log(path, lines):
             os.lseek(fd, size - 1, os.SEEK_SET)
             if os.read(fd, 1) != b"\n":
                 payload = b"\n" + payload
-        os.write(fd, payload)
+        short = _write_all(fd, payload)
+        if short is not None:
+            return short
         return None
     except OSError:
         return "the log cannot be written"
@@ -366,6 +435,8 @@ def main():
         if err:
             return refuse(err)
         err = append_log(os.path.join(workspace, LOG_NAME), lines)
+        if isinstance(err, tuple):
+            return incomplete(err[0], err[1])
         if err:
             return refuse(err)
         for line in lines:

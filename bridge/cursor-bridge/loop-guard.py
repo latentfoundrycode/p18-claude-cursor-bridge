@@ -198,6 +198,17 @@ def field(text, name):
     return m.group(1).strip().strip("*_`").strip()
 
 
+def last_field(text, name):
+    """The last value of a `Name: value` line. The pattern is field's; the match is the last one."""
+    pat = r"^\s*(?:[-*]\s+)?[*_`]*%s[*_`]*\s*:[*_`]*\s*(.*?)\s*$" % re.escape(name)
+    found = None
+    for m in re.finditer(pat, text, re.M | re.I):
+        found = m
+    if not found:
+        return None
+    return found.group(1).strip().strip("*_`").strip()
+
+
 def parse_ts(s):
     """ISO 8601 (with or without Z), or epoch seconds or milliseconds, as a unix time; None otherwise.
     (reAngle, 2026-10-10: every task's start read as 'now' because the hook's form was not the one expected.)"""
@@ -270,15 +281,16 @@ def names_a_wait(value):
 
 
 def paused_in_flight(cwd):
-    """The `Paused:` line of run/supervisor/in-flight.md beside the status file, when it names a
+    """The last `Paused:` line of run/supervisor/in-flight.md beside the status file, when it names a
     wait (2026.10.25a, FB-027): the untracked working file records a pause, so no tracked file is
-    edited for it. None otherwise, or when the file is missing or unreadable."""
+    edited for it. None otherwise, or when the file is missing or unreadable. A later line replaces
+    an earlier one. A stamped line is not a `Paused:` line."""
     ws = workspace_of(cwd)
     if not ws:
         return None
     try:
         with open(os.path.join(ws, "run", "supervisor", "in-flight.md"), encoding="utf-8-sig", errors="replace") as f:
-            value = field(f.read(), "Paused")
+            value = last_field(f.read(), "Paused")
     except OSError:
         return None
     if value is None or not names_a_wait(value):

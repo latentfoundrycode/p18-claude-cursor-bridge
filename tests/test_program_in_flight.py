@@ -392,3 +392,55 @@ def test_r088_r2_a_log_folder_that_is_a_link_is_refused(tmp_path, where):
     finally:
         os.rmdir(str(ws / "run")) if where == "run" else os.rmdir(str(ws / "run" / "supervisor"))
 
+
+# Round 3 (TASK-068-r3): the review ceiling's round; each case is a finding of the five blocking classes.
+
+def test_r088_r3_an_empty_paused_line_never_takes_the_next_line_as_its_value(tmp_path):
+    """R-088 (round 3, convergent: the security review's B1 and Review A's note; a defeated safety mechanism): an empty
+    `Paused:` line, the form that lifts a pause, is read as empty, never as the line after it, so a later ordinary
+    line never sets a pause, and an empty pause followed by `Paused: resumed` is no wait."""
+    ws = scratch(tmp_path)
+    lg = _guard()
+    assert run(ws, "Paused: the owner word")[0] == 0
+    assert lg.paused_in_flight(str(ws)) == "the owner word"
+    assert run(ws, "Paused:")[0] == 0
+    assert lg.paused_in_flight(str(ws)) is None
+    assert run(ws, "started the review of TASK-068")[0] == 0
+    assert lg.paused_in_flight(str(ws)) is None
+    ws2 = scratch(tmp_path / "second")
+    log_of(ws2).parent.mkdir(parents=True)
+    log_of(ws2).write_text("Paused: x\nPaused:\nPaused: resumed\n", encoding="utf-8")
+    assert lg.paused_in_flight(str(ws2)) is None
+
+
+def test_r088_r3_a_log_that_is_a_hard_link_is_refused(tmp_path):
+    """R-088 (round 3, convergent: Review A and the security review; security): an in-flight.md that is a hard link to a
+    file outside the Workspace is refused, exit 2, and the outside file is unchanged."""
+    ws = scratch(tmp_path)
+    (ws / "run" / "supervisor").mkdir(parents=True)
+    outside = tmp_path / "outside.md"
+    outside.write_bytes(b"outside\n")
+    try:
+        os.link(str(outside), str(log_of(ws)))
+    except (OSError, NotImplementedError, AttributeError):
+        pytest.skip("this file system cannot make a hard link")
+    rc, out, err = run(ws, "a text")
+    assert rc == 2, out + err
+    assert outside.read_bytes() == b"outside\n"
+
+
+def test_r088_r3_a_supervisor_folder_linked_inside_the_workspace_is_refused(tmp_path):
+    """R-088 (round 3, Review A's note: the link test of run/supervisor/ itself, not only the real-path test): a
+    run/supervisor/ that is a junction or link to another folder of the same Workspace is refused, nothing written."""
+    ws = scratch(tmp_path)
+    (ws / "run").mkdir()
+    target = ws / "docs"
+    if not _junction(target, ws / "run" / "supervisor"):
+        pytest.skip("this account can create neither a junction nor a link")
+    try:
+        rc, out, err = run(ws, "a text")
+        assert rc == 2, out + err
+        assert not (target / "in-flight.md").exists()
+    finally:
+        os.rmdir(str(ws / "run" / "supervisor"))
+
