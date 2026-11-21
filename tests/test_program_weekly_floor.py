@@ -443,3 +443,120 @@ def test_this_repository_prints_the_weekly_row_ok():
     status, detail = weekly_row(out)
     assert status == "OK", out
     assert "not compared" in detail and "disabled" in detail, out
+
+
+# ---------------------------------------------------------------- round 2: the remote is this repository's own
+
+def conformance_env(ws, env):
+    """The check over `ws`, --offline, with `env` as its whole environment."""
+    kw = suite_conftest.windowless_kwargs({"capture_output": True, "text": True, "encoding": "utf-8",
+                                           "errors": "replace", "timeout": 300, "env": env})
+    p = subprocess.run([sys.executable, CONFORMANCE, str(ws), "--offline"], cwd=str(ws), **kw)
+    return p.returncode, p.stdout + p.stderr
+
+
+def test_r2_a_git_dir_whose_path_holds_a_space_is_read(tmp_path):
+    """R-092, TASK-072 Done when (`NOTE` where the repository has no GitHub remote, read from the local
+    configuration alone; otherwise `MISSING` where the file is absent): Review A round 1, B1. The Workspace's
+    .git is a file (`git init --separate-git-dir`, as a worktree's is) naming a folder whose path holds a space;
+    the repository's origin is on github.com and no weekly workflow exists, so the row is MISSING. Round 1 cut
+    the gitdir path at its first space and read NOTE."""
+    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"))
+    git(ws, "init", "-q", "--separate-git-dir", str(tmp_path / "git dir with space").replace("\\", "/"))
+    assert os.path.isfile(os.path.join(str(ws), ".git"))
+    rc, out = conformance(ws)
+    status, detail = weekly_row(out)
+    assert status == "MISSING", out
+    assert "no workflow file" in plain(detail).lower(), out
+    assert rc == 1, out
+
+
+@pytest.mark.parametrize("how", ["global-file", "environment-pairs"])
+def test_r2_a_remote_outside_this_repository_config_is_not_read(tmp_path, how):
+    """R-092, TASK-072 Done when (`NOTE` where the repository has no GitHub remote, read from the local
+    configuration alone): Review A round 1, B2. The repository has no remote; a github.com remote stands in
+    the user's global configuration (GIT_CONFIG_GLOBAL) or in configuration passed by the environment
+    (GIT_CONFIG_COUNT); neither is this repository's, so the row is NOTE. Round 1 read both and said MISSING."""
+    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"), remote=None)
+    env = dict(os.environ)
+    if how == "global-file":
+        cfg = tmp_path / "global.gitconfig"
+        cfg.write_text('[remote "x"]\n\turl = %s\n' % GITHUB_REMOTE, encoding="ascii")
+        env["GIT_CONFIG_GLOBAL"] = str(cfg)
+    else:
+        env["GIT_CONFIG_COUNT"] = "1"
+        env["GIT_CONFIG_KEY_0"] = "remote.y.url"
+        env["GIT_CONFIG_VALUE_0"] = GITHUB_REMOTE
+    rc, out = conformance_env(ws, env)
+    status, _detail = weekly_row(out)
+    assert status == "NOTE", out
+    assert rc == 0, out
+
+
+def test_r2_an_included_config_file_is_not_read(tmp_path):
+    """R-092, TASK-072 Done when (`NOTE` where the repository has no GitHub remote, read from the local
+    configuration alone): the security audit of round 1. The repository's own config names no remote but
+    includes (include.path) a file outside it that names a github.com remote; an include is not this
+    repository's configuration, and following one lets a project's config make the check read any file, so the
+    row is NOTE. Round 1 followed the include and said MISSING."""
+    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"), remote=None)
+    inc = tmp_path / "included.gitconfig"
+    inc.write_text('[remote "origin"]\n\turl = %s\n' % GITHUB_REMOTE, encoding="ascii")
+    git(ws, "config", "include.path", str(inc).replace("\\", "/"))
+    rc, out = conformance(ws)
+    status, _detail = weekly_row(out)
+    assert status == "NOTE", out
+    assert rc == 0, out
+
+
+@pytest.mark.parametrize("key", ['"on":', "'on':"], ids=["double-quoted", "single-quoted"])
+def test_r2_a_quoted_on_key_is_read(tmp_path, key):
+    """R-092, TASK-072 Done when (`OK` where a workflow file carries a `schedule:` trigger and an OSV-Scanner
+    step whose list equals the gate's): Review A round 1, S1. Both workflows write their trigger key quoted, as
+    yamllint's truthy rule asks; the lists are equal and the remote is on github.com, so the row is OK. Round 1
+    read no trigger under a quoted key and said MISSING."""
+    gate_text = gate("--lockfile='requirements.txt:requirements.lock'").replace("\non:\n", "\n%s\n" % key)
+    scan_text = scan("--lockfile=requirements.txt:requirements.lock").replace("\non:\n", "\n%s\n" % key)
+    assert key in gate_text and key in scan_text
+    ws = make_project(tmp_path, gate_text, [("dependency-scan.yml", scan_text)])
+    rc, out = conformance(ws)
+    assert_ok(rc, out)
+
+
+def test_r2_a_parent_folder_repository_is_not_read(tmp_path):
+    """R-092, TASK-072 Done when (`NOTE` where the repository has no GitHub remote, read from the local
+    configuration alone): Review A round 1, a gap no test held. The Workspace has no .git of its own; the
+    folder above it is a repository whose origin is on github.com. That repository is not the Workspace's, so
+    the row is NOTE."""
+    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"))
+    os.rename(os.path.join(str(ws), ".git"), os.path.join(os.path.dirname(str(ws)), ".git"))
+    assert not os.path.exists(os.path.join(str(ws), ".git"))
+    rc, out = conformance(ws)
+    status, _detail = weekly_row(out)
+    assert status == "NOTE", out
+    assert rc == 0, out
+
+
+def test_r2_the_remote_url_is_never_printed(tmp_path):
+    """R-092, TASK-072 (the brief's trust boundary: a remote URL can hold a credential and is never printed):
+    Review A round 1, a gap no test held. The origin carries a user name; the row is MISSING and no part of the
+    URL appears in the output."""
+    remote = "https://example-user@github.com/example-owner/thing.git"
+    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"), remote=remote)
+    rc, out = conformance(ws)
+    status, _detail = weekly_row(out)
+    assert status == "MISSING", out
+    assert "example-user" not in out and "example-owner" not in out, out
+
+
+def test_r2_the_row_stands_where_there_is_no_workflow(tmp_path):
+    """R-092, TASK-072 Done when (`MISSING` where the file is absent, the row saying which): Review A round 1,
+    a gap no test held. The project has no workflow at all and a github.com remote; the one row still stands,
+    MISSING, saying no workflow file runs OSV-Scanner on a schedule: trigger."""
+    ws = make_project(tmp_path, gate(None))
+    os.remove(os.path.join(str(ws), ".github", "workflows", "tests.yml"))
+    rc, out = conformance(ws)
+    status, detail = weekly_row(out)
+    assert status == "MISSING", out
+    assert "no workflow file" in plain(detail).lower() and "schedule:" in plain(detail), out
+    assert rc == 1, out
