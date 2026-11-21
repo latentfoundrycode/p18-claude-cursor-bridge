@@ -1663,3 +1663,21 @@ def test_r062_check_would_write_only_when_write_succeeds(tmp_path, rel):
     assert snapshot(root) != before
     assert not listed(out_run, "would write ", rel)
     assert not listed(out_run, "cannot write ", rel)
+
+
+def test_r091_the_field_form_fixture_is_refused_naming_stage_pause(tmp_path):
+    """R-091: the field-form fixture (a heading in place of each plain line) is refused naming Stage pause, and its bytes stay as they were."""
+    fixture = os.path.join(ROOT, "tests", "fixtures", "headers", "field", "run-parameters.md")
+    with open(fixture, "rb") as f:
+        raw = f.read()
+    root = tmp_path / "field"
+    os.makedirs(str(root / "docs"))
+    target = root / "docs" / "RUN_PARAMETERS.md"
+    with open(str(target), "wb") as f:
+        f.write(raw)
+    code, out = migrate(root, "docs/RUN_PARAMETERS.md")
+    lines = [ln for ln in out.splitlines() if ln.strip()]
+    assert lines == ["cannot read docs/RUN_PARAMETERS.md: Stage pause has no value on a plain line"], out
+    assert code == 0, out
+    with open(str(target), "rb") as f:
+        assert f.read() == raw

@@ -42,7 +42,8 @@ The fixed forms these tests pin, which the brief repeats:
   lines decide, no traceback); a disagreement on any other key is not its finding.
 - inventory-check.py checks docs/RUN_PARAMETERS.md beside the inventory: `HEADER DISAGREES: <key>` for each of the
   nine keys that disagrees (exit 1), `HEADER MALFORMED: docs/RUN_PARAMETERS.md:<line> <what>` and exit 2 for a
-  malformed header; a file with no header is not its finding.
+  malformed header; a file with no header was not its finding until R-091 (TASK-071), which fails any of the
+  five values empty in either form (tests/test_program_run_parameters_empty.py).
 - With an agreeing header every reader gives the answer the lines give.
 
 The supervisor's cases stand above the marker at the end of this file. The builder adds its own cases below the
