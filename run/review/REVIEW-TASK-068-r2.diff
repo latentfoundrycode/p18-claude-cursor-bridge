@@ -1,0 +1,2322 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 7a49164..e4b74a3 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.11.12a",
+-  "generated": "2026-11-19 06:03",
++  "generated": "2026-11-21 02:51",
+   "files": {
+     "agents/cursor-configurator.md": "a8aad7838a9bc5b4f00e13fd3749919158cbe37ec7acfa9a40960600398784bc",
+     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
+@@ -31,9 +31,9 @@
+     "cursor-bridge/boundary-check.py": "10aa333b4387f7f14ae85f9edb68fc5e8bda5a17a391f6161004f40cef4e7242",
+     "cursor-bridge/bridge-check.py": "2e3af785b847076210979e6e5f775d2550ecd960600cd0e18210920d2b0babd1",
+     "cursor-bridge/bridge-install.py": "d1bfdb4421f79f4cbfbbb6af5ffef2713f1b1f31a7a1293ce17cdd495466e4c1",
+-    "cursor-bridge/bridge-run.py": "86e393af528f75a5edcc2a328fd1050bdfd1f24d370c03992e4b76b5f753c724",
++    "cursor-bridge/bridge-run.py": "b6fec8ec0f46f48819ceeb2655d7a921d369f1041b2d110222533e24a615296d",
+     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
+-    "cursor-bridge/bridge_env.py": "f5cca61489a5adea7f7294606f86e6233401c7a359c53eea1282adac7f3d79fa",
++    "cursor-bridge/bridge_env.py": "32a6a920f7410d2eddd433654f300c9d2559478456c240a18be32c95932e15cd",
+     "cursor-bridge/completion-check.py": "27bfc126a40986f16347307126d909738ce90d71a6d29caa05b898654419249b",
+     "cursor-bridge/conformance-check.py": "3dde6c1edee5ec706c6fa7ac30fbb0bfde11aa53f622e5c4238c3c46f5b484ae",
+     "cursor-bridge/cursor-agent.shim": "a524585b139ce42a15edc3ea1e6f6d0ce83dee9c41c5ace7e71e3958e5c73ad7",
+@@ -79,14 +79,15 @@
+     "cursor-bridge/design-seeds/x.ai/README.md": "8560245632010049402a9aaab516e47b1876c660e9fabe2220c7a2be52470e40",
+     "cursor-bridge/diagram-check.py": "d8bc790a1196f1f290f410fe8ceb4eee3d812b1c9d903129ba5923cd47b8d015",
+     "cursor-bridge/evaluate-reports.py": "4e4eb6a41b95093a62905fcc8e2fc9d9cafc74ffe41ea17cb46eb6485934e50a",
++    "cursor-bridge/in-flight.py": "aa5e828996aac2144b901eaf6fc4ed54b5697317bcac3539598a113070fad0d1",
+     "cursor-bridge/installer-check.ps1": "a662ab0f1d707234d5b1b58de7584b812099cddcec78274b8f15599a3e026cb5",
+     "cursor-bridge/inventory-check.py": "17f71879b6cd68dd20b898d72aab70284761835376ed390a88b5ecf83abef477",
+     "cursor-bridge/invisible-check.py": "5584c8f1e4099603d965c86dbdaad8f226fe373dba736c10264a88894fbb7a91",
+     "cursor-bridge/lock-check.py": "f843dd5a213583d2fb9896bb269c2803511b3ea7b46a561337dc74a67b4e45fe",
+-    "cursor-bridge/loop-guard.py": "6444e26b2ac598d6813be75fb96c7fda7fef8bf0f8b9de1f71ac6854dd7648ef",
++    "cursor-bridge/loop-guard.py": "e6a4b1453f22b4317047995cfbd1ad5deb6478b1a67a3d91d08f0c839f16b9d9",
+     "cursor-bridge/minimal-code.snapshot.md": "b822c4d7abd69971dc5fee671b8a63daa58ba62a2711c9cf07849ed82d01a215",
+     "cursor-bridge/mutation-run.py": "3489d7778015393029dc9a768f42b3f213e999fad32e9b918c4c10160676569f",
+-    "cursor-bridge/pace-report.py": "95d3116b8559c392e14a07154dcbea25eb5365bdc368f33fe62aef6b02e51bd2",
++    "cursor-bridge/pace-report.py": "c416140ed4ea0841dd10bbdd66b88250c08024328b1d25a839de0d706cc79065",
+     "cursor-bridge/permission-guard.py": "6e85731afcca3f8fa4a71c80a3501d9875c7f4f470128ca3f10f8e089db6c31a",
+     "cursor-bridge/plan-check.py": "f8167ac2793c34c7cd8ea8c5fe96ab24937dae28f8051709b9b9f6b248139405",
+     "cursor-bridge/pr-activity-check.py": "7b6f59a14a52c34d14222939d5af52f677e7494e9008d702e3a5bb0bdb8a8768",
+@@ -101,7 +102,7 @@
+     "cursor-bridge/secure-coding.snapshot.md": "3f41667754917ffef6fb47308645356be6a5fd2fc362cc9c3dedf92a9457324e",
+     "cursor-bridge/semgrep-bridge-rules.yml": "924db9d2386c850dafd4e3f829a693dc0fef0d1409ef7f5887302a930c8192ec",
+     "cursor-bridge/session-start.py": "0051b98bb279da8eecf772b53c11fc7a431dae59b24ef0a11882d41a7a964f69",
+-    "cursor-bridge/settings.bridge.json": "3ab45ec0b204c6868942f0d324f075c31b6ed1055cf2fe6fce8e2151ebe2953b",
++    "cursor-bridge/settings.bridge.json": "66297738dee0bb4afac6af23a426beb2739856dfabfa0eed93faf4165fd238a0",
+     "cursor-bridge/shell-guard.py": "6abdc15bd149afdf1561997512b75253a154f58ddb05355577b4ebbcec36c67b",
+     "cursor-bridge/stage-diff.py": "167685045331b10e550679eb28fd51e7d829603310bde841bafb3a1cdd9a1ecc",
+     "cursor-bridge/sync-check.py": "41d4e74931b150bba23a67a1a024b640f95673a490b3a6522af3f9d6ff43e0de",
+diff --git a/bridge/cursor-bridge/bridge-run.py b/bridge/cursor-bridge/bridge-run.py
+index 14dd3e6..2d413eb 100644
+--- a/bridge/cursor-bridge/bridge-run.py
++++ b/bridge/cursor-bridge/bridge-run.py
+@@ -987,7 +987,7 @@ def outside_target(argv, folder=None):
+     return None
+ 
+ 
+-ROUND_CAUSES = ("defect", "security", "fix-induced", "no external path", "records", "builder incomplete", "brief error")
++ROUND_CAUSES = bridge_env.ROUND_CAUSES
+ ROUND_CAUSE_RE = re.compile(r"^Round cause:[ \t]*(.*?)[ \t]*$", re.M)
+ 
+ 
+diff --git a/bridge/cursor-bridge/bridge_env.py b/bridge/cursor-bridge/bridge_env.py
+index 0bd321e..eb8bb1d 100644
+--- a/bridge/cursor-bridge/bridge_env.py
++++ b/bridge/cursor-bridge/bridge_env.py
+@@ -4399,3 +4399,34 @@ def ci_class(item, kind):
+         return "failed"
+     return "failed"
+ 
++
++ROUND_CAUSES = (
++    "defect",
++    "security",
++    "fix-induced",
++    "no external path",
++    "records",
++    "builder incomplete",
++    "brief error",
++)
++
++
++def workspace_of(start):
++    """Absolute path of the Workspace that holds start, or None.
++
++    start is a folder. The Workspace is that folder, or the nearest parent
++    that holds docs/PROJECT_STATUS.md as a file.
++    """
++    if not isinstance(start, str) or start == "":
++        return None
++    current = os.path.abspath(start)
++    seen = None
++    while current != seen:
++        if os.path.isfile(os.path.join(current, "docs", "PROJECT_STATUS.md")):
++            return current
++        seen = current
++        parent = os.path.dirname(current)
++        if parent == current:
++            return None
++        current = parent
++    return None
+diff --git a/bridge/cursor-bridge/in-flight.py b/bridge/cursor-bridge/in-flight.py
+new file mode 100644
+index 0000000..cf171cd
+--- /dev/null
++++ b/bridge/cursor-bridge/in-flight.py
+@@ -0,0 +1,463 @@
++#!/usr/bin/env python3
++"""Append one clock-stamped line to the Workspace in-flight log.
++
++  python in-flight.py <text>
++  python in-flight.py --file <path>
++  python in-flight.py --pass <name> <reviewer> [--round <n>] [--cause <cause>]
++
++The Workspace is the current folder, or its nearest parent, that holds
++docs/PROJECT_STATUS.md. The log is that folder's run/supervisor/in-flight.md.
++Exactly one source is accepted. Exit 0 prints each line written. Exit 2
++writes nothing.
++"""
++import argparse
++import datetime
++import errno
++import os
++import re
++import stat
++import sys
++import time
++import unicodedata
++
++HERE = os.path.dirname(os.path.abspath(__file__))
++sys.path.insert(0, HERE)
++import bridge_env
++
++REVIEWERS = (
++    "review-a",
++    "review-b",
++    "security-auditor",
++    "design-auditor",
++    "plan-critic",
++    "design-critic-b",
++    "supervisor",
++)
++FILE_LIMIT = 65536
++LOCK_SECONDS = 10
++LOG_NAME = os.path.join("run", "supervisor", "in-flight.md")
++
++
++class FlightParser(argparse.ArgumentParser):
++    def error(self, message):
++        sys.stderr.buffer.write(("in-flight: REFUSED - %s\n" % message).encode("utf-8", "replace"))
++        raise SystemExit(2)
++
++
++def say(line):
++    sys.stdout.buffer.write((line + "\n").encode("utf-8"))
++    sys.stdout.buffer.flush()
++
++
++def refuse(reason):
++    sys.stderr.buffer.write(("in-flight: REFUSED - %s\n" % reason).encode("utf-8"))
++    return 2
++
++
++def incomplete(written, total):
++    sys.stderr.buffer.write(("in-flight: INCOMPLETE - %d of %d bytes written\n" % (written, total)).encode("utf-8"))
++    return 1
++
++
++def stamp():
++    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
++
++
++def _strip_spaces(text):
++    start = 0
++    end = len(text)
++    while start < end and unicodedata.category(text[start]) == "Zs":
++        start += 1
++    while end > start and unicodedata.category(text[end - 1]) == "Zs":
++        end -= 1
++    return text[start:end]
++
++
++def _blank(line):
++    return all(unicodedata.category(ch) == "Zs" for ch in line)
++
++
++def _forbidden(text):
++    return any(unicodedata.category(ch) in ("Cc", "Cf", "Zl", "Zp") for ch in text)
++
++
++def _file_lines(text):
++    lines = []
++    buf = []
++    i = 0
++    n = len(text)
++    while i < n:
++        ch = text[i]
++        if ch == "\r":
++            lines.append("".join(buf))
++            buf = []
++            i += 2 if i + 1 < n and text[i + 1] == "\n" else 1
++            continue
++        if ch == "\n":
++            lines.append("".join(buf))
++            buf = []
++            i += 1
++            continue
++        buf.append(ch)
++        i += 1
++    lines.append("".join(buf))
++    return lines
++
++
++def _first_word_is_pass(line):
++    parts = line.split(None, 1)
++    return bool(parts) and parts[0].lower() == "pass"
++
++
++def _paused_body(line):
++    i = 0
++    while i < len(line) and unicodedata.category(line[i]) == "Zs":
++        i += 1
++    body = line[i:]
++    if len(body) >= 7 and body[:7].lower() == "paused:":
++        return body
++    return None
++
++
++def _text_and_pauses(raw, from_file):
++    if from_file:
++        rows = _file_lines(raw)
++    else:
++        rows = [raw]
++    pauses = []
++    kept = []
++    for row in rows:
++        body = _paused_body(row)
++        if body is not None:
++            pauses.append(body)
++        if not _blank(row):
++            kept.append(row)
++    return _strip_spaces(" ".join(kept)), pauses
++
++
++def _same(a, b):
++    return os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))
++
++
++def _at_or_under(child, parent):
++    child = os.path.normcase(os.path.normpath(child))
++    parent = os.path.normcase(os.path.normpath(parent))
++    try:
++        return os.path.commonpath([child, parent]) == parent
++    except ValueError:
++        return False
++
++
++def _reparse(path):
++    """A symbolic link or a junction. isjunction where the platform has it, else the reparse point."""
++    try:
++        if os.path.islink(path):
++            return True
++        isjunction = getattr(os.path, "isjunction", None)
++        if isjunction is not None:
++            return bool(isjunction(path))
++        info = os.lstat(path)
++        mark = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
++        return bool(getattr(info, "st_file_attributes", 0) & mark)
++    except OSError:
++        return False
++
++
++def _through_link(supervisor, given):
++    """The file is a symbolic link, or a folder between supervisor and the file is a link or junction."""
++    sup_real = os.path.realpath(supervisor)
++    path = given if os.path.isabs(given) else os.path.join(os.getcwd(), given)
++    drive, tail = os.path.splitdrive(path)
++    parts = tail.replace("/", os.sep).replace("\\", os.sep).split(os.sep)
++    current = (drive + os.sep) if drive else os.sep
++    for part in parts:
++        if part == "" or part == ".":
++            continue
++        if part == "..":
++            parent = os.path.dirname(current.rstrip(os.sep))
++            if parent:
++                current = parent
++            continue
++        nxt = os.path.join(current, part)
++        if _reparse(nxt):
++            try:
++                parent_real = os.path.realpath(current)
++            except OSError:
++                parent_real = ""
++            if parent_real and _at_or_under(parent_real, sup_real):
++                return True
++        current = nxt
++    return False
++
++
++def _read_source(workspace, given):
++    if "\x00" in given:
++        return None, "the file is not under run/supervisor"
++    supervisor = os.path.join(workspace, "run", "supervisor")
++    if _through_link(supervisor, given):
++        return None, "the path reaches the file through a link"
++    try:
++        file_real = os.path.realpath(given)
++        sup_real = os.path.realpath(supervisor)
++        log_real = os.path.realpath(os.path.join(supervisor, "in-flight.md"))
++    except OSError:
++        return None, "the file cannot be read"
++    if not _at_or_under(file_real, sup_real) or _same(file_real, sup_real):
++        return None, "the file is not under run/supervisor"
++    if _same(file_real, log_real):
++        return None, "the file is the in-flight log"
++    if os.path.isdir(file_real):
++        return None, "the path is a folder"
++    if not os.path.isfile(file_real):
++        return None, "the file is missing"
++    try:
++        checked = os.lstat(file_real)
++    except OSError:
++        return None, "the file cannot be read"
++    flags = os.O_RDONLY
++    if hasattr(os, "O_BINARY"):
++        flags |= os.O_BINARY
++    if hasattr(os, "O_NOFOLLOW"):
++        flags |= os.O_NOFOLLOW
++    try:
++        fd = os.open(file_real, flags)
++    except OSError:
++        return None, "the file cannot be read"
++    try:
++        opened = os.fstat(fd)
++        if opened.st_dev and checked.st_dev and opened.st_dev != checked.st_dev:
++            return None, "the file is not the file checked"
++        if opened.st_ino and checked.st_ino and opened.st_ino != checked.st_ino:
++            return None, "the file is not the file checked"
++        if opened.st_nlink != 1:
++            return None, "the file is not the file checked"
++        data = b""
++        while len(data) <= FILE_LIMIT:
++            piece = os.read(fd, FILE_LIMIT + 1 - len(data))
++            if not piece:
++                break
++            data += piece
++    except OSError:
++        return None, "the file cannot be read"
++    finally:
++        os.close(fd)
++    if len(data) > FILE_LIMIT:
++        return None, "the file is larger than 65536 bytes"
++    try:
++        text = data.decode("utf-8-sig")
++    except UnicodeDecodeError:
++        return None, "the file is not utf-8"
++    return text, None
++
++
++def _pass_text(args):
++    name, reviewer = args.pass_name
++    if re.fullmatch(bridge_env.GRAMMAR_ID_PATTERN, name) is None:
++        return None, "the name is not an id"
++    if reviewer not in REVIEWERS:
++        return None, "the reviewer is outside the list"
++    if args.round is not None and (args.round < 1 or args.round > 999):
++        return None, "the round is outside 1 to 999"
++    if args.cause is not None and args.cause not in bridge_env.ROUND_CAUSES:
++        return None, "the cause is outside the round causes"
++    parts = ["PASS", name]
++    if args.round is not None:
++        parts.append("r%d" % args.round)
++    parts.append(reviewer)
++    if args.cause is not None:
++        parts.append(args.cause)
++    return " ".join(parts), None
++
++
++def prepare(args):
++    """(workspace, lines, error). error is set when nothing may be written."""
++    if args.round is not None or args.cause is not None:
++        if args.pass_name is None:
++            return None, None, "a round or a cause needs --pass"
++    sources = (args.text is not None, args.file is not None, args.pass_name is not None)
++    if sum(sources) == 0:
++        return None, None, "no text"
++    if sum(sources) > 1:
++        return None, None, "more than one source"
++    if args.file == "" and args.text is None and args.pass_name is None:
++        return None, None, "no text"
++    try:
++        cwd = os.getcwd()
++    except OSError:
++        return None, None, "no Workspace"
++    workspace = bridge_env.workspace_of(cwd)
++    if not workspace:
++        return None, None, "no Workspace"
++    if args.pass_name is not None:
++        text, err = _pass_text(args)
++        if err:
++            return None, None, err
++        return workspace, [stamp() + " " + text], None
++    if args.file:
++        raw, err = _read_source(workspace, args.file)
++        if err:
++            return None, None, err
++        rows = _file_lines(raw)
++        if rows and _first_word_is_pass(rows[0]):
++            return None, None, "a pass line needs --pass"
++        text, pauses = _text_and_pauses(raw, True)
++    else:
++        text, pauses = _text_and_pauses(args.text, False)
++    if _first_word_is_pass(text):
++        return None, None, "a pass line needs --pass"
++    if text == "":
++        return None, None, "no text"
++    if _forbidden(text):
++        return None, None, "a control character"
++    return workspace, [stamp() + " " + text] + pauses, None
++
++
++def _contended(exc):
++    if isinstance(exc, BlockingIOError):
++        return True
++    return exc.errno in (errno.EACCES, errno.EAGAIN, errno.EDEADLOCK)
++
++
++def _acquire(fd, seconds):
++    deadline = time.monotonic() + seconds
++    while True:
++        try:
++            if sys.platform == "win32":
++                import msvcrt
++                os.lseek(fd, 2 ** 31, os.SEEK_SET)
++                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
++            else:
++                import fcntl
++                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
++            return True
++        except OSError as exc:
++            if not _contended(exc):
++                raise
++            left = deadline - time.monotonic()
++            if left <= 0:
++                return False
++            time.sleep(min(0.05, left))
++
++
++def _release(fd):
++    try:
++        if sys.platform == "win32":
++            import msvcrt
++            os.lseek(fd, 2 ** 31, os.SEEK_SET)
++            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
++        else:
++            import fcntl
++            fcntl.flock(fd, fcntl.LOCK_UN)
++    except OSError:
++        pass
++
++
++def _log_blocked(path):
++    """A reason when run/, run/supervisor/ or the log is a link, or the real folder leaves the Workspace."""
++    supervisor = os.path.dirname(path)
++    run = os.path.dirname(supervisor)
++    workspace = os.path.dirname(run)
++    for item in (run, supervisor, path):
++        if _reparse(item):
++            return "the log path is a link"
++    try:
++        ws_real = os.path.realpath(workspace)
++        sup_real = os.path.realpath(supervisor)
++    except OSError:
++        return "the log cannot be written"
++    if not _at_or_under(sup_real, ws_real):
++        return "the log path leaves the Workspace"
++    return None
++
++
++def _write_all(fd, payload):
++    """None when every byte is written, else (written, total)."""
++    written = 0
++    total = len(payload)
++    while written < total:
++        try:
++            n = os.write(fd, payload[written:])
++        except OSError:
++            return written, total
++        if n == 0:
++            return written, total
++        written += n
++    return None
++
++
++def append_log(path, lines):
++    """Append every line of this run. None on success, (written, total) when the write stops short, else a reason."""
++    blocked = _log_blocked(path)
++    if blocked:
++        return blocked
++    payload = "".join(line + "\n" for line in lines).encode("utf-8")
++    folder = os.path.dirname(path)
++    held = False
++    fd = None
++    try:
++        os.makedirs(folder, exist_ok=True)
++        flags = os.O_RDWR | os.O_CREAT | os.O_APPEND | getattr(os, "O_BINARY", 0)
++        if hasattr(os, "O_NOFOLLOW"):
++            flags |= os.O_NOFOLLOW
++        fd = os.open(path, flags, 0o666)
++        if not _acquire(fd, LOCK_SECONDS):
++            return "the log was busy"
++        held = True
++        size = os.lseek(fd, 0, os.SEEK_END)
++        if size:
++            os.lseek(fd, size - 1, os.SEEK_SET)
++            if os.read(fd, 1) != b"\n":
++                payload = b"\n" + payload
++        opened = os.fstat(fd)
++        if opened.st_nlink != 1:
++            return "the log has more than one link"
++        blocked = _log_blocked(path)
++        if blocked:
++            return blocked
++        short = _write_all(fd, payload)
++        if short is not None:
++            return short
++        return None
++    except OSError:
++        return "the log cannot be written"
++    finally:
++        if held and fd is not None:
++            _release(fd)
++        if fd is not None:
++            os.close(fd)
++
++
++def build_parser():
++    parser = FlightParser(
++        prog="in-flight.py",
++        description="Append one clock-stamped line to the Workspace in-flight log.")
++    parser.add_argument("text", nargs="?", help="the line's text, one argument")
++    parser.add_argument("--file", help="a file under run/supervisor/ whose lines become the text")
++    parser.add_argument("--pass", nargs=2, metavar=("NAME", "REVIEWER"), dest="pass_name",
++                        help="record a review pass of NAME by REVIEWER")
++    parser.add_argument("--round", type=int, help="the pass round, a whole number from 1 to 999")
++    parser.add_argument("--cause", help="the round cause, one word")
++    return parser
++
++
++def main():
++    try:
++        workspace, lines, err = prepare(build_parser().parse_args())
++        if err:
++            return refuse(err)
++        err = append_log(os.path.join(workspace, LOG_NAME), lines)
++        if isinstance(err, tuple):
++            return incomplete(err[0], err[1])
++        if err:
++            return refuse(err)
++        for line in lines:
++            say(line)
++        return 0
++    except SystemExit:
++        raise
++    except Exception:
++        return refuse("internal error")
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/bridge/cursor-bridge/loop-guard.py b/bridge/cursor-bridge/loop-guard.py
+index 050a9ff..6f7c845 100644
+--- a/bridge/cursor-bridge/loop-guard.py
++++ b/bridge/cursor-bridge/loop-guard.py
+@@ -198,6 +198,17 @@ def field(text, name):
+     return m.group(1).strip().strip("*_`").strip()
+ 
+ 
++def last_field(text, name):
++    """The last value of a `Name: value` line. field's pattern, except the white space after the colon and around the value is spaces and tabs only, so it cannot cross a line break."""
++    pat = r"^\s*(?:[-*]\s+)?[*_`]*%s[*_`]*\s*:[*_`]*[ \t]*(.*?)[ \t]*$" % re.escape(name)
++    found = None
++    for m in re.finditer(pat, text, re.M | re.I):
++        found = m
++    if not found:
++        return None
++    return found.group(1).strip().strip("*_`").strip()
++
++
+ def parse_ts(s):
+     """ISO 8601 (with or without Z), or epoch seconds or milliseconds, as a unix time; None otherwise.
+     (reAngle, 2026-10-10: every task's start read as 'now' because the hook's form was not the one expected.)"""
+@@ -270,15 +281,16 @@ def names_a_wait(value):
+ 
+ 
+ def paused_in_flight(cwd):
+-    """The `Paused:` line of run/supervisor/in-flight.md beside the status file, when it names a
++    """The last `Paused:` line of run/supervisor/in-flight.md beside the status file, when it names a
+     wait (2026.10.25a, FB-027): the untracked working file records a pause, so no tracked file is
+-    edited for it. None otherwise, or when the file is missing or unreadable."""
++    edited for it. None otherwise, or when the file is missing or unreadable. A later line replaces
++    an earlier one. A stamped line is not a `Paused:` line."""
+     ws = workspace_of(cwd)
+     if not ws:
+         return None
+     try:
+         with open(os.path.join(ws, "run", "supervisor", "in-flight.md"), encoding="utf-8-sig", errors="replace") as f:
+-            value = field(f.read(), "Paused")
++            value = last_field(f.read(), "Paused")
+     except OSError:
+         return None
+     if value is None or not names_a_wait(value):
+@@ -635,7 +647,7 @@ def main():
+     listed, unscheduled = pending_from_hook(data, time.time(), cwd)
+     tp = data.get("transcript_path")
+     if unscheduled:                                        # before anything else: a later wake-up does not bound the agent
+-        sys.stderr.write("Loop guard (Claude-Cursor Bridge, rule 43): you are waiting on a background agent with no timer running to its ceiling: %s. The computer's clock reads %s now. A scheduled wake-up (CronCreate) does not fire while a background agent runs, so the bound is a wake-timer command started in the background, whose completion wakes you (KP-043). A hung agent never completes and nothing else would wake you (plan 10.1, case 5). Before ending the turn, write it on the status file's `In flight:` line and start the timer with the command above (run in the background); when the timer ends, stop an agent still running with TaskStop and run its task again in the foreground.%s%s" % (", ".join(unscheduled), local_clock(time.time()), (" Leftover polling loop(s) %s never end and never count: stop them with TaskStop." % ", ".join(WAITERS)) if WAITERS else "", chr(10)))
++        sys.stderr.write("Loop guard (Claude-Cursor Bridge, rule 43): you are waiting on a background agent with no timer running to its ceiling: %s. The computer's clock reads %s now. A scheduled wake-up (CronCreate) does not fire while a background agent runs, so the bound is a wake-timer command started in the background, whose completion wakes you (KP-043). A hung agent never completes and nothing else would wake you (plan 10.1, case 5). Before ending the turn, append it to run/supervisor/in-flight.md with python ~/.claude/cursor-bridge/in-flight.py and start the timer with the command above (run in the background); when the timer ends, stop an agent still running with TaskStop and run its task again in the foreground.%s%s" % (", ".join(unscheduled), local_clock(time.time()), (" Leftover polling loop(s) %s never end and never count: stop them with TaskStop." % ", ".join(WAITERS)) if WAITERS else "", chr(10)))
+         sys.exit(2)
+     if listed:
+         allow()
+diff --git a/bridge/cursor-bridge/pace-report.py b/bridge/cursor-bridge/pace-report.py
+index 1a96aea..1e6cd6d 100644
+--- a/bridge/cursor-bridge/pace-report.py
++++ b/bridge/cursor-bridge/pace-report.py
+@@ -428,7 +428,7 @@ def _lift_map(ws, common, id_part):
+     return lifts
+ 
+ 
+-ROUND_CAUSES = ("defect", "security", "fix-induced", "no external path", "records", "builder incomplete", "brief error", "unstated")
++ROUND_CAUSES = bridge_env.ROUND_CAUSES + ("unstated",)
+ 
+ 
+ def _builder_rounds(ws, weeks):
+diff --git a/bridge/cursor-bridge/settings.bridge.json b/bridge/cursor-bridge/settings.bridge.json
+index 988f634..e2395af 100644
+--- a/bridge/cursor-bridge/settings.bridge.json
++++ b/bridge/cursor-bridge/settings.bridge.json
+@@ -71,6 +71,7 @@
+       "Bash(python ~/.claude/cursor-bridge/records-check.py:*)",
+       "Bash(python ~/.claude/cursor-bridge/records-migrate.py:*)",
+       "Bash(python ~/.claude/cursor-bridge/push-scan.py:*)",
++      "Bash(python ~/.claude/cursor-bridge/in-flight.py:*)",
+       "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File ~/.claude/cursor-bridge/installer-check.ps1:*)"
+     ],
+     "deny": [
+diff --git a/docs/BUILDER_NOTES.md b/docs/BUILDER_NOTES.md
+index 678c5a8..64bbd65 100644
+--- a/docs/BUILDER_NOTES.md
++++ b/docs/BUILDER_NOTES.md
+@@ -96,3 +96,9 @@
+ 2026-11-19 REFAC-008: `git grep -n -w -e app_id_of -e suite_id -e is_int_id` matches the committed brief in handoff/REFAC-008.md, and `git grep` of `_check_app` also matches tests/test_loop_guard.py's `test_the_run_sheet_check_applies_in_every_phase_and_blocks_the_stop` because that name contains the substring `_check_app`; the helpers themselves are only in the three programs.
+ 
+ 2026-11-19 REFAC-009: `git grep -n -w -e reply_bits -e rule_contexts` matches only the committed brief in handoff/REFAC-009.md; the two names are unused in bridge, tools, tests and docs, so the move continued.
++
++2026-11-21 TASK-068: on Windows `msvcrt.locking` locks a byte range from the current file position, so a handle already at the end of an append does not exclude another append; `in-flight.py` seeks to offset 0 before `LK_NBLCK` and unlocks that same byte.
++
++2026-11-21 TASK-068-r2: `paused_in_flight` keeps the first `Paused:` line for the life of an append-only log, so a later `Paused: resumed` never lifts it; the guard has to read the last match of `field`'s pattern. The append also has to set `O_BINARY`, or Windows turns each LF into CR LF.
++
++2026-11-21 TASK-068-r3: since round 2, the Windows lock sits on the byte at `2**31`, not byte 0 as round 1's line says.
+diff --git a/docs/CLI_REFERENCE.md b/docs/CLI_REFERENCE.md
+index b4202ea..ac502e9 100644
+--- a/docs/CLI_REFERENCE.md
++++ b/docs/CLI_REFERENCE.md
+@@ -448,6 +448,26 @@ evaluate-reports: the report cycle's program (restructuring plan, section 12; re
+ - `--out`; default: null; required: false
+ - `--since`; default: null; required: false; a date; default the ledger's last extract, else the newest evaluation folder
+ 
++## in-flight.py
++
++Path: `bridge/cursor-bridge/in-flight.py`
++
++```
++Append one clock-stamped line to the Workspace in-flight log.
++```
++
++### Positionals
++
++- `text`; default: null; required: false; the line's text, one argument
++
++### Options
++
++- `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
++- `--file`; default: null; required: false; a file under run/supervisor/ whose lines become the text
++- `--pass`; default: null; required: false; record a review pass of NAME by REVIEWER
++- `--round`; default: null; required: false; the pass round, a whole number from 1 to 999
++- `--cause`; default: null; required: false; the round cause, one word
++
+ ## inventory-check.py
+ 
+ Path: `bridge/cursor-bridge/inventory-check.py`
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 0845d0b..b33fcff 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -2311,3 +2311,17 @@ The records pull request of stage P2's close took the full gate (built rows R-08
+ - REQUIREMENTS, R-080: the row names run kinds ("other than a builder or review run"); the code keeps a `CURSOR_` name by whether the command is a bare cursor-agent (`is_agent`), not by the kind. In ordinary use the two agree, builder and review runs being cursor-agent runs (the review kind refuses any other command).
+ 
+ Each is fixed by the next increment that edits its record.
++
++### Stage P3
++
++### TASK-068: the in-flight program (2026-11-20 to 2026-11-21, three builder rounds)
++- **The increment.** R-088's program (C15, J3): `in-flight.py` appends the clock-stamped line, from a text, a file under run/supervisor/ or a review pass's tagged line; the round causes moved to `bridge_env.ROUND_CAUSES`, read by the launcher, the pace report (which adds `unstated`) and the program; the loop guard's refusal names the log and the program; its allow entry pinned; the command reference and the manifest regenerated. The supervisor's acceptance tests, tests/test_program_in_flight.py, and D-002's `dump_cli` edge were committed first (48bcfa6), red on the checkpoint 618292e: "36 failed, 1 skipped" (run/agent/TASK-068-checkpoint.out). The row stays planned: the three texts and KP-041's retirement are TASK-078's, the plan's rule for a row with a program and a sentence.
++- **Round 1.** Review A rejected: the log was opened without `O_BINARY`, so Windows wrote CR LF (behaviour); the loop guard's `field` read the first `Paused:` line, so an append-only log could never lift a pause and the guard would let the supervisor stop with nothing to wake it (a defeated safety mechanism, convergent with the security audit and the packager's warning). Should fix: `--file ""` with a text accepted; a POSIX path through `L/..` checked by its real path and opened by its own. Tests stripped over seven files: "544 passed, 21 skipped".
++- **The decision (the supervisor's, told to the owner in this chat, rule 58).** The loop guard reads the log's last `Paused:` line (a new helper, `last_field`), where the plan kept the guard's decision unchanged: in an append-only log the first pause would stand for ever.
++- **Round 2.** Nine corrections (handoff/TASK-068-r2.md) and the supervisor's five new cases (LF only; a later `Paused:` lifts or replaces an earlier one; an empty `--file` with a text refused; a text beginning PASS refused; run/ or run/supervisor/ as a junction refused). Tests: "553 passed, 21 skipped". Review A approved; the security audit rejected: `last_field` kept `field`'s white space after the colon, which crosses a line break, so an empty `Paused:` line took the next line as its value and a later ordinary line read as a pause (a defeated safety mechanism, convergent with a note of Review A's); a log that is a hard link to a file outside the Workspace was appended to (security, convergent).
++- **Round 3 (the review ceiling's round).** Four corrections (handoff/TASK-068-r3.md): spaces and tabs only after the colon and around the value; the log opened with `O_NOFOLLOW` where the platform has it, refused unless `fstat` shows one link, the folder checks run again after the open; `--file` compared with an `lstat` taken before the open; one notes line on the lock's byte. The supervisor's three cases on round 2's work: "2 failed, 1 passed". Tests stripped over eight files: "566 passed, 22 skipped" (run/agent/TASK-068-r3-tests.out). Review A approved; the security audit passed, both round-2 findings closed, the hard-link case running on this account. The builder's hand mutations: H1 (the old white space) and H2 (no link count) each failed a test; H3 (the comparison against `os.stat` after the open) left the acceptance file green and the report files it as not run (both reviewers).
++- **The builder's assumptions, dispositioned.** Round 1: the lock on Linux and the symbolic-link case run in CI's ubuntu job; a junction at the log, probed (run/supervisor/task068_probe.py): refused, the log unchanged; a log with no final line break, probed: the break added; Zs spaces read as spaces, accepted (lead 6); an empty log left by a lock timeout, accepted (lead 4). Round 2: the Linux arms, CI; the short write, read in review; the folder check before Python 3.12, accepted (lead 2); a reader while the lock is held and the timeout, probed (run/supervisor/task068_lockprobe.py): the reader reads, a second run exits 2 after 10.1 seconds with nothing appended. Round 3: `O_NOFOLLOW` on Linux, CI; the report says this Windows host has it, and it has not (Python 3.12.10, Review A), so on Windows a link at the log is refused by the folder checks' reparse test alone; the `lstat` against `fstat` swap and a link appearing during the lock wait, races this host cannot stage, leads 1 and 3.
++- **Leads, recorded, not fixed.** (1) The second folder check after the open reads the path, not the open handle: a folder swapped and swapped back between the first check and the open passes (security audit, round 3; a concurrent swap by a process of the owner's account); comparing `fstat` with an `lstat` taken at the re-check would close it. (2) The reparse test asks `os.path.isjunction` where Python has it (3.12 and later), which names junctions only, so another reparse point is not refused there (security audit, round 2). (3) `O_CREAT` precedes the re-check, so a folder link appearing during the lock wait can leave an empty file created outside before the refusal (the supervisor's reading of round 3). (4) A lock error after the open leaves an empty log the run created (security audit, round 2; round 1's assumption). (5) A text whose first word is a variant of PASS (`**PASS**`, `PASS:`) is not refused, and a reader of pass lines that strips emphasis would take it (security audit, round 2). (6) Unicode space separators (Zs) count as spaces: a line of them is dropped as blank and they are trimmed at either end of a text, with no test of either (round 1's assumption). (7) The loop guard reads `**Paused:**` and `- Paused:` forms that the program never writes as a lift, and `last_field`'s white space before the name, after a bullet and before the colon still crosses a line break, so a hand-edited `Paused` followed by a line beginning with a colon reads as a pause (both reviewers, rounds 2 and 3; the program stamps every line it writes). (8) Correction 3 has no test telling it from round 2's code: a `--file` case on an account that can create a symbolic link, or a file swapped between the check and the open, would settle it (both reviewers, round 3). (9) argparse's own messages echo the words given; the splitter of a file's text is hand-written; `bridge_env.workspace_of` finds the nearest folder holding docs/PROJECT_STATUS.md where the loop guard reads `<root>/Workspace`, so the two can disagree in a worktree (Review A, round 1). (10) The builder's report quotes H1's and H2's counts without the narrowed commands that produced them, and its `Assumed, not verified` list keeps the middle-dot separators of its form (Review A, round 3; records).
++- **The CI watch's `--repo` (stage P2's least confident 2, found at FIX-006's pull request).** The launcher's wait reads any `-R` or `--repo` as another repository, the checkout's own included, so a watch given `--repo` starts without the wait; at PR 184 the watch was given it and the check was not exercised. At this pull request the watch runs from the repository's launcher without `--repo`. Lead: compare the named repository with the checkout's `origin` before skipping the wait.
++- **CI's first run (PR #185).** ubuntu: "3 failed, 7062 passed, 66 skipped"; windows and the security floor passed. The three failures were the supervisor's link cases (round 2's two, round 3's inside link), whose `finally` removed the link with `os.rmdir`: on Windows the helper makes a junction, which `os.rmdir` removes, but on Linux it makes a symbolic link, and `os.rmdir` refuses one (`NotADirectoryError`). Each case's assertions had held, the program refusing on Linux too; only the clean-up failed. Fixed in the test by a helper that unlinks a symbolic link and removes a junction as a folder; Review B's note (an extra blank line at the file's end) taken with it. Lesson: a test that makes a junction or a link by platform removes it by what it made.
++- **Working practice.** run/supervisor/append_inflight.py, the supervisor's stand-in writer, takes no lock; from this merge the loop writes its in-flight lines with `in-flight.py`.
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index f8960da..8c68c7e 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -81,6 +81,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | The permission guard's flat reading and merge refusal | the guard reads a Bash or PowerShell command as the shell does under a flat grammar: a `$`, a backtick or a process substitution outside single quotes, a quote it cannot close and every word it cannot read for certain are refused as unreadable; a refused action is refused under any quoting, chain, wrapper, prefix, assignment, `eval`, here-document, alias or launcher it reads, and the seven git subcommands are held to `--no-verify` by position, git's global options read from a known list and abbreviations counted; `gh pr merge` passes only with `--match-head-commit`, the pull request's number, the premerge record of the head and the ready record of `<pr>-<head>` (a merge without it refused naming `review-guard.py ready <n>`); a `gh api` word holding `pulls` and `merge` after percent-decoding, and a body read from a file or standard input, are refused whatever the method; its threat model is INVENTORY's row of 2026-11-16 | bridge/cursor-bridge/permission-guard.py | tests/test_program_permission_guard.py; tests/test_bug045.py; tests/test_bug046.py; tests/test_permission_guard.py; tests/test_permission_guard_a4.py; tests/test_program_ready.py | the program release, stage P2 (TASK-063, BUG-045, TASK-083, BUG-046) |
+ | The invisible-character check by category | `invisible-check.py` lists every line holding a character of Unicode category Cc, Cf, Zl or Zp, or Zs other than U+0020, tab, line feed and carriage return allowed anywhere and U+FEFF only as a file's first character, naming each by its code point (and its Unicode name where it has one); options, files read, exits and the `--non-ascii` listing as before; the repository's tracked files swept to pass it | bridge/cursor-bridge/invisible-check.py | tests/test_program_invisible.py; tests/test_invisible_check.py | the program release, stage P2 (TASK-066) |
+ | The pre-push scan | `push-scan.py [<base>]` reads every commit between the base (default origin's HEAD branch) and HEAD, never the base itself: the message, the author and committer lines, each added or renamed file's name and each added line, in two readings of a file where its content marks it, for a path of this computer (a drive and a segment, a Users or home folder and a segment, the application-data segment beside a slash; an angle-bracket segment a placeholder) and an account name as a whole word under caseless compatibility matching (from the profile folder, the login and the per-computer names file, never the command line); each hit printed as `HIT <commit> <place> <kind>` with its place (`message`, `author`, `committer`, `file #k`, `line <path>:<n>` or `line #k:<n>`) and never its value; exit 0 clean, 1 a hit, 2 the range, git or the names file unreadable; its allow entry in settings.bridge.json | bridge/cursor-bridge/push-scan.py; .../settings.bridge.json | tests/test_program_push_scan.py; tests/test_release_t_merge.py | the program release, stage P2 (TASK-067) |
++| The in-flight program | `in-flight.py <text>` or `in-flight.py --file <path>` appends one line, `<UTC time to the minute, with Z> <text>`, to run/supervisor/in-flight.md of the Workspace the current folder belongs to (the nearest folder holding docs/PROJECT_STATUS.md), creating the folder and the file, with LF line ends, under a lock it waits at most 10 seconds for (on Windows the byte at 2**31, so a reader still reads), and prints it; `--file` takes a file under that Workspace's run/supervisor/, read through no link, at most 65,536 bytes, its line breaks made spaces but a `Paused:` line kept as a line of its own; `--pass <name> <reviewer> [--round <n>] [--cause <cause>]` writes `<time> PASS <name> r<n> <reviewer> <cause>`, the reviewers seven, the causes `bridge_env.ROUND_CAUSES`, the one list the launcher and the pace report read; a text whose first word is PASS, a control or format character, both sources or none, a word outside a list, a log or a folder of it reached through a link, and a log with more than one link are refused, `in-flight: REFUSED - <reason>`, exit 2, nothing written; a short write prints `INCOMPLETE`, exit 1; the loop guard reads the log's last `Paused:` line, an empty one lifting the pause, and its refusal names the log and this program; its allow entry in settings.bridge.json | bridge/cursor-bridge/in-flight.py; .../loop-guard.py; .../bridge_env.py; .../bridge-run.py; .../pace-report.py; .../settings.bridge.json | tests/test_program_in_flight.py; tests/test_loop_guard.py (test_r088_); tests/test_allowlist.py; tests/test_dump_cli.py | the program release, stage P3 (TASK-068); its texts TASK-078 |
+ 
+ ## Resources
+ | Name | Kind | Where it lives | Used by | Provided |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 38d5eb5..3f35530 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -12,12 +12,12 @@ stage: "the program release's stage P2 closed 2026-11-19, stage P1 2026-11-14 (H
+ open_issues: ["ISS-037 worked around (Review B's provider stopped a review of the guards as security activity; one re-run with context approved)", "ISS-001 recurred, counter 2 (a review log named apart from its snapshot)", "ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on)", "ISS-024 recurred, counter 3", "ISS-036 recurred, counter 3 (fixed each time; stage P1)", "ISS-013 mitigated (the plan check's rule, TASK-033, installed)", "Every other issue fixed or closed: the Issues file in Documents/, and docs/archive/STATUS_HISTORY.md"]
+ ---
+ # Project Status
+-Last updated: 2026-11-19
++Last updated: 2026-11-21
+ Phase: changing
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable, External services
+ Change cycle: the program release (begun 2026-11-13, the owner's word in this chat; its intake's read-back confirmed by the owner 2026-11-13; the field finding F7 added to it by the owner 2026-11-13; its design revision and plan addendum, one subject, `program`, approved by the owner at the design gate 2026-11-13, seven decisions in the question form, the trait External services approved and the carry comparison kept a recorded lead; its scoped revision for F7, one subject with its plan revision, `program-f7`, approved by the owner at its gate 2026-11-14, five decisions in the question form; step: the loop, stage P2 closed 2026-11-19 (twelve increments, its refactoring pass, its review approved by both, its demonstration live), stage P3 next from TASK-068, on Opus 5.5; the owner placed one more item into it 2026-11-14, the diagram design-decision Feedback entry, planned at the next plan revision (INVENTORY, Decisions)); before it release B2, begun 2026-11-04, complete 2026-11-11 (Claude-Cursor Bridge 2026.11.11a)
+ Awaiting user on: nothing
+-Next: stage P3 from TASK-068 (stage P2's least-confident item 3 settled by FIX-006's test; its `git --version` floor on the install's machines and CI's images is the install's, stage P4); at stage P3's first pull request the CI watch run from the repository's launcher (least confident 2); when TASK-078 is packaged its Scope notes take KP-051's Correction, run-parameters.md's `supervisor` gloss and step 8's and the sentinel's reading of a push-scan hit at its place (HARDENING, Stage P2's demonstration); the next plan revision also places the owner's two rules of 2026-11-15, and release G's widening waits for G's planning (both INVENTORY, Decisions); the plan revision that places the owner's diagram design-decision item (2026-11-14) into a later stage, a records pull request of its own; stage P1 (TASK-055 to TASK-058, REFAC-007) closed 2026-11-14, then P2 to P4 (docs/BUILD_PLAN.md, The program release — the plan addendum; docs/DESIGN.md, Change: the program release); each brief names its calls' time and retry limits (the trait External services); the release ends with the owner's install from a run sheet, Context7's setup a step of it. The order after it (INVENTORY, Decisions): the prototype meta workflow (the owner, 2026-11-20; its design on the owner's word), the progress graph, W, G, F, then C, which waits for the TDP's code-map command, D, the trial of the code map, and E last (the owner, 2026-11-15). reAngle and the video factory calibrate when the owner resumes them (R-031, R-037), the TDP in its own session; release T's field items on the TDP (the first stripped suite at its TASK-172; the weekly workflow, rewritten from the frozen block, v7.0.1 since 2026.11.12a, at its next configuration touch) stand in HARDENING, Correction to project end. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++Next: stage P3 from TASK-069 (TASK-068's in-flight program merged, its row R-088 planned until TASK-078's texts; the loop writes its in-flight lines with `in-flight.py`; stage P2's least-confident item 3's `git --version` floor on the install's machines and CI's images is the install's, stage P4); the CI watch from the repository's launcher ran at TASK-068's pull request without `--repo` (least confident 2), its reading recorded with TASK-069's records (HARDENING, TASK-068); when TASK-078 is packaged its Scope notes take KP-051's Correction, run-parameters.md's `supervisor` gloss and step 8's and the sentinel's reading of a push-scan hit at its place (HARDENING, Stage P2's demonstration); the next plan revision also places the owner's two rules of 2026-11-15, and release G's widening waits for G's planning (both INVENTORY, Decisions); the plan revision that places the owner's diagram design-decision item (2026-11-14) into a later stage, a records pull request of its own; stage P1 (TASK-055 to TASK-058, REFAC-007) closed 2026-11-14, then P2 to P4 (docs/BUILD_PLAN.md, The program release — the plan addendum; docs/DESIGN.md, Change: the program release); each brief names its calls' time and retry limits (the trait External services); the release ends with the owner's install from a run sheet, Context7's setup a step of it. The order after it (INVENTORY, Decisions): the prototype meta workflow (the owner, 2026-11-20; its design on the owner's word), the progress graph, W, G, F, then C, which waits for the TDP's code-map command, D, the trial of the code map, and E last (the owner, 2026-11-15). reAngle and the video factory calibrate when the owner resumes them (R-031, R-037), the TDP in its own session; release T's field items on the TDP (the first stripped suite at its TASK-172; the weekly workflow, rewritten from the frozen block, v7.0.1 since 2026.11.12a, at its next configuration touch) stand in HARDENING, Correction to project end. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
+ Deviations accepted: none; told to the owner (rule 58): stage P2's demonstration line expected push-scan to exit 0 on the stage's own commits, which hold 18 generic drive paths R-087 counts (exit 1; drawn, the texts' reading in TASK-078; HARDENING, Stage P2's demonstration); stage H2's refactoring pass recorded its twelve candidates as next-release leads, nothing merged after the stamp (HARDENING, stage H2's close); TASK-054's viewer check made on GitHub only, Typora not opened (HARDENING, TASK-054); TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions); stage T2's demonstration ran after the install, where the plan says before (HARDENING, Stage T2's demonstration)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -26,7 +26,7 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/working-files.md lists this project's local working files under run/supervisor/ (gitignored), in-flight.md first, the scratch log a resume reads before anything else.
+ Delegated gates: none
+-Remote sync: main at the merge of this pull request, FIX-006's, in sync with origin/main at that merge; local main is fast-forwarded after every merge
++Remote sync: main at the merge of this pull request, TASK-068's, in sync with origin/main at that merge; local main is fast-forwarded after every merge
+ Stage: the program release's stage P2 closed 2026-11-19, stage P1 2026-11-14 (HARDENING, The program release, Stage P1 and Stage P2); release B2 complete 2026-11-11 (its stages H1 and H2 and its project end; HARDENING, Project end of release B2); release T's T1 closed 2026-11-02, T2 2026-11-04, its project end 2026-11-04; release B's stages and project end: docs/archive/STATUS_HISTORY.md. Last reflection: stage P2's close, 2026-11-19 (its review approved by both, Review B on its one permitted re-run after its provider's safety refusal; demonstration live on main c4a3763, 43 of 44 checks, push-scan's exit on the stage's own commits the one item drawn; conformance 25 OK, 0 MISSING, 5 NOTE; ISS-001 recurred, counter 2; ISS-037 opened; ISS-031 closed; Feedback FB-109 to FB-117; Project Summary and User Manual patched); before it the design gate of the scoped revision program-f7, 2026-11-14 (conformance 25 OK, 0 MISSING, 5 NOTE; Feedback FB-107, FB-108); stage P1's close, 2026-11-14 (22 of 22 checks; Feedback FB-102 to FB-106)
+ Deferred increments: none; TASK-027's calibrations of reAngle and the video factory deferred by the owner on 2026-10-31 until they resume (INVENTORY, Deferred)
+ Open issues: ISS-037 worked around (Review B's provider stopped a review of the guards as security activity; one re-run with context approved). ISS-001 recurred, counter 2 (a review log named apart from its snapshot). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-024 recurred, counter 3. ISS-036 recurred, counter 3 (fixed each time; stage P1). ISS-013 mitigated (the plan check's rule, TASK-033, installed). Every other issue fixed or closed: the Issues file in Documents/, and docs/archive/STATUS_HISTORY.md
+diff --git a/docs/cli-reference.json b/docs/cli-reference.json
+index 6a2cc4c..f204e41 100644
+--- a/docs/cli-reference.json
++++ b/docs/cli-reference.json
+@@ -578,6 +578,88 @@
+         }
+       ]
+     },
++    {
++      "description": "Append one clock-stamped line to the Workspace in-flight log.",
++      "name": "in-flight.py",
++      "options": [
++        {
++          "choices": null,
++          "default": "==SUPPRESS==",
++          "dest": "help",
++          "help": "show this help message and exit",
++          "nargs": 0,
++          "option_strings": [
++            "-h",
++            "--help"
++          ],
++          "required": false,
++          "type": null
++        },
++        {
++          "choices": null,
++          "default": null,
++          "dest": "file",
++          "help": "a file under run/supervisor/ whose lines become the text",
++          "nargs": null,
++          "option_strings": [
++            "--file"
++          ],
++          "required": false,
++          "type": null
++        },
++        {
++          "choices": null,
++          "default": null,
++          "dest": "pass_name",
++          "help": "record a review pass of NAME by REVIEWER",
++          "nargs": 2,
++          "option_strings": [
++            "--pass"
++          ],
++          "required": false,
++          "type": null
++        },
++        {
++          "choices": null,
++          "default": null,
++          "dest": "round",
++          "help": "the pass round, a whole number from 1 to 999",
++          "nargs": null,
++          "option_strings": [
++            "--round"
++          ],
++          "required": false,
++          "type": "int"
++        },
++        {
++          "choices": null,
++          "default": null,
++          "dest": "cause",
++          "help": "the round cause, one word",
++          "nargs": null,
++          "option_strings": [
++            "--cause"
++          ],
++          "required": false,
++          "type": null
++        }
++      ],
++      "path": "bridge/cursor-bridge/in-flight.py",
++      "positionals": [
++        {
++          "choices": null,
++          "default": null,
++          "dest": "text",
++          "help": "the line's text, one argument",
++          "nargs": "?",
++          "option_strings": [],
++          "required": false,
++          "type": null
++        }
++      ],
++      "source": "argparse",
++      "subcommands": []
++    },
+     {
+       "description": "Check the project's current-state record.",
+       "name": "inventory-check.py",
+diff --git a/docs/diagrams/D-002-components.md b/docs/diagrams/D-002-components.md
+index 93d0f5a..1ea5924 100644
+--- a/docs/diagrams/D-002-components.md
++++ b/docs/diagrams/D-002-components.md
+@@ -17,7 +17,7 @@ Notes:
+   - `inventory_check` loads `workflow_check` (`escape_field`);
+   - `session_start` loads `workflow_check` (`load_checker_module`: `slash`, `is_link`, `read_utf8`, `load_tables`);
+   - `pace_report` loads `evaluate_reports` (`_load_evaluate_reports`, the project keys);
+-  - `dump_cli` loads each program of `bridge/cursor-bridge/` that has a `__main__` block and a top-level `build_parser`, to read its parser. As of the code that is 14: `completion_check`, `diagram_check`, `inventory_check`, `mutation_run`, `plan_check`, `push_scan`, `records_check`, `records_migrate`, `stage_diff`, `sync_check`, `trace_check`, `workflow_check` in `sg_shell`, and `evaluate_reports`, `pace_report` in `sg_maintainer`. It reads every other program's docstring with `ast` and does not load it. The selection is made at run time; each of the fourteen is drawn as its own edge. A further program gaining a `build_parser` changes no `import` and no `spec_from_file_location` call, so the enforcement of these edges is a test: `tests/test_dump_cli.py`, naming D-002, asserts that the programs `dump-cli.py` loads (computed as the tool computes them) equal this diagram's `dump_cli` edges read from this file (the addendum's test increment, R-055). The program release's two new programs each have a top-level `build_parser`, and each edge from `dump_cli` is drawn by the increment that adds the program, by the supervisor's commit on that increment's branch, which also moves the count, as TASK-051 drew the edge to `records_migrate`: `dump_cli -.-> push_scan` by TASK-067; `in_flight` is not yet written and is not among the fourteen, its edge TASK-068's.
++  - `dump_cli` loads each program of `bridge/cursor-bridge/` that has a `__main__` block and a top-level `build_parser`, to read its parser. As of the code that is 15: `completion_check`, `diagram_check`, `in_flight`, `inventory_check`, `mutation_run`, `plan_check`, `push_scan`, `records_check`, `records_migrate`, `stage_diff`, `sync_check`, `trace_check`, `workflow_check` in `sg_shell`, and `evaluate_reports`, `pace_report` in `sg_maintainer`. It reads every other program's docstring with `ast` and does not load it. The selection is made at run time; each of the fifteen is drawn as its own edge. A further program gaining a `build_parser` changes no `import` and no `spec_from_file_location` call, so the enforcement of these edges is a test: `tests/test_dump_cli.py`, naming D-002, asserts that the programs `dump-cli.py` loads (computed as the tool computes them) equal this diagram's `dump_cli` edges read from this file (the addendum's test increment, R-055). The program release's two new programs each have a top-level `build_parser`, and each edge from `dump_cli` is drawn by the increment that adds the program, by the supervisor's commit on that increment's branch, which also moves the count, as TASK-051 drew the edge to `records_migrate`: `dump_cli -.-> push_scan` by TASK-067 and `dump_cli -.-> in_flight` by TASK-068.
+ - **`dump_cli` and `records_migrate`:** `records-migrate.py` has a `build_parser`, so `dump_cli` loads it. The edge `dump_cli -.-> records_migrate` is drawn by TASK-051, the increment that added `records-migrate.py`: `tests/test_dump_cli.py` compares the `dump_cli` edges with the code as it stands, so the edge came with the program, by the supervisor's own commit on that increment's branch, since a diagram is a record and outside the builder's brief (`scope-check.py`'s RECORDS rule). The fallback readers of the records' prose live in `bridge_env` too (docs/DESIGN.md, "The fallback readers, one copy each"), so `records_migrate` reads prose through the one edge drawn here.
+ - **Not edges:** `mutation_run` contains `import` lines inside the source strings of the pytest plugins it generates (`OUTCOMES_PLUGIN_CODE`, `write_resolution_plugin`). These are text that mutation-run writes to a file, not imports of its own. `make_manifest` and `compaction_baseline` import nothing of the project.
+ - **Grouping:** `shell_guard` is Cursor's `beforeShellExecution` hook, copied to a project's `.cursor/hooks/shell-guard.py`; `settings.bridge.json` has no entry for it. Only the maintainer's command starts `pace_report` (`evaluate-reports.md`, step 3). `windowless_check` is started by the supervisor's shell (an allow rule in `settings.bridge.json`) and by a project's pre-commit gate from its copy. `records_migrate` is started by the supervisor's shell (the calibration's step 4 and the addendum's migration increment). `project_cursor_hooks` is this project's installed copies of the Cursor hooks (`boundary-check.py`, `run-hidden.py`, `windowless-check.py`). It has no edges. It is marked external in the block because `check:components` does not read `.cursor/`, so no file can mark it built.
+@@ -168,6 +168,7 @@ flowchart LR
+     pace_report -.-> evaluate_reports
+     dump_cli -.-> completion_check
+     dump_cli -.-> diagram_check
++    dump_cli -.-> in_flight
+     dump_cli -.-> inventory_check
+     dump_cli -.-> mutation_run
+     dump_cli -.-> plan_check
+diff --git a/handoff/TASK-068-r1-report.md b/handoff/TASK-068-r1-report.md
+new file mode 100644
+index 0000000..6f0d95b
+--- /dev/null
++++ b/handoff/TASK-068-r1-report.md
+@@ -0,0 +1,177 @@
++# TASK-068 round 1 report
++
++## Files changed
++
++- `bridge/cursor-bridge/in-flight.py` (new)
++- `bridge/cursor-bridge/bridge_env.py`
++- `bridge/cursor-bridge/bridge-run.py`
++- `bridge/cursor-bridge/pace-report.py`
++- `bridge/cursor-bridge/loop-guard.py`
++- `bridge/cursor-bridge/settings.bridge.json`
++- `bridge/cursor-bridge/MANIFEST.json` (regenerated)
++- `docs/cli-reference.json` (regenerated)
++- `docs/CLI_REFERENCE.md` (regenerated)
++- `tests/test_dump_cli.py`
++- `tests/test_allowlist.py`
++- `tests/test_loop_guard.py`
++- `docs/BUILDER_NOTES.md`
++- `handoff/TASK-068-r1-report.md`
++
++`tests/test_bridge_run.py` and `tests/test_pace_report.py` were not edited.
++
++## Summary
++
++`in-flight.py` appends one clock-stamped line to the Workspace log `run/supervisor/in-flight.md`, taking the text from one argument, from a file under `run/supervisor/`, or from a tagged review pass, and it refuses every other case before it creates a folder or writes a line. The seven round causes stand once as `bridge_env.ROUND_CAUSES`, which the launcher reads as itself and the pace report reads with `unstated` appended. The loop guard's refusal for a background agent with no timer now names that log and `python ~/.claude/cursor-bridge/in-flight.py`, the allow list admits the program, and the command reference and MANIFEST were regenerated.
++
++## Requirements
++
++- R1. `build_parser` (lines 350-360) and `main` (lines 363-377) expose `<text>`, `--file`, and `--pass NAME REVIEWER` with optional `--round` and `--cause`. `prepare` (lines 248-255) accepts exactly one source and refuses `--round` or `--cause` without `--pass`. `FlightParser.error` (lines 40-43) turns argparse usage errors into exit 2. The description and help name no path and no user name.
++- R2. `bridge_env.workspace_of` (lines 4414-4432) walks from the start folder to the nearest parent that holds `docs/PROJECT_STATUS.md` as a file and returns that folder's absolute path, or `None`. `prepare` (line 260) calls it with the current folder. The log is `<Workspace>/run/supervisor/in-flight.md`. `append_log` (line 329) creates the folder only after `prepare` has accepted the run.
++- R3. `stamp` (lines 56-57) formats `datetime.now(timezone.utc)` as `%Y-%m-%dT%H:%MZ`, 17 characters, then one space and the text.
++- R4. `_strip_spaces` (lines 60-67) drops leading and trailing space separators. `_file_lines` (lines 78-98) splits a `--file` body on CR LF, LF, and CR; `_text_and_pauses` (lines 111-124) drops blank lines and joins the rest with one space. `_read_source` (lines 178-224) reads at most 65,536 bytes as UTF-8 and drops a leading byte-order mark. `_through_link` (lines 151-175) refuses a symbolic link or junction on the file or on a folder between `run/supervisor/` and the file. `_at_or_under` (lines 131-137) compares `os.path.normcase` paths, and the resolved path must sit inside the resolved `run/supervisor/` folder and must not be the log. `_forbidden` (lines 74-75) refuses an empty text and any character of category Cc, Cf, Zl, or Zp.
++- R5. `prepare` (lines 263-279) builds `<stamp> <text>`, and `_paused_body` (lines 101-108) repeats each line that begins with `Paused:` in any letter case, after the stamped line, with its leading spaces removed. `_pass_text` (lines 227-243) builds `PASS <name> r<n> <reviewer> <cause>`, omitting ` r<n>` and ` <cause>` when those options are absent. The name must match `bridge_env.GRAMMAR_ID_PATTERN` whole, the reviewer is one of the seven kinds in `REVIEWERS` (lines 26-34), the round is an `int` from 1 to 999, and the cause must be a member of `bridge_env.ROUND_CAUSES`. `append_log` (line 324) ends each line with LF and writes UTF-8.
++- R6. `append_log` (lines 322-347) writes every line of the run in one `os.write` after `_acquire` (lines 288-306) holds the first byte of the log. If the file is not empty and its last byte is not LF, that block starts with LF. On Windows the C runtime append is a seek to the end plus a write, so it is not one operation across processes; this program seeks to offset 0 and takes `msvcrt.locking` on that byte for the whole read-and-write, and another run waits there instead of writing into the same line. The wait stops at `LOCK_SECONDS` (line 36), 10 seconds, and then the run exits 2 with nothing appended.
++- R7. `refuse` (lines 51-53) prints one stderr line, `in-flight: REFUSED - <reason>`, and returns 2. `prepare` finishes every check before `append_log` creates the folder or opens the log, and a missing Workspace creates no `run/` folder. Reasons name the fault and include no path and no traceback. `main` (lines 374-377) turns any other exception into that same line.
++- R8. On success `main` (lines 371-372) calls `say` (lines 46-48), which writes each whole line to stdout as UTF-8 bytes, and returns 0.
++- R9. `bridge_env.ROUND_CAUSES` (lines 4403-4411) is the seven causes in the required order, without `unstated`. `bridge-run.py` line 990 sets the module name `ROUND_CAUSES` to `bridge_env.ROUND_CAUSES`, and `round_cause` is unchanged. `pace-report.py` line 431 sets its `ROUND_CAUSES` to `bridge_env.ROUND_CAUSES + ("unstated",)`. `_pass_text` (line 235) reads `bridge_env.ROUND_CAUSES` and the program holds no copy of the list.
++- R10. `loop-guard.py` line 638 keeps the opening `Loop guard (Claude-Cursor Bridge, rule 43): you are waiting on a background agent with no timer running to its ceiling:` and now tells the supervisor to append the position to `run/supervisor/in-flight.md` with `python ~/.claude/cursor-bridge/in-flight.py`. The rest of the refusal, the exit code, and the decision are unchanged, and the source no longer holds the status file's `In flight:` line. `test_r088_the_refusal_names_the_in_flight_log_and_the_program` (`tests/test_loop_guard.py` line 283) drives `lg.main()` into that refusal and checks the opening words and both names.
++- R11. `settings.bridge.json` line 74 is `Bash(python ~/.claude/cursor-bridge/in-flight.py:*)`, directly after the push-scan entry. `test_r088_in_flight_rule_in_allow` (`tests/test_allowlist.py` line 266) asserts that rule is in `ALLOW` and that `decide` allows the four commands from the brief.
++- R12. `tests/test_dump_cli.py` line 34 adds `"in-flight.py"` to `ARGPARSE`. `python tools/dump-cli.py` regenerated the command reference, and `python tools/dump-cli.py --check` exited 0. `python tools/make-manifest.py` regenerated MANIFEST, and `git restore bridge/cursor-bridge/VERSION` put `2026.11.12a` back. Command 12 does not list `bridge/cursor-bridge/VERSION`.
++- R13. `in-flight.py` is ASCII, imports only the standard library and `bridge_env` (lines 14-24), starts no process, and makes no network call. Importing it only adjusts `sys.path` and loads `bridge_env`.
++
++## Mutation self-check
++
++Each mutant was applied, `python -m pytest -p no:cacheprovider -q tests/test_program_in_flight.py` was run (for M12, `tests/test_loop_guard.py`), and the file was restored. `test_r088_a_file_reached_through_a_link_is_refused` was not exercised: this account cannot create a symbolic link, and the run skipped it.
++
++- M1 the stamp written in local time instead of UTC. Caught by `test_r088_a_text_is_appended_with_the_clock_s_time_and_printed`.
++- M2 the stamp written to the second. Caught by `test_r088_a_text_is_appended_with_the_clock_s_time_and_printed`.
++- M3 the log opened for writing instead of appending (`O_WRONLY | O_CREAT | O_TRUNC` in place of `O_RDWR | O_CREAT | O_APPEND`). Caught by `test_r088_a_second_run_appends_and_never_rewrites`.
++- M4 the Workspace taken to be the current folder, with no walk to its parents. Caught by `test_r088_the_workspace_is_found_from_a_folder_inside_it`.
++- M5 a `Paused:` line of the file joined into the stamped line only. Caught by `test_r088_a_paused_line_in_the_file_stays_a_line_the_loop_guard_reads`.
++- M6 a `--file` path accepted without resolving `..` (the path was accepted when the unresolved text contained `run/supervisor`). Caught by `test_r088_a_file_outside_run_supervisor_is_refused`.
++- M7 a `--file` path outside `run/supervisor/` but inside the Workspace accepted (the containment parent was the Workspace). Caught by `test_r088_a_file_outside_run_supervisor_is_refused`.
++- M8 a text holding an escape character accepted. Caught by `test_r088_no_text_both_sources_or_a_control_character_is_refused[control-character]`.
++- M9 a reviewer outside the list accepted. Caught by `test_r088_a_word_outside_the_lists_is_refused_and_nothing_written[unknown-reviewer]`.
++- M10 `--cause` accepted outside `bridge_env.ROUND_CAUSES`. Caught by `test_r088_a_word_outside_the_lists_is_refused_and_nothing_written[unknown-cause]`.
++- M11 the log's folder created before the checks run. Caught by `test_r088_outside_a_workspace_it_refuses_and_writes_nothing`.
++- M12 the loop guard's refusal's first words changed (`you are waiting` to `you were waiting`). Caught by `test_r088_the_refusal_names_the_in_flight_log_and_the_program`.
++
++## Commands
++
++The counts below belong to commit `11469ea79c58bb3a2c43bb31680fd34501ece55c`. The working tree then held uncommitted changes. `bridge/cursor-bridge/VERSION` was not listed.
++
++### 1. `git status --short`
++
++```
++ M bridge/cursor-bridge/bridge-run.py
++ M bridge/cursor-bridge/bridge_env.py
++ M bridge/cursor-bridge/loop-guard.py
++ M bridge/cursor-bridge/pace-report.py
++ M bridge/cursor-bridge/settings.bridge.json
++ M docs/BUILDER_NOTES.md
++ M tests/test_allowlist.py
++ M tests/test_dump_cli.py
++ M tests/test_loop_guard.py
++?? bridge/cursor-bridge/in-flight.py
++?? handoff/TASK-068-r1-report.md
++```
++
++### 2. `python tools/dump-cli.py`
++
++The command printed no lines and exited 0.
++
++### 3. `python tools/dump-cli.py --check`
++
++The command printed no lines and exited 0.
++
++### 4. `python tools/make-manifest.py`
++
++```
++make-manifest: version 2026.11.12a, 148 files hashed, VERSION + MANIFEST.json written
++```
++
++### 5. `git restore bridge/cursor-bridge/VERSION`
++
++The command printed no lines and exited 0.
++
++### 6. `python -m pytest -p no:cacheprovider -q -rs tests/test_program_in_flight.py tests/test_dump_cli.py tests/test_allowlist.py tests/test_loop_guard.py`
++
++```
++.............................s.......................................... [ 15%]
++.......................................................................s [ 30%]
++...ss.....sss....................s...............s...................... [ 46%]
++.........................s..........s.................s...ss.....sss.... [ 61%]
++................s...............s....................................... [ 77%]
++........s..........s.................................................... [ 92%]
++...................................                                      [100%]
++=========================== short test summary info ===========================
++SKIPPED [1] tests\test_program_in_flight.py:230: this account cannot create a symbolic link
++SKIPPED [10] tests\test_allowlist.py:65: prose, not a runnable command
++SKIPPED [10] tests\test_allowlist.py:106: prose, not a runnable command
++446 passed, 21 skipped in 122.60s (0:02:02)
++```
++
++`test_r088_a_file_reached_through_a_link_is_refused` was not exercised. The skip reason is the first SKIPPED line above.
++
++### 7. `python -m pytest -p no:cacheprovider -q tests/test_bridge_run.py tests/test_pace_report.py tests/test_release_s_launcher.py`
++
++```
++........................................................................ [ 73%]
++..........................                                               [100%]
++98 passed in 56.11s
++```
++
++### 8. `python -m pytest -p no:cacheprovider -q tests/test_install_check.py tests/test_tests_windowless.py`
++
++```
++.........................                                                [100%]
++25 passed in 22.04s
++```
++
++### 9. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++```
++bridge-check: version 2026.11.12a (2026-11-21 00:23) at <Workspace>\bridge
++bridge-check: 148 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.12a
++```
++
++### 10. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++
++```
++windowless-check: 41 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++### 11. `python -c "open('bridge/cursor-bridge/in-flight.py','rb').read().decode('ascii'); print('ascii ok')"`
++
++```
++ascii ok
++```
++
++### 12. `git rev-parse HEAD` and `git status --short`
++
++```
++11469ea79c58bb3a2c43bb31680fd34501ece55c
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/bridge-run.py
++ M bridge/cursor-bridge/bridge_env.py
++ M bridge/cursor-bridge/loop-guard.py
++ M bridge/cursor-bridge/pace-report.py
++ M bridge/cursor-bridge/settings.bridge.json
++ M docs/BUILDER_NOTES.md
++ M docs/CLI_REFERENCE.md
++ M docs/cli-reference.json
++ M tests/test_allowlist.py
++ M tests/test_dump_cli.py
++ M tests/test_loop_guard.py
++?? bridge/cursor-bridge/in-flight.py
++?? handoff/TASK-068-r1-report.md
++```
++
++## Assumed, not verified
++
++- The offset-0 byte lock plus one write keeps one run's lines whole against another in-flight process on Windows beyond the eight runs the test starts, and on Linux, which this run did not execute. · Windows append is a seek plus a write, and the lock only excludes another process that locks the same byte. · A Linux run of `tests/test_program_in_flight.py`, and a second writer that does not take the lock.
++- A junction under `run/supervisor/` is refused, and so is a symbolic link whose target stays inside that folder. · `_reparse` treats `os.path.isjunction` and `os.path.islink` as a link, and `test_r088_a_file_reached_through_a_link_is_refused` was skipped on this account. · That test on an account that can create a symbolic link, and the same layout with a junction.
++- When the log is not empty and its last byte is not LF, the next append starts with LF. · `append_log` reads that byte under the lock, and no acceptance test builds a log without a trailing line break. · A log ending in a letter, then one run, with the new stamp on its own line.
++- A line of only Unicode space separators is blank and is dropped, and the spaces removed from either end of the text are category Zs. · The brief says blank lines are dropped and spaces are removed, and the tests use ordinary spaces only. · A `--file` body with a middle line of spaces, and one with a leading no-break space.
++- If the lock is not acquired within 10 seconds, the run exits 2 and appends nothing, but a log file this run created so it could lock it can remain empty. · The file has to exist before the lock, and deleting it could remove another run's file; no test holds the lock for 10 seconds. · One process holding the lock past 10 seconds, and a second run that exits 2 with its text absent.
+diff --git a/handoff/TASK-068-r2-report.md b/handoff/TASK-068-r2-report.md
+new file mode 100644
+index 0000000..c04dac9
+--- /dev/null
++++ b/handoff/TASK-068-r2-report.md
+@@ -0,0 +1,179 @@
++# TASK-068 round 2 report
++
++## Files changed
++
++- `bridge/cursor-bridge/in-flight.py`
++- `bridge/cursor-bridge/loop-guard.py`
++- `bridge/cursor-bridge/bridge_env.py`
++- `bridge/cursor-bridge/MANIFEST.json` (regenerated)
++- `tests/test_loop_guard.py`
++- `docs/BUILDER_NOTES.md`
++- `handoff/TASK-068-r2-report.md`
++
++`python tools/dump-cli.py` printed nothing and `python tools/dump-cli.py --check` exited 0, so `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` are unchanged. `tests/test_program_in_flight.py` was not edited.
++
++## Summary
++
++The in-flight log is appended in binary mode, and the run writes every byte of that payload or exits 1 with `in-flight: INCOMPLETE` and prints no line. The loop guard takes the last `Paused:` line, so a later `Paused: resumed` lifts a pause and a later pause sets it again. An empty `--file` counts as a source, a text whose first word is `PASS` is refused unless it comes from `--pass`, and the program refuses before it creates or opens the log when `run/`, `run/supervisor/` or the log is a link or the real supervisor folder leaves the Workspace. A `--file` is opened at the real path already checked, the Windows lock is the byte at `2 ** 31`, and `bridge_env.py` ends with one line break.
++
++## Corrections
++
++1. `append_log` (line 396) opens the log with `O_RDWR | O_CREAT | O_APPEND` and `getattr(os, "O_BINARY", 0)`, so the bytes written are the payload and every line ends with LF.
++2. `last_field` (lines 201-209) returns the last match of `field`'s pattern, and `paused_in_flight` (lines 283-300) uses it for `Paused`; `test_r088_the_last_paused_line_decides` (`tests/test_loop_guard.py` lines 478-488) reads a pause followed by `Paused: resumed` as no wait, and a resume followed by a pause as that pause.
++3. `prepare` (line 274) counts a source with `args.file is not None`, so `--file ""` beside a text is two sources, and line 279 refuses `--file ""` alone as no text.
++4. `_first_word_is_pass` (lines 107-109) is true only when the first word is `pass` in any letter case, and `prepare` (lines 298-304) refuses that word on the first line of a `--file` text and on the text that would be written, exit 2, the reason naming `--pass`.
++5. `_log_blocked` (lines 352-367) runs in `append_log` (lines 387-389) before the folder is created or the log opened, and it refuses when `_reparse` (lines 151-163) finds a link at `run/`, `run/supervisor/` or the log, or when the real path of `run/supervisor/` is not under the real Workspace.
++6. `_read_source` opens `file_real` (line 219) with `O_BINARY` where the platform has it (lines 214-215) and `O_NOFOLLOW` where it has it (lines 216-217), then requires `os.fstat` and `os.stat` of that path to agree on `st_dev` and `st_ino` where both are non-zero and requires `st_nlink == 1` (lines 223-230).
++7. `_acquire` (lines 324-325) and `_release` (lines 343-344) seek to `2 ** 31` before `msvcrt.locking` on Windows, and on POSIX they keep `fcntl.flock`; the wait is still `LOCK_SECONDS`, 10 seconds.
++8. `_write_all` (lines 370-383) repeats `os.write` until every byte is written, and a write of zero bytes or an `OSError` returns the counts; `main` (lines 438-439) then calls `incomplete` (lines 57-59), which exits 1 with `in-flight: INCOMPLETE - <n> of <m> bytes written` and does not print the line. `_reparse` calls `os.path.isjunction` when that function exists, and otherwise uses `st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT` (lines 156-161).
++9. `bridge_env.py` ends at `workspace_of`'s `return None` (line 4432) with one line break.
++
++## Mutation self-check
++
++Each mutant was applied to the finished source, the pytest command below was run, and the file was restored. H1, H3, H4 and H5 ran `python -m pytest -p no:cacheprovider -q --tb=no tests/test_program_in_flight.py`. H2 ran that file and `tests/test_loop_guard.py`. `test_r088_a_file_reached_through_a_link_is_refused` was skipped on this account, as in the acceptance run.
++
++- H1 `O_BINARY` dropped from `append_log`'s flags. Caught by `test_r088_r2_every_line_the_program_writes_ends_with_lf_alone`.
++
++```
++FAILED tests/test_program_in_flight.py::test_r088_r2_every_line_the_program_writes_ends_with_lf_alone
++1 failed, 43 passed, 1 skipped in 6.04s
++```
++
++- H2 `paused_in_flight` read the first `Paused:` line again (`field` in place of `last_field`). Caught by `test_r088_r2_a_later_paused_line_lifts_or_replaces_an_earlier_one` and `test_r088_the_last_paused_line_decides`.
++
++```
++FAILED tests/test_program_in_flight.py::test_r088_r2_a_later_paused_line_lifts_or_replaces_an_earlier_one
++FAILED tests/test_loop_guard.py::test_r088_the_last_paused_line_decides - ass...
++2 failed, 112 passed, 1 skipped in 6.65s
++```
++
++- H3 `bool(args.file)` restored in the source count. Caught by `test_r088_r2_an_empty_file_option_beside_a_text_is_two_sources`.
++
++```
++FAILED tests/test_program_in_flight.py::test_r088_r2_an_empty_file_option_beside_a_text_is_two_sources
++1 failed, 43 passed, 1 skipped in 5.70s
++```
++
++- H4 the `PASS` refusal dropped (`_first_word_is_pass` returned false). Caught by `test_r088_r2_a_free_text_cannot_forge_a_pass_line`.
++
++```
++FAILED tests/test_program_in_flight.py::test_r088_r2_a_free_text_cannot_forge_a_pass_line[PASS TASK-1 r9 review-a defect]
++FAILED tests/test_program_in_flight.py::test_r088_r2_a_free_text_cannot_forge_a_pass_line[pass PR-3 r1 review-b records]
++FAILED tests/test_program_in_flight.py::test_r088_r2_a_free_text_cannot_forge_a_pass_line[Pass X]
++3 failed, 41 passed, 1 skipped in 5.51s
++```
++
++- H5 the link test of `run/supervisor/` dropped. Removing `supervisor` from the reparse loop alone left the acceptance file green (`44 passed, 1 skipped in 5.72s`), because the real-path confinement still refuses a junction that leaves the Workspace. Dropping that confinement as well, so nothing tests `run/supervisor/`, was caught by `test_r088_r2_a_log_folder_that_is_a_link_is_refused[supervisor]`.
++
++```
++FAILED tests/test_program_in_flight.py::test_r088_r2_a_log_folder_that_is_a_link_is_refused[supervisor]
++1 failed, 43 passed, 1 skipped in 5.69s
++```
++
++## Commands
++
++The outputs below are the last run, after the source edits above. A repository path printed by a command is written `<Workspace>`. `bridge/cursor-bridge/VERSION` is not listed.
++
++### 1. `git status --short`
++
++```
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/bridge_env.py
++ M bridge/cursor-bridge/in-flight.py
++ M bridge/cursor-bridge/loop-guard.py
++ M docs/BUILDER_NOTES.md
++ M tests/test_loop_guard.py
++?? handoff/TASK-068-r2-report.md
++```
++
++### 2. `python tools/dump-cli.py`
++
++The command printed no lines and exited 0.
++
++### 3. `python tools/dump-cli.py --check`
++
++The command printed no lines and exited 0.
++
++### 4. `python tools/make-manifest.py`
++
++```
++make-manifest: version 2026.11.12a, 148 files hashed, VERSION + MANIFEST.json written
++```
++
++### 5. `git restore bridge/cursor-bridge/VERSION`
++
++The command printed no lines and exited 0.
++
++### 6. `python -m pytest -p no:cacheprovider -q -rs tests/test_program_in_flight.py tests/test_dump_cli.py tests/test_allowlist.py tests/test_loop_guard.py`
++
++```
++.............................s.......................................... [ 15%]
++........................................................................ [ 30%]
++.......s...ss.....sss....................s...............s.............. [ 45%]
++.................................s..........s.................s...ss.... [ 60%]
++.sss....................s...............s............................... [ 75%]
++................s..........s............................................ [ 90%]
++............................................                             [100%]
++=========================== short test summary info ===========================
++SKIPPED [1] tests\test_program_in_flight.py:230: this account cannot create a symbolic link
++SKIPPED [10] tests\test_allowlist.py:65: prose, not a runnable command
++SKIPPED [10] tests\test_allowlist.py:106: prose, not a runnable command
++455 passed, 21 skipped in 129.10s (0:02:09)
++```
++
++`test_r088_a_file_reached_through_a_link_is_refused` was not exercised. The skip reason is the first SKIPPED line above.
++
++### 7. `python -m pytest -p no:cacheprovider -q tests/test_bridge_run.py tests/test_pace_report.py tests/test_release_s_launcher.py`
++
++```
++........................................................................ [ 73%]
++..........................                                               [100%]
++98 passed in 56.93s
++```
++
++### 8. `python -m pytest -p no:cacheprovider -q tests/test_install_check.py tests/test_tests_windowless.py`
++
++```
++.........................                                                [100%]
++25 passed in 21.46s
++```
++
++### 9. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++```
++bridge-check: version 2026.11.12a (2026-11-21 01:51) at <Workspace>\bridge
++bridge-check: 148 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.12a
++```
++
++### 10. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++
++```
++windowless-check: 41 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++### 11. `python -c "open('bridge/cursor-bridge/in-flight.py','rb').read().decode('ascii'); open('bridge/cursor-bridge/loop-guard.py','rb').read().decode('ascii'); print('ascii ok')"`
++
++```
++ascii ok
++```
++
++### 12. `git rev-parse HEAD` and `git status --short`
++
++```
++5df881c38ae0d02e2324783bc874071eca40c575
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/bridge_env.py
++ M bridge/cursor-bridge/in-flight.py
++ M bridge/cursor-bridge/loop-guard.py
++ M docs/BUILDER_NOTES.md
++ M tests/test_loop_guard.py
++?? handoff/TASK-068-r2-report.md
++```
++
++## Assumed, not verified
++
++- On Linux the append flag `O_BINARY` is absent, the `--file` open adds `O_NOFOLLOW`, and the lock is `fcntl.flock` on the whole file. · The branches are the POSIX arms of `_acquire`, `_release` and `_read_source`, and this run was Windows. · A Linux run of `tests/test_program_in_flight.py`.
++- A short or failed `os.write` exits 1 with `in-flight: INCOMPLETE - <n> of <m> bytes written` and prints no line. · `_write_all` returns the counts and `main` calls `incomplete` before `say`, and no acceptance test makes `os.write` return 0 or raise. · A run whose write returns 0 after some bytes, with the log holding only that prefix and stdout empty.
++- Python before 3.12 takes `_reparse`'s `lstat` branch. · `getattr(os.path, "isjunction", None)` is how the missing attribute is avoided, and this interpreter is 3.12.10, which has `os.path.isjunction`. · The junction case of `test_r088_r2_a_log_folder_that_is_a_link_is_refused` on Python 3.11.
++- A reader can read the log while a run holds the byte at `2 ** 31`, and a second run that cannot take that byte exits 2 after 10 seconds with nothing appended. · The lock range is one byte at that position and `LOCK_SECONDS` is unchanged, and no test holds the lock or reads during it. · One process locking that byte, a concurrent read of the log, and a second `in-flight.py` that waits out the 10 seconds.
+diff --git a/handoff/TASK-068-r2.md b/handoff/TASK-068-r2.md
+new file mode 100644
+index 0000000..67f25e8
+--- /dev/null
++++ b/handoff/TASK-068-r2.md
+@@ -0,0 +1,79 @@
++---
++record: brief
++header: 1
++id: "TASK-068"
++round: 2
++satisfies: [R-088]
++scope: ["bridge/cursor-bridge/in-flight.py", "bridge/cursor-bridge/loop-guard.py", "bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/MANIFEST.json", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "tests/test_loop_guard.py", "docs/BUILDER_NOTES.md", "handoff/TASK-068-r2-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# TASK-068 round 2: the in-flight program (R-088)
++
++Round cause: defect - bridge/cursor-bridge/loop-guard.py:191-196 with bridge/cursor-bridge/in-flight.py:101-124, the loop guard reads the first `Paused:` line of the log, so a log the program only appends to can never lift a pause and the guard then lets every stop through (a defeated safety mechanism, convergent: Review A B2 and the security review's blocking finding); behaviour - bridge/cursor-bridge/in-flight.py:330, the log is opened without `O_BINARY`, so every line is written with CR LF on Windows where Requirement 5 says LF (Review A B1)
++
++## Objective
++This is round 2 of TASK-068. Round 1's code is committed (the commit "TASK-068 r1: the builder's work (rejected) and the round-2 tests", `git log` shows it) with the supervisor's eight new cases at the end of the acceptance file. Round 1 met most of the brief; this round makes the minimum changes the corrections below name, keeps every test green, and edits nothing in the acceptance file. Round 1's brief, `handoff/TASK-068.md`, stays in force for everything this brief does not change, except one sentence of it: round 1's brief kept the loop guard's decision unchanged; correction 2 changes which `Paused:` line the guard reads (the supervisor's decision for this round).
++
++Satisfies: R-088 - The live position is written by a program (C15, J3): `in-flight.py` appends one line, `<UTC time from the clock> <text>`, to the Workspace's `run/supervisor/in-flight.md`, the text from a file under `run/supervisor/` (`--file`) or from one argument, and with `--pass <name> <reviewer>` and the optional `--round <n>` and `--cause <cause>` a tagged line for a review pass; it refuses outside a Workspace or with no text and prints what it wrote; the loop guard's refusal and the three texts that sent the live position to the status file's `In flight:` line (rule 54, calibration's step 0, the parallel builders' paragraph) name the in-flight log and this program, and KP-041 is retired. (The three texts and KP-041 are TASK-078's, as in round 1.)
++
++## Scope
++Files you may create or modify:
++- bridge/cursor-bridge/in-flight.py
++- bridge/cursor-bridge/loop-guard.py
++- bridge/cursor-bridge/bridge_env.py
++- bridge/cursor-bridge/MANIFEST.json
++- docs/cli-reference.json
++- docs/CLI_REFERENCE.md
++- tests/test_loop_guard.py
++- docs/BUILDER_NOTES.md
++- handoff/TASK-068-r2-report.md
++
++Limits on these files: `in-flight.py`: corrections 1 and 3 to 8. `loop-guard.py`: correction 2 alone (the function `paused_in_flight` and, where you need one, one new helper beside `field`; `field` itself and every other reader of the status file unchanged). `bridge_env.py`: correction 9 alone. `MANIFEST.json`, `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` only as regenerated. `tests/test_loop_guard.py`: one or two `test_r088_` cases you add for correction 2; no other case changes. `tests/test_program_in_flight.py` is the supervisor's, read only. `docs/BUILDER_NOTES.md`: a new line at the file's end.
++
++## Out of scope
++As round 1's brief. In particular: `bridge-run.py`, `pace-report.py`, `settings.bridge.json` and every test file but `tests/test_loop_guard.py` untouched; the loop guard's other decisions, its other messages and the status file's readers unchanged; no option, no environment variable, no new dependency, no import of a module outside the standard library; the supervisor's mutants file is not yours.
++
++## Corrections
++1. **LF on every platform (behaviour; Review A B1).** The log is opened for the append with `O_BINARY` where the platform has it (`getattr(os, "O_BINARY", 0)` added to the flags), so the bytes written are the bytes of the payload: every line ends with LF alone, on Windows as on Linux. The acceptance case `test_r088_r2_every_line_the_program_writes_ends_with_lf_alone` reads the raw bytes.
++2. **The last `Paused:` line decides (a defeated safety mechanism; convergent: Review A B2, the security review).** `paused_in_flight` in `loop-guard.py` reads the **last** line of `run/supervisor/in-flight.md` that begins `Paused:` (the same pattern `field` uses, its last match), never the first, and applies to it the tests it applies today (`names_a_wait`, and the words `no`, `not`, `false`, `off`, `resumed`, `ended`, `cleared` read as no wait). So `Paused: resumed` written after a pause lifts it, and a later `Paused: <reason>` sets it again. A stamped line (`<stamp> Paused: ...`) is no `Paused:` line, as today. Add a `test_r088_` case to `tests/test_loop_guard.py` with a log holding a pause and then `Paused: resumed`, read as no wait, and one holding a resume and then a pause, read as that pause.
++3. **Two sources are two sources (behaviour; Review A SF1).** `--file` given at all, even as an empty string, counts as a source: `args.file is not None`. `--file ""` alone is refused as no text; beside a text it is refused as two sources.
++4. **Only `--pass` writes a pass line (data integrity; convergent: Review A, the security review).** A text, or the first line of a `--file` text, whose first word is `PASS` in any letter case (the word alone or followed by white space) is refused with exit 2 and nothing written, the reason naming `--pass`. A word that only begins with those letters (`PASSED`, `passing`) is not refused.
++5. **The log is written only inside the Workspace (security; convergent: Review A, the security review).** Before it creates or opens anything, the program refuses, exit 2 and nothing written, where `run/`, `run/supervisor/` or `run/supervisor/in-flight.md` exists and is a symbolic link or a junction (round 1's link test, made to work on every Python 3 this project runs, correction 8), or where the real path of `run/supervisor/` does not lie under the real path of the Workspace. A folder it creates is created with no link in its way.
++6. **The file read is the file checked (security; Review A SF2, the security review).** `--file` opens the real path its checks resolved (round 1's `file_real`), never `os.path.abspath(given)`, with `O_NOFOLLOW` where the platform has it and `O_BINARY` where it has it; after the open, `os.fstat` of the open file must name the same file as `os.stat` of that real path (`st_dev` and `st_ino`, compared where both are non-zero) and the file must have one link (`st_nlink == 1`), else exit 2 and nothing written.
++7. **The lock never blocks a reader (other; convergent: Review A, the security review).** On Windows the lock is taken on one byte far past any log's end (the file position set to `2**31` before `msvcrt.locking`, and set there again before the unlock), never byte 0, so a reader such as the loop guard is never refused while a run appends. The lock stays bounded at 10 seconds as in round 1. On POSIX keep round 1's lock.
++8. **Every byte is written or none is claimed (data integrity; security review).** The append writes the whole payload: `os.write` repeated until every byte is written, a write of zero bytes or an error ending the run with exit 1 and the message `in-flight: INCOMPLETE - <n> of <m> bytes written`, never `REFUSED` and never the printed line. The test of a link: `os.path.isjunction` where it exists, else the reparse-point attribute of `os.lstat` (`st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT` on Windows), so the program never ends in an `AttributeError` on a Python before 3.12.
++9. **One stray line (other; Review A note).** Remove the extra blank line round 1 left at the end of `bridge_env.py`; the file ends with one line break.
++
++## Context
++The acceptance file `tests/test_program_in_flight.py` gained eight cases after the line `# Round 2 (TASK-068-r2)`: the raw bytes hold no CR; a later `Paused:` line lifts or replaces an earlier one, read through the loop guard's own `paused_in_flight`; `--file ""` beside a text refused; a free text and a `--file` text whose first word is `PASS` (three spellings) refused; `run/` and `run/supervisor/` each made a junction (or a link where a junction cannot be made) to a folder outside the Workspace, refused with no `.md` written there. On round 1's code: "8 failed, 37 deselected".
++
++Threat model: as round 1's brief (`docs/INVENTORY.md` Decisions, "The bridge's threat model as a whole"). The log decides, through the loop guard, whether the supervisor may end its turn: what the log holds is a safety input, and a link or junction under the Workspace's `run/` is outside input, which needs no privilege on Windows.
++
++## Acceptance criteria
++- [ ] Every test in `tests/test_program_in_flight.py` passes, the link case of round 1 skipped where the account cannot create a link, and every test of round 1's Done list passes.
++- [ ] Corrections 1 to 9 met, each named in the report with its function and lines.
++- [ ] Round 1's requirements and choices stand where this brief does not change them.
++- [ ] Every line added ASCII; no option, environment variable or dependency.
++
++## Constraints
++Round 1's brief's Constraints all stand. Mutations by hand, in process, each reverted, listed by label with the pytest line that shows a test failing, else `not run`: (H1) `O_BINARY` dropped from the append's flags; (H2) `paused_in_flight` reading the first `Paused:` line again; (H3) `bool(args.file)` restored; (H4) the `PASS` refusal dropped; (H5) the link test of `run/supervisor/` dropped. Prefer the smallest change; refactor nothing else.
++
++## Done
++Your report is `handoff/TASK-068-r2-report.md`, written as you go, in round 1's form (files changed, the report itself among them; summary; each correction in one sentence with the function and lines; every command below with its output, verbatim, in fenced blocks, each pytest summary line quoted; the mutations H1 to H5, each with the FAILED line and the summary line; a last section headed exactly `Assumed, not verified`). It names no computer path: `<Workspace>` for the repository folder, `<tmp>` for a temporary folder.
++
++Run these from the Workspace root, in this order, after your last edit, each in the foreground, with no `PYTHONPATH` or other environment change; run them again in order if you edit anything after them, and quote the last run:
++1. `git status --short`
++2. `python tools/dump-cli.py`
++3. `python tools/dump-cli.py --check` (expect exit 0)
++4. `python tools/make-manifest.py`
++5. `git restore bridge/cursor-bridge/VERSION`
++6. `python -m pytest -p no:cacheprovider -q -rs tests/test_program_in_flight.py tests/test_dump_cli.py tests/test_allowlist.py tests/test_loop_guard.py`
++7. `python -m pytest -p no:cacheprovider -q tests/test_bridge_run.py tests/test_pace_report.py tests/test_release_s_launcher.py`
++8. `python -m pytest -p no:cacheprovider -q tests/test_install_check.py tests/test_tests_windowless.py`
++9. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` (expect `RESULT: SOURCES MATCH`)
++10. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++11. `python -c "open('bridge/cursor-bridge/in-flight.py','rb').read().decode('ascii'); open('bridge/cursor-bridge/loop-guard.py','rb').read().decode('ascii'); print('ascii ok')"` (expect `ascii ok`)
++12. `git rev-parse HEAD` and `git status --short` (`bridge/cursor-bridge/VERSION` must not be listed; if it is, report it)
++
++Every pytest summary line quoted verbatim; never restate a count in prose. Your last message is the summary and the report file's path, and nothing follows it.
+diff --git a/handoff/TASK-068-r3-report.md b/handoff/TASK-068-r3-report.md
+new file mode 100644
+index 0000000..6ee1bdb
+--- /dev/null
++++ b/handoff/TASK-068-r3-report.md
+@@ -0,0 +1,152 @@
++# TASK-068 round 3 report
++
++## Files changed
++
++- `bridge/cursor-bridge/in-flight.py`
++- `bridge/cursor-bridge/loop-guard.py`
++- `bridge/cursor-bridge/MANIFEST.json` (regenerated)
++- `tests/test_loop_guard.py`
++- `docs/BUILDER_NOTES.md`
++- `handoff/TASK-068-r3-report.md`
++
++`tests/test_program_in_flight.py` was not edited. `field` in `loop-guard.py` was not edited.
++
++## Summary
++
++An empty `Paused:` line is read as empty, because `last_field` no longer lets the white space after the colon cross a line break, so a later ordinary line is not a pause and `Paused: resumed` after an empty pause is no wait. The log is opened with `O_NOFOLLOW` where the platform has it, and before any byte is written the open file must have one link and the folder checks run again, so a hard link to a file outside the Workspace is refused and left unchanged. A `--file` is compared with `os.lstat` taken before the open, not with `os.stat` after it. The notes record that the Windows lock sits on the byte at `2**31`.
++
++## Corrections
++
++1. `last_field` (lines 201-209) keeps `field`'s pattern except the white space after the colon and around the value, which is `[ \t]*` (line 203), so `Paused:` alone yields `""` and the next line is a separate line. `field` (lines 191-198) is unchanged. `test_r088_an_empty_paused_line_reads_as_no_wait` (`tests/test_loop_guard.py` lines 491-499) reads a log `Paused: x` / `Paused:` / `2026-11-21T02:43Z text` as no wait.
++2. `append_log` (lines 388-427) adds `O_NOFOLLOW` where the platform has it (lines 400-401) beside `O_RDWR | O_CREAT | O_APPEND` and `O_BINARY`. After the open and before `_write_all` (line 417), `os.fstat` of the open log must show `st_nlink == 1` (lines 411-413) and `_log_blocked` runs again (lines 414-416). Either failure returns a reason, and `main` ends the run with exit 2, `in-flight: REFUSED - <reason>`, and nothing appended.
++3. `_read_source` (lines 193-249) takes `os.lstat` of the checked real path during the checks, before the open (lines 213-216), and compares `os.fstat` of the opened file with that result on `st_dev` and `st_ino` where both are non-zero (lines 227-231), in place of round 2's `os.stat` after the open.
++4. `docs/BUILDER_NOTES.md` line 104 says that, since round 2, the Windows lock sits on the byte at `2**31`, not byte 0 as round 1's line says.
++
++## Commands
++
++The outputs below are the last run, after the source edits above. A repository path printed by a command is written `<Workspace>`. `bridge/cursor-bridge/VERSION` is not listed.
++
++### 1. `git status --short`
++
++```
++ M bridge/cursor-bridge/in-flight.py
++ M bridge/cursor-bridge/loop-guard.py
++ M docs/BUILDER_NOTES.md
++ M tests/test_loop_guard.py
++?? handoff/TASK-068-r3-report.md
++```
++
++### 2. `python tools/dump-cli.py`
++
++The command printed no lines and exited 0.
++
++### 3. `python tools/dump-cli.py --check`
++
++The command printed no lines and exited 0.
++
++### 4. `python tools/make-manifest.py`
++
++```
++make-manifest: version 2026.11.12a, 148 files hashed, VERSION + MANIFEST.json written
++```
++
++### 5. `git restore bridge/cursor-bridge/VERSION`
++
++The command printed no lines and exited 0.
++
++### 6. `python -m pytest -p no:cacheprovider -q -rs tests/test_program_in_flight.py tests/test_dump_cli.py tests/test_allowlist.py tests/test_loop_guard.py`
++
++```
++.............................s.......................................... [ 15%]
++........................................................................ [ 30%]
++..........s...ss.....sss....................s...............s........... [ 45%]
++....................................s..........s.................s...ss. [ 60%]
++....sss....................s...............s............................ [ 75%]
++...................s..........s......................................... [ 90%]
++................................................                         [100%]
++=========================== short test summary info ===========================
++SKIPPED [1] tests\test_program_in_flight.py:230: this account cannot create a symbolic link
++SKIPPED [10] tests\test_allowlist.py:65: prose, not a runnable command
++SKIPPED [10] tests\test_allowlist.py:106: prose, not a runnable command
++459 passed, 21 skipped in 127.65s (0:02:07)
++```
++
++`test_r088_a_file_reached_through_a_link_is_refused` was not exercised. The skip reason is the first SKIPPED line above.
++
++### 7. `python -m pytest -p no:cacheprovider -q tests/test_bridge_run.py tests/test_pace_report.py tests/test_release_s_launcher.py`
++
++```
++........................................................................ [ 73%]
++..........................                                               [100%]
++98 passed in 56.18s
++```
++
++### 8. `python -m pytest -p no:cacheprovider -q tests/test_install_check.py tests/test_tests_windowless.py`
++
++```
++.........................                                                [100%]
++25 passed in 21.18s
++```
++
++### 9. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++```
++bridge-check: version 2026.11.12a (2026-11-21 02:51) at <Workspace>\bridge
++bridge-check: 148 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.12a
++```
++
++### 10. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++
++```
++windowless-check: 41 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++### 11. `python -c "open('bridge/cursor-bridge/in-flight.py','rb').read().decode('ascii'); open('bridge/cursor-bridge/loop-guard.py','rb').read().decode('ascii'); print('ascii ok')"`
++
++```
++ascii ok
++```
++
++### 12. `git rev-parse HEAD` and `git status --short`
++
++```
++32db4290f39736d074bb4ec8f0e845e1e2043ecc
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/in-flight.py
++ M bridge/cursor-bridge/loop-guard.py
++ M docs/BUILDER_NOTES.md
++ M tests/test_loop_guard.py
++?? handoff/TASK-068-r3-report.md
++```
++
++## Mutation self-check
++
++Each mutant was applied to the finished source, the pytest command below was run, and the file was restored.
++
++- H1 `last_field`'s `\s*` restored (the white space after the colon and around the value). Caught by `test_r088_r3_an_empty_paused_line_never_takes_the_next_line_as_its_value` and `test_r088_an_empty_paused_line_reads_as_no_wait`.
++
++```
++FAILED tests/test_program_in_flight.py::test_r088_r3_an_empty_paused_line_never_takes_the_next_line_as_its_value
++FAILED tests/test_loop_guard.py::test_r088_an_empty_paused_line_reads_as_no_wait
++2 failed, 1 passed in 0.54s
++```
++
++- H2 the log's `st_nlink` check dropped. Caught by `test_r088_r3_a_log_that_is_a_hard_link_is_refused`. The supervisor-folder link case still passed.
++
++```
++FAILED tests/test_program_in_flight.py::test_r088_r3_a_log_that_is_a_hard_link_is_refused
++1 failed, 1 passed in 0.77s
++```
++
++- H3 the `--file` comparison made against `os.stat` after the open again (`os.lstat` before the open removed). No test failed. The symbolic-link case was skipped, so this mutant was not distinguished from the finished source. Failing pytest line: `not run`.
++
++```
++47 passed, 1 skipped in 6.12s
++```
++
++## Assumed, not verified
++
++- On Linux the log open adds `O_NOFOLLOW` and a symlink at the log path fails the open. · This run was Windows, where `os.O_NOFOLLOW` is present and a normal create still succeeded. · A Linux run of `tests/test_program_in_flight.py` with the log path a symbolic link.
++- `os.lstat` before the open disagrees with `os.fstat` when the path is replaced by a link between the check and the open. · H3 left the acceptance file green, and `test_r088_a_file_reached_through_a_link_is_refused` was skipped on this account. · That case on an account that can create a symbolic link, and a file swapped for a link after `os.lstat`.
++- The second `_log_blocked` after the open refuses a `run/supervisor/` link that appears during the lock wait. · The acceptance case plants the link before the run, so the first `_log_blocked` already refuses it. · A link created after the first check and before the write.
+diff --git a/handoff/TASK-068-r3.md b/handoff/TASK-068-r3.md
+new file mode 100644
+index 0000000..e4df889
+--- /dev/null
++++ b/handoff/TASK-068-r3.md
+@@ -0,0 +1,56 @@
++---
++record: brief
++header: 1
++id: "TASK-068"
++round: 3
++satisfies: [R-088]
++scope: ["bridge/cursor-bridge/in-flight.py", "bridge/cursor-bridge/loop-guard.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_loop_guard.py", "docs/BUILDER_NOTES.md", "handoff/TASK-068-r3-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# TASK-068 round 3: the in-flight program (R-088)
++
++Round cause: defect - bridge/cursor-bridge/loop-guard.py:203, `last_field`'s pattern lets the white space after the colon run past the line break, so an empty `Paused:` line, the form that lifts a pause, takes the next line as its value and a later ordinary line reads as a pause (a defeated safety mechanism, convergent: the security review's B1 and Review A's note); security - bridge/cursor-bridge/in-flight.py:352-397, a log that is a hard link to a file outside the Workspace is appended to (convergent: Review A and the security review)
++
++## Objective
++This is round 3 of TASK-068, the review ceiling's round: only the corrections below, each a finding of the five blocking classes. Round 2's code is committed (the commit "TASK-068 r2: the builder's work (rejected) and the round-3 tests") with the supervisor's three new cases at the end of the acceptance file. Make the minimum changes the corrections name, keep every test green, and edit nothing in the acceptance file. The briefs of rounds 1 and 2, `handoff/TASK-068.md` and `handoff/TASK-068-r2.md`, stay in force for everything this brief does not change.
++
++Satisfies: R-088 - as round 1's brief.
++
++## Scope
++Files you may create or modify:
++- bridge/cursor-bridge/in-flight.py
++- bridge/cursor-bridge/loop-guard.py
++- bridge/cursor-bridge/MANIFEST.json
++- tests/test_loop_guard.py
++- docs/BUILDER_NOTES.md
++- handoff/TASK-068-r3-report.md
++
++Limits on these files: `loop-guard.py`: correction 1 alone, inside `last_field` (`field` and every other function unchanged). `in-flight.py`: corrections 2 and 3 alone. `MANIFEST.json` only as regenerated. `tests/test_loop_guard.py`: one `test_r088_` case you add for correction 1; no other case changes. `tests/test_program_in_flight.py` is the supervisor's, read only. `docs/BUILDER_NOTES.md`: correction 4, a new line at the file's end.
++
++## Out of scope
++As the earlier rounds' briefs. Nothing beyond the four corrections: no refactoring, no other finding of the reviews (the supervisor records the rest in `docs/HARDENING.md`), no option, no environment variable, no new dependency.
++
++## Corrections
++1. **An empty `Paused:` line reads as empty (a defeated safety mechanism).** In `last_field`, the white space the pattern allows after the colon, and around the value, matches spaces and tabs only (`[ \t]*` where `field`'s pattern has `\s*`), never a line break, so `Paused:` alone on its line gives the value `""` (no wait), a later line never becomes its value, and `Paused:` followed by `Paused: resumed` gives `resumed`. `field` is not changed. Add a `test_r088_` case to `tests/test_loop_guard.py` with a log `Paused: x` / `Paused:` / `<stamp> text`, read as no wait.
++2. **The log is never written through a hard link, and the checks hold at the write (security).** The log is opened with `O_NOFOLLOW` where the platform has it, beside the flags it has; after the open and before any byte is written, `os.fstat` of the open log must show one link (`st_nlink == 1`), and round 2's folder checks (`_log_blocked`) are run again; either failing ends the run with exit 2, the message `in-flight: REFUSED - <reason>`, and nothing appended.
++3. **The file read is the file checked, compared without following (security).** For `--file`, take `os.lstat` of the checked real path during the checks, before the open, and compare `os.fstat` of the opened file with that result (`st_dev` and `st_ino`, where both are non-zero), in place of round 2's `os.stat` after the open.
++4. **The notes say where the lock is (records).** Append one line to `docs/BUILDER_NOTES.md` saying that, since round 2, the Windows lock sits on the byte at `2**31`, not byte 0 as round 1's line says.
++
++## Context
++The acceptance file gained three cases after the line `# Round 3 (TASK-068-r3)`: an empty `Paused:` line never takes the next line as its value (through the loop guard's own `paused_in_flight`); an `in-flight.md` that is a hard link to a file outside the Workspace is refused, the outside file unchanged; a `run/supervisor/` linked to another folder of the same Workspace is refused. On round 2's code: "2 failed, 1 passed" (the third already holds; keep it holding).
++
++Threat model: as round 1's brief. The log decides, through the loop guard, whether the supervisor may end its turn.
++
++## Acceptance criteria
++- [ ] Every test in `tests/test_program_in_flight.py` passes (round 1's symbolic-link case skipped where the account cannot create a link), and every test of round 1's Done list passes.
++- [ ] Corrections 1 to 4 met, each named in the report with its function and lines.
++- [ ] Every line added ASCII.
++
++## Constraints
++The earlier rounds' Constraints all stand. Mutations by hand, in process, each reverted, listed by label with the pytest line that shows a test failing, else `not run`: (H1) `last_field`'s `\s*` restored; (H2) the log's `st_nlink` check dropped; (H3) the `--file` comparison made against `os.stat` after the open again. Prefer the smallest change.
++
++## Done
++Your report is `handoff/TASK-068-r3-report.md`, in round 2's form (files changed; summary; each correction with its function and lines; every command below with its output, verbatim, in fenced blocks; the mutations H1 to H3; a last section headed exactly `Assumed, not verified`). It names no computer path: `<Workspace>` for the repository folder, `<tmp>` for a temporary folder.
++
++Run round 2's Done list, commands 1 to 12, in order, from the Workspace root, after your last edit, each in the foreground, with no environment change; quote the last run. Every pytest summary line quoted verbatim; never restate a count in prose. Your last message is the summary and the report file's path, and nothing follows it.
+diff --git a/handoff/TASK-068.md b/handoff/TASK-068.md
+new file mode 100644
+index 0000000..662f85a
+--- /dev/null
++++ b/handoff/TASK-068.md
+@@ -0,0 +1,223 @@
++---
++record: brief
++header: 1
++id: "TASK-068"
++round: 1
++satisfies: [R-088]
++scope: ["bridge/cursor-bridge/in-flight.py", "bridge/cursor-bridge/bridge_env.py", "bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/pace-report.py", "bridge/cursor-bridge/loop-guard.py", "bridge/cursor-bridge/settings.bridge.json", "bridge/cursor-bridge/MANIFEST.json", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "tests/test_loop_guard.py", "tests/test_bridge_run.py", "tests/test_pace_report.py", "tests/test_dump_cli.py", "tests/test_allowlist.py", "docs/BUILDER_NOTES.md", "handoff/TASK-068-r1-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# TASK-068: the in-flight program (R-088)
++
++Round cause: first round (no earlier round)
++
++## Objective
++Between merges the supervisor keeps its live position (what is in flight, since when, a pause) in the untracked file `run/supervisor/in-flight.md` of the Workspace. Today it writes that file by hand, with a time it types itself. This increment makes the writing a program, `bridge/cursor-bridge/in-flight.py`, installed as `python ~/.claude/cursor-bridge/in-flight.py`. It appends one clock-stamped line to the log of the Workspace the current folder belongs to: a text given as one argument, or the text of a file under `run/supervisor/` (`--file`), or, with `--pass <name> <reviewer>` and the optional `--round <n>` and `--cause <cause>`, a tagged line recording a review pass, which the pace report reads later (TASK-069). It prints what it wrote and refuses, writing nothing, outside a Workspace, with no text, with two sources, or with a word outside its lists. The round causes, which the launcher and the pace report each hold a copy of today, move to one list in `bridge_env.py` that both read and this program reads. The loop guard's refusal, which still sends the supervisor to the status file's `In flight:` line, names the in-flight log and this program instead. The program gets its allow entry, and the generated files (the command reference and MANIFEST) are regenerated. The texts that still send the live position to the status file (rule 54, calibration's step 0, the parallel builders' paragraph) and KP-041's retirement are TASK-078's, not yours.
++
++Satisfies: R-088 - The live position is written by a program (C15, J3): `in-flight.py` appends one line, `<UTC time from the clock> <text>`, to the Workspace's `run/supervisor/in-flight.md`, the text from a file under `run/supervisor/` (`--file`) or from one argument, and with `--pass <name> <reviewer>` and the optional `--round <n>` and `--cause <cause>` a tagged line for a review pass; it refuses outside a Workspace or with no text and prints what it wrote; the loop guard's refusal and the three texts that sent the live position to the status file's `In flight:` line (rule 54, calibration's step 0, the parallel builders' paragraph) name the in-flight log and this program, and KP-041 is retired. (Its row in `docs/REQUIREMENTS.md`, line 114. This brief serves the program, the one list of causes and the loop guard's refusal. The three texts and KP-041 are TASK-078's.)
++
++## Scope
++Files and directories you may create or modify:
++- bridge/cursor-bridge/in-flight.py
++- bridge/cursor-bridge/bridge_env.py
++- bridge/cursor-bridge/bridge-run.py
++- bridge/cursor-bridge/pace-report.py
++- bridge/cursor-bridge/loop-guard.py
++- bridge/cursor-bridge/settings.bridge.json
++- bridge/cursor-bridge/MANIFEST.json
++- docs/cli-reference.json
++- docs/CLI_REFERENCE.md
++- tests/test_loop_guard.py
++- tests/test_bridge_run.py
++- tests/test_pace_report.py
++- tests/test_dump_cli.py
++- tests/test_allowlist.py
++- docs/BUILDER_NOTES.md
++- handoff/TASK-068-r1-report.md
++
++Limits on these paths:
++- `bridge/cursor-bridge/in-flight.py` is new. You write all of it.
++- `bridge/cursor-bridge/bridge_env.py`: add exactly two things, the constant `ROUND_CAUSES` (R9) and one function that finds the Workspace (R2). Change nothing else in the file.
++- `bridge/cursor-bridge/bridge-run.py`: line 990 (`ROUND_CAUSES = ("defect", ...)`) becomes a reading of `bridge_env.ROUND_CAUSES`; the module keeps a module-level name `ROUND_CAUSES` equal to it. Nothing else changes; `round_cause` (lines 994-1007) is untouched.
++- `bridge/cursor-bridge/pace-report.py`: line 431 becomes `bridge_env.ROUND_CAUSES` with `"unstated"` appended, kept under the module-level name `ROUND_CAUSES`. Nothing else changes.
++- `bridge/cursor-bridge/loop-guard.py`: only the text of the refusal at line 638 (R10). Its decision, every other message and the docstring stay as they are.
++- `bridge/cursor-bridge/settings.bridge.json`: add exactly one line to the `allow` list, the entry `"Bash(python ~/.claude/cursor-bridge/in-flight.py:*)",` placed directly after the line `"Bash(python ~/.claude/cursor-bridge/push-scan.py:*)",` (line 73). Change nothing else in the file. It must stay valid JSON.
++- `tests/test_dump_cli.py`: add `"in-flight.py"` to the `ARGPARSE` tuple (lines 33-34) and change nothing else. Without it, `test_cfgb3b_docstring_entries_hold_the_whole_docstring` expects a docstring entry for the new program and fails.
++- `tests/test_allowlist.py`: add one test, `test_r088_in_flight_rule_in_allow`, beside `test_r087_push_scan_rule_in_allow` (line 257) and in its form (R11). Change nothing else.
++- `tests/test_loop_guard.py`: add one test naming R-088 that pins the refusal (R10). Change nothing else.
++- `tests/test_bridge_run.py` and `tests/test_pace_report.py`: the plan lists them so that you run them. Change nothing in either: they must pass unedited (the plan's Scope notes).
++- `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` change only by running `python tools/dump-cli.py` (Done). Afterwards `python tools/dump-cli.py --check` must exit 0. Never edit either by hand.
++- `bridge/cursor-bridge/MANIFEST.json` changes only by running `python tools/make-manifest.py` (Done). Never edit it by hand. `bridge/cursor-bridge/VERSION` is outside Scope and reads `2026.11.12a`. `make-manifest.py` rewrites its line endings, so restore it with `git restore bridge/cursor-bridge/VERSION` right after (Done).
++
++Read-only for you (already done and committed by the supervisor on this branch, commit 48bcfa6; the plan's Scope names them, this brief does not):
++- `docs/diagrams/D-002-components.md` (the element `in_flight`, the edges `in_flight --> bridge_env` and `dump_cli -.-> in_flight`, the count fifteen);
++- `tests/test_program_in_flight.py` (the acceptance tests).
++
++Read and run them. Edit neither.
++
++Do not modify anything else.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration
++- docs/ and handoff/, except the files the Scope section names. Every record under docs/ is the supervisor's, the diagrams included.
++- `tests/test_program_in_flight.py` and every test file the Scope does not name. You add no test file. If a case of the acceptance tests seems wrong, report it by its test id.
++- Every other program under `bridge/cursor-bridge/`, `review-guard.py` included (the guard reads the list from TASK-069 on).
++- The texts under `bridge/commands/`, `bridge/agents/` and `bridge/cursor-bridge/workflow/` (TASK-078), and `bridge/cursor-bridge/CHANGELOG.md`.
++- The eighth cause, `base update` (TASK-069). The list stays the seven.
++- `tools/make-manifest.py`, `tools/dump-cli.py` (you run them, Done, and edit neither).
++- Any mutation script. The mutants file and the mutation run are the supervisor's, after your run.
++
++## Context
++**The design that binds this increment:** `docs/DESIGN.md`, "Change: the program release", "Measurement", the bullet *C15* and *J3* (line 351), and in the next bullet (line 352) the sentence beginning "The round causes stand once, in `bridge_env.py`". The plan entry is `docs/BUILD_PLAN.md`, `### TASK-068` (line 1870), its Scope notes and Done when.
++
++**The reality check (the supervisor's, on this branch's checkpoint).**
++- `bridge/cursor-bridge/in-flight.py` does not exist yet. `bridge_env.py` has no `ROUND_CAUSES` and no function that finds a Workspace from a folder.
++- `bridge/cursor-bridge/bridge-run.py` line 990 and `bridge/cursor-bridge/pace-report.py` line 431 each hold their own tuple of the causes (the report's with `"unstated"` appended). Both already import `bridge_env` at module level (`bridge-run.py` line 115, `pace-report.py` line 48).
++- `tests/test_release_s_launcher.py` (outside Scope) line 485 asserts `program("pace-report").ROUND_CAUSES == program("bridge-run").ROUND_CAUSES + ("unstated",)`: both modules keep the name `ROUND_CAUSES`, both tuples. It must pass unedited.
++- `bridge/cursor-bridge/loop-guard.py` line 638 writes the refusal for a background agent with no timer; it tells the supervisor to "write it on the status file's `In flight:` line". The guard also reads a pause from the log: `paused_in_flight(cwd)` (line 272) finds the Workspace with `workspace_of` (line 258) and reads the log with `field(text, "Paused")` (line 191), whose pattern `^\s*(?:[-*]\s+)?[*_`]*Paused[*_`]*\s*:` (multiline, any letter case) matches only a line that begins with `Paused:` (after spaces, a bullet or emphasis marks). A `Paused:` line behind a time stamp is not read. The test `test_r088_a_paused_line_in_the_file_stays_a_line_the_loop_guard_reads` loads the guard and calls `paused_in_flight` on the scratch Workspace.
++- `tests/test_loop_guard.py` line 276-280 drives `lg.main()` into this refusal (stdin JSON with an agent and no timer) and asserts `The computer's clock reads`, `KP-043` and `wake-timer` in stderr: the pattern for your pin.
++- `tools/dump-cli.py` loads every program of `bridge/cursor-bridge/` that has a `__main__` block and a top-level `build_parser`, imports it and calls `build_parser()`: importing `in-flight.py` must run nothing, read nothing and write nothing. `test_r055_d002_the_programs_dump_cli_loads_equal_the_diagrams_edges` compares those loads with D-002's `dump_cli` edges and fails until the program exists.
++- The program follows `bridge/cursor-bridge/push-scan.py`: a shebang, a module docstring, `HERE = os.path.dirname(os.path.abspath(__file__))`, `sys.path.insert(0, HERE)`, `import bridge_env` (lines 28-30, a plain import); `def build_parser():` at module top level with no argument, returning the parser, and `def main():` (no argument) calling it and building no parser of its own (lines 1240-1258); `if __name__ == "__main__": sys.exit(main())` (lines 1261-1262).
++
++**The supervisor's acceptance tests.** `tests/test_program_in_flight.py` fixes the interface; read it whole. Each case builds a scratch Workspace under pytest's `tmp_path` (`<tmp>/proj/Workspace` holding `docs/PROJECT_STATUS.md`), runs the program as a child with `sys.executable` from a folder inside it, and reads the log `run/supervisor/in-flight.md`. The stamp form is `STAMP = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z"`; the tests read the stamp from a line's first 17 characters and the text from character 18 on. The reviewer kinds are `REVIEWERS` and the causes `SEVEN` (lines 29-30). The three static cases read the sources of `bridge-run.py`, `pace-report.py` and `in-flight.py`: each must contain the text `bridge_env.ROUND_CAUSES`, and none may match the regex `["']builder incomplete["']\s*,\s*["']brief error["']` anywhere (comments and docstrings included). One case reads `loop-guard.py`'s source for `in-flight.py` and `run/supervisor/in-flight.md`, and for the absence of the words "status file's `In flight:` line".
++
++**Known failures before your change** (the supervisor's run on the checkpoint; quote your own runs): `tests/test_program_in_flight.py` 36 failed, 1 skipped; in `tests/test_dump_cli.py`, `test_r055_d002_the_programs_dump_cli_loads_equal_the_diagrams_edges` fails (the edge to `in_flight` has no program). After your change: `tests/test_program_in_flight.py` all pass except `test_r088_a_file_reached_through_a_link_is_refused`, which is skipped on an account that cannot create a symbolic link (this computer's), and every other command of the Done list passes.
++
++**External services.** None. The program calls no service, no network and no git, and starts no process, so no time limit or retry applies to it. This session has no `claude` on PATH (`claude --version`: command not found); nothing in this increment calls it.
++
++**Trust boundaries and security context.** The ASVS level is 2 (`docs/INVENTORY.md`, Decisions, line 137). `.cursor/rules/secure-coding.mdc` is in force for you. Outside input, each crossing a boundary into the program: the command-line words (the text, the path, the name, the reviewer, the round, the cause), the content of the `--file` file, and the file system it walks (the folders above the current folder, a link under `run/supervisor/`). The log is read later by the supervisor, the loop guard, the session-start hook and the pace report, so what it writes must not be able to forge a line: no control character reaches it, and only the lines R5 names are written. The program writes one file, the log, and creates its folder; nothing else.
++
++**Development data.** The inventory's decision (`docs/INVENTORY.md`, Decisions, the row beginning `Development data:`) reads: "the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet". For you this means: run `in-flight.py` only through the tests, on their scratch Workspaces under `tmp_path`. Never run it from inside this repository: this Workspace's `run/supervisor/in-flight.md` is the supervisor's live log, and a run from here would append to it. Never install anything and never copy anything under `~/.claude`. `python tools/dump-cli.py` imports the module (Done), which is why importing it must do nothing.
++
++**Host.** Windows 11, with Python as on the owner's interpreter; CI also runs on Linux. On Windows, Python's append mode is the C runtime's move to the end of the file followed by a write, which is not one operation across processes; R6's guarantee must hold on both systems.
++
++## Diagrams
++`docs/diagrams/D-002-components.md` (the component diagram) draws the program, its one edge to the library and the generator's load of it (lines 105, 159, 171, quoted):
++
++```mermaid
++        in_flight["in-flight.py"]
++    in_flight --> bridge_env
++    dump_cli -.-> in_flight
++```
++
++`in-flight.py` imports `bridge_env` and no other bridge program: it does not load `loop-guard.py` or any sibling by file. `bridge_run --> bridge_env` and `pace_report --> bridge_env` exist already, so the move of the list adds no edge. The program must be one `dump-cli.py` loads (a `__main__` block and a top-level `build_parser`). If the task cannot be done within this diagram, stop and report the conflict instead of deviating.
++
++## Requirements
++1. **R1. The command.** `python in-flight.py <text>`, `python in-flight.py --file <path>`, or `python in-flight.py --pass <name> <reviewer> [--round <n>] [--cause <cause>]`, with argparse, a top-level `build_parser()` and `main()` as Context says. Exactly one of the three sources: none, two of them (a text with `--file`, a text or `--file` with `--pass`), or `--round` or `--cause` without `--pass` is refused (R7). The parser's description and help name no path of this computer and no user name.
++2. **R2. The Workspace.** The Workspace is the current folder or its nearest parent that holds `docs/PROJECT_STATUS.md` as a file, found by one new function in `bridge_env.py` that takes the start folder as its argument and returns the folder's absolute path or `None`; `in-flight.py` calls it with the current folder. No Workspace: refused (R7), and no `run/` folder is created anywhere. The log is `<Workspace>/run/supervisor/in-flight.md`; its folder and the file are created where absent.
++3. **R3. The stamp.** The UTC time from the clock when the program runs, to the minute, written `YYYY-MM-DDTHH:MMZ` (17 characters, for example `2026-11-20T09:05Z`), followed by one space and the text.
++4. **R4. The text.**
++   - From the argument: the one word as given, its leading and trailing spaces removed.
++   - From `--file`: the file's text read as UTF-8 (a leading byte-order mark dropped), split into lines at CR LF, LF or CR, blank lines dropped, the rest joined by one space, leading and trailing spaces removed (so `first part\r\nsecond part\nthird part\n` gives `first part second part third part`). The file holds at most 65,536 bytes; a larger one, one that is not UTF-8, a missing path or a folder is refused (R7).
++   - `--file` names a file under that Workspace's `run/supervisor/` by its resolved path: the path, resolved (`..` and links followed), must lie inside the resolved `<Workspace>/run/supervisor/` folder, at any depth, and is not the log itself. A path that reaches the file through a link (the file a symbolic link, or a folder between `run/supervisor/` and the file a symbolic link or a junction) is refused, even when the link stands under `run/supervisor/`. Path comparison follows the platform's case rules (`os.path.normcase`).
++   - A text (either source, after the line breaks of a file are made spaces) that is empty, or that holds a character of Unicode category Cc, Cf, Zl or Zp (a tab, an escape, a line break in the argument, a right-to-left override U+202E), is refused (R7).
++5. **R5. The lines written.**
++   - A text: one line, `<stamp> <text>`.
++   - Where a line of the text (a line of the `--file` file, or the argument) begins with `Paused:` in any letter case after leading spaces, that line is written once more, after the stamped line, as a line of its own with no stamp, its leading spaces removed, so that the loop guard's `paused_in_flight` reads it. Several such lines follow in their order. The stamped line still holds the whole text.
++   - `--pass <name> <reviewer>`: one line, `<stamp> PASS <name> r<n> <reviewer> <cause>`, where ` r<n>` is left out when `--round` is not given and ` <cause>` is left out when `--cause` is not given (the pace report reads a pass line with no round as round 1 and with no cause as `unstated`, TASK-069).
++     - `<name>` matches `bridge_env.GRAMMAR_ID_PATTERN` (`[A-Z][A-Za-z0-9-]*`, bridge_env.py line 428) whole: an increment's ID (`TASK-068`) or a pull request's `PR-<n>` (`PR-7`).
++     - `<reviewer>` is exactly one of `review-a`, `review-b`, `security-auditor`, `design-auditor`, `plan-critic`, `design-critic-b`, `supervisor`.
++     - `<n>` is a whole number from 1 to 999, parsed with `int` (`zero`, `0`, `-1`, `1.5` are refused).
++     - `<cause>` is exactly one of `bridge_env.ROUND_CAUSES`, given as one word (`--cause "no external path"`); the source names `bridge_env.ROUND_CAUSES` and holds no copy of the list. `unstated` is not accepted.
++   - Each line ends with LF; the file is written as UTF-8.
++6. **R6. One append.** All the lines of one run reach the file in one append, so runs started together never interleave within a line and never lose a line (`test_r088_concurrent_runs_never_interleave_within_a_line`: eight runs, each with a text of about 3,600 characters). Where the existing file is not empty and does not end with a line break, the appended block begins with LF, so the new line is a line of its own. What stands in the file is never rewritten. Any wait for the file is bounded: at most 10 seconds, then refused (R7) with nothing written.
++7. **R7. Refusals.** Every refusal exits 2 and writes nothing: no log line, no `run/` or `run/supervisor/` folder created. All checks (R1, R2, R4, R5) run before the first write. Argparse's own usage errors exit 2 as well. A refusal prints one line to stderr, `in-flight: REFUSED - <reason>`, naming the reason and never a traceback; it never prints a path of this computer.
++8. **R8. The output.** On success, exit 0 and print every line it wrote, each whole, to stdout, encoded as UTF-8 whatever the console's code page (as `push-scan.py`'s `say` does).
++9. **R9. The one list of round causes.** `bridge_env.py` gains `ROUND_CAUSES`, a tuple of exactly the seven causes in this order: `"defect", "security", "fix-induced", "no external path", "records", "builder incomplete", "brief error"`. `bridge-run.py` keeps a module-level `ROUND_CAUSES` that is `bridge_env.ROUND_CAUSES` (its `round_cause` unchanged); `pace-report.py` keeps a module-level `ROUND_CAUSES` that is `bridge_env.ROUND_CAUSES` with `"unstated"` appended (the report's word for none). Neither holds a tuple of the causes of its own; `"unstated"` is not added to bridge_env's list. `in-flight.py` reads `bridge_env.ROUND_CAUSES` for `--cause`.
++10. **R10. The loop guard's refusal.** In the refusal at `loop-guard.py` line 638, the words "write it on the status file's `In flight:` line" give way to words that send the supervisor to the in-flight log through the program, naming both `run/supervisor/in-flight.md` and `python ~/.claude/cursor-bridge/in-flight.py`. The refusal's first words stay `Loop guard (Claude-Cursor Bridge, rule 43): you are waiting on a background agent with no timer running to its ceiling:`; the rest of it, its exit code and the guard's decision are unchanged; the output stays ASCII. The source no longer holds "status file's `In flight:` line". In `tests/test_loop_guard.py`, one new test whose name begins `test_r088_` drives `lg.main()` into this refusal as lines 276-280 do and asserts that stderr begins with those first words and holds `run/supervisor/in-flight.md` and `in-flight.py`.
++11. **R11. The allow entry and its pin.** The entry in `settings.bridge.json` exactly as the Scope's limits say. `test_r088_in_flight_rule_in_allow` in `tests/test_allowlist.py` asserts the rule `Bash(python ~/.claude/cursor-bridge/in-flight.py:*)` is in `ALLOW` and that `decide(cmd, ALLOW, DENY)[0] == "allow"` for each of `python ~/.claude/cursor-bridge/in-flight.py "TASK-068 builder r1 launched"`, `python ~/.claude/cursor-bridge/in-flight.py --file run/supervisor/line.txt`, `python ~/.claude/cursor-bridge/in-flight.py --pass PR-7 review-a --round 2 --cause records` and `python ~/.claude/cursor-bridge/in-flight.py --pass TASK-068 review-b --round 1 --cause "no external path"`. If `decide` does not allow one of them, stop and report it by the command; do not change the permission rules or the guard.
++12. **R12. The generated files.** `tests/test_dump_cli.py`'s `ARGPARSE` gains `"in-flight.py"` (Scope's limits). Regenerate the command reference with `python tools/dump-cli.py`; `python tools/dump-cli.py --check` then exits 0. Regenerate MANIFEST with `python tools/make-manifest.py` and restore VERSION.
++13. **R13. The source.** `in-flight.py` is ASCII only, imports only the standard library and `bridge_env`, starts no process and makes no network call.
++
++## Acceptance criteria
++- [ ] The Done section's first pytest command passes whole: `tests/test_program_in_flight.py` with only the link case skipped where the account cannot create a symbolic link; `tests/test_dump_cli.py`, `tests/test_allowlist.py` and `tests/test_loop_guard.py` give no failure.
++- [ ] The Done section's second pytest command passes whole: `tests/test_bridge_run.py`, `tests/test_pace_report.py` and `tests/test_release_s_launcher.py`, unedited.
++- [ ] One appended line per text, `<YYYY-MM-DDTHH:MMZ> <text>`, from the argument or from a file under `run/supervisor/`, a `Paused:` line kept as its own line, the log and its folder created where absent, the lines printed (R3-R5, R8).
++- [ ] The pass line `<stamp> PASS <name> r<n> <reviewer> <cause>` with the seven reviewer kinds and the seven causes, each word outside its list refused (R5).
++- [ ] Each refusal of R1, R2, R4, R5 and R6 exits 2 and writes nothing, no folder included (R7).
++- [ ] Runs started together leave whole lines, none lost, on Windows and Linux (R6).
++- [ ] `bridge_env.ROUND_CAUSES` is the seven, read by the launcher, the report and the program, none holding a copy (R9).
++- [ ] The loop guard's refusal names `run/supervisor/in-flight.md` and `in-flight.py`, its first words pinned by a `test_r088_` test, its decision unchanged (R10).
++- [ ] `in-flight.py` imports `bridge_env` plainly and no other bridge program; `build_parser` stands at top level; importing it does nothing (D-002).
++- [ ] `python tools/dump-cli.py --check` exits 0. MANIFEST is regenerated. `bridge/cursor-bridge/VERSION` reads `2026.11.12a` and is not listed by `git status --short`. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` prints `RESULT: SOURCES MATCH`.
++- [ ] `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks` passes.
++- [ ] `settings.bridge.json` gains exactly the one allow line and stays valid JSON; `test_r088_in_flight_rule_in_allow` passes (R11).
++- [ ] R-088 (the parts this brief serves) is fully met: no stand-in, placeholder or "later" text in the program. The acceptance tests naming R-088 are the supervisor's; your two new tests name R-088 too.
++- [ ] No new dependency (standard library only), configuration key or environment variable. No new Semgrep high finding. No exception escapes as a traceback (ASVS L2).
++
++## Constraints
++- Do not add dependencies (the standard library only).
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it, and everything you produce goes inside it.
++- Do not edit `tests/test_program_in_flight.py`, `docs/diagrams/D-002-components.md`, or anything else outside Scope. If a test case seems wrong, stop and report it by its test id instead of working around it.
++- If the brief, the rules, or the tooling got in your way (an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason), append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall: one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks.
++- **No owner's names, no paths.** Nothing you write (the program, the notes line, the report) holds a path of this computer or a user name. In the report write `<Workspace>` for the repository folder and `<tmp>` for a temporary folder, including in quoted command output.
++- **Never run `in-flight.py` from inside this repository** or on any folder but the tests' scratch Workspaces (Context, "Development data"): it would append to the supervisor's live log.
++- **Windowless launches.** The program starts no process. If you find you need one, stop and report it.
++- Never start a server, a watcher or a daemon. Run every command synchronously, in the foreground, and wait for it to end. Leave nothing running when you finish.
++- **Do NOT run the full `tests/` tree** (`python -m pytest`, `python -m pytest tests`, or any command that collects all of it). Run only the commands the Done section names, exactly as written, from the Workspace root, with no `PYTHONPATH` or other environment change. The whole suite is CI's run.
++- Never run the product, a migration, a seed or a test against the owner's live data. Never install anything.
++- Follow existing conventions of `bridge/cursor-bridge/` programs: a module docstring holding the usage, ASCII program text, results returned as values, `main()` returning the exit code through `sys.exit(main())` in the `__main__` block.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`. You read with `git status`, `git diff` and `git log` only. The single exception is `git restore bridge/cursor-bridge/VERSION` in the Done section.
++- Numbers from the command line (`--round`) are parsed with `int`, never by slicing; the round is a whole number from 1 to 999. The file bound is 65,536 bytes; the wait bound is 10 seconds.
++- **Mutation self-check (by hand, in process, no script in the diff).** The supervisor's mutants file sweeps the program after your run, and every mutant must fail a test. Before you finish, apply each of these by hand, one at a time, run `python -m pytest -p no:cacheprovider -q tests/test_program_in_flight.py` from the Workspace root (for M12, `tests/test_loop_guard.py`), and revert. List each in the report by its label and text, with the test id that caught it, or `not caught`:
++  - M1 the stamp written in local time instead of UTC;
++  - M2 the stamp written to the second;
++  - M3 the log opened for writing instead of appending;
++  - M4 the Workspace taken to be the current folder, with no walk to its parents;
++  - M5 a `Paused:` line of the file joined into the stamped line only;
++  - M6 a `--file` path accepted without resolving `..`;
++  - M7 a `--file` path outside `run/supervisor/` but inside the Workspace accepted;
++  - M8 a text holding an escape character accepted;
++  - M9 a reviewer outside the list accepted;
++  - M10 `--cause` accepted outside `bridge_env.ROUND_CAUSES`;
++  - M11 the log's folder created before the checks run;
++  - M12 the loop guard's refusal's first words changed.
++
++  You cannot add a test to `tests/test_program_in_flight.py`. A mutant no test catches is reported as `not caught`, with one line on the case that would catch it; the supervisor adds it. The link refusal is skipped on this computer: say in the report that it was not exercised.
++- **Known failures.** Context lists the cases that fail before your change. If a case fails that your change did not cause, report it by its test id with its failure lines and fix none.
++- Prefer reuse over new code: `bridge_env.GRAMMAR_ID_PATTERN`, the standard library (`argparse`, `datetime`, `os`, `unicodedata`), and the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a security, observability or accessibility requirement stated above.
++- Rules in force for you: `.cursor/rules/secure-coding.mdc`, `.cursor/rules/workspace-boundary.mdc` and the frozen `minimal-code.mdc`.
++
++## Done
++Your report is the file `handoff/TASK-068-r1-report.md`, which you write as you go: what you did, what you changed, what you ran and what it printed, and what you could not do, so that nothing of it is lost if your run ends early. It names no computer path and no user name: write `<Workspace>` for the repository folder and `<tmp>` for a temporary folder, including in quoted command output.
++
++When you finish, it holds:
++- a list of every file you changed;
++- a one-paragraph summary of what you did;
++- for R1-R13, one line each on what meets it, naming the functions and their lines as the files stand after your change (the name of the new `bridge_env` function among them), and one sentence on how R6's one append holds on Windows;
++- the mutation self-check list, M1-M12, each with the test id that caught it (or `not caught` and the case that would);
++- every command of the list below with its output;
++- a section headed exactly `Assumed, not verified`, as the report's last section.
++
++The `Assumed, not verified` section lists every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm: a platform behaviour you expected, an ambiguous requirement you resolved one way, a library behaviour you expected, a value you chose. Examples:
++- that the way you append keeps one run's lines whole against another process on Windows and on Linux beyond the eight runs the test starts;
++- that a junction under `run/supervisor/` is refused as a link, since the link case is skipped on this account.
++
++One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Run these from the Workspace root, in this order, after your last edit, each on its own, synchronously in the foreground, with no `PYTHONPATH` or other environment change:
++1. `git status --short`
++2. `python tools/dump-cli.py`
++3. `python tools/dump-cli.py --check` (expect exit 0)
++4. `python tools/make-manifest.py`
++5. `git restore bridge/cursor-bridge/VERSION`
++6. `python -m pytest -p no:cacheprovider -q -rs tests/test_program_in_flight.py tests/test_dump_cli.py tests/test_allowlist.py tests/test_loop_guard.py`
++7. `python -m pytest -p no:cacheprovider -q tests/test_bridge_run.py tests/test_pace_report.py tests/test_release_s_launcher.py` (`tests/test_release_s_launcher.py` is outside Scope. A failure there is reported by test id, never fixed in that file.)
++8. `python -m pytest -p no:cacheprovider -q tests/test_install_check.py tests/test_tests_windowless.py` (outside Scope. A failure here is reported by test id, never fixed in those files.)
++9. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` (expect `RESULT: SOURCES MATCH`)
++10. `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++11. `python -c "open('bridge/cursor-bridge/in-flight.py','rb').read().decode('ascii'); print('ascii ok')"` (expect `ascii ok`)
++12. `git rev-parse HEAD` and `git status --short` (`bridge/cursor-bridge/VERSION` must not be listed; if it is, report it)
++
++Quoting rules:
++- Every command you ran is quoted in the report with the lines it printed, verbatim, in a fenced block.
++- Each pytest summary line is quoted verbatim in a fenced block. Never restate a count in prose.
++- A claim that a check passed quotes the output line that shows it. A number of failing or skipped cases is backed by the pytest lines naming them (`-rs` prints the skip's reason).
++- Each mutation is listed by its label and text, with what caught it.
++- A command you did not run is written `not run`, never described as run.
++- Write the report's results after step 12, naming the commit its counts belong to (`git rev-parse HEAD`) and whether the working tree then held uncommitted changes (`git status --short`).
++
++Your last message is the summary and the report file's path, and nothing follows it. The supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/tests/test_allowlist.py b/tests/test_allowlist.py
+index bf38b40..be3d52b 100644
+--- a/tests/test_allowlist.py
++++ b/tests/test_allowlist.py
+@@ -263,6 +263,17 @@ def test_r087_push_scan_rule_in_allow():
+         assert decide(cmd, ALLOW, DENY)[0] == "allow", cmd
+ 
+ 
++def test_r088_in_flight_rule_in_allow():
++    """R-088 (TASK-068): in-flight.py is allowed for a text, a file, and a review pass."""
++    rule = "Bash(python ~/.claude/cursor-bridge/in-flight.py:*)"
++    assert rule in ALLOW
++    for cmd in ('python ~/.claude/cursor-bridge/in-flight.py "TASK-068 builder r1 launched"',
++                "python ~/.claude/cursor-bridge/in-flight.py --file run/supervisor/line.txt",
++                "python ~/.claude/cursor-bridge/in-flight.py --pass PR-7 review-a --round 2 --cause records",
++                'python ~/.claude/cursor-bridge/in-flight.py --pass TASK-068 review-b --round 1 --cause "no external path"'):
++        assert decide(cmd, ALLOW, DENY)[0] == "allow", cmd
++
++
+ def test_r062_records_migrate_rule_in_allow():
+     """R13: records-migrate.py is allowed for a normal run and for --check."""
+     rule = "Bash(python ~/.claude/cursor-bridge/records-migrate.py:*)"
+diff --git a/tests/test_dump_cli.py b/tests/test_dump_cli.py
+index d948800..0816deb 100644
+--- a/tests/test_dump_cli.py
++++ b/tests/test_dump_cli.py
+@@ -31,7 +31,7 @@ MD_REL = "docs/CLI_REFERENCE.md"
+ EXTRACTED = ("completion-check.py", "diagram-check.py", "evaluate-reports.py", "inventory-check.py", "plan-check.py",
+              "sync-check.py")
+ ARGPARSE = EXTRACTED + ("workflow-check.py", "trace-check.py", "records-check.py", "stage-diff.py", "mutation-run.py",
+-             "pace-report.py", "records-migrate.py", "push-scan.py")
++             "pace-report.py", "records-migrate.py", "push-scan.py", "in-flight.py")
+ ACTION_KEYS = {"option_strings", "dest", "nargs", "type", "default", "required", "choices", "help"}
+ CHECK_CMD = "python tools/dump-cli.py --check"
+ BRIDGE_PLACEHOLDER = "<bridge folder>/"
+diff --git a/tests/test_loop_guard.py b/tests/test_loop_guard.py
+index c25e9d6..ca20971 100644
+--- a/tests/test_loop_guard.py
++++ b/tests/test_loop_guard.py
+@@ -280,6 +280,24 @@ def test_the_refusal_prints_the_ceiling_on_the_computers_clock(lg, tmp_path, mon
+     assert e.value.code == 2 and "The computer's clock reads" in err and "KP-043" in err and "wake-timer" in err, err
+ 
+ 
++def test_r088_the_refusal_names_the_in_flight_log_and_the_program(lg, tmp_path, monkeypatch, capsys):
++    """R-088: a background agent with no timer is refused, and the refusal names the in-flight log and in-flight.py."""
++    from datetime import datetime as dt
++    root = tmp_path / "proj" / "Workspace"
++    (root / "docs").mkdir(parents=True)
++    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\nAwaiting user on: nothing\n", encoding="utf-8")
++    agent = {"id": "a1", "type": "background_subagent", "status": "running", "description": "Review A", "command": "Agent", "started_at": ts(-600)}
++    late = dt.fromtimestamp(NOW - 600 + 3600 + 3600)
++    cron = {"id": "c1", "schedule": "%d %d %d %d *" % (late.minute, late.hour, late.day, late.month), "description": "an hour late", "command": "", "last_run_at": None}
++    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps({"cwd": str(root), "transcript_path": str(root / "none"), "hook_event_name": "Stop", "background_tasks": [agent], "session_crons": [cron]})))
++    with pytest.raises(SystemExit) as e:
++        lg.main()
++    err = capsys.readouterr().err
++    first = "Loop guard (Claude-Cursor Bridge, rule 43): you are waiting on a background agent with no timer running to its ceiling:"
++    assert e.value.code == 2 and err.startswith(first), err
++    assert "run/supervisor/in-flight.md" in err and "in-flight.py" in err, err
++
++
+ def test_the_hook_input_is_read_in_its_live_forms(lg, tmp_path, monkeypatch):
+     """reAngle, 2026-10-10 (field observation on 2026.10.10a): a start as epoch milliseconds, a one-shot
+     cron with its schedule only, a command task under another type name."""
+@@ -455,3 +473,27 @@ def test_r061_agent_ceiling_by_header_matches_line_when_agreeing(lg, tmp_path):
+     (ws / "docs" / "RUN_PARAMETERS.md").write_text(header + line_text, encoding="utf-8")
+     (ws / "docs" / "PROJECT_STATUS.md").write_text("# Status\nPhase: building\nAwaiting user on: none\n", encoding="utf-8")
+     assert lg.agent_ceiling(str(ws)) == 9900
++
++
++def test_r088_the_last_paused_line_decides(lg, tmp_path):
++    """R-088 round 2: the last Paused: line decides, so a later resume is no wait and a later pause is that pause."""
++    root = tmp_path / "proj" / "Workspace"
++    (root / "docs").mkdir(parents=True)
++    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\n", encoding="utf-8")
++    log = root / "run" / "supervisor" / "in-flight.md"
++    log.parent.mkdir(parents=True)
++    log.write_text("Paused: the owner's word\nPaused: resumed\n", encoding="utf-8")
++    assert lg.paused_in_flight(str(root)) is None
++    log.write_text("Paused: resumed\nPaused: the install run sheet\n", encoding="utf-8")
++    assert lg.paused_in_flight(str(root)) == "the install run sheet"
++
++
++def test_r088_an_empty_paused_line_reads_as_no_wait(lg, tmp_path):
++    """R-088 round 3: an empty Paused: line is empty, so the stamped line after it is not a pause."""
++    root = tmp_path / "proj" / "Workspace"
++    (root / "docs").mkdir(parents=True)
++    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\n", encoding="utf-8")
++    log = root / "run" / "supervisor" / "in-flight.md"
++    log.parent.mkdir(parents=True)
++    log.write_text("Paused: x\nPaused:\n2026-11-21T02:43Z text\n", encoding="utf-8")
++    assert lg.paused_in_flight(str(root)) is None
+diff --git a/tests/test_program_in_flight.py b/tests/test_program_in_flight.py
+new file mode 100644
+index 0000000..d5771d7
+--- /dev/null
++++ b/tests/test_program_in_flight.py
+@@ -0,0 +1,453 @@
++"""TASK-068's acceptance tests, the supervisor's (R-088; D-002): the in-flight program.
++enforces: docs/REQUIREMENTS.md R-088; docs/DESIGN.md, Change: the program release, "Measurement" (C15, J3); docs/BUILD_PLAN.md,
++TASK-068, Done when; D-002 (in_flight --> bridge_env). The builder reads and runs these tests and never edits them.
++
++The interface these tests fix (the brief states it):
++  python in-flight.py <text>                       appends `<UTC time to the minute>Z <text>` to the Workspace's
++  python in-flight.py --file <path>                run/supervisor/in-flight.md and prints the line it wrote
++  python in-flight.py --pass <name> <reviewer> [--round <n>] [--cause <cause>]
++                                                   appends `<time> PASS <name> r<n> <reviewer> <cause>`
++  The Workspace is the folder holding docs/PROJECT_STATUS.md that the current folder belongs to. A refusal exits 2 and
++  writes nothing. The round causes stand once, as bridge_env.ROUND_CAUSES, read by the launcher, the pace report and
++  this program.
++
++Every case builds a scratch Workspace under pytest's tmp_path. KP-052: no character outside printable ASCII is typed in
++this file."""
++import datetime
++import os
++import re
++import subprocess
++import sys
++
++import pytest
++
++HERE = os.path.dirname(os.path.abspath(__file__))
++WORKSPACE = os.path.normpath(os.path.join(HERE, os.pardir))
++BRIDGE = os.path.join(WORKSPACE, "bridge", "cursor-bridge")
++PROG = os.path.join(BRIDGE, "in-flight.py")
++
++SEVEN = ("defect", "security", "fix-induced", "no external path", "records", "builder incomplete", "brief error")
++REVIEWERS = ("review-a", "review-b", "security-auditor", "design-auditor", "plan-critic", "design-critic-b", "supervisor")
++STAMP = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z"
++
++
++def scratch(tmp_path):
++    ws = tmp_path / "proj" / "Workspace"
++    (ws / "docs").mkdir(parents=True)
++    (ws / "docs" / "PROJECT_STATUS.md").write_text("# Project Status\nPhase: changing\n", encoding="utf-8")
++    return ws
++
++
++def log_of(ws):
++    return ws / "run" / "supervisor" / "in-flight.md"
++
++
++def run(cwd, *args):
++    assert os.path.isfile(PROG), "in-flight.py is not built"
++    p = subprocess.run([sys.executable, PROG] + list(args), cwd=str(cwd), capture_output=True, timeout=60)
++    return p.returncode, p.stdout.decode("utf-8", "replace"), p.stderr.decode("utf-8", "replace")
++
++
++def lines(ws):
++    return log_of(ws).read_text(encoding="utf-8").splitlines() if log_of(ws).exists() else []
++
++
++def now_minute():
++    return datetime.datetime.now(datetime.timezone.utc).replace(second=0, microsecond=0)
++
++
++def parse_stamp(line):
++    return datetime.datetime.strptime(line[:17], "%Y-%m-%dT%H:%MZ").replace(tzinfo=datetime.timezone.utc)
++
++
++def test_r088_a_text_is_appended_with_the_clock_s_time_and_printed(tmp_path):
++    """R-088: one line `<UTC time to the minute>Z <text>`, the folder and file created where absent, the line printed."""
++    ws = scratch(tmp_path)
++    before = now_minute()
++    rc, out, err = run(ws, "TASK-068 builder r1 launched")
++    after = now_minute()
++    assert rc == 0, out + err
++    got = lines(ws)
++    assert len(got) == 1, got
++    assert re.fullmatch(STAMP + " TASK-068 builder r1 launched", got[0]), got
++    assert before <= parse_stamp(got[0]) <= after, got
++    assert got[0] in out, out
++
++
++def test_r088_a_second_run_appends_and_never_rewrites(tmp_path):
++    """R-088: what stands in the log stays; each run adds exactly one line at the end."""
++    ws = scratch(tmp_path)
++    log_of(ws).parent.mkdir(parents=True)
++    log_of(ws).write_text("an earlier line\n", encoding="utf-8")
++    assert run(ws, "one")[0] == 0
++    assert run(ws, "two")[0] == 0
++    got = lines(ws)
++    assert got[0] == "an earlier line" and len(got) == 3, got
++    assert got[1].endswith(" one") and got[2].endswith(" two"), got
++
++
++def test_r088_the_workspace_is_found_from_a_folder_inside_it(tmp_path):
++    """R-088: run from a subfolder, the line goes to the Workspace's log, not the subfolder's."""
++    ws = scratch(tmp_path)
++    sub = ws / "bridge" / "deep"
++    sub.mkdir(parents=True)
++    rc, out, err = run(sub, "from below")
++    assert rc == 0, out + err
++    assert lines(ws)[-1].endswith(" from below"), lines(ws)
++    assert not (sub / "run").exists()
++
++
++def test_r088_file_text_has_its_line_breaks_made_spaces(tmp_path):
++    """R-088: --file takes a file under run/supervisor/, its line breaks made spaces, in one line."""
++    ws = scratch(tmp_path)
++    (ws / "run" / "supervisor").mkdir(parents=True)
++    src = ws / "run" / "supervisor" / "line.txt"
++    src.write_bytes(b"first part\r\nsecond part\nthird part\n")
++    rc, out, err = run(ws, "--file", str(src))
++    assert rc == 0, out + err
++    got = lines(ws)
++    assert len(got) == 1 and re.fullmatch(STAMP + " first part second part third part", got[0].rstrip()), got
++
++
++def test_r088_a_paused_line_in_the_file_stays_a_line_the_loop_guard_reads(tmp_path):
++    """R-088 with the loop guard (FB-027): a line beginning `Paused:` keeps a line of its own, so the guard's reading
++    of a pause in the log still finds it."""
++    ws = scratch(tmp_path)
++    (ws / "run" / "supervisor").mkdir(parents=True)
++    src = ws / "run" / "supervisor" / "pause.txt"
++    src.write_text("position written down\nPaused: the owner's word to resume\nnext step named\n", encoding="utf-8")
++    rc, out, err = run(ws, "--file", str(src))
++    assert rc == 0, out + err
++    got = lines(ws)
++    assert any(line.startswith("Paused: the owner's word to resume") for line in got), got
++    assert re.match(STAMP + " position written down", got[0]), got
++    import importlib.util
++    spec = importlib.util.spec_from_file_location("loop_guard_r088", os.path.join(BRIDGE, "loop-guard.py"))
++    lg = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(lg)
++    assert lg.paused_in_flight(str(ws)), "the loop guard does not find the pause"
++
++
++def test_r088_a_pass_line_is_tagged(tmp_path):
++    """R-088: --pass <name> <reviewer> --round <n> --cause <cause> appends `<time> PASS <name> r<n> <reviewer> <cause>`."""
++    ws = scratch(tmp_path)
++    rc, out, err = run(ws, "--pass", "PR-7", "review-a", "--round", "2", "--cause", "records")
++    assert rc == 0, out + err
++    got = lines(ws)
++    assert re.fullmatch(STAMP + " PASS PR-7 r2 review-a records", got[-1]), got
++    rc, out, err = run(ws, "--pass", "TASK-068", "review-b", "--round", "1", "--cause", "no external path")
++    assert rc == 0, out + err
++    assert re.fullmatch(STAMP + " PASS TASK-068 r1 review-b no external path", lines(ws)[-1]), lines(ws)
++
++
++@pytest.mark.parametrize("reviewer", REVIEWERS)
++def test_r088_every_stated_reviewer_kind_is_accepted(tmp_path, reviewer):
++    """R-088: the reviewer is one of the stated kinds."""
++    ws = scratch(tmp_path)
++    rc, out, err = run(ws, "--pass", "TASK-068", reviewer, "--round", "1", "--cause", "defect")
++    assert rc == 0, out + err
++    assert (" %s defect" % reviewer) in lines(ws)[-1], lines(ws)
++
++
++@pytest.mark.parametrize("cause", SEVEN)
++def test_r088_every_round_cause_is_accepted(tmp_path, cause):
++    """R-088: the cause is one of the round causes."""
++    ws = scratch(tmp_path)
++    rc, out, err = run(ws, "--pass", "TASK-068", "review-a", "--round", "3", "--cause", cause)
++    assert rc == 0, out + err
++    assert lines(ws)[-1].endswith(" review-a " + cause), lines(ws)
++
++
++@pytest.mark.parametrize("args", [
++    ["--pass", "TASK-068", "reviewer-c", "--round", "1", "--cause", "defect"],
++    ["--pass", "TASK-068", "review-a", "--round", "1", "--cause", "weather"],
++    ["--pass", "TASK-068", "review-a", "--round", "zero", "--cause", "defect"],
++], ids=["unknown-reviewer", "unknown-cause", "round-not-a-number"])
++def test_r088_a_word_outside_the_lists_is_refused_and_nothing_written(tmp_path, args):
++    """R-088: a reviewer or cause outside its list, or a round that is no number, exits 2 and writes nothing."""
++    ws = scratch(tmp_path)
++    rc, out, err = run(ws, *args)
++    assert rc == 2, out + err
++    assert lines(ws) == []
++
++
++def test_r088_outside_a_workspace_it_refuses_and_writes_nothing(tmp_path):
++    """R-088: no docs/PROJECT_STATUS.md above the current folder: exit 2, no run/ folder made."""
++    plain = tmp_path / "plain"
++    plain.mkdir()
++    rc, out, err = run(plain, "a text")
++    assert rc == 2, out + err
++    assert not (plain / "run").exists()
++
++
++@pytest.mark.parametrize("case", ["no-text", "empty-text", "file-and-text", "control-character"])
++def test_r088_no_text_both_sources_or_a_control_character_is_refused(tmp_path, case):
++    """R-088: no text, an empty text, a file and a text together, and a text holding a control character each exit 2
++    and write nothing."""
++    ws = scratch(tmp_path)
++    (ws / "run" / "supervisor").mkdir(parents=True)
++    src = ws / "run" / "supervisor" / "line.txt"
++    src.write_text("text\n", encoding="utf-8")
++    if case == "no-text":
++        rc, out, err = run(ws)
++    elif case == "empty-text":
++        rc, out, err = run(ws, "")
++    elif case == "file-and-text":
++        rc, out, err = run(ws, "--file", str(src), "a text")
++    else:
++        rc, out, err = run(ws, "before" + chr(27) + "[2Jafter")
++    assert rc == 2, out + err
++    assert lines(ws) == []
++
++
++def test_r088_a_file_outside_run_supervisor_is_refused(tmp_path):
++    """R-088: --file names a file under that Workspace's run/supervisor/ by its resolved path; one elsewhere in the
++    Workspace, or outside it, is refused."""
++    ws = scratch(tmp_path)
++    (ws / "run" / "supervisor").mkdir(parents=True)
++    inside_ws = ws / "docs" / "note.txt"
++    inside_ws.write_text("x\n", encoding="utf-8")
++    outside = tmp_path / "elsewhere.txt"
++    outside.write_text("y\n", encoding="utf-8")
++    dotted = os.path.join(str(ws), "run", "supervisor", os.pardir, os.pardir, "docs", "note.txt")
++    for path in (str(inside_ws), str(outside), dotted):
++        rc, out, err = run(ws, "--file", path)
++        assert rc == 2, (path, out + err)
++    assert lines(ws) == []
++
++
++def test_r088_a_file_reached_through_a_link_is_refused(tmp_path):
++    """R-088: a --file path through a link is refused, even when the link stands under run/supervisor/."""
++    ws = scratch(tmp_path)
++    sup = ws / "run" / "supervisor"
++    sup.mkdir(parents=True)
++    target = tmp_path / "target.txt"
++    target.write_text("through a link\n", encoding="utf-8")
++    link = sup / "link.txt"
++    try:
++        os.symlink(str(target), str(link))
++    except (OSError, NotImplementedError):
++        pytest.skip("this account cannot create a symbolic link")
++    rc, out, err = run(ws, "--file", str(link))
++    assert rc == 2, out + err
++    assert lines(ws) == []
++
++
++def test_r088_concurrent_runs_never_interleave_within_a_line(tmp_path):
++    """R-088: the write is one append, so eight runs started together leave eight whole lines."""
++    ws = scratch(tmp_path)
++    (ws / "run" / "supervisor").mkdir(parents=True)
++    texts = ["run%d-" % i + ("abcdefgh%d" % i) * 400 for i in range(8)]
++    procs = [subprocess.Popen([sys.executable, PROG, t], cwd=str(ws), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
++             for t in texts]
++    for p in procs:
++        assert p.wait(timeout=120) == 0
++    got = lines(ws)
++    assert len(got) == 8, len(got)
++    assert sorted(line[18:] for line in got) == sorted(texts)
++
++
++def _load(name, filename):
++    import importlib.util
++    sys.path.insert(0, BRIDGE)
++    try:
++        spec = importlib.util.spec_from_file_location(name, os.path.join(BRIDGE, filename))
++        mod = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(mod)
++        return mod
++    finally:
++        sys.path.remove(BRIDGE)
++
++
++def test_r088_the_round_causes_stand_once_in_bridge_env():
++    """R-088: the seven round causes of release S stand once, as bridge_env.ROUND_CAUSES, unchanged."""
++    env = _load("bridge_env_r088", "bridge_env.py")
++    assert tuple(env.ROUND_CAUSES) == SEVEN
++
++
++@pytest.mark.parametrize("filename", ["bridge-run.py", "pace-report.py", "in-flight.py"])
++def test_r088_the_launcher_the_report_and_this_program_hold_no_copy_of_the_list(filename):
++    """R-088: the launcher, the pace report and the in-flight program read bridge_env's list and hold no list of their
++    own: no tuple or list literal of the causes in their source, and each names bridge_env.ROUND_CAUSES."""
++    with open(os.path.join(BRIDGE, filename), encoding="utf-8") as f:
++        src = f.read()
++    assert "bridge_env.ROUND_CAUSES" in src, filename
++    assert not re.search(r"""["']builder incomplete["']\s*,\s*["']brief error["']""", src), filename
++
++
++def test_r088_the_launcher_and_the_report_see_the_same_list_as_bridge_env():
++    """R-088: loaded, the launcher's and the report's readings of the causes are bridge_env's seven (the report adds
++    `unstated`, the word for none)."""
++    env = _load("bridge_env_r088b", "bridge_env.py")
++    launcher = _load("bridge_run_r088", "bridge-run.py")
++    report = _load("pace_report_r088", "pace-report.py")
++    assert tuple(getattr(launcher, "ROUND_CAUSES", env.ROUND_CAUSES)) == SEVEN
++    report_list = tuple(getattr(report, "ROUND_CAUSES", tuple(env.ROUND_CAUSES) + ("unstated",)))
++    assert report_list[:7] == SEVEN and set(report_list) - set(SEVEN) <= {"unstated"}
++
++
++def test_r088_the_loop_guard_s_refusal_names_the_in_flight_log_and_the_program():
++    """R-088 (J3): the loop guard's refusal names run/supervisor/in-flight.md and in-flight.py where it named the status
++    file's `In flight:` line; its decision is the loop guard's own tests' (tests/test_loop_guard.py)."""
++    with open(os.path.join(BRIDGE, "loop-guard.py"), encoding="utf-8") as f:
++        src = f.read()
++    assert "in-flight.py" in src and "run/supervisor/in-flight.md" in src
++    assert "status file's `In flight:` line" not in src
++
++
++# Round 2 (TASK-068-r2): the reviewers' findings on round 1, each held by a test.
++
++def _guard():
++    import importlib.util
++    spec = importlib.util.spec_from_file_location("loop_guard_r088_r2", os.path.join(BRIDGE, "loop-guard.py"))
++    lg = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(lg)
++    return lg
++
++
++def test_r088_r2_every_line_the_program_writes_ends_with_lf_alone(tmp_path):
++    """R-088 (round 2, Review A's B1): the log's raw bytes hold no carriage return, whatever the platform's text mode."""
++    ws = scratch(tmp_path)
++    (ws / "run" / "supervisor").mkdir(parents=True)
++    src = ws / "run" / "supervisor" / "pause.txt"
++    src.write_text("a line\nPaused: until the owner\n", encoding="utf-8")
++    assert run(ws, "plain text")[0] == 0
++    assert run(ws, "--file", str(src))[0] == 0
++    assert run(ws, "--pass", "TASK-068", "review-a", "--round", "1", "--cause", "defect")[0] == 0
++    raw = log_of(ws).read_bytes()
++    assert b"\r" not in raw and raw.endswith(b"\n"), raw
++
++
++def test_r088_r2_a_later_paused_line_lifts_or_replaces_an_earlier_one(tmp_path):
++    """R-088 (round 2, convergent: Review A's B2 and the security review's blocking finding): the loop guard reads the
++    last `Paused:` line of the log, so a pause written through the program can be lifted through it, and set again."""
++    ws = scratch(tmp_path)
++    lg = _guard()
++    assert run(ws, "Paused: the owner's word to resume")[0] == 0
++    assert lg.paused_in_flight(str(ws)) == "the owner's word to resume"
++    assert run(ws, "Paused: resumed 11-21")[0] == 0
++    assert lg.paused_in_flight(str(ws)) is None
++    assert run(ws, "an ordinary line after the resume")[0] == 0
++    assert lg.paused_in_flight(str(ws)) is None
++    assert run(ws, "Paused: the install run sheet")[0] == 0
++    assert lg.paused_in_flight(str(ws)) == "the install run sheet"
++    assert run(ws, "Paused: no")[0] == 0
++    assert lg.paused_in_flight(str(ws)) is None
++
++
++def test_r088_r2_an_empty_file_option_beside_a_text_is_two_sources(tmp_path):
++    """R-088 (round 2, Review A's SF1): `--file ""` beside a text is two sources, refused, nothing written."""
++    ws = scratch(tmp_path)
++    rc, out, err = run(ws, "--file", "", "free text")
++    assert rc == 2, out + err
++    assert lines(ws) == []
++
++
++@pytest.mark.parametrize("text", ["PASS TASK-1 r9 review-a defect", "pass PR-3 r1 review-b records", "Pass X"])
++def test_r088_r2_a_free_text_cannot_forge_a_pass_line(tmp_path, text):
++    """R-088 (round 2, convergent: Review A and the security review): a text, or a --file text, whose first word is
++    PASS in any letter case is refused, so a tagged line comes from --pass alone."""
++    ws = scratch(tmp_path)
++    (ws / "run" / "supervisor").mkdir(parents=True)
++    rc, out, err = run(ws, text)
++    assert rc == 2, out + err
++    src = ws / "run" / "supervisor" / "line.txt"
++    src.write_text(text + "\nmore\n", encoding="utf-8")
++    rc, out, err = run(ws, "--file", str(src))
++    assert rc == 2, out + err
++    assert lines(ws) == []
++
++
++def _junction(target, link):
++    try:
++        import _winapi
++        _winapi.CreateJunction(str(target), str(link))
++        return True
++    except Exception:
++        try:
++            os.symlink(str(target), str(link), target_is_directory=True)
++            return True
++        except (OSError, NotImplementedError):
++            return False
++
++
++def _remove_link(link):
++    """A symbolic link is unlinked; a junction is removed as a folder, never followed."""
++    if os.path.islink(str(link)):
++        os.unlink(str(link))
++    else:
++        os.rmdir(str(link))
++
++
++@pytest.mark.parametrize("where", ["run", "supervisor"])
++def test_r088_r2_a_log_folder_that_is_a_link_is_refused(tmp_path, where):
++    """R-088 (round 2, convergent: Review A's note and the security review): where `run/` or `run/supervisor/` is a
++    junction or link leading out of the Workspace, the program refuses and appends nothing there."""
++    ws = scratch(tmp_path)
++    outside = tmp_path / "outside"
++    outside.mkdir()
++    if where == "run":
++        made = _junction(outside, ws / "run")
++    else:
++        (ws / "run").mkdir()
++        made = _junction(outside, ws / "run" / "supervisor")
++    if not made:
++        pytest.skip("this account can create neither a junction nor a link")
++    try:
++        rc, out, err = run(ws, "a text")
++        assert rc == 2, out + err
++        assert list(outside.rglob("*.md")) == []
++    finally:
++        _remove_link(ws / "run" if where == "run" else ws / "run" / "supervisor")
++
++
++# Round 3 (TASK-068-r3): the review ceiling's round; each case is a finding of the five blocking classes.
++
++def test_r088_r3_an_empty_paused_line_never_takes_the_next_line_as_its_value(tmp_path):
++    """R-088 (round 3, convergent: the security review's B1 and Review A's note; a defeated safety mechanism): an empty
++    `Paused:` line, the form that lifts a pause, is read as empty, never as the line after it, so a later ordinary
++    line never sets a pause, and an empty pause followed by `Paused: resumed` is no wait."""
++    ws = scratch(tmp_path)
++    lg = _guard()
++    assert run(ws, "Paused: the owner word")[0] == 0
++    assert lg.paused_in_flight(str(ws)) == "the owner word"
++    assert run(ws, "Paused:")[0] == 0
++    assert lg.paused_in_flight(str(ws)) is None
++    assert run(ws, "started the review of TASK-068")[0] == 0
++    assert lg.paused_in_flight(str(ws)) is None
++    ws2 = scratch(tmp_path / "second")
++    log_of(ws2).parent.mkdir(parents=True)
++    log_of(ws2).write_text("Paused: x\nPaused:\nPaused: resumed\n", encoding="utf-8")
++    assert lg.paused_in_flight(str(ws2)) is None
++
++
++def test_r088_r3_a_log_that_is_a_hard_link_is_refused(tmp_path):
++    """R-088 (round 3, convergent: Review A and the security review; security): an in-flight.md that is a hard link to a
++    file outside the Workspace is refused, exit 2, and the outside file is unchanged."""
++    ws = scratch(tmp_path)
++    (ws / "run" / "supervisor").mkdir(parents=True)
++    outside = tmp_path / "outside.md"
++    outside.write_bytes(b"outside\n")
++    try:
++        os.link(str(outside), str(log_of(ws)))
++    except (OSError, NotImplementedError, AttributeError):
++        pytest.skip("this file system cannot make a hard link")
++    rc, out, err = run(ws, "a text")
++    assert rc == 2, out + err
++    assert outside.read_bytes() == b"outside\n"
++
++
++def test_r088_r3_a_supervisor_folder_linked_inside_the_workspace_is_refused(tmp_path):
++    """R-088 (round 3, Review A's note: the link test of run/supervisor/ itself, not only the real-path test): a
++    run/supervisor/ that is a junction or link to another folder of the same Workspace is refused, nothing written."""
++    ws = scratch(tmp_path)
++    (ws / "run").mkdir()
++    target = ws / "docs"
++    if not _junction(target, ws / "run" / "supervisor"):
++        pytest.skip("this account can create neither a junction nor a link")
++    try:
++        rc, out, err = run(ws, "a text")
++        assert rc == 2, out + err
++        assert not (target / "in-flight.md").exists()
++    finally:
++        _remove_link(ws / "run" / "supervisor")
