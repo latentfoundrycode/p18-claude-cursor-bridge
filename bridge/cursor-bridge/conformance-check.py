@@ -584,8 +584,14 @@ def _weekly_decision_cell(sections):
 
 def _own_git_dir(ws):
     """This folder's git dir, or None. A parent folder's repository is not used."""
+    import stat
+    # Absent on non-Windows CPython; a bare name would raise while reading an ordinary directory.
+    reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
     git_path = os.path.join(ws, ".git")
     try:
+        st = os.lstat(git_path)
+        if stat.S_ISLNK(st.st_mode) or (getattr(st, "st_file_attributes", 0) & reparse):
+            return None
         if os.path.isdir(git_path):
             return os.path.abspath(git_path)
         if not os.path.isfile(git_path):
@@ -607,6 +613,9 @@ def _own_git_dir(ws):
     if not os.path.isabs(raw):
         raw = os.path.join(ws, raw)
     try:
+        st = os.lstat(raw)
+        if stat.S_ISLNK(st.st_mode) or (getattr(st, "st_file_attributes", 0) & reparse):
+            return None
         if os.path.isdir(raw):
             return os.path.abspath(raw)
     except OSError:
