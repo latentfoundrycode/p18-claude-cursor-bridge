@@ -396,3 +396,76 @@ def test_r090_baseline_names_each_failing_list_on_its_own_line(tmp_path):
     for mid in ("m1", "m2", "m3"):
         assert _mutant_lines(p, mid) == [], p.stdout
     assert not _cache_path(ws, "btwo").exists()
+
+
+# --- round 2: the baseline leaves the copy as it found it ------------------------------------------------------
+
+REWRITE_MOD_TEST = (
+    "import os\n"
+    "import mod\n"
+    "\n"
+    "\n"
+    "def test_double():\n"
+    "    assert mod.double(2) == 4\n"
+    "    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'mod.py')\n"
+    "    with open(path, encoding='utf-8') as f:\n"
+    "        text = f.read()\n"
+    "    with open(path, 'w', encoding='utf-8', newline='\\n') as f:\n"
+    "        f.write(text.replace('x * 2', '2 * x'))\n"
+)
+
+REWRITE_SELF_TEST = (
+    "import os\n"
+    "import mod\n"
+    "\n"
+    "\n"
+    "def test_double():\n"
+    "    assert mod.double(2) == 4\n"
+    "    path = os.path.abspath(__file__)\n"
+    "    with open(path, encoding='utf-8') as f:\n"
+    "        text = f.read()\n"
+    "    with open(path, 'w', encoding='utf-8', newline='\\n') as f:\n"
+    "        f.write(text.replace('mod.double(2) == ' + '4', 'mod.double(2) == ' + '4 or True', 1))\n"
+)
+
+
+def _cache_outcomes(ws, run_id):
+    path = _cache_path(ws, run_id)
+    if not path.is_file():
+        return []
+    return [json.loads(ln) for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+
+
+def test_r090_r2_baseline_that_rewrites_the_mutated_file_leaves_it_pristine(tmp_path):
+    """R-090, TASK-070 Done when (each distinct tests list runs once on the unmutated copy; the mutants then run as
+    before), round 2 (Review B r1): a baseline test that passes and rewrites mod.py (x * 2 becomes 2 * x) must not
+    change what the mutants run on. m1 replaces x * 2 and is killed, exit 0, its cache line `killed`; a second run
+    serves m1 from the cache. Today the baseline's rewrite is taken as mod.py's original, m1 is `not applied`, exit 1,
+    and `not applied` is cached under the key of the bytes before the baseline."""
+    ws = _fixture(tmp_path, {"mod.py": MOD, "tests/test_mod.py": REWRITE_MOD_TEST})
+    mf = _mutants(ws, "brw", {"mutants": [_mutant(
+        "m1", "x * 2", "x * 3", ["tests/test_mod.py"], ["tests/test_mod.py::test_double"])]})
+    p = _run(ws, mf)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert _mutant_lines(p, "m1") and "killed" in _mutant_lines(p, "m1")[0], p.stdout
+    assert "not applied" not in p.stdout, p.stdout
+    assert [c.get("outcome") for c in _cache_outcomes(ws, "brw")] == ["killed"]
+    p2 = _run(ws, mf)
+    assert p2.returncode == 0, p2.stdout + p2.stderr
+    assert _mutant_lines(p2, "m1") and "cached" in _mutant_lines(p2, "m1")[0], p2.stdout
+    assert (ws / "mod.py").read_text(encoding="utf-8") == MOD
+
+
+def test_r090_r2_baseline_that_rewrites_a_test_file_leaves_it_pristine(tmp_path):
+    """R-090, TASK-070 Done when (the mutants run as before, on the copy the cache key read), round 2 (Review B r1):
+    a baseline test that passes and rewrites its own test file so that it can no longer fail must not weaken the
+    mutants' tests. m1 is killed by the test as committed, exit 0, its cache line `killed`. Today the mutants run
+    the rewritten test, m1 survives and the run exits 1."""
+    ws = _fixture(tmp_path, {"mod.py": MOD, "tests/test_mod.py": REWRITE_SELF_TEST})
+    mf = _mutants(ws, "brs", {"mutants": [_mutant(
+        "m1", "x * 2", "x * 3", ["tests/test_mod.py"], ["tests/test_mod.py::test_double"])]})
+    p = _run(ws, mf)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert _mutant_lines(p, "m1") and "killed" in _mutant_lines(p, "m1")[0], p.stdout
+    assert [c.get("outcome") for c in _cache_outcomes(ws, "brs")] == ["killed"]
+    assert (ws / "tests" / "test_mod.py").read_text(encoding="utf-8") == REWRITE_SELF_TEST
