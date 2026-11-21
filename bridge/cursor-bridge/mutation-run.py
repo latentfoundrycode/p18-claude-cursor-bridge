@@ -1642,6 +1642,8 @@ def main(argv=None):
         elif base_failures:
             print_baseline_failures(base_failures)
             return 5
+        elif base_lists:
+            copy_tracked(workspace, copy_root, tracked_list, untracked)
         for mut_idx, m in enumerate(mutants):
             if pytest_still_alive:
                 break

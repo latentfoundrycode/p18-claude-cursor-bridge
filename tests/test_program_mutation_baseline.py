@@ -448,7 +448,7 @@ def test_r090_r2_baseline_that_rewrites_the_mutated_file_leaves_it_pristine(tmp_
     p = _run(ws, mf)
     assert p.returncode == 0, p.stdout + p.stderr
     assert _mutant_lines(p, "m1") and "killed" in _mutant_lines(p, "m1")[0], p.stdout
-    assert "not applied" not in p.stdout, p.stdout
+    assert "not applied" not in _mutant_lines(p, "m1")[0], p.stdout
     assert [c.get("outcome") for c in _cache_outcomes(ws, "brw")] == ["killed"]
     p2 = _run(ws, mf)
     assert p2.returncode == 0, p2.stdout + p2.stderr

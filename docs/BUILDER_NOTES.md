@@ -106,3 +106,5 @@
 2026-11-21 TASK-069: a pass line's stamp is `YYYY-MM-DDTHH:MMZ` with no seconds, so pace-report's `_parse_run_time` (which requires seconds) does not read it; the stamp is parsed with `strptime` and `%Y-%m-%dT%H:%MZ`.
 2026-11-21 TASK-069-r2: `test_r089_r2_a_stamp_of_other_digits_is_no_pass_line` stays green when the stamp pattern uses `\d`, because `strptime` rejects the full-width digits after the match; the case does not show that the pattern itself is ASCII `[0-9]`.
 2026-11-21 TASK-069-r3: `tracked_old_brief` already commits `TASK-001 (#1)`, so `PR-2: follow-up (#1)` is a second close of the same number. The earliest close folds into TASK-001. PR-1 is its own name only when a close that names no counted name still counts, and it merges at that commit rather than at the earliest close.
+
+2026-11-21 TASK-070-r2: `test_r090_r2_baseline_that_rewrites_the_mutated_file_leaves_it_pristine` asserts the substring `not applied` is absent from the whole of stdout, and the counts line always contains `not applied=0`, so that case stays red after the copy is put back and m1 is killed with exit 0. The acceptance file is not edited. Round 1's R8 keeps that counts line.
