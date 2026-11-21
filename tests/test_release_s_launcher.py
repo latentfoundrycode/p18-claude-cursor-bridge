@@ -524,7 +524,7 @@ def test_m1_m2_the_pace_report_counts_causes_and_rounds_per_model(tmp_path):
     lines = pace_lines(tmp_path, rows)
     causes = [l for l in lines if l.startswith("Round causes")]
     models = [l for l in lines if l.startswith("Builder rounds per model")]
-    assert causes == ["Round causes (4 builder rounds after the first): defect 1 (25%); fix-induced 2 (50%); unstated 1 (25%)"], lines
+    assert causes == ["Round causes (4 rounds after the first): defect 1 (25%); fix-induced 2 (50%); unstated 1 (25%)"], lines  # R-089: the heading says rounds
     assert models == ["Builder rounds per model: composer-2.5 4 round(s) over 2 increment(s), mean 2; grok-4.7-high 2 round(s) over 1 increment(s), mean 2"], lines
 
 

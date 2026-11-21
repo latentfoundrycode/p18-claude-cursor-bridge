@@ -260,9 +260,10 @@ def _load(name, filename):
 
 
 def test_r088_the_round_causes_stand_once_in_bridge_env():
-    """R-088: the seven round causes of release S stand once, as bridge_env.ROUND_CAUSES, unchanged."""
+    """R-088: the seven round causes of release S stand once, as bridge_env.ROUND_CAUSES, unchanged and first (R-089,
+    TASK-069, adds `base update` after them, pinned in tests/test_program_pace_rounds.py)."""
     env = _load("bridge_env_r088", "bridge_env.py")
-    assert tuple(env.ROUND_CAUSES) == SEVEN
+    assert tuple(env.ROUND_CAUSES)[:7] == SEVEN
 
 
 @pytest.mark.parametrize("filename", ["bridge-run.py", "pace-report.py", "in-flight.py"])
@@ -281,9 +282,10 @@ def test_r088_the_launcher_and_the_report_see_the_same_list_as_bridge_env():
     env = _load("bridge_env_r088b", "bridge_env.py")
     launcher = _load("bridge_run_r088", "bridge-run.py")
     report = _load("pace_report_r088", "pace-report.py")
-    assert tuple(getattr(launcher, "ROUND_CAUSES", env.ROUND_CAUSES)) == SEVEN
+    assert tuple(getattr(launcher, "ROUND_CAUSES", env.ROUND_CAUSES)) == tuple(env.ROUND_CAUSES)
+    assert tuple(env.ROUND_CAUSES)[:7] == SEVEN
     report_list = tuple(getattr(report, "ROUND_CAUSES", tuple(env.ROUND_CAUSES) + ("unstated",)))
-    assert report_list[:7] == SEVEN and set(report_list) - set(SEVEN) <= {"unstated"}
+    assert report_list[:7] == SEVEN and set(report_list) - set(env.ROUND_CAUSES) <= {"unstated"}
 
 
 def test_r088_the_loop_guard_s_refusal_names_the_in_flight_log_and_the_program():
