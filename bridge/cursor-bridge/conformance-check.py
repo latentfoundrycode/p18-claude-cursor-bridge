@@ -532,7 +532,7 @@ def _workflow_triggers(text):
     """Trigger names from a top-level on: (block keys, `on: push`, or `on: [push, pull_request]`)."""
     lines = text.splitlines()
     for i, line in enumerate(lines):
-        m = re.match(r"^on:\s*(.*?)\s*$", line)
+        m = re.match(r"""^(?:"on"|'on'|on):\s*(.*?)\s*$""", line)
         if not m:
             continue
         rest = m.group(1).split("#", 1)[0].strip()
@@ -593,11 +593,16 @@ def _own_git_dir(ws):
     except OSError:
         return None
     text = read(git_path) or ""
-    m = re.match(r"gitdir:[ \t]*(\S+)", text)
-    if not m:
+    raw = None
+    for line in text.splitlines():
+        m = re.match(r"gitdir:[ \t]*(.*)$", line)
+        if m:
+            raw = m.group(1).strip(" \t")
+            break
+    if not raw or raw.startswith("-") or "\x00" in raw:
         return None
-    raw = m.group(1)
-    if raw.startswith("-") or "\x00" in raw:
+    # Two leading slashes, either direction, name another host. Do not touch the path.
+    if len(raw) >= 2 and raw[0] in "/\\" and raw[1] in "/\\":
         return None
     if not os.path.isabs(raw):
         raw = os.path.join(ws, raw)
@@ -635,9 +640,12 @@ def _has_github_remote(ws):
     env = os.environ.copy()
     env["GIT_DIR"] = git_dir
     env.pop("GIT_WORK_TREE", None)
+    for name in list(env):
+        if name.startswith("GIT_CONFIG"):
+            del env[name]
     try:
         p = subprocess.run(
-            ["git", "-c", "core.fsmonitor=false", "--git-dir=" + git_dir, "config", "--get-regexp", r"^remote\..*\.url$"],
+            ["git", "-c", "core.fsmonitor=false", "--git-dir=" + git_dir, "config", "--local", "--no-includes", "--get-regexp", r"^remote\..*\.url$"],
             cwd=ws, capture_output=True, timeout=GH_TIMEOUT, creationflags=NO_WINDOW, env=env)
     except (OSError, subprocess.TimeoutExpired):
         return False
