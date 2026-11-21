@@ -584,7 +584,7 @@ open: a parse problem never blocks. ASCII output only. Never writes anything.
 Path: `bridge/cursor-bridge/mutation-run.py`
 
 ```
-Apply mutants from a JSON file in a scratch copy of the Workspace and run each mutant's tests with pytest. Usage: python mutation-run.py <mutants file> [--all] [--checkpoint <commit>] [--scratch <folder>] [--mutant-timeout <seconds>]. Default scratch is ~/.cursor-bridge/scratch/<project>/. Exit 0 when every mutant is killed; 1 when any survived, was not applied, or an expect-survive mutant was killed; 2 for malformed input, refused paths, or failed resolution check; 3 when any mutant errored; 4 in --checkpoint mode when a listed new test passed on the old code.
+Apply mutants from a JSON file in a scratch copy of the Workspace and run each mutant's tests with pytest. Usage: python mutation-run.py <mutants file> [--all] [--checkpoint <commit>] [--scratch <folder>] [--mutant-timeout <seconds>]. Default scratch is ~/.cursor-bridge/scratch/<project>/. Exit 0 when every mutant is killed; 1 when any survived, was not applied, or an expect-survive mutant was killed; 2 for malformed input, refused paths, or failed resolution check; 3 when any mutant errored; 4 in --checkpoint mode when a listed new test passed on the old code; 5 when a tests list fails or errors on the unmutated code before any mutant runs. A mutant whose tests list times out on the unmutated code is an error and is not run.
 ```
 
 ### Positionals

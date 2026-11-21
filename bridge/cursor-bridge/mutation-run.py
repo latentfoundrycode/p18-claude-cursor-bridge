@@ -7,7 +7,9 @@ file is run/supervisor/<id>-mutants.json. Scratch defaults to ~/.cursor-bridge/s
 Exit 0 when every mutant is killed (or cached kill); 1 when any survived, was not applied, or an
 expect-survive mutant was killed; 2 for a malformed file, refused path or resolution check, or
 --all with --checkpoint; 3 when any mutant errored or on an internal crash; 4 in --checkpoint mode
-when any listed new test passed on the old code. ASCII-only on purpose (cp1252 consoles).
+when any listed new test passed on the old code; 5 when a tests list fails or errors on the
+unmutated code before any mutant runs. A mutant whose tests list times out on the unmutated code
+is an error and is not run. ASCII-only on purpose (cp1252 consoles).
 """
 import argparse
 import hashlib
@@ -55,6 +57,11 @@ OUT_PATH = os.environ.get("MUTATION_PYTEST_RESULTS", "")
 _state = {"tests": [], "collect_errors": [], "session_finished": False, "exitstatus": None}
 
 
+def _slash_file(nodeid):
+    head, sep, tail = nodeid.partition("::")
+    return head.replace(chr(92), "/") + sep + tail
+
+
 def _write():
     if OUT_PATH:
         with open(OUT_PATH, "w", encoding="utf-8") as f:
@@ -77,13 +84,13 @@ def pytest_runtest_logreport(report):
         outcome = "skipped"
     else:
         return
-    nodeid = report.nodeid.replace(chr(92), "/")
+    nodeid = _slash_file(report.nodeid)
     _state["tests"].append({"nodeid": nodeid, "outcome": outcome})
 
 
 def pytest_collectreport(report):
     if report.failed:
-        _state["collect_errors"].append(report.nodeid.replace(chr(92), "/"))
+        _state["collect_errors"].append(_slash_file(report.nodeid))
 
 
 def pytest_sessionfinish(session, exitstatus):
@@ -1348,6 +1355,75 @@ def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_t
     return None
 
 
+def mutant_cached_kill(cache, mutant, key, run_all):
+    cached = cache.get((mutant["id"], key))
+    return cached and cached[0] == "killed" and not run_all
+
+
+def uncached_test_lists(mutants, cache, mutant_keys, run_all):
+    found = []
+    for m in mutants:
+        if mutant_cached_kill(cache, m, mutant_keys[m["id"]], run_all):
+            continue
+        if m["tests"] not in found:
+            found.append(m["tests"])
+    return found
+
+
+def baseline_failing_ids(data):
+    found = []
+    if not data:
+        return found
+    for rec in data.get("tests", []):
+        nid = rec.get("nodeid")
+        if nid and rec.get("outcome") in ("failed", "error") and nid not in found:
+            found.append(nid)
+    for nid in data.get("collect_errors", []):
+        if nid and nid not in found:
+            found.append(nid)
+    return found
+
+
+def baseline_failure(rc, data):
+    ids = baseline_failing_ids(data)
+    bad_rc = rc if rc not in (0, 1) else None
+    failed = bool(ids) or bad_rc is not None or data is None or rc != 0
+    return failed, ids, bad_rc
+
+
+def format_baseline_failure(tests, failing_ids, bad_rc):
+    head = "baseline failed"
+    if bad_rc is not None:
+        head = "baseline failed (pytest exit %d)" % bad_rc
+    line = "%s: %s" % (head, " ".join(tests))
+    if failing_ids:
+        line = "%s: %s" % (line, " ".join(failing_ids))
+    return line
+
+
+def print_baseline_failures(failures):
+    for tests, failing_ids, bad_rc in failures:
+        print(format_baseline_failure(tests, failing_ids, bad_rc))
+
+
+def run_baselines(plugin_dir, copy_root, lists, env, timeout_sec):
+    failures = []
+    timed_out = []
+    for i, tests in enumerate(lists):
+        results_path = os.path.join(plugin_dir, "pytest-outcomes-base-%d.json" % i)
+        rc, _out, _err, timed, alive, data = run_mutant_tests(
+            plugin_dir, copy_root, tests, env, timeout_sec, results_path)
+        if alive:
+            return failures, timed_out, tests
+        if timed:
+            timed_out.append(tests)
+            continue
+        failed, ids, bad_rc = baseline_failure(rc, data)
+        if failed:
+            failures.append((tests, ids, bad_rc))
+    return failures, timed_out, None
+
+
 def run_mutant_tests(plugin_dir, copy_root, tests, env, timeout_sec, results_path):
     if os.path.isfile(results_path):
         os.remove(results_path)
@@ -1400,7 +1476,9 @@ def build_parser():
         "~/.cursor-bridge/scratch/<project>/. Exit 0 when every mutant is killed; 1 when any "
         "survived, was not applied, or an expect-survive mutant was killed; 2 for malformed input, "
         "refused paths, or failed resolution check; 3 when any mutant errored; 4 in --checkpoint "
-        "mode when a listed new test passed on the old code."
+        "mode when a listed new test passed on the old code; 5 when a tests list fails or errors "
+        "on the unmutated code before any mutant runs. A mutant whose tests list times out on the "
+        "unmutated code is an error and is not run."
     )
     ap = argparse.ArgumentParser(description=desc)
     ap.add_argument("mutants_file", help="run/supervisor/<id>-mutants.json")
@@ -1548,8 +1626,22 @@ def main(argv=None):
             res_tests.extend(m["tests"])
         run_resolution_check(plugin_dir, copy_root, mutants, res_tests, tracked_set, workspace, env, timeout_sec)
         mutant_keys = {m["id"]: compute_key(copy_root, m, tracked_set) for m in mutants}
+        base_lists = uncached_test_lists(mutants, cache, mutant_keys, args.all)
+        base_failures, base_timed, base_alive = run_baselines(
+            plugin_dir, copy_root, base_lists, env, timeout_sec)
         originals = {}
         pytest_still_alive = False
+        if base_alive is not None:
+            pytest_still_alive = True
+            print_baseline_failures(base_failures)
+            for m in mutants:
+                if m["tests"] == base_alive and not mutant_cached_kill(
+                        cache, m, mutant_keys[m["id"]], args.all):
+                    results.append((m["id"], "error (timed out)", None))
+                    counts["error"] += 1
+        elif base_failures:
+            print_baseline_failures(base_failures)
+            return 5
         for mut_idx, m in enumerate(mutants):
             if pytest_still_alive:
                 break
@@ -1564,6 +1656,10 @@ def main(argv=None):
                     results.append((m["id"], "killed (wrong equivalence claim, cached %s)" % cached[1], False))
                 else:
                     results.append((m["id"], "killed (cached %s)" % cached[1], False))
+                continue
+            if m["tests"] in base_timed:
+                results.append((m["id"], "error (timed out)", None))
+                counts["error"] += 1
                 continue
             counts["run"] += 1
             orig_path = os.path.join(copy_root, m["file"])
@@ -1612,7 +1708,10 @@ def main(argv=None):
             if pytest_still_alive:
                 break
         for mid, outcome, ran in results:
-            tag = "ran" if ran else "cached"
+            if ran is None:
+                tag = "not run"
+            else:
+                tag = "ran" if ran else "cached"
             print("%s: %s (%s)" % (mid, outcome, tag))
         print("counts: run=%d cached=%d killed=%d survived=%d not applied=%d error=%d expected survive=%d" % (
             counts["run"], counts["cached"], counts["killed"], counts["survived"],
