@@ -88,7 +88,6 @@ MANIFEST = "cursor-bridge/MANIFEST.json"
 PREVIOUS = "cursor-bridge-previous"
 KEEP_MARKER = ".keep"
 ROLLED_BACK = os.path.join("cursor-bridge", "ROLLED-BACK.md")
-KEPT_NAME = re.compile(r"^\d{4}\.\d{2}\.\d{2}[a-z]$")
 PROGRAM_IN_HOOK = re.compile(r"cursor-bridge[/\\]([\w.-]+\.py)")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 USAGE = (
@@ -370,8 +369,7 @@ def kept_release_names(target):
     if not os.path.isdir(base):
         return []
     return sorted(n for n in os.listdir(base)
-                  if KEPT_NAME.match(n) and os.path.isdir(os.path.join(base, n))
-                  and not n.endswith(".partial"))
+                  if os.path.isdir(os.path.join(base, n)) and not n.endswith(".partial"))
 
 
 def name_value_problem(value):
@@ -392,9 +390,9 @@ def read_keep_marker(base):
     if not os.path.isfile(path):
         return None
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8-sig") as f:
             return f.read().strip()
-    except OSError:
+    except (OSError, UnicodeDecodeError, ValueError):
         return None
 
 
@@ -471,7 +469,7 @@ def parse_argv(argv):
             "rollback_version": rollback_version, "keep": keep}
 
 
-def save_previous(target, version, files, dry):
+def save_previous(target, version, files, dry, keep=None):
     """Copy the installed release's own files to <target>/cursor-bridge-previous/<version>/.
 
     A kept copy of that version is never written twice: after an interrupted install the
@@ -482,14 +480,21 @@ def save_previous(target, version, files, dry):
     dest = os.path.join(base, version)
     if dry or os.path.isdir(dest):
         return dest
-    marked = read_keep_marker(base)
+    if keep is not None:
+        marked = None if keep == "none" else keep
+    else:
+        marked = read_keep_marker(base)
     if os.path.isdir(base):
         for n in os.listdir(base):
-            if n == KEEP_MARKER or n.endswith(".partial"):
+            if n == KEEP_MARKER:
+                continue
+            if n == marked or n == version:
                 continue
             p = os.path.join(base, n)
-            if os.path.isdir(p) and n != marked and n != version:
+            if os.path.isdir(p):
                 shutil.rmtree(p, ignore_errors=True)
+            elif os.path.isfile(p):
+                os.remove(p)
     else:
         os.makedirs(base, exist_ok=True)
     tmp = dest + ".partial"
@@ -762,7 +767,7 @@ def install(target, dry, anyway=False, keep=None):
                   "release before it is untouched. Tell the maintainer, who repairs the installed tree first (the same release installed again from its folder); "
                   "--anyway installs regardless (the maintainer's rehearsals)." % (old_version, len(changed), few(changed)))
             return 2
-        dest = save_previous(target, old_version, old_files, dry)
+        dest = save_previous(target, old_version, old_files, dry, keep)
         print("  previous       %s kept at %s" % (old_version, dest))
         print("  way back       python %s --rollback" % os.path.join(HERE, "bridge-install.py").replace("\\", "/"))
         if changed:
@@ -775,7 +780,12 @@ def install(target, dry, anyway=False, keep=None):
         os.remove(stale_note)
     result = run_check(target)
     if result == 0 and keep is not None:
-        write_keep_marker(os.path.join(target, PREVIOUS), keep, dry)
+        base = os.path.join(target, PREVIOUS)
+        write_keep_marker(base, keep, dry)
+        if keep == "none":
+            print("  keep           none (no named copy kept over later installs)")
+        else:
+            print("  keep           %s kept over later installs" % keep)
     return result
 
 
@@ -853,21 +863,21 @@ def main():
         target = os.path.join(os.path.expanduser("~"), ".claude")
     else:
         target = os.path.abspath(target)
-    if opts["keep"] is not None:
-        prob = name_value_problem(opts["keep"])
-        if prob:
-            return refuse_usage("the --keep value is %s" % prob)
-        if opts["keep"] != "none" and opts["keep"] not in kept_release_names(target):
-            return refuse_usage("the --keep value %r is not the name of a kept folder" % opts["keep"])
-    if opts["rollback_version"] is not None:
-        prob = name_value_problem(opts["rollback_version"])
-        if prob:
-            return refuse_usage("the --rollback value is %s" % prob)
-        if opts["rollback_version"] not in kept_release_names(target):
-            print("bridge-install: no kept folder named %r; nothing was changed." % opts["rollback_version"])
-            print(USAGE, end="" if USAGE.endswith("\n") else "\n")
-            return 2
     try:
+        if opts["keep"] is not None:
+            prob = name_value_problem(opts["keep"])
+            if prob:
+                return refuse_usage("the --keep value is %s" % prob)
+            if opts["keep"] != "none" and opts["keep"] not in kept_release_names(target):
+                return refuse_usage("the --keep value %r is not the name of a kept folder" % opts["keep"])
+        if opts["rollback_version"] is not None:
+            prob = name_value_problem(opts["rollback_version"])
+            if prob:
+                return refuse_usage("the --rollback value is %s" % prob)
+            if opts["rollback_version"] not in kept_release_names(target):
+                print("bridge-install: no kept folder named %r; nothing was changed." % opts["rollback_version"])
+                print(USAGE, end="" if USAGE.endswith("\n") else "\n")
+                return 2
         if opts["rollback"]:
             return rollback(target, opts["dry"], opts["rollback_version"])
         return install(target, opts["dry"], opts["anyway"], opts["keep"])

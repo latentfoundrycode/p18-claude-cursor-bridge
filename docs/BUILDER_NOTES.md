@@ -112,3 +112,5 @@
 2026-11-21 TASK-070-r3: the round 2 note above misreads that case. `not applied` is checked only on the mutant line (`_mutant_lines`), so the counts line's `not applied=0` does not fail it. With the baseline in its own copy the case passes, exit 0, `m1: killed (ran)`.
 
 2026-11-21 TASK-070-r3: a foreground pytest of the three mutation files was killed (exit 143, Terminated) after about five minutes even though the wait was longer, so that command was started again and left running until it finished. The partial dot line from the killed run is not a result.
+
+2026-11-21 TASK-073-r2: `git checkout -- bridge-install.py` during mutation checks reverts the whole file; keep a sidecar copy and re-run `make-manifest.py` if a scratch file was hashed before deletion.

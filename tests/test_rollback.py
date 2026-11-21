@@ -459,3 +459,6 @@ def test_r094_keep_with_rollback_is_refused(tmp_path, installed_old_then_new):
     rc, out = run(NEW_INSTALLER, tmp_path, "--rollback", "--target", str(target), "--keep", OLD_VERSION)
     assert rc == 2 and "Traceback" not in out, out
     assert "--keep" in out and "--rollback" in out
+    assert version_of(target) == NEW_VERSION
+    assert (target / "cursor-bridge-previous" / OLD_VERSION).is_dir()
+    assert not (target / "cursor-bridge" / "ROLLED-BACK.md").exists()
