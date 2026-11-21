@@ -560,3 +560,60 @@ def test_r2_the_row_stands_where_there_is_no_workflow(tmp_path):
     assert status == "MISSING", out
     assert "no workflow file" in plain(detail).lower() and "schedule:" in plain(detail), out
     assert rc == 1, out
+
+
+# ---------------------------------------------------------------- round 3: no link is followed to the git folder
+
+def link_dir(link, target):
+    """A folder link the platform makes without a privilege: a junction on Windows, a symbolic link elsewhere."""
+    if os.name == "nt":
+        import _winapi
+        _winapi.CreateJunction(str(target), str(link))
+    else:
+        os.symlink(str(target), str(link), target_is_directory=True)
+
+
+def unlink_dir(link):
+    """Remove the link itself, never what it points at."""
+    if os.name == "nt":
+        os.rmdir(str(link))
+    else:
+        os.unlink(str(link))
+
+
+def test_r3_a_git_entry_that_is_a_link_is_not_followed(tmp_path):
+    """R-092, TASK-072 (the brief's trust boundary: the remote is read from the Workspace's own configuration and
+    reading the row never opens a network connection): Review B round 1, finding 1. The Workspace's .git is a
+    link (a junction on Windows) to a git folder elsewhere whose origin is on github.com; a link at .git could as
+    well name a folder on another host, so it is not followed and the row is NOTE (no GitHub remote of its own).
+    Round 2 followed it and said MISSING."""
+    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"))
+    real = tmp_path / "real-git"
+    os.rename(os.path.join(str(ws), ".git"), str(real))
+    link = os.path.join(str(ws), ".git")
+    link_dir(link, real)
+    try:
+        rc, out = conformance(ws)
+        status, _detail = weekly_row(out)
+        assert status == "NOTE", out
+    finally:
+        unlink_dir(link)
+
+
+def test_r3_a_gitdir_target_that_is_a_link_is_not_followed(tmp_path):
+    """R-092, TASK-072 (as above): Review B round 1, finding 1, its second door. The Workspace's .git is a file
+    whose gitdir: line names a link (a junction on Windows) to the real git folder, whose origin is on github.com;
+    the link is not followed and the row is NOTE. Round 2 followed it and said MISSING."""
+    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"))
+    named = tmp_path / "gitdir-link"
+    git(ws, "init", "-q", "--separate-git-dir", str(named).replace("\\", "/"))
+    assert os.path.isfile(os.path.join(str(ws), ".git"))
+    real = tmp_path / "gitdir-real"
+    os.rename(str(named), str(real))
+    link_dir(named, real)
+    try:
+        rc, out = conformance(ws)
+        status, _detail = weekly_row(out)
+        assert status == "NOTE", out
+    finally:
+        unlink_dir(named)
