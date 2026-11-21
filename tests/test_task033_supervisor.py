@@ -723,7 +723,8 @@ def known(tmp_path_factory):
     """The known history: started, merged, rounds, days and HARDENING lines in set weeks (k weeks back).
 
     starts: TASK-104 launcher k6 (guard k5), TASK-101 launcher k5, TASK-102 guard k4, TASK-103 guard k4 (launcher k3),
-            TASK-105 unknown, STAGE-B3 and B3-RECORDS records at k7 (no brief: no start).
+            TASK-105 unknown, STAGE-B3 records at k7 (a stage review: no start), B3-RECORDS at k7 (no brief, but a
+            guard record: a start since R-089); TASK-900, TASK-901 and the notes commit close no pull request.
     merges: k4 TASK-101 `(TASK-101, R-044)`; k2 TASK-102 by trailer and TASK-105 by subject; k1 `TASK-103 TASK-104:`;
             TASK-900 (no brief) k6 and TASK-901 (a report, no brief) k7 count nothing.
     rounds: TASK-101 3 (three builder reports), TASK-102 5 (guard record over reports r1, r2a), TASK-103 2,
@@ -739,12 +740,12 @@ def known(tmp_path_factory):
              "TASK-104-r1", "TASK-104-r3a", "TASK-105-r1", "TASK-901-r1")
     p.write("docs/README.md", "fixture \u00e9\n")
     p.commit("records: briefs and reports", at(10, 0))
-    p.commit("TASK-901: report only, no brief (#11)", at(7, 3))
-    p.commit("docs: caf\u00e9 notes \u2014 nothing merges (#12)", at(7, 4))
-    p.commit("TASK-900: no brief (#10)", at(6, 3))
+    p.commit("TASK-901: report only, no brief", at(7, 3))       # no (#n): since R-089 a close is PR-<n>
+    p.commit("docs: caf\u00e9 notes \u2014 nothing merges", at(7, 4))
+    p.commit("TASK-900: no brief", at(6, 3))
     p.commit("feat(core): first increment (TASK-101, R-044) (#1)", at(4, 2))
     p.write("docs/HARDENING.md", "".join("- lead %d\n" % i for i in range(1, 6)))
-    p.commit("docs: hardening leads (#4)", at(3, 3))
+    p.commit("docs: hardening leads", at(3, 3))
     p.commit("chore: land the unit (#2)", at(2, 2), body="Merges: TASK-102")
     p.commit("TASK-105: unknown start (#5)", at(2, 2, hour=13))
     p.write("docs/HARDENING.md", "".join("- lead %d\n" % i for i in (1, 2, 3, 4, 6, 7)))
@@ -796,11 +797,12 @@ def test_task033_started_whichever_is_earlier(known):
 
 
 def test_task033_stage_and_records_subject_records_are_no_start(known):
-    """R-044. Clause (b): a stage review's record (STAGE-B3) and a records subject's (B3-RECORDS, no brief) are no
-    start: k7 starts nothing. enforces: docs/BUILD_PLAN.md TASK-033 (b) ("counted only for an ID that has a brief");
-    (c) "a stage review's record counted as no start"."""
+    """R-044, R-089. Clause (b): a stage review's record (STAGE-B3) is no start; a records subject's guard record
+    (B3-RECORDS, no brief) starts it since R-089, which counts a name from a guard rounds record (F6): k7 starts
+    one. enforces: docs/BUILD_PLAN.md TASK-033 (c) "a stage review's record counted as no start"; TASK-069 (a name
+    counted from "a rounds record of the guard")."""
     rep = known.report()
-    assert rep.at_week(7, "started") == 0
+    assert rep.at_week(7, "started") == 1
 
 
 def test_task033_unknown_start_is_printed_and_not_counted(tmp_path):
@@ -848,11 +850,12 @@ def test_task033_an_id_without_a_brief_is_never_merged(known):
 
 def test_task033_total_row(known):
     """R-044. Clause (b): the table has a total row; with every event inside the window it sums the weeks (merged 5,
-    started 4, HARDENING lines 7). enforces: docs/BUILD_PLAN.md TASK-033 (b) ("and a total row")."""
+    started 5, B3-RECORDS counted from its guard record since R-089, HARDENING lines 7).
+    enforces: docs/BUILD_PLAN.md TASK-033 (b) ("and a total row")."""
     rep = known.report()
     assert rep.total is not None, rep.text
     assert rep.number(rep.total, "merged") == 5
-    assert rep.number(rep.total, "started") == 4
+    assert rep.number(rep.total, "started") == 5
     assert rep.number(rep.total, "hardening") == 7
 
 
@@ -1159,7 +1162,8 @@ def test_task033_letter_files_beside_a_real_lettered_increment(tmp_path):
 def test_task033_iss013_form_merges_nothing_in_both_programs(tmp_path, program, monkeypatch):
     """R-044. One subject in the ISS-013 form with no leading ID, on one repository: the merged set plan-check.py reads
     (bridge_env.squash_merged_ids under the plan pattern since TASK-048, the retired reading (11)) does not read
-    TASK-031 as merged, and pace-report.py counts no merge that week.
+    TASK-031 as merged, and pace-report.py merges no increment that week: since R-089 the squash, naming no counted
+    name, is its pull request, PR-61, the week's one merge.
     enforces: docs/BUILD_PLAN.md TASK-033 (c) ("a subject in the ISS-013 form merging nothing in both programs (one
     test runs both on the same subject)"); handoff/TASK-033.md Context, "The ISS-013 subject"."""
     p = Project(tmp_path / "proj-iss013-q7")
@@ -1169,8 +1173,9 @@ def test_task033_iss013_form_merges_nothing_in_both_programs(tmp_path, program, 
     r = pace([p.root], cwd=tmp_path)
     assert r.rc == 0, r
     rep = Report(section(r.out, p.name))
-    assert rep.at_week(2, "merged") in (0, None)
-    assert rep.number(rep.total, "merged") in (0, None)
+    assert rep.at_week(2, "merged") == 1, rep.text
+    assert rep.number(rep.total, "merged") == 1, rep.text
+    assert rep.at_week(2, "started") == 1, rep.text              # PR-61 at its commit; TASK-031 starts nothing
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
     monkeypatch.setenv("GIT_CONFIG_SYSTEM", os.devnull)
     monkeypatch.chdir(str(p.ws))

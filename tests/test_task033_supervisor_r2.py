@@ -127,7 +127,7 @@ def test_task033r2_a_separator_character_in_a_subject_merges_nothing(tmp_path):
     p = Project(tmp_path / "proj-sep-q7")
     p.brief("TASK-650")
     p.commit("records: brief", at(10, 0))
-    p.commit("docs: x\x1fTASK-650 (#4)", at(2, 2))
+    p.commit("docs: x\x1fTASK-650", at(2, 2))                 # no (#n): since R-089 a close is PR-<n>
     r = pace([p.root], cwd=tmp_path)
     assert r.rc == 0, r
     rep = Report(section(r.out, p.name))
@@ -164,7 +164,7 @@ def test_task033r2_one_new_brief_beside_a_tracked_handoff_is_no_untracked_handof
     p.commit("records: brief", at(10, 0))
     p.launch("TASK-701", at(3, 0))
     p.commit("TASK-701: x (#1)", at(2, 2))
-    p.commit("TASK-703: not briefed in git (#3)", at(2, 3))
+    p.commit("TASK-703: not briefed in git", at(2, 3))        # no (#n): since R-089 a close is PR-<n>
     p.brief("TASK-702", "TASK-703")                      # written after the last commit: untracked
     assert "TASK-701" in git(p.ws, "ls-files", "handoff/")
     r = pace([p.root], cwd=tmp_path)
