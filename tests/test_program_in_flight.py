@@ -371,6 +371,14 @@ def _junction(target, link):
             return False
 
 
+def _remove_link(link):
+    """A symbolic link is unlinked; a junction is removed as a folder, never followed."""
+    if os.path.islink(str(link)):
+        os.unlink(str(link))
+    else:
+        os.rmdir(str(link))
+
+
 @pytest.mark.parametrize("where", ["run", "supervisor"])
 def test_r088_r2_a_log_folder_that_is_a_link_is_refused(tmp_path, where):
     """R-088 (round 2, convergent: Review A's note and the security review): where `run/` or `run/supervisor/` is a
@@ -390,7 +398,7 @@ def test_r088_r2_a_log_folder_that_is_a_link_is_refused(tmp_path, where):
         assert rc == 2, out + err
         assert list(outside.rglob("*.md")) == []
     finally:
-        os.rmdir(str(ws / "run")) if where == "run" else os.rmdir(str(ws / "run" / "supervisor"))
+        _remove_link(ws / "run" if where == "run" else ws / "run" / "supervisor")
 
 
 # Round 3 (TASK-068-r3): the review ceiling's round; each case is a finding of the five blocking classes.
@@ -442,5 +450,4 @@ def test_r088_r3_a_supervisor_folder_linked_inside_the_workspace_is_refused(tmp_
         assert rc == 2, out + err
         assert not (target / "in-flight.md").exists()
     finally:
-        os.rmdir(str(ws / "run" / "supervisor"))
-
+        _remove_link(ws / "run" / "supervisor")
