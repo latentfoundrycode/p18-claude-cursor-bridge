@@ -448,6 +448,26 @@ evaluate-reports: the report cycle's program (restructuring plan, section 12; re
 - `--out`; default: null; required: false
 - `--since`; default: null; required: false; a date; default the ledger's last extract, else the newest evaluation folder
 
+## in-flight.py
+
+Path: `bridge/cursor-bridge/in-flight.py`
+
+```
+Append one clock-stamped line to the Workspace in-flight log.
+```
+
+### Positionals
+
+- `text`; default: null; required: false; the line's text, one argument
+
+### Options
+
+- `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
+- `--file`; default: null; required: false; a file under run/supervisor/ whose lines become the text
+- `--pass`; default: null; required: false; record a review pass of NAME by REVIEWER
+- `--round`; default: null; required: false; the pass round, a whole number from 1 to 999
+- `--cause`; default: null; required: false; the round cause, one word
+
 ## inventory-check.py
 
 Path: `bridge/cursor-bridge/inventory-check.py`

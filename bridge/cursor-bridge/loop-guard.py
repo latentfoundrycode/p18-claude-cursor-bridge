@@ -198,6 +198,17 @@ def field(text, name):
     return m.group(1).strip().strip("*_`").strip()
 
 
+def last_field(text, name):
+    """The last value of a `Name: value` line. field's pattern, except the white space after the colon and around the value is spaces and tabs only, so it cannot cross a line break."""
+    pat = r"^\s*(?:[-*]\s+)?[*_`]*%s[*_`]*\s*:[*_`]*[ \t]*(.*?)[ \t]*$" % re.escape(name)
+    found = None
+    for m in re.finditer(pat, text, re.M | re.I):
+        found = m
+    if not found:
+        return None
+    return found.group(1).strip().strip("*_`").strip()
+
+
 def parse_ts(s):
     """ISO 8601 (with or without Z), or epoch seconds or milliseconds, as a unix time; None otherwise.
     (reAngle, 2026-10-10: every task's start read as 'now' because the hook's form was not the one expected.)"""
@@ -270,15 +281,16 @@ def names_a_wait(value):
 
 
 def paused_in_flight(cwd):
-    """The `Paused:` line of run/supervisor/in-flight.md beside the status file, when it names a
+    """The last `Paused:` line of run/supervisor/in-flight.md beside the status file, when it names a
     wait (2026.10.25a, FB-027): the untracked working file records a pause, so no tracked file is
-    edited for it. None otherwise, or when the file is missing or unreadable."""
+    edited for it. None otherwise, or when the file is missing or unreadable. A later line replaces
+    an earlier one. A stamped line is not a `Paused:` line."""
     ws = workspace_of(cwd)
     if not ws:
         return None
     try:
         with open(os.path.join(ws, "run", "supervisor", "in-flight.md"), encoding="utf-8-sig", errors="replace") as f:
-            value = field(f.read(), "Paused")
+            value = last_field(f.read(), "Paused")
     except OSError:
         return None
     if value is None or not names_a_wait(value):
@@ -635,7 +647,7 @@ def main():
     listed, unscheduled = pending_from_hook(data, time.time(), cwd)
     tp = data.get("transcript_path")
     if unscheduled:                                        # before anything else: a later wake-up does not bound the agent
-        sys.stderr.write("Loop guard (Claude-Cursor Bridge, rule 43): you are waiting on a background agent with no timer running to its ceiling: %s. The computer's clock reads %s now. A scheduled wake-up (CronCreate) does not fire while a background agent runs, so the bound is a wake-timer command started in the background, whose completion wakes you (KP-043). A hung agent never completes and nothing else would wake you (plan 10.1, case 5). Before ending the turn, write it on the status file's `In flight:` line and start the timer with the command above (run in the background); when the timer ends, stop an agent still running with TaskStop and run its task again in the foreground.%s%s" % (", ".join(unscheduled), local_clock(time.time()), (" Leftover polling loop(s) %s never end and never count: stop them with TaskStop." % ", ".join(WAITERS)) if WAITERS else "", chr(10)))
+        sys.stderr.write("Loop guard (Claude-Cursor Bridge, rule 43): you are waiting on a background agent with no timer running to its ceiling: %s. The computer's clock reads %s now. A scheduled wake-up (CronCreate) does not fire while a background agent runs, so the bound is a wake-timer command started in the background, whose completion wakes you (KP-043). A hung agent never completes and nothing else would wake you (plan 10.1, case 5). Before ending the turn, append it to run/supervisor/in-flight.md with python ~/.claude/cursor-bridge/in-flight.py and start the timer with the command above (run in the background); when the timer ends, stop an agent still running with TaskStop and run its task again in the foreground.%s%s" % (", ".join(unscheduled), local_clock(time.time()), (" Leftover polling loop(s) %s never end and never count: stop them with TaskStop." % ", ".join(WAITERS)) if WAITERS else "", chr(10)))
         sys.exit(2)
     if listed:
         allow()

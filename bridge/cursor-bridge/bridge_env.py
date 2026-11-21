@@ -4399,3 +4399,34 @@ def ci_class(item, kind):
         return "failed"
     return "failed"
 
+
+ROUND_CAUSES = (
+    "defect",
+    "security",
+    "fix-induced",
+    "no external path",
+    "records",
+    "builder incomplete",
+    "brief error",
+)
+
+
+def workspace_of(start):
+    """Absolute path of the Workspace that holds start, or None.
+
+    start is a folder. The Workspace is that folder, or the nearest parent
+    that holds docs/PROJECT_STATUS.md as a file.
+    """
+    if not isinstance(start, str) or start == "":
+        return None
+    current = os.path.abspath(start)
+    seen = None
+    while current != seen:
+        if os.path.isfile(os.path.join(current, "docs", "PROJECT_STATUS.md")):
+            return current
+        seen = current
+        parent = os.path.dirname(current)
+        if parent == current:
+            return None
+        current = parent
+    return None

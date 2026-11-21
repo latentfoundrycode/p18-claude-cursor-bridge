@@ -263,6 +263,17 @@ def test_r087_push_scan_rule_in_allow():
         assert decide(cmd, ALLOW, DENY)[0] == "allow", cmd
 
 
+def test_r088_in_flight_rule_in_allow():
+    """R-088 (TASK-068): in-flight.py is allowed for a text, a file, and a review pass."""
+    rule = "Bash(python ~/.claude/cursor-bridge/in-flight.py:*)"
+    assert rule in ALLOW
+    for cmd in ('python ~/.claude/cursor-bridge/in-flight.py "TASK-068 builder r1 launched"',
+                "python ~/.claude/cursor-bridge/in-flight.py --file run/supervisor/line.txt",
+                "python ~/.claude/cursor-bridge/in-flight.py --pass PR-7 review-a --round 2 --cause records",
+                'python ~/.claude/cursor-bridge/in-flight.py --pass TASK-068 review-b --round 1 --cause "no external path"'):
+        assert decide(cmd, ALLOW, DENY)[0] == "allow", cmd
+
+
 def test_r062_records_migrate_rule_in_allow():
     """R13: records-migrate.py is allowed for a normal run and for --check."""
     rule = "Bash(python ~/.claude/cursor-bridge/records-migrate.py:*)"

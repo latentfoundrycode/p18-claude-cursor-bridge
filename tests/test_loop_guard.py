@@ -280,6 +280,24 @@ def test_the_refusal_prints_the_ceiling_on_the_computers_clock(lg, tmp_path, mon
     assert e.value.code == 2 and "The computer's clock reads" in err and "KP-043" in err and "wake-timer" in err, err
 
 
+def test_r088_the_refusal_names_the_in_flight_log_and_the_program(lg, tmp_path, monkeypatch, capsys):
+    """R-088: a background agent with no timer is refused, and the refusal names the in-flight log and in-flight.py."""
+    from datetime import datetime as dt
+    root = tmp_path / "proj" / "Workspace"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\nAwaiting user on: nothing\n", encoding="utf-8")
+    agent = {"id": "a1", "type": "background_subagent", "status": "running", "description": "Review A", "command": "Agent", "started_at": ts(-600)}
+    late = dt.fromtimestamp(NOW - 600 + 3600 + 3600)
+    cron = {"id": "c1", "schedule": "%d %d %d %d *" % (late.minute, late.hour, late.day, late.month), "description": "an hour late", "command": "", "last_run_at": None}
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO(json.dumps({"cwd": str(root), "transcript_path": str(root / "none"), "hook_event_name": "Stop", "background_tasks": [agent], "session_crons": [cron]})))
+    with pytest.raises(SystemExit) as e:
+        lg.main()
+    err = capsys.readouterr().err
+    first = "Loop guard (Claude-Cursor Bridge, rule 43): you are waiting on a background agent with no timer running to its ceiling:"
+    assert e.value.code == 2 and err.startswith(first), err
+    assert "run/supervisor/in-flight.md" in err and "in-flight.py" in err, err
+
+
 def test_the_hook_input_is_read_in_its_live_forms(lg, tmp_path, monkeypatch):
     """reAngle, 2026-10-10 (field observation on 2026.10.10a): a start as epoch milliseconds, a one-shot
     cron with its schedule only, a command task under another type name."""
@@ -455,3 +473,27 @@ def test_r061_agent_ceiling_by_header_matches_line_when_agreeing(lg, tmp_path):
     (ws / "docs" / "RUN_PARAMETERS.md").write_text(header + line_text, encoding="utf-8")
     (ws / "docs" / "PROJECT_STATUS.md").write_text("# Status\nPhase: building\nAwaiting user on: none\n", encoding="utf-8")
     assert lg.agent_ceiling(str(ws)) == 9900
+
+
+def test_r088_the_last_paused_line_decides(lg, tmp_path):
+    """R-088 round 2: the last Paused: line decides, so a later resume is no wait and a later pause is that pause."""
+    root = tmp_path / "proj" / "Workspace"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\n", encoding="utf-8")
+    log = root / "run" / "supervisor" / "in-flight.md"
+    log.parent.mkdir(parents=True)
+    log.write_text("Paused: the owner's word\nPaused: resumed\n", encoding="utf-8")
+    assert lg.paused_in_flight(str(root)) is None
+    log.write_text("Paused: resumed\nPaused: the install run sheet\n", encoding="utf-8")
+    assert lg.paused_in_flight(str(root)) == "the install run sheet"
+
+
+def test_r088_an_empty_paused_line_reads_as_no_wait(lg, tmp_path):
+    """R-088 round 3: an empty Paused: line is empty, so the stamped line after it is not a pause."""
+    root = tmp_path / "proj" / "Workspace"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\n", encoding="utf-8")
+    log = root / "run" / "supervisor" / "in-flight.md"
+    log.parent.mkdir(parents=True)
+    log.write_text("Paused: x\nPaused:\n2026-11-21T02:43Z text\n", encoding="utf-8")
+    assert lg.paused_in_flight(str(root)) is None
