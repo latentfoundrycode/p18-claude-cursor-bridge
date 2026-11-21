@@ -3133,6 +3133,20 @@ def run_parameters_fallback(text):
     return out
 
 
+def empty_run_parameters(values):
+    """(key, label) for each of the five run-parameter values equal to "", in prefix order.
+
+    `values` is a header or the dict run_parameters_fallback returns. The label is that
+    key's entry in _RUN_PARAM_VALUE_PREFIXES without the trailing colon and space.
+    """
+    named = []
+    mapping = values if isinstance(values, dict) else {}
+    for key, prefix in _RUN_PARAM_VALUE_PREFIXES:
+        if mapping.get(key) == "":
+            named.append((key, prefix[:-2]))
+    return named
+
+
 def run_parameters_values(text):
     """(values, malformed, disagrees) for run-parameters header fields."""
     fallback = run_parameters_fallback(text)
