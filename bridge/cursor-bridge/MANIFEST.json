@@ -1,6 +1,6 @@
 {
   "version": "2026.11.12a",
-  "generated": "2026-11-21 01:51",
+  "generated": "2026-11-21 02:51",
   "files": {
     "agents/cursor-configurator.md": "a8aad7838a9bc5b4f00e13fd3749919158cbe37ec7acfa9a40960600398784bc",
     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
@@ -79,12 +79,12 @@
     "cursor-bridge/design-seeds/x.ai/README.md": "8560245632010049402a9aaab516e47b1876c660e9fabe2220c7a2be52470e40",
     "cursor-bridge/diagram-check.py": "d8bc790a1196f1f290f410fe8ceb4eee3d812b1c9d903129ba5923cd47b8d015",
     "cursor-bridge/evaluate-reports.py": "4e4eb6a41b95093a62905fcc8e2fc9d9cafc74ffe41ea17cb46eb6485934e50a",
-    "cursor-bridge/in-flight.py": "bbe83dfd86c432889ab8e890266bcfd522766ce89fbcc6f1401e9eb17e8d0c44",
+    "cursor-bridge/in-flight.py": "aa5e828996aac2144b901eaf6fc4ed54b5697317bcac3539598a113070fad0d1",
     "cursor-bridge/installer-check.ps1": "a662ab0f1d707234d5b1b58de7584b812099cddcec78274b8f15599a3e026cb5",
     "cursor-bridge/inventory-check.py": "17f71879b6cd68dd20b898d72aab70284761835376ed390a88b5ecf83abef477",
     "cursor-bridge/invisible-check.py": "5584c8f1e4099603d965c86dbdaad8f226fe373dba736c10264a88894fbb7a91",
     "cursor-bridge/lock-check.py": "f843dd5a213583d2fb9896bb269c2803511b3ea7b46a561337dc74a67b4e45fe",
-    "cursor-bridge/loop-guard.py": "0f796b4db104bd261bedaa4d5e018e519d777af9dfb8ad09905a5ac16a4da1ea",
+    "cursor-bridge/loop-guard.py": "e6a4b1453f22b4317047995cfbd1ad5deb6478b1a67a3d91d08f0c839f16b9d9",
     "cursor-bridge/minimal-code.snapshot.md": "b822c4d7abd69971dc5fee671b8a63daa58ba62a2711c9cf07849ed82d01a215",
     "cursor-bridge/mutation-run.py": "3489d7778015393029dc9a768f42b3f213e999fad32e9b918c4c10160676569f",
     "cursor-bridge/pace-report.py": "c416140ed4ea0841dd10bbdd66b88250c08024328b1d25a839de0d706cc79065",

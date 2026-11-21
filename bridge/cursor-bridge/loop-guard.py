@@ -199,8 +199,8 @@ def field(text, name):
 
 
 def last_field(text, name):
-    """The last value of a `Name: value` line. The pattern is field's; the match is the last one."""
-    pat = r"^\s*(?:[-*]\s+)?[*_`]*%s[*_`]*\s*:[*_`]*\s*(.*?)\s*$" % re.escape(name)
+    """The last value of a `Name: value` line. field's pattern, except the white space after the colon and around the value is spaces and tabs only, so it cannot cross a line break."""
+    pat = r"^\s*(?:[-*]\s+)?[*_`]*%s[*_`]*\s*:[*_`]*[ \t]*(.*?)[ \t]*$" % re.escape(name)
     found = None
     for m in re.finditer(pat, text, re.M | re.I):
         found = m

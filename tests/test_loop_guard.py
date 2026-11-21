@@ -486,3 +486,14 @@ def test_r088_the_last_paused_line_decides(lg, tmp_path):
     assert lg.paused_in_flight(str(root)) is None
     log.write_text("Paused: resumed\nPaused: the install run sheet\n", encoding="utf-8")
     assert lg.paused_in_flight(str(root)) == "the install run sheet"
+
+
+def test_r088_an_empty_paused_line_reads_as_no_wait(lg, tmp_path):
+    """R-088 round 3: an empty Paused: line is empty, so the stamped line after it is not a pause."""
+    root = tmp_path / "proj" / "Workspace"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "PROJECT_STATUS.md").write_text("Phase: building\n", encoding="utf-8")
+    log = root / "run" / "supervisor" / "in-flight.md"
+    log.parent.mkdir(parents=True)
+    log.write_text("Paused: x\nPaused:\n2026-11-21T02:43Z text\n", encoding="utf-8")
+    assert lg.paused_in_flight(str(root)) is None

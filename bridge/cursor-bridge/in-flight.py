@@ -210,6 +210,10 @@ def _read_source(workspace, given):
         return None, "the path is a folder"
     if not os.path.isfile(file_real):
         return None, "the file is missing"
+    try:
+        checked = os.lstat(file_real)
+    except OSError:
+        return None, "the file cannot be read"
     flags = os.O_RDONLY
     if hasattr(os, "O_BINARY"):
         flags |= os.O_BINARY
@@ -221,10 +225,9 @@ def _read_source(workspace, given):
         return None, "the file cannot be read"
     try:
         opened = os.fstat(fd)
-        named = os.stat(file_real)
-        if opened.st_dev and named.st_dev and opened.st_dev != named.st_dev:
+        if opened.st_dev and checked.st_dev and opened.st_dev != checked.st_dev:
             return None, "the file is not the file checked"
-        if opened.st_ino and named.st_ino and opened.st_ino != named.st_ino:
+        if opened.st_ino and checked.st_ino and opened.st_ino != checked.st_ino:
             return None, "the file is not the file checked"
         if opened.st_nlink != 1:
             return None, "the file is not the file checked"
@@ -394,6 +397,8 @@ def append_log(path, lines):
     try:
         os.makedirs(folder, exist_ok=True)
         flags = os.O_RDWR | os.O_CREAT | os.O_APPEND | getattr(os, "O_BINARY", 0)
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
         fd = os.open(path, flags, 0o666)
         if not _acquire(fd, LOCK_SECONDS):
             return "the log was busy"
@@ -403,6 +408,12 @@ def append_log(path, lines):
             os.lseek(fd, size - 1, os.SEEK_SET)
             if os.read(fd, 1) != b"\n":
                 payload = b"\n" + payload
+        opened = os.fstat(fd)
+        if opened.st_nlink != 1:
+            return "the log has more than one link"
+        blocked = _log_blocked(path)
+        if blocked:
+            return blocked
         short = _write_all(fd, payload)
         if short is not None:
             return short

@@ -100,3 +100,5 @@
 2026-11-21 TASK-068: on Windows `msvcrt.locking` locks a byte range from the current file position, so a handle already at the end of an append does not exclude another append; `in-flight.py` seeks to offset 0 before `LK_NBLCK` and unlocks that same byte.
 
 2026-11-21 TASK-068-r2: `paused_in_flight` keeps the first `Paused:` line for the life of an append-only log, so a later `Paused: resumed` never lifts it; the guard has to read the last match of `field`'s pattern. The append also has to set `O_BINARY`, or Windows turns each LF into CR LF.
+
+2026-11-21 TASK-068-r3: since round 2, the Windows lock sits on the byte at `2**31`, not byte 0 as round 1's line says.
