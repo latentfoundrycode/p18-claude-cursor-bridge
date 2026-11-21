@@ -363,8 +363,17 @@ What it checks, with the file it reads (the 0b review corrected several of these
     "not through an environment variable", "no longer ...") is not one;
   - the private memory notes Claude Code keeps for this project (names only; calibration
     step 2b reviews them, rule 41);
-  - the recorded bridge version against the installed one (calibration due).
-Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace.
+  - the recorded bridge version against the installed one (calibration due);
+  - the weekly dependency scan, found by its triggers and its OSV-Scanner step, never by a
+    file name: OK where a workflow with a schedule: trigger and an OSV-Scanner step has the
+    same --lockfile= values, as a set, as the workflows triggered by push or pull_request;
+    NOTE where the inventory Decisions table holds a row whose first cell begins "Weekly scan:",
+    the note quoting that cell, or where the local git configuration names no GitHub remote;
+    MISSING where no workflow file runs OSV-Scanner on a schedule: trigger, where an
+    OSV-Scanner workflow has no schedule: trigger, or where the lock-file lists differ and the
+    row names the lock files apart; pins, permissions and exit handling are not compared, and
+    a workflow disabled on GitHub is the evaluation's read.
+Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace, or a malformed record header (HEADER MALFORMED, the status file's or the inventory's).
 ASCII-only on purpose (cp1252 consoles). Never writes.
 ```
 
