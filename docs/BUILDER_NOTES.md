@@ -104,3 +104,4 @@
 2026-11-21 TASK-068-r3: since round 2, the Windows lock sits on the byte at `2**31`, not byte 0 as round 1's line says.
 
 2026-11-21 TASK-069: a pass line's stamp is `YYYY-MM-DDTHH:MMZ` with no seconds, so pace-report's `_parse_run_time` (which requires seconds) does not read it; the stamp is parsed with `strptime` and `%Y-%m-%dT%H:%MZ`.
+2026-11-21 TASK-069-r2: `test_r089_r2_a_stamp_of_other_digits_is_no_pass_line` stays green when the stamp pattern uses `\d`, because `strptime` rejects the full-width digits after the match; the case does not show that the pattern itself is ASCII `[0-9]`.

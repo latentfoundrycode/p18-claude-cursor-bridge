@@ -847,8 +847,13 @@ What each step does:
             snapshot again). For a name the grammar reads, the round's entry of the rounds
             record gains `cause` beside `time`: the cause named by the first line of the
             round's SCOPE file that begins `Round cause:`, or `unstated` where that file is
-            missing, unreadable, has no such line, or names a word outside the round causes.
-            A re-snapshot reads the line again. The field decides no count and no lift.
+            missing, unreadable, over 1048576 bytes, has no such line, or names a word
+            outside the round causes. The file is read in binary, at most 1048577 bytes, then
+            decoded as UTF-8 with errors replaced. The cause line is found by the first line
+            that begins `Round cause:`, with no backtracking expression: the text after the
+            prefix, stripped of spaces and tabs, then the longest cause first and a separator.
+            A re-snapshot reads the line again. The field decides no count and no lift. A file
+            over the bound never refuses the snapshot.
   verify    reads the configuration and the hooks folders FIRST, as files, without running
             git: a change is GATE-INTEGRITY and nothing else runs. Every git command the
             guard runs is given `-c core.hooksPath=<an empty folder> -c core.fsmonitor=false`,

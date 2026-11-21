@@ -9,29 +9,34 @@ like that program. Defaults for --weeks (8), --ceiling (bridge_env.REVIEW_ROUNDS
 are resolved in main(), not in the parser. No option is added beyond those.
 
 A counted name is an increment's ID (a string GRAMMAR_ID_PATTERN fullmatches) or PR-<n> (PR-
-and a whole number from 1, parsed with int), the reserved form for a pull request. It is counted
-where it has a brief under a tracked handoff/, a guard rounds record (a record named STAGE-
-excepted), or a tagged pass line in run/supervisor/in-flight.md. PR-<n> is also counted by a
-commit of refs/heads/main whose subject closes with (#<n>) and names no name counted by those
-three: the IDs the subject reader returns that are counted names. Where that subject names one
-or more, PR-<n> is not a name of its own; its pass lines and their causes fold into the first
-counted name by position in the subject (a name the reader returns only from a trailer sorts
-after every name that stands in the subject, and those tie by the ID text). A PR-<n> that main
-does not close is a name of its own, started and not merged. One merge is never two names and
-one pass never two passes.
+and a whole number from 1, parsed with int), the reserved form for a pull request. A name that
+begins STAGE- or DESIGN- (a stage review, or a design critique) is no counted name from any
+source: it starts nothing, merges nothing, and its rounds enter no cause line. A counted name
+is counted where it has a brief under a tracked handoff/, a guard rounds record, or a tagged
+pass line in run/supervisor/in-flight.md. PR-<n> is also counted by a commit of refs/heads/main
+whose subject closes with (#<n>) and names no name counted by those three: the IDs the subject
+reader returns that are counted names. That PR-<n> rule holds with handoff/ tracked or
+untracked: a squash closing (#<n>) whose subject names no ID the reader finds is merged as
+PR-<n> in both modes. Where that subject names one or more counted names, PR-<n> is not a name
+of its own; its pass lines and their causes fold into the first counted name by position in the
+subject (a name the reader returns only from a trailer sorts after every name that stands in
+the subject, and those tie by the ID text). A PR-<n> that main does not close is a name of its
+own, started and not merged. One merge is never two names and one pass never two passes.
 
 Columns per ISO week (UTC): started (the earliest of a counted name's launcher rows, its
 non-seeded guard rounds and its pass lines, folded pass lines included; a PR-<n> with none of
-those starts at its commit on refs/heads/main; else unknown), merged (by the commits of
-refs/heads/main alone: an ID by a subject the reader says names it, at its earliest such commit,
-and PR-<n> by the closing (#<n>) where it is a name of its own; a rounds record or a pass line
-never merges a name; with handoff/ untracked, every ID the reader finds, as before), rounds mean
-and max among merges that week that have a rounds reading, mean days from a known start to that
-merge, and docs/HARDENING.md lines added on refs/heads/main that week (added lines only). The
-HARDENING column reads refs/heads/main, as the commit list does. A total row follows. Below the
-table, IDs over --ceiling with round counts and lifts (class, owner, none, unknown), then stage
-reviews (STAGE-<name>). Those lists keep their present rules: a name with no brief is not listed
-as over the ceiling, and a stage review stays in the stage list.
+those starts at its commit on refs/heads/main for the Started column only; else unknown),
+merged (by the commits of refs/heads/main alone: an ID by a subject the reader says names it,
+at its earliest such commit, and PR-<n> by the closing (#<n>) where it is a name of its own; a
+rounds record or a pass line never merges a name), rounds mean and max among merges that week
+that have a rounds reading, mean days from a known start to that merge (a known start is only a
+launcher row, a non-seeded guard round or a pass line; a pull request's own commit time is not
+a known start, so that pull request adds nothing to the days), and docs/HARDENING.md lines
+added on refs/heads/main that week (added lines only). The HARDENING column reads
+refs/heads/main, as the commit list does. A total row follows. Below the table, IDs over
+--ceiling with round counts and lifts (class, owner, none, unknown), then stage reviews
+(STAGE-<name>). Those lists keep their present rules: a name with no brief is not listed as
+over the ceiling, and a stage review stays in the stage list.
 
 One round per name and round number. Its records are the builder's launcher rows (kind builder,
 not slot not free) of that brief and round (a row with no round is round 1), including a brief
@@ -50,7 +55,8 @@ Below that line, or where it would stand, one line per week of the window that h
 pass, in the table's week order. A pass is one per name, reviewer kind and round: a non-seeded
 guard round is a review-b pass in the week of its time; a pass line is a pass of its name, kind
 and round in the week of its stamp, the earliest if written twice; a review-b pass line is not
-a further pass where the guard holds that name and round. Kinds are review-a, review-b,
+a further pass where the guard holds that name and round. A STAGE- or DESIGN- name is not
+counted, and its passes still count by those same rules. Kinds are review-a, review-b,
 security-auditor, design-auditor, plan-critic, design-critic-b and supervisor, printed in that
 order. The line is `<YYYY-Www> <kind> <count>, <kind> <count> recorded passes only`: one space
 between a kind and its count, a comma and a space between kinds, and nothing after
@@ -60,11 +66,12 @@ output_tokens, cache_creation_input_tokens, cache_read_input_tokens per message 
 total kept) from ~/.claude/projects/<key>/*.jsonl and <key>/**/subagents/*.jsonl for keys from
 evaluate-reports.py's project_keys, plus tokens per merged increment.
 
-The in-flight log is read as UTF-8 with errors replaced, at most 8388608 bytes; past that cap
-only the bytes up to the last newline are kept, and a file with no newline inside the cap is no
-pass lines. A missing or unreadable file is no pass lines. A line that is not a whole pass line
-is skipped. With handoff/ untracked, started and rounds show n/a (handoff/ untracked); the cause
-line and the passes lines are still printed from the launcher rows, the guard rounds and the
+The in-flight log is read in binary, at most 8388608 bytes plus one, then decoded as UTF-8 with
+errors replaced; past that cap only the bytes up to the last newline are kept, and a file with
+no newline inside the cap is no pass lines. A missing or unreadable file is no pass lines. A
+line that is not a whole pass line is skipped. A pass line's stamp is ASCII digits only.
+With handoff/ untracked, started and rounds show n/a (handoff/ untracked); the cause line
+and the passes lines are still printed from the launcher rows, the guard rounds and the
 pass lines. Sources: git log on refs/heads/main (committer week), run/launcher/runs.jsonl,
 .git/bridge/rounds-*.json, handoff/*.md and *-report.md, run/review/REVIEW-*.err,
 run/supervisor/in-flight.md, docs/HARDENING.md numstat, session jsonl.
@@ -102,7 +109,7 @@ _REVIEWERS = (
     "supervisor",
 )
 _PASS_RX = re.compile(
-    r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z) PASS ([A-Z][A-Za-z0-9-]*)(?: r([0-9]+))? ([a-z0-9-]+)(?: (.+))?$"
+    r"^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}Z) PASS ([A-Z][A-Za-z0-9-]*)(?: r([0-9]+))? ([a-z0-9-]+)(?: (.+))?$"
 )
 _PR_CLOSE_RX = re.compile(r"\(#([0-9]+)\)$")
 _ID_EDGE = r"[A-Za-z0-9-]"
@@ -527,6 +534,11 @@ def _grammar_name(name):
     return isinstance(name, str) and re.fullmatch(bridge_env.GRAMMAR_ID_PATTERN, name) is not None
 
 
+def _review_only_name(name):
+    """A stage review or a design critique: no counted name, from any source."""
+    return isinstance(name, str) and (name.startswith("STAGE-") or name.startswith("DESIGN-"))
+
+
 def _stated_cause(value):
     if isinstance(value, str) and value in bridge_env.ROUND_CAUSES:
         return value
@@ -590,16 +602,17 @@ def _parse_pass_line(line):
 def _read_pass_lines(ws):
     path = os.path.join(ws, "run", "supervisor", "in-flight.md")
     try:
-        with open(path, encoding="utf-8", errors="replace") as f:
-            data = f.read(_IN_FLIGHT_CAP + 1)
+        with open(path, "rb") as f:
+            raw = f.read(_IN_FLIGHT_CAP + 1)
     except OSError:
         return []
-    if len(data) > _IN_FLIGHT_CAP:
-        data = data[:_IN_FLIGHT_CAP]
-        cut = data.rfind("\n")
+    if len(raw) > _IN_FLIGHT_CAP:
+        raw = raw[:_IN_FLIGHT_CAP]
+        cut = raw.rfind(b"\n")
         if cut < 0:
             return []
-        data = data[:cut]
+        raw = raw[:cut]
+    data = raw.decode("utf-8", errors="replace")
     out = []
     for line in data.split("\n"):
         if line.endswith("\r"):
@@ -663,7 +676,7 @@ def _builder_events(ws):
 def _guard_name_ids(common):
     out = set()
     for id_part in bridge_env._read_rounds_files(common):
-        if id_part.startswith("STAGE-") or not _grammar_name(id_part):
+        if _review_only_name(id_part) or not _grammar_name(id_part):
             continue
         out.add(id_part)
     return out
@@ -672,7 +685,7 @@ def _guard_name_ids(common):
 def _guard_events(common):
     events = []
     for id_part, data in bridge_env._read_rounds_files(common).items():
-        if id_part.startswith("STAGE-") or not _grammar_name(id_part):
+        if not _grammar_name(id_part):
             continue
         for rnd in data.get("rounds") or []:
             if not isinstance(rnd, dict) or rnd.get("seeded"):
@@ -718,11 +731,12 @@ def _pace_names(ws, common, brief_ids, untracked, commits, weeks):
     base = set()
     if not untracked:
         for ident in brief_ids:
-            if _grammar_name(ident):
+            if _grammar_name(ident) and not _review_only_name(ident):
                 base.add(ident)
     base.update(_guard_name_ids(common))
     for row in pass_rows:
-        base.add(row["name"])
+        if not _review_only_name(row["name"]):
+            base.add(row["name"])
     fold = {}
     own = {}
     seen_pr = set()
@@ -735,7 +749,7 @@ def _pace_names(ws, common, brief_ids, untracked, commits, weeks):
         occupy = set(base)
         if untracked:
             for ident in merged:
-                if _grammar_name(ident):
+                if _grammar_name(ident) and not _review_only_name(ident):
                     occupy.add(ident)
         target = _first_counted_name(subject, merged, occupy)
         if target and target != pr:
@@ -747,7 +761,7 @@ def _pace_names(ws, common, brief_ids, untracked, commits, weeks):
         counted.discard(pr)
     counted.update(own)
     for target in fold.values():
-        if target not in fold:
+        if target not in fold and not _review_only_name(target):
             counted.add(target)
 
     def home(name):
@@ -760,21 +774,23 @@ def _pace_names(ws, common, brief_ids, untracked, commits, weeks):
     start_dt = {}
     if not untracked:
         for ident in counted:
-            times = list(pass_times.get(ident, ()))
+            known = list(pass_times.get(ident, ()))
             base_t = _start_times(ws, common, ident)
             if base_t:
-                times.append(base_t)
-            if ident in own and not times:
-                times.append(own[ident])
-            dt = min(times) if times else None
-            start_dt[ident] = dt
+                known.append(base_t)
+            known_dt = min(known) if known else None
+            start_dt[ident] = known_dt
+            column = list(known)
+            if ident in own and not column:
+                column.append(own[ident])
+            dt = min(column) if column else None
             starts[ident] = _iso_week(dt) if dt else None
     merge_dt = {}
     merge_week = {}
     for dt, merged, subject in commits:
         wk = _iso_week(dt)
         for ident in merged:
-            if _grammar_name(ident) and (untracked or ident in counted):
+            if _grammar_name(ident) and not _review_only_name(ident) and (untracked or ident in counted):
                 prev = merge_dt.get(ident)
                 if prev is None or dt < prev:
                     merge_dt[ident] = dt
@@ -795,26 +811,36 @@ def _pace_names(ws, common, brief_ids, untracked, commits, weeks):
 
     held = set()
     for brief, rnd, when, cause in builders:
-        got = bucket(home(brief), rnd)
+        if _review_only_name(brief):
+            continue
+        name = home(brief)
+        if _review_only_name(name):
+            continue
+        got = bucket(name, rnd)
         got["builder"].append(cause)
         if when:
             got["times"].append(when)
     for ident, rnd, when, cause in guard:
         name = home(ident)
         held.add((name, rnd))
+        if _review_only_name(ident) or _review_only_name(name):
+            continue
         got = bucket(name, rnd)
         got["guard"].append(cause)
         if when:
             got["times"].append(when)
     pass_best = {}
     for row in pass_rows:
-        name = home(row["name"])
-        if name not in counted:
+        raw_name = row["name"]
+        name = home(raw_name)
+        review_only = _review_only_name(raw_name) or _review_only_name(name)
+        if name not in counted and not review_only:
             continue
         rnd = row["round"]
-        got = bucket(name, rnd)
-        got["pass"].append(row["cause"])
-        got["times"].append(row["time"])
+        if not review_only:
+            got = bucket(name, rnd)
+            got["pass"].append(row["cause"])
+            got["times"].append(row["time"])
         if row["kind"] == "review-b" and (name, rnd) in held:
             continue
         key = (name, row["kind"], rnd)

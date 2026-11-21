@@ -140,9 +140,10 @@ def test_r044_merge_and_start_weeks(tmp_path):
 
 
 def test_r044_iss013_form_merges_nothing_with_plan_check(tmp_path, program, monkeypatch):
-    """R-044. ISS-013-shaped subject counts no merge; plan-check agrees on TASK-031, read through the merged set it
-    reads since TASK-048 (R-059; the design's retired reading (11)): bridge_env.squash_merged_ids under the plan
-    pattern, which tests/test_header_plan.py pins plan-check.py to."""
+    """R-044. The ISS-013-shaped subject merges no increment and is counted as its pull request, PR-61 (R-089);
+    plan-check agrees on TASK-031, read through the merged set it reads since TASK-048 (R-059; the design's retired
+    reading (11)): bridge_env.squash_merged_ids under the plan pattern, which tests/test_header_plan.py pins
+    plan-check.py to."""
     p = MiniProject(tmp_path)
     p.brief("TASK-031")
     p.commit("records: brief", at(10))
