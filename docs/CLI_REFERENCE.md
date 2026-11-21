@@ -844,7 +844,11 @@ What each step does:
             checkout the reviewer runs in (~/.cursor-bridge/review-hashes/<key>-<nnn>.sha256,
             FB-037), and prints that file's hash. `verify` and `premerge` compare the copy
             themselves: a mismatch is GATE-INTEGRITY, a missing copy CANNOT VERIFY (take the
-            snapshot again).
+            snapshot again). For a name the grammar reads, the round's entry of the rounds
+            record gains `cause` beside `time`: the cause named by the first line of the
+            round's SCOPE file that begins `Round cause:`, or `unstated` where that file is
+            missing, unreadable, has no such line, or names a word outside the round causes.
+            A re-snapshot reads the line again. The field decides no count and no lift.
   verify    reads the configuration and the hooks folders FIRST, as files, without running
             git: a change is GATE-INTEGRITY and nothing else runs. Every git command the
             guard runs is given `-c core.hooksPath=<an empty folder> -c core.fsmonitor=false`,

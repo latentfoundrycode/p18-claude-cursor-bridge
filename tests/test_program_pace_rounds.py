@@ -565,3 +565,104 @@ def test_r089_the_hardening_column_reads_refs_heads_main(tmp_path):
     assert rows[label(2)][5] == "7", rows[label(2)]
     assert rows[label(1)][5] == "11", rows[label(1)]
     assert total_row(out)[5] == "23", out
+
+
+# ---------------------------------------------------------------- Round 2 (TASK-069-r2): Review A's two behaviour
+# findings, its should-fix on the ISS-013 subject, and the security review's two hardenings.
+
+
+def test_r089_r2_a_pull_request_s_own_start_is_no_known_start_for_the_days(tmp_path):
+    """R-089 (round 2, Review A B1, behaviour): a PR-<n> with no launcher row, guard round or pass line starts at its
+    commit's time for the Started column only; the Mean days column reads only a start drawn from a record, so a records
+    pull request merged beside an increment leaves that increment's days as they were."""
+    p = MiniProject(tmp_path)
+    tracked_old_brief(p)
+    p.brief("TASK-701")
+    p.commit("records: the brief", at(6))
+    p.builder("TASK-701", 1, at(3, day=2, hour=9))
+    p.commit("TASK-701: the thing (#71)", at(1, day=2, hour=12))
+    p.commit("docs: records of the week (#72)", at(1, day=2, hour=13))
+    out = p.report(tmp_path)
+    row = table(out)[label(1)]
+    assert row[1:3] == ["1", "2"], "started (PR-72) and merged (TASK-701, PR-72): %r" % (row,)
+    assert row[4] == "14", "mean days to merge is TASK-701's alone: %r\n%s" % (row, out)
+
+
+def test_r089_r2_a_stage_review_or_a_design_critique_is_no_counted_name(tmp_path):
+    """R-089 (round 2, Review A B2, behaviour): a name beginning STAGE- or DESIGN-, a stage review or a design critique
+    that merges nothing of its own, is no counted name from any source (guard record or pass line): it starts nothing
+    and its rounds enter no cause line; its passes still count in the passes lines."""
+    p = MiniProject(tmp_path)
+    tracked_old_brief(p)
+    p.guard("STAGE-P2", [(1, at(2, day=1, hour=8), None), (2, at(2, day=1, hour=13), "defect")])
+    p.pass_line(at(2, day=1, hour=9), "PASS STAGE-P2 r1 security-auditor")
+    p.pass_line(at(2, day=1, hour=10), "PASS STAGE-P2 r2 security-auditor records")
+    p.pass_line(at(2, day=1, hour=11), "PASS DESIGN-program r1 plan-critic")
+    p.pass_line(at(2, day=1, hour=12), "PASS DESIGN-program r2 plan-critic scope")
+    out = p.report(tmp_path)
+    assert table(out)[label(2)][1] == "0", out
+    assert total_row(out)[1] == "0", out
+    for line in cause_lines(out):
+        assert not cause_counts(line), "a stage review's rounds are no increment's: %s" % line
+    line = passes_line(out, 2)
+    assert kind_count(line, "security-auditor") == 2, out
+    assert kind_count(line, "review-b") == 2, out
+
+
+def test_r089_r2_with_handoff_untracked_a_pull_request_is_counted_too(tmp_path):
+    """R-089 (round 2, Review A should-fix 1, the supervisor's ruling): the rule for PR-<n> holds whether handoff/ is
+    tracked or not, so with handoff/ untracked a squash naming no ID is merged as its pull request."""
+    p = MiniProject(tmp_path)
+    p.commit("docs: fix the pointers (#5)", at(2, day=2))
+    out = p.report(tmp_path)
+    assert table(out)[label(2)][2] == "1", out
+
+
+def test_r089_r2_the_iss013_subject_is_its_pull_request_not_the_increment_it_mentions(tmp_path):
+    """R-089 (round 2, Review A should-fix 3): the ISS-013 subject mentions TASK-031, which has a brief, inside its
+    parenthesis; the reader names no ID there, so the commit is PR-61: started at its commit (its own start, no known
+    start for the days) and merged; TASK-031 starts nothing."""
+    p = MiniProject(tmp_path)
+    tracked_old_brief(p)
+    p.brief("TASK-031")
+    p.commit("records: the brief", at(6))
+    p.commit("docs: fixes (pointers, TASK-031's Scope, survival lists, records) (#61)", at(2, day=2))
+    out = p.report(tmp_path)
+    row = table(out)[label(2)]
+    assert row[1:3] == ["1", "1"], out
+    assert row[4] == "", "PR-61's own start is no known start for the days: %r" % (row,)
+
+
+def test_r089_r2_a_stamp_of_other_digits_is_no_pass_line(tmp_path):
+    """R-089 (round 2, the security review's advisory): a pass line's stamp is the ASCII form in-flight.py writes; a
+    stamp written in other digits (here the full-width ones) is no pass line."""
+    p = MiniProject(tmp_path)
+    tracked_old_brief(p)
+    good = minute(at(2, day=1, hour=9))
+    wide = "".join(chr(0xFF10 + int(c)) if c in "0123456789" else c for c in good)
+    log = p.ws / "run" / "supervisor"
+    log.mkdir(parents=True, exist_ok=True)
+    (log / "in-flight.md").write_text(wide + " PASS TASK-001 r2 review-a\n" + good + " PASS TASK-001 r1 review-b\n",
+                                      encoding="utf-8")
+    out = p.report(tmp_path)
+    line = passes_line(out, 2)
+    assert kind_count(line, "review-b") == 1, out
+    assert kind_count(line, "review-a") == 0, out
+
+
+def test_r089_r2_a_long_scope_line_never_stalls_the_snapshot(tmp_path):
+    """R-089 (round 2, the security review's advisory): the guard reads the round's SCOPE file within a bound and
+    matches the cause line in linear time, so a line of 200,000 spaces between two words neither stalls the snapshot
+    nor stops it; the cause, a word outside the list, is unstated."""
+    import time
+    env = guard_env(tmp_path)
+    repo = guard_repo(tmp_path, "long")
+    rc, out = snapshot(repo, env, "TASK-001")
+    assert rc == 0, out
+    write_scope(repo, "Round cause: a" + " " * 200000 + "b" + chr(10), "a long cause line")
+    began = time.monotonic()
+    rc, out = snapshot(repo, env, "TASK-001-r2")
+    took = time.monotonic() - began
+    assert rc == 0, out
+    assert took < 20, "the snapshot took %.1f s" % took
+    assert round_entry(repo, 2).get("cause") == "unstated"

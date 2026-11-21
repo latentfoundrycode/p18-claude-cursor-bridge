@@ -102,3 +102,5 @@
 2026-11-21 TASK-068-r2: `paused_in_flight` keeps the first `Paused:` line for the life of an append-only log, so a later `Paused: resumed` never lifts it; the guard has to read the last match of `field`'s pattern. The append also has to set `O_BINARY`, or Windows turns each LF into CR LF.
 
 2026-11-21 TASK-068-r3: since round 2, the Windows lock sits on the byte at `2**31`, not byte 0 as round 1's line says.
+
+2026-11-21 TASK-069: a pass line's stamp is `YYYY-MM-DDTHH:MMZ` with no seconds, so pace-report's `_parse_run_time` (which requires seconds) does not read it; the stamp is parsed with `strptime` and `%Y-%m-%dT%H:%MZ`.

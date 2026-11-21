@@ -1,31 +1,73 @@
 #!/usr/bin/env python3
-"""pace-report: read-only weekly pace table per project (R-044).
+"""pace-report: read-only weekly pace table per project (R-044, R-089).
 
   python pace-report.py [<project root>...] [--weeks <n>] [--ceiling <n>] [--tokens] [--home <folder>]
 
 Run from any folder. ASCII output only; writes nothing. A project root holds Workspace/ with its
 own .git. With no roots, the roots are evaluate-reports.py's PROJECTS plus the bridge root found
 like that program. Defaults for --weeks (8), --ceiling (bridge_env.REVIEW_ROUNDS), and --home (~)
-are resolved in main(), not in the parser.
+are resolved in main(), not in the parser. No option is added beyond those.
 
-Columns per ISO week (UTC): increments started (earliest launcher brief row or guard round with
-a time, else unknown), merged (squash subjects on main via bridge_env's reader and
-GRAMMAR_ID_PATTERN; with a tracked handoff/ only IDs that have a brief, with handoff/ untracked
-every ID the reader finds), rounds mean and max among merges that week, mean
-days from known start to merge, docs/HARDENING.md lines added on main that week (added lines only).
-A total row follows. Below the table, IDs over --ceiling with round counts and lifts (class, owner,
-none, unknown), then stage reviews (STAGE-<name>); then, from the launcher's builder rows launched in
-the window, why the rounds after the first were opened (the `cause` the launcher read from each
-brief's `Round cause:` line; a row without one counts as unstated) and the builder rounds per model
-(release S). With --tokens, token millions (sum of
-input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens per message id,
-greatest total kept) from ~/.claude/projects/<key>/*.jsonl and <key>/**/subagents/*.jsonl for keys
-from evaluate-reports.py's project_keys, plus tokens per merged increment.
+A counted name is an increment's ID (a string GRAMMAR_ID_PATTERN fullmatches) or PR-<n> (PR-
+and a whole number from 1, parsed with int), the reserved form for a pull request. It is counted
+where it has a brief under a tracked handoff/, a guard rounds record (a record named STAGE-
+excepted), or a tagged pass line in run/supervisor/in-flight.md. PR-<n> is also counted by a
+commit of refs/heads/main whose subject closes with (#<n>) and names no name counted by those
+three: the IDs the subject reader returns that are counted names. Where that subject names one
+or more, PR-<n> is not a name of its own; its pass lines and their causes fold into the first
+counted name by position in the subject (a name the reader returns only from a trailer sorts
+after every name that stands in the subject, and those tie by the ID text). A PR-<n> that main
+does not close is a name of its own, started and not merged. One merge is never two names and
+one pass never two passes.
 
-Sources: git log on Workspace/main (committer week), run/launcher/runs.jsonl, .git/bridge/rounds-*.json,
-handoff/*.md and *-report.md, run/review/REVIEW-*.err, docs/HARDENING.md numstat, session jsonl.
-Untracked handoff/ (git ls-files): started and rounds show n/a (handoff/ untracked); merged counts
-every ID the reader finds in squash subjects.
+Columns per ISO week (UTC): started (the earliest of a counted name's launcher rows, its
+non-seeded guard rounds and its pass lines, folded pass lines included; a PR-<n> with none of
+those starts at its commit on refs/heads/main; else unknown), merged (by the commits of
+refs/heads/main alone: an ID by a subject the reader says names it, at its earliest such commit,
+and PR-<n> by the closing (#<n>) where it is a name of its own; a rounds record or a pass line
+never merges a name; with handoff/ untracked, every ID the reader finds, as before), rounds mean
+and max among merges that week that have a rounds reading, mean days from a known start to that
+merge, and docs/HARDENING.md lines added on refs/heads/main that week (added lines only). The
+HARDENING column reads refs/heads/main, as the commit list does. A total row follows. Below the
+table, IDs over --ceiling with round counts and lifts (class, owner, none, unknown), then stage
+reviews (STAGE-<name>). Those lists keep their present rules: a name with no brief is not listed
+as over the ceiling, and a stage review stays in the stage list.
+
+One round per name and round number. Its records are the builder's launcher rows (kind builder,
+not slot not free) of that brief and round (a row with no round is round 1), including a brief
+that has no brief file, the guard's non-seeded entry of that round, and the pass lines of that
+name and round (a pass line with no round number is round 1; folded pass lines count under the
+name they fold into). A seeded guard round is not a record, not a start and not a pass. The
+round's cause is the first stated one among the builder's rows (log order), the guard's round
+and the pass lines (log order); a value is stated when it is on bridge_env.ROUND_CAUSES, and
+unstated only where none of them states one. The round, with its cause, stands in the week of
+its earliest record. The line, printed only where the window holds at least one round after the
+first, is `Round causes (<n> rounds after the first): ` then `<cause> <count> (<pct>%)` joined
+by `; `, in the report's ROUND_CAUSES order (bridge_env.ROUND_CAUSES, then unstated), zeroes
+left out, `<pct>` rounded as round(100.0 * count / n).
+
+Below that line, or where it would stand, one line per week of the window that holds a recorded
+pass, in the table's week order. A pass is one per name, reviewer kind and round: a non-seeded
+guard round is a review-b pass in the week of its time; a pass line is a pass of its name, kind
+and round in the week of its stamp, the earliest if written twice; a review-b pass line is not
+a further pass where the guard holds that name and round. Kinds are review-a, review-b,
+security-auditor, design-auditor, plan-critic, design-critic-b and supervisor, printed in that
+order. The line is `<YYYY-Www> <kind> <count>, <kind> <count> recorded passes only`: one space
+between a kind and its count, a comma and a space between kinds, and nothing after
+`recorded passes only`. It counts recorded passes only. Then `Builder rounds per model:`, from
+builder launcher rows only, unchanged. With --tokens, token millions (sum of input_tokens,
+output_tokens, cache_creation_input_tokens, cache_read_input_tokens per message id, greatest
+total kept) from ~/.claude/projects/<key>/*.jsonl and <key>/**/subagents/*.jsonl for keys from
+evaluate-reports.py's project_keys, plus tokens per merged increment.
+
+The in-flight log is read as UTF-8 with errors replaced, at most 8388608 bytes; past that cap
+only the bytes up to the last newline are kept, and a file with no newline inside the cap is no
+pass lines. A missing or unreadable file is no pass lines. A line that is not a whole pass line
+is skipped. With handoff/ untracked, started and rounds show n/a (handoff/ untracked); the cause
+line and the passes lines are still printed from the launcher rows, the guard rounds and the
+pass lines. Sources: git log on refs/heads/main (committer week), run/launcher/runs.jsonl,
+.git/bridge/rounds-*.json, handoff/*.md and *-report.md, run/review/REVIEW-*.err,
+run/supervisor/in-flight.md, docs/HARDENING.md numstat, session jsonl.
 Every git command is read-only with a 120-second limit; session folder reads use the same limit per project.
 
 Exit 0 when done; 1 when a project's git command failed (timed out, exited non-zero, or could not
@@ -49,6 +91,21 @@ import bridge_env
 
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 GIT_LIMIT = 120
+_IN_FLIGHT_CAP = 8 * 1024 * 1024
+_REVIEWERS = (
+    "review-a",
+    "review-b",
+    "security-auditor",
+    "design-auditor",
+    "plan-critic",
+    "design-critic-b",
+    "supervisor",
+)
+_PASS_RX = re.compile(
+    r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z) PASS ([A-Z][A-Za-z0-9-]*)(?: r([0-9]+))? ([a-z0-9-]+)(?: (.+))?$"
+)
+_PR_CLOSE_RX = re.compile(r"\(#([0-9]+)\)$")
+_ID_EDGE = r"[A-Za-z0-9-]"
 SESSION_READ_LIMIT = 120
 UNTRACKED_HANDOFF = "n/a (handoff/ untracked)"
 USAGE_FIELDS = (
@@ -346,10 +403,11 @@ def _commits(ws):
         except (OverflowError, OSError, ValueError):
             continue
         body = lines[1:]
+        subject = body[0] if body else ""
         merged = bridge_env.squash_merged_ids_from_lines(
             body, bridge_env.GRAMMAR_ID_PATTERN, plan_style=False
         )
-        commits.append((dt, merged))
+        commits.append((dt, merged, subject))
     commits.reverse()
     return "ok", commits, None
 
@@ -357,7 +415,7 @@ def _commits(ws):
 def _hardening_by_week(ws):
     status, out, code = _git(
         ws,
-        ["log", "main", "--format=%ct", "--numstat", "--", "docs/HARDENING.md"],
+        ["log", "refs/heads/main", "--format=%ct", "--numstat", "--", "docs/HARDENING.md"],
         diff_output=True,
     )
     if status != "ok":
@@ -450,26 +508,348 @@ def _builder_rounds(ws, weeks):
     return seen
 
 
-def _cause_and_model_lines(ws, weeks):
-    """Two lines below the table: why the rounds after the first were opened (M1, the launcher's
-    reading of each brief's `Round cause:` line), and the builder rounds each model took per
-    increment (M2). Neither line where the window holds no such row."""
+def _model_lines(ws, weeks):
+    """The builder-rounds-per-model line, from builder launcher rows only (M2)."""
     rounds = _builder_rounds(ws, weeks)
-    out = []
-    later = [cause for (_, rnd), (_, cause) in rounds.items() if rnd > 1]
-    if later:
-        parts = ["%s %d (%d%%)" % (c, later.count(c), round(100.0 * later.count(c) / len(later))) for c in ROUND_CAUSES if later.count(c)]
-        out.append("Round causes (%d builder rounds after the first): %s" % (len(later), "; ".join(parts)))
     by_model = {}
     for (ident, _), (model, _) in rounds.items():
         by_model.setdefault(model, []).append(ident)
-    if by_model:
-        parts = []
-        for model in sorted(by_model):
-            ids = by_model[model]
-            parts.append("%s %d round(s) over %d increment(s), mean %s" % (_ascii_name(model), len(ids), len(set(ids)), _fmt_num(len(ids) / float(len(set(ids))))))
-        out.append("Builder rounds per model: " + "; ".join(parts))
+    if not by_model:
+        return []
+    parts = []
+    for model in sorted(by_model):
+        ids = by_model[model]
+        parts.append("%s %d round(s) over %d increment(s), mean %s" % (_ascii_name(model), len(ids), len(set(ids)), _fmt_num(len(ids) / float(len(set(ids))))))
+    return ["Builder rounds per model: " + "; ".join(parts)]
+
+
+def _grammar_name(name):
+    return isinstance(name, str) and re.fullmatch(bridge_env.GRAMMAR_ID_PATTERN, name) is not None
+
+
+def _stated_cause(value):
+    if isinstance(value, str) and value in bridge_env.ROUND_CAUSES:
+        return value
+    return None
+
+
+def _first_stated(values):
+    for value in values:
+        stated = _stated_cause(value)
+        if stated:
+            return stated
+    return None
+
+
+def _closing_pr(subject):
+    if not isinstance(subject, str):
+        return None
+    m = _PR_CLOSE_RX.search(subject.rstrip())
+    if not m:
+        return None
+    try:
+        n = int(m.group(1))
+    except ValueError:
+        return None
+    if n < 1:
+        return None
+    return n
+
+
+def _parse_pass_stamp(text):
+    try:
+        return datetime.datetime.strptime(text, "%Y-%m-%dT%H:%MZ").replace(tzinfo=datetime.timezone.utc)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_pass_line(line):
+    m = _PASS_RX.match(line)
+    if not m:
+        return None
+    when = _parse_pass_stamp(m.group(1))
+    if when is None or not _grammar_name(m.group(2)):
+        return None
+    if m.group(3) is None:
+        rnd = 1
+    else:
+        try:
+            rnd = int(m.group(3))
+        except ValueError:
+            return None
+        if rnd < 1 or rnd > 999:
+            return None
+    if m.group(4) not in _REVIEWERS:
+        return None
+    cause = m.group(5)
+    if cause is not None and cause not in bridge_env.ROUND_CAUSES:
+        return None
+    return {"time": when, "name": m.group(2), "round": rnd, "kind": m.group(4), "cause": cause}
+
+
+def _read_pass_lines(ws):
+    path = os.path.join(ws, "run", "supervisor", "in-flight.md")
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            data = f.read(_IN_FLIGHT_CAP + 1)
+    except OSError:
+        return []
+    if len(data) > _IN_FLIGHT_CAP:
+        data = data[:_IN_FLIGHT_CAP]
+        cut = data.rfind("\n")
+        if cut < 0:
+            return []
+        data = data[:cut]
+    out = []
+    for line in data.split("\n"):
+        if line.endswith("\r"):
+            line = line[:-1]
+        parsed = _parse_pass_line(line)
+        if parsed:
+            out.append(parsed)
     return out
+
+
+def _id_at(subject, ident):
+    m = re.search("(?<!" + _ID_EDGE + ")" + re.escape(ident) + "(?!" + _ID_EDGE + ")", subject or "")
+    return m.start() if m else None
+
+
+def _first_counted_name(subject, merged, occupy):
+    found = []
+    for ident in merged:
+        if ident not in occupy:
+            continue
+        at = _id_at(subject, ident)
+        found.append((10 ** 9 if at is None else at, ident))
+    if not found:
+        return None
+    found.sort()
+    return found[0][1]
+
+
+def _home_name(name, fold):
+    seen = set()
+    while name in fold and name not in seen:
+        seen.add(name)
+        nxt = fold[name]
+        if nxt == name:
+            break
+        name = nxt
+    return name
+
+
+def _builder_events(ws):
+    events = []
+    for row in bridge_env.read_runs_jsonl(ws):
+        if row.get("kind") != "builder" or not row.get("brief") or row.get("slot") == "not free":
+            continue
+        brief = row.get("brief")
+        if not _grammar_name(brief):
+            continue
+        raw = row.get("round")
+        if isinstance(raw, bool):
+            continue
+        try:
+            rnd = int(raw or 1)
+        except (TypeError, ValueError):
+            continue
+        if rnd < 1:
+            continue
+        events.append((brief, rnd, _parse_run_time(str(row.get("id", ""))[:20]), row.get("cause")))
+    return events
+
+
+def _guard_name_ids(common):
+    out = set()
+    for id_part in bridge_env._read_rounds_files(common):
+        if id_part.startswith("STAGE-") or not _grammar_name(id_part):
+            continue
+        out.add(id_part)
+    return out
+
+
+def _guard_events(common):
+    events = []
+    for id_part, data in bridge_env._read_rounds_files(common).items():
+        if id_part.startswith("STAGE-") or not _grammar_name(id_part):
+            continue
+        for rnd in data.get("rounds") or []:
+            if not isinstance(rnd, dict) or rnd.get("seeded"):
+                continue
+            rn = rnd.get("round")
+            if isinstance(rn, bool) or not isinstance(rn, int) or rn < 1:
+                continue
+            events.append((id_part, rn, _parse_run_time(rnd.get("time") or ""), rnd.get("cause")))
+    return events
+
+
+def _format_cause_line(causes):
+    n = len(causes)
+    parts = []
+    for cause in ROUND_CAUSES:
+        count = causes.count(cause)
+        if count:
+            parts.append("%s %d (%d%%)" % (cause, count, round(100.0 * count / n)))
+    return "Round causes (%d rounds after the first): %s" % (n, "; ".join(parts))
+
+
+def _format_pass_lines(by_week, weeks):
+    lines = []
+    for wk in weeks:
+        counts = by_week.get(wk)
+        if not counts:
+            continue
+        parts = ["%s %d" % (kind, counts[kind]) for kind in _REVIEWERS if counts.get(kind)]
+        if parts:
+            lines.append("%d-W%02d %s recorded passes only" % (wk[0], wk[1], ", ".join(parts)))
+    return lines
+
+
+def _pace_names(ws, common, brief_ids, untracked, commits, weeks):
+    """Counted names, their starts and merges, the cause-line causes and the passes lines.
+
+    `commits` is oldest first, as `_commits` returns it. A seeded guard round is ignored.
+    """
+    weeks_set = set(weeks)
+    pass_rows = _read_pass_lines(ws)
+    guard = _guard_events(common)
+    builders = _builder_events(ws)
+    base = set()
+    if not untracked:
+        for ident in brief_ids:
+            if _grammar_name(ident):
+                base.add(ident)
+    base.update(_guard_name_ids(common))
+    for row in pass_rows:
+        base.add(row["name"])
+    fold = {}
+    own = {}
+    seen_pr = set()
+    for dt, merged, subject in commits:
+        n = _closing_pr(subject)
+        if n is None or n in seen_pr:
+            continue
+        seen_pr.add(n)
+        pr = "PR-%d" % n
+        occupy = set(base)
+        if untracked:
+            for ident in merged:
+                if _grammar_name(ident):
+                    occupy.add(ident)
+        target = _first_counted_name(subject, merged, occupy)
+        if target and target != pr:
+            fold[pr] = target
+        else:
+            own[pr] = dt
+    counted = set(base)
+    for pr in fold:
+        counted.discard(pr)
+    counted.update(own)
+    for target in fold.values():
+        if target not in fold:
+            counted.add(target)
+
+    def home(name):
+        return _home_name(name, fold)
+
+    pass_times = {}
+    for row in pass_rows:
+        pass_times.setdefault(home(row["name"]), []).append(row["time"])
+    starts = {}
+    start_dt = {}
+    if not untracked:
+        for ident in counted:
+            times = list(pass_times.get(ident, ()))
+            base_t = _start_times(ws, common, ident)
+            if base_t:
+                times.append(base_t)
+            if ident in own and not times:
+                times.append(own[ident])
+            dt = min(times) if times else None
+            start_dt[ident] = dt
+            starts[ident] = _iso_week(dt) if dt else None
+    merge_dt = {}
+    merge_week = {}
+    for dt, merged, subject in commits:
+        wk = _iso_week(dt)
+        for ident in merged:
+            if _grammar_name(ident) and (untracked or ident in counted):
+                prev = merge_dt.get(ident)
+                if prev is None or dt < prev:
+                    merge_dt[ident] = dt
+                    merge_week[ident] = wk
+        n = _closing_pr(subject)
+        if n is None:
+            continue
+        pr = "PR-%d" % n
+        if pr in counted:
+            prev = merge_dt.get(pr)
+            if prev is None or dt < prev:
+                merge_dt[pr] = dt
+                merge_week[pr] = wk
+    buckets = {}
+
+    def bucket(name, rnd):
+        return buckets.setdefault((name, rnd), {"times": [], "builder": [], "guard": [], "pass": []})
+
+    held = set()
+    for brief, rnd, when, cause in builders:
+        got = bucket(home(brief), rnd)
+        got["builder"].append(cause)
+        if when:
+            got["times"].append(when)
+    for ident, rnd, when, cause in guard:
+        name = home(ident)
+        held.add((name, rnd))
+        got = bucket(name, rnd)
+        got["guard"].append(cause)
+        if when:
+            got["times"].append(when)
+    pass_best = {}
+    for row in pass_rows:
+        name = home(row["name"])
+        if name not in counted:
+            continue
+        rnd = row["round"]
+        got = bucket(name, rnd)
+        got["pass"].append(row["cause"])
+        got["times"].append(row["time"])
+        if row["kind"] == "review-b" and (name, rnd) in held:
+            continue
+        key = (name, row["kind"], rnd)
+        prev = pass_best.get(key)
+        if prev is None or row["time"] < prev:
+            pass_best[key] = row["time"]
+    for ident, rnd, when, _cause in guard:
+        if when is None:
+            continue
+        name = home(ident)
+        key = (name, "review-b", rnd)
+        prev = pass_best.get(key)
+        if prev is None or when < prev:
+            pass_best[key] = when
+    later = []
+    for (_name, rnd), got in buckets.items():
+        if rnd < 2 or not got["times"]:
+            continue
+        when = min(got["times"])
+        if _iso_week(when) not in weeks_set:
+            continue
+        cause = _first_stated(got["builder"])
+        if cause is None:
+            cause = _first_stated(got["guard"])
+        if cause is None:
+            cause = _first_stated(got["pass"])
+        later.append(cause or "unstated")
+    by_week = {}
+    for (_name, kind, _rnd), when in pass_best.items():
+        wk = _iso_week(when)
+        if wk not in weeks_set:
+            continue
+        cell = by_week.setdefault(wk, {})
+        cell[kind] = cell.get(kind, 0) + 1
+    return starts, start_dt, merge_week, merge_dt, later, _format_pass_lines(by_week, weeks)
 
 
 def _entry_is_link(entry):
@@ -682,37 +1062,21 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
 
     status, hardening, code = _hardening_by_week(ws)
     if status == "timeout":
-        return None, ("timeout", "git log main --numstat docs/HARDENING.md")
+        return None, ("timeout", "git log refs/heads/main --numstat docs/HARDENING.md")
     if status == "start":
-        return None, ("start", "git log main --numstat docs/HARDENING.md")
+        return None, ("start", "git log refs/heads/main --numstat docs/HARDENING.md")
     if status == "fail":
-        return None, ("fail", "git log main --numstat docs/HARDENING.md", code)
+        return None, ("fail", "git log refs/heads/main --numstat docs/HARDENING.md", code)
 
-    merge_week = {}
-    merge_dt = {}
-    for dt, merged in commits:
-        wk = _iso_week(dt)
-        for ident in merged:
-            if untracked or ident in brief_ids:
-                prev = merge_dt.get(ident)
-                if prev is None or dt < prev:
-                    merge_dt[ident] = dt
-                    merge_week[ident] = wk
-
-    starts = {}
-    for ident in brief_ids:
-        if untracked:
-            continue
-        t = _start_times(ws, common, ident)
-        if t is None:
-            starts[ident] = None
-        else:
-            starts[ident] = _iso_week(t)
+    starts, start_dt, merge_week, merge_dt, later_causes, pass_lines = _pace_names(
+        ws, common, brief_ids, untracked, commits, weeks
+    )
 
     rounds_cache = {}
     if not untracked:
         round_ids = set(brief_ids)
         round_ids.update(_rounds_file_ids(common))
+        round_ids.update(merge_week)
         for ident in round_ids:
             rounds_cache[ident] = _rounds_for_id(ws, common, ident, brief_ids)
 
@@ -732,16 +1096,10 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
             week_rows[mw]["merged"] += 1
             if not untracked and _has_rounds_reading(ws, common, ident, brief_ids):
                 week_rows[mw]["rounds"].append(rounds_cache.get(ident, 0))
-            st = starts.get(ident)
-            if st is not None:
-                start_dt = _start_times(ws, common, ident)
-                if start_dt:
-                    for dt, merged in commits:
-                        if ident in merged and _iso_week(dt) == mw:
-                            if start_dt.date() <= dt.date():
-                                days = (dt.date() - start_dt.date()).days
-                                week_rows[mw]["days"].append(days)
-                            break
+            st = start_dt.get(ident)
+            mt = merge_dt.get(ident)
+            if st and mt and st.date() <= mt.date():
+                week_rows[mw]["days"].append((mt.date() - st.date()).days)
 
     tokens_by_week = {}
     session_files = 0
@@ -896,7 +1254,11 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
             parts.append("r%d %s" % (r, lv))
         lines.append("- " + "; ".join(parts))
 
-    extra = _cause_and_model_lines(ws, set(weeks))
+    extra = []
+    if later_causes:
+        extra.append(_format_cause_line(later_causes))
+    extra.extend(pass_lines)
+    extra.extend(_model_lines(ws, set(weeks)))
     if extra:
         if over or stage:
             lines.append("")
@@ -905,7 +1267,7 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
     unknown_starts = [
         i
         for i in brief_ids
-        if starts.get(i) is None and not untracked and (merge_week.get(i) in weeks or merge_week.get(i) is None)
+        if i in starts and starts.get(i) is None and not untracked and (merge_week.get(i) in weeks or merge_week.get(i) is None)
     ]
     if unknown_starts and not untracked:
         lines.append("")

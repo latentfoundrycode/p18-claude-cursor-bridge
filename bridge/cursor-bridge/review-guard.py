@@ -31,7 +31,11 @@ What each step does:
             checkout the reviewer runs in (~/.cursor-bridge/review-hashes/<key>-<nnn>.sha256,
             FB-037), and prints that file's hash. `verify` and `premerge` compare the copy
             themselves: a mismatch is GATE-INTEGRITY, a missing copy CANNOT VERIFY (take the
-            snapshot again).
+            snapshot again). For a name the grammar reads, the round's entry of the rounds
+            record gains `cause` beside `time`: the cause named by the first line of the
+            round's SCOPE file that begins `Round cause:`, or `unstated` where that file is
+            missing, unreadable, has no such line, or names a word outside the round causes.
+            A re-snapshot reads the line again. The field decides no count and no lift.
   verify    reads the configuration and the hooks folders FIRST, as files, without running
             git: a change is GATE-INTEGRITY and nothing else runs. Every git command the
             guard runs is given `-c core.hooksPath=<an empty folder> -c core.fsmonitor=false`,
@@ -114,6 +118,8 @@ import bridge_env  # noqa: E402
 
 GIT_TIMEOUT = 120
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+_ROUND_CAUSE_RE = re.compile(r"^Round cause:[ \t]*(.*?)[ \t]*$")
+_CAUSE_SEPS = "-:(,;" + "\u2013" + "\u2014"
 CACHE_DIRS = {".venv", "venv", "env", "node_modules", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
               ".tox", ".nox", "dist", "build", ".cache", "target", ".next", ".turbo", "coverage", "site-packages", ".ipynb_checkpoints"}
 PROTECTED_PREFIXES = ("docs/", "handoff/", "run/review/")
@@ -751,6 +757,45 @@ def scope_blocking_line(root, id_part):
     return None
 
 
+def _cause_on_first_line(text):
+    """The cause the first `Round cause:` line names, read as the launcher reads a brief, or unstated."""
+    causes = sorted(bridge_env.ROUND_CAUSES, key=len, reverse=True)
+    for line in (text or "").split("\n"):
+        if line.endswith("\r"):
+            line = line[:-1]
+        m = _ROUND_CAUSE_RE.match(line)
+        if not m:
+            continue
+        value = m.group(1).lower()
+        for cause in causes:
+            rest = value[len(cause):].lstrip()
+            if value.startswith(cause) and (not rest or rest[0] in _CAUSE_SEPS):
+                return cause
+        return "unstated"
+    return "unstated"
+
+
+def _round_cause(root, id_part):
+    """Cause for the round's entry, from the first SCOPE file that exists, or unstated. Never a refusal."""
+    names = ["SCOPE-%s.md" % id_part]
+    if not id_part.startswith("STAGE-"):
+        names.append("SCOPE-STAGE-%s.md" % id_part)
+    path = None
+    for name in names:
+        p = os.path.join(root, "run", "review", name)
+        if os.path.isfile(p):
+            path = p
+            break
+    if path is None:
+        return "unstated"
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            text = f.read()
+    except OSError:
+        return "unstated"
+    return _cause_on_first_line(text)
+
+
 def snapshot_review_refusal(nnn, root, common):
     if str(nnn).startswith("DESIGN-"):
         return None
@@ -930,6 +975,7 @@ def cmd_snapshot(nnn, cwd):
             "branch": br_short,
             "tree": tree,
             "time": snap["taken"],
+            "cause": _round_cause(root, id_part),
             "lift": None,
             "lift_line": None,
             "reply": None,
