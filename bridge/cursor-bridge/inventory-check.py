@@ -24,6 +24,10 @@ Run from the Workspace root. Deterministic; reads only. Checks:
                       after Phase: (missing, malformed, or not right after Phase:; R-015). The
                       grammar is workflow-check.py's; unwritten types and traits are that
                       program's concern, not a failure here.
+ 7. RUN PARAMETERS    docs/RUN_PARAMETERS.md beside the inventory has any of the five values
+                      empty: `RUN PARAMETERS: <key> is empty` for each empty header key, or
+                      `RUN PARAMETERS: <label> is empty` for each empty value where the file
+                      has no header.
 
 Notes (never fail): a Resources name that no code reads (fine for an account or a tool; stale
 otherwise). Exit 0 = OK, 1 = at least one failure. ASCII output only.
@@ -82,7 +86,7 @@ def _safe_exc_type_name(err):
 _INVENTORY_BRIDGE_NAMES = (
     "status_values", "read_header", "check_header", "header_agrees",
     "inventory_fallback", "inventory_reflected_through", "inventory_parse_tables",
-    "run_parameters_fallback",
+    "run_parameters_fallback", "empty_run_parameters",
 )
 
 
@@ -346,6 +350,12 @@ def main():
             rp_fallback = bridge_env.run_parameters_fallback(rp_text)
             for key in bridge_env.header_agrees("run-parameters", rp_header, rp_fallback):
                 fails.append("HEADER DISAGREES: %s" % key)
+            for key, _label in bridge_env.empty_run_parameters(rp_header):
+                fails.append("RUN PARAMETERS: %s is empty" % key)
+        else:
+            for _key, label in bridge_env.empty_run_parameters(
+                    bridge_env.run_parameters_fallback(rp_text)):
+                fails.append("RUN PARAMETERS: %s is empty" % label)
 
     # 2. shape
     if not os.path.exists(a.inventory):

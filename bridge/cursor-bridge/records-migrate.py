@@ -445,12 +445,15 @@ def _compose_deviations_header(text):
 
 def _compose_run_parameters_header(text):
     fb = bridge_env.run_parameters_fallback(text)
+    empty = bridge_env.empty_run_parameters(fb)
+    if empty:
+        return None, "%s has no value on a plain line" % empty[0][1]
     out = {"record": "run-parameters", "header": 1}
     for key in bridge_env.HEADER_SCHEMAS["run-parameters"]:
         if key in ("record", "header"):
             continue
         out[key] = fb.get(key)
-    return out
+    return out, None
 
 
 def compose_header(kind, text, rel, merged):
@@ -477,7 +480,7 @@ def compose_header(kind, text, rel, merged):
     if kind == "deviations":
         return _compose_deviations_header(text)
     if kind == "run-parameters":
-        return _compose_run_parameters_header(text), None
+        return _compose_run_parameters_header(text)
     return None, "unknown kind"
 
 
