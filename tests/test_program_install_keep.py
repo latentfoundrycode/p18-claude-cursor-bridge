@@ -543,3 +543,81 @@ def test_r2_a_kept_copy_of_a_version_with_no_letter_is_still_rolled_back_to(worl
     rc, out = run(s, world.installer(B), "--rollback", "--target", s.target)
     assert rc == 0 and "MATCHES bridge " + plain_version in out, "the kept copy of a version with no letter was not restored: %s" % out
     assert installed_version(s.target) == plain_version
+
+
+# ---------------------------------------------------------------- round 3
+
+def link_dir(link, target):
+    """A folder link the platform makes without a privilege: a junction on Windows, a symbolic link elsewhere."""
+    if os.name == "nt":
+        import _winapi
+        _winapi.CreateJunction(str(target), str(link))
+    else:
+        os.symlink(str(target), str(link), target_is_directory=True)
+
+
+def unlink_dir(link):
+    """Remove the link itself, never what it points at."""
+    if os.name == "nt":
+        os.rmdir(link)
+    else:
+        os.unlink(link)
+
+
+def test_r3_a_linked_previous_folder_never_has_its_other_contents_removed(world, sb):
+    """R-094, TASK-073 Done when (`--keep <version>` keeps the named earlier copy under `cursor-bridge-previous/`;
+    the one-previous rule as today): round 2's rotation followed a `cursor-bridge-previous` that is itself a link (a
+    junction on Windows) and removed every file and folder in the folder it points at; before this increment the
+    whole-folder removal refused a link. The kept copies moved to a folder elsewhere that also holds the owner's
+    own files, `cursor-bridge-previous` made a link to it, C installed: the owner's files are all still there."""
+    base = os.path.join(sb.target, PREVIOUS)
+    elsewhere = os.path.join(sb.root, "elsewhere")
+    shutil.move(base, elsewhere)
+    with open(os.path.join(elsewhere, "doc.txt"), "w", encoding="utf-8") as f:
+        f.write("the owner's own file\n")
+    os.makedirs(os.path.join(elsewhere, "sub"))
+    with open(os.path.join(elsewhere, "sub", "f.txt"), "w", encoding="utf-8") as f:
+        f.write("the owner's own folder\n")
+    owned = {k: v for k, v in snapshot(elsewhere).items() if k.startswith("./doc") or k.startswith("./sub")}
+    link_dir(base, elsewhere)
+    try:
+        rc, out = run(sb, world.installer(C), "--target", sb.target)
+        assert "Traceback" not in out, out
+        after = {k: v for k, v in snapshot(elsewhere).items() if k.startswith("./doc") or k.startswith("./sub")}
+        assert after == owned, "the install removed or changed what the linked folder points at: %s" % out
+    finally:
+        unlink_dir(base)
+
+
+def test_r3_a_stray_file_that_cannot_be_removed_never_stops_an_install(world, sb):
+    """R-094, TASK-073 Done when (a marker or an entry under `cursor-bridge-previous/` never makes an install
+    fail): round 2's rotation removed a stray file with no error handling, so a read-only file there stopped every
+    install; before this increment the whole-folder removal ignored errors. A read-only file beside the kept copy,
+    C installed: exit 0, no traceback, B kept as the one previous release."""
+    import stat
+    stray = os.path.join(sb.target, PREVIOUS, "notes.txt")
+    with open(stray, "w", encoding="utf-8") as f:
+        f.write("a stray file\n")
+    os.chmod(stray, stat.S_IREAD)
+    try:
+        rc, out = run(sb, world.installer(C), "--target", sb.target)
+        assert "Traceback" not in out, out
+        assert rc == 0 and "MATCHES bridge " + C in out, "a stray read-only file stopped the install: %s" % out
+        assert B in kept_versions(sb.target) and whole_copy(sb.target, B)
+    finally:
+        if os.path.exists(stray):
+            os.chmod(stray, stat.S_IREAD | stat.S_IWRITE)
+
+
+def test_r3_a_stray_file_named_like_the_version_being_saved_never_stops_an_install(world, sb):
+    """R-094, TASK-073 Done when (an entry under `cursor-bridge-previous/` never makes an install fail; the
+    one-previous rule as today): round 2's rotation spared any entry named like the version being saved, so a stray
+    file of that name stayed and the new copy could not take its place. A file named like B beside the kept copy,
+    C installed: exit 0, no traceback, B kept whole as the one previous release."""
+    stray = os.path.join(sb.target, PREVIOUS, B)
+    with open(stray, "w", encoding="utf-8") as f:
+        f.write("a stray file named like a version\n")
+    rc, out = run(sb, world.installer(C), "--target", sb.target)
+    assert "Traceback" not in out, out
+    assert rc == 0 and "MATCHES bridge " + C in out, "a stray file named like the saved version stopped the install: %s" % out
+    assert whole_copy(sb.target, B)
