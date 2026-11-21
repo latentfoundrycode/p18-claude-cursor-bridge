@@ -140,9 +140,10 @@ def test_r044_merge_and_start_weeks(tmp_path):
 
 
 def test_r044_iss013_form_merges_nothing_with_plan_check(tmp_path, program, monkeypatch):
-    """R-044. ISS-013-shaped subject counts no merge; plan-check agrees on TASK-031, read through the merged set it
-    reads since TASK-048 (R-059; the design's retired reading (11)): bridge_env.squash_merged_ids under the plan
-    pattern, which tests/test_header_plan.py pins plan-check.py to."""
+    """R-044. The ISS-013-shaped subject merges no increment and is counted as its pull request, PR-61 (R-089);
+    plan-check agrees on TASK-031, read through the merged set it reads since TASK-048 (R-059; the design's retired
+    reading (11)): bridge_env.squash_merged_ids under the plan pattern, which tests/test_header_plan.py pins
+    plan-check.py to."""
     p = MiniProject(tmp_path)
     p.brief("TASK-031")
     p.commit("records: brief", at(10))
@@ -152,7 +153,7 @@ def test_r044_iss013_form_merges_nothing_with_plan_check(tmp_path, program, monk
     wk = week(2)
     row = [line for line in out.splitlines() if "%d-W%02d" % (wk[0], wk[1]) in line][0]
     parts = [c.strip() for c in row.strip("|").split("|")]
-    assert parts[2] == "0"
+    assert parts[2] == "1"  # R-089: PR-61, the subject names no counted name
     be = program("bridge_env")
     monkeypatch.chdir(str(p.ws))
     assert "TASK-031" not in (be.squash_merged_ids(os.getcwd(), be.PLAN_ID_PATTERN, ref="main") or set())
@@ -169,6 +170,26 @@ def test_r044_blank_mean_when_no_merge(tmp_path):
     wk = week(3)
     rows = [ln for ln in out.splitlines() if "%d-W%02d" % (wk[0], wk[1]) in ln]
     assert rows and re.search(r"\|\s*\|\s*\|", rows[0])
+
+
+def test_r089_a_pass_line_with_no_round_number_is_round_1(tmp_path):
+    """R-089: a pass line with no round number is that name's round 1, so it is one review-a pass."""
+    p = MiniProject(tmp_path)
+    p.brief("TASK-001")
+    p.commit("records: brief", at(10))
+    log = p.ws / "run" / "supervisor"
+    log.mkdir(parents=True)
+    stamp = at(2, day=1, hour=9).astimezone(UTC).strftime("%Y-%m-%dT%H:%MZ")
+    (log / "in-flight.md").write_text(
+        stamp + " PASS TASK-890 r1 review-a\n" + stamp + " PASS TASK-891 review-a\n",
+        encoding="utf-8",
+    )
+    rc, out, err = pace([p.root], tmp_path)
+    assert rc == 0, err
+    label = "%d-W%02d" % week(2)
+    lines = [ln for ln in out.splitlines() if ln.rstrip().endswith("recorded passes only") and label in ln]
+    assert len(lines) == 1, out
+    assert re.search(r"(?<![\w-])review-a[\s:=]*(\d+)", lines[0]).group(1) == "2", lines[0]
 
 
 def test_r044_usage_error_on_bad_weeks(tmp_path):

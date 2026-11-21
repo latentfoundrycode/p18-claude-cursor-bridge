@@ -4408,6 +4408,7 @@ ROUND_CAUSES = (
     "records",
     "builder incomplete",
     "brief error",
+    "base update",
 )
 
 

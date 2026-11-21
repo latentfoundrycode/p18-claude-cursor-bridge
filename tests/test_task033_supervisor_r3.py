@@ -152,7 +152,7 @@ def test_task033r3_a_carriage_return_inside_a_subject_merges_nothing(tmp_path):
     p.brief("TASK-850")
     p.commit("records: brief", at(10, 0))
     msg = tmp_path / "message.txt"
-    msg.write_bytes(b"docs: x\rTASK-850 later (#4)\n")
+    msg.write_bytes(b"docs: x\rTASK-850 later\n")               # no (#n): since R-089 a close is PR-<n>
     git(p.ws, "add", "-A")
     git(p.ws, "commit", "-q", "--allow-empty", "--no-verify", "--cleanup=verbatim", "-F", str(msg),
         extra={"GIT_AUTHOR_DATE": gitdate(at(2, 2)), "GIT_COMMITTER_DATE": gitdate(at(2, 2))})
