@@ -675,7 +675,10 @@ def test_r089_r2_a_long_scope_line_never_stalls_the_snapshot(tmp_path):
 def test_r089_r3_a_pull_request_is_merged_by_its_closing_number_alone(tmp_path):
     """R-089 (round 3, Review B finding 1, behaviour): PR-<n> is merged by a squash closing `(#<n>)` alone. A PR-<n>
     the subject reader finds in a subject is no name that subject names: `PR-2: follow-up (#1)` merges PR-1, which
-    starts at its commit, and leaves PR-2, counted from its pass line, started and not merged."""
+    starts at its commit, and leaves PR-2, counted from its pass line, started and not merged. The scratch project's
+    `TASK-001 (#1)` closes the same number earlier; a close of (#1) that names no counted name makes PR-1 a name of
+    its own, merged at that close (the supervisor's ruling after round 3: the plan's "a commit ... closes with
+    (#<n>) and its subject names no name counted")."""
     p = MiniProject(tmp_path)
     tracked_old_brief(p)
     p.pass_line(at(2, day=1, hour=9), "PASS PR-2 r1 review-b")
@@ -700,3 +703,16 @@ def test_r089_r3_a_pass_line_naming_a_word_outside_the_causes_is_unstated(tmp_pa
     assert lines[0].startswith("Round causes (1 rounds after the first): "), lines[0]
     assert cause_counts(lines[0]) == {"unstated": 1}, lines[0]
     assert kind_count(passes_line(out, 2), "review-a") == 1, out
+
+
+def test_r089_r3_a_pull_request_named_in_another_s_subject_stays_unmerged(tmp_path):
+    """R-089 (round 3, Review B finding 1, the supervisor's case after the builder's run, with a number no other commit
+    closes): `PR-2: follow-up (#3)` names no counted name, so it counts and merges PR-3; PR-2, counted from its pass
+    line, stays started and not merged, and nothing folds into it."""
+    p = MiniProject(tmp_path)
+    tracked_old_brief(p)
+    p.pass_line(at(2, day=1, hour=9), "PASS PR-2 r1 review-b")
+    p.commit("PR-2: follow-up (#3)", at(2, day=2, hour=12))
+    out = p.report(tmp_path)
+    row = table(out)[label(2)]
+    assert row[1:3] == ["2", "1"], "started (PR-2, PR-3) and merged (PR-3 alone): %r\n%s" % (row, out)

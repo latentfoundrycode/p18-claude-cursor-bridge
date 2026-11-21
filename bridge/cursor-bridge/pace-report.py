@@ -568,6 +568,17 @@ def _closing_pr(subject):
     return n
 
 
+def _pr_name(name):
+    """Reserved form PR-<n>: the subject reader may return it, and it names nothing."""
+    if not isinstance(name, str) or not name.startswith("PR-"):
+        return False
+    try:
+        n = int(name[3:])
+    except ValueError:
+        return False
+    return n >= 1 and name == "PR-%d" % n
+
+
 def _parse_pass_stamp(text):
     try:
         return datetime.datetime.strptime(text, "%Y-%m-%dT%H:%MZ").replace(tzinfo=datetime.timezone.utc)
@@ -595,7 +606,7 @@ def _parse_pass_line(line):
         return None
     cause = m.group(5)
     if cause is not None and cause not in bridge_env.ROUND_CAUSES:
-        return None
+        cause = "unstated"
     return {"time": when, "name": m.group(2), "round": rnd, "kind": m.group(4), "cause": cause}
 
 
@@ -737,25 +748,34 @@ def _pace_names(ws, common, brief_ids, untracked, commits, weeks):
     for row in pass_rows:
         if not _review_only_name(row["name"]):
             base.add(row["name"])
-    fold = {}
+    fold_at = {}
     own = {}
-    seen_pr = set()
     for dt, merged, subject in commits:
         n = _closing_pr(subject)
-        if n is None or n in seen_pr:
+        if n is None:
             continue
-        seen_pr.add(n)
         pr = "PR-%d" % n
         occupy = set(base)
         if untracked:
             for ident in merged:
+                if _pr_name(ident):
+                    continue
                 if _grammar_name(ident) and not _review_only_name(ident):
                     occupy.add(ident)
-        target = _first_counted_name(subject, merged, occupy)
+        named = set()
+        for ident in merged:
+            if not _pr_name(ident):
+                named.add(ident)
+        target = _first_counted_name(subject, named, occupy)
         if target and target != pr:
-            fold[pr] = target
-        else:
+            if pr not in fold_at:
+                fold_at[pr] = target
+        elif pr not in own:
             own[pr] = dt
+    fold = {}
+    for pr, target in fold_at.items():
+        if pr not in own:
+            fold[pr] = target
     counted = set(base)
     for pr in fold:
         counted.discard(pr)
@@ -790,6 +810,8 @@ def _pace_names(ws, common, brief_ids, untracked, commits, weeks):
     for dt, merged, subject in commits:
         wk = _iso_week(dt)
         for ident in merged:
+            if _pr_name(ident):
+                continue
             if _grammar_name(ident) and not _review_only_name(ident) and (untracked or ident in counted):
                 prev = merge_dt.get(ident)
                 if prev is None or dt < prev:
@@ -799,11 +821,9 @@ def _pace_names(ws, common, brief_ids, untracked, commits, weeks):
         if n is None:
             continue
         pr = "PR-%d" % n
-        if pr in counted:
-            prev = merge_dt.get(pr)
-            if prev is None or dt < prev:
-                merge_dt[pr] = dt
-                merge_week[pr] = wk
+        if pr in own and dt == own[pr]:
+            merge_dt[pr] = dt
+            merge_week[pr] = wk
     buckets = {}
 
     def bucket(name, rnd):
