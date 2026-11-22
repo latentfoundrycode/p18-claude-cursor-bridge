@@ -30,6 +30,7 @@ Isolation: every run is a subprocess whose HOME, USERPROFILE, LOCALAPPDATA and A
 temporary folder; the trees checked and stamped are copies of this repository's bridge/ (and tools/make-manifest.py)
 under that folder, and the programs run are those copies.
 """
+import hashlib
 import json
 import os
 import shutil
@@ -43,8 +44,29 @@ SOURCE_RELEASE = os.path.join(ROOT, "bridge")
 MAKE_MANIFEST = os.path.join(ROOT, "tools", "make-manifest.py")
 
 
+def stamp_hash(path):
+    """A file's fingerprint as bridge-check.py and make-manifest.py compute it (CRLF and a BOM ignored)."""
+    with open(path, "rb") as f:
+        data = f.read().replace(b"\r\n", b"\n")
+    if data.startswith(b"\xef\xbb\xbf"):
+        data = data[3:]
+    return hashlib.sha256(data).hexdigest()
+
+
 def copy_release(dest):
+    """Copy this repository's bridge/ to `dest` and stamp the copy as it stands, so a case judges the program's
+    logic on a tree that matches its manifest (the repository's own stamp is CI's step, not these cases')."""
     shutil.copytree(SOURCE_RELEASE, str(dest), ignore=shutil.ignore_patterns("__pycache__"))
+    manifest_path = os.path.join(str(dest), "cursor-bridge", "MANIFEST.json")
+    with open(manifest_path, encoding="utf-8") as f:
+        manifest = json.load(f)
+    for rel in list(manifest.get("files", {})):
+        p = os.path.join(str(dest), *rel.split("/"))
+        if os.path.isfile(p):
+            manifest["files"][rel] = stamp_hash(p)
+    with open(manifest_path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(manifest, f, indent=2)
+        f.write("\n")
     return dest
 
 
@@ -268,3 +290,15 @@ def test_r093_r3_a_folder_name_cannot_add_a_result_line(tmp_path):
     assert rc == 2, out
     results = [ln for ln in out.splitlines() if ln.startswith("RESULT:")]
     assert len(results) == 1 and results[0].startswith("RESULT: REFUSED"), out
+
+
+def test_r093_r3_the_version_line_names_the_tree_checked_not_the_spelling_given(tmp_path):
+    """The supervisor's, added after round 3 for the mutation run: the files are read under the resolved --root,
+    which the version line names, not under the link the caller spelled."""
+    tree = copy_release(tmp_path / "bridge")
+    j = tmp_path / "J"
+    link_folder(tree, j)
+    rc, out = run(tree / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", j, "--sources", "--quiet")
+    assert rc == 0, out
+    line = result_line(out, "bridge-check: version")
+    assert resolved(tree) in norm(line) and norm(str(j)) not in norm(line), line
