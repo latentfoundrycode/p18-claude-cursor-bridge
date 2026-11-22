@@ -1,0 +1,149 @@
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 2851525..deb3a50 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -2390,3 +2390,10 @@ Each is fixed by the next increment that edits its record.
+ - **Leads, recorded, not fixed.** (1) On standard error any line beginning with the prefix counts: this trusts that a model's words never reach the tool's stderr; a captured stderr of a real failed builder call would settle it. (2) A builder runs with `--force` and can write its own `run/agent/TASK-<nnn>.err`: a sign-in line appended there stops its failure count (exit 5, the owner told, no profile resolves); the `.err` is trusted only as far as the builder's sandbox (as it could already delete a usage-limit line). (3) With UTF-8 decoding an error word glued to a non-ASCII letter (`error` then a Hebrew letter) passes the error-word boundary where cp1252 did not; an ASCII boundary would close it. (4) The excerpts print ASCII, but ESC and BEL are ASCII: terminal control sequences from an error file reach the console (before this increment). (5) The sign-in check precedes the model-argument check in `--record-failure`, so a wrong model argument beside the line gets SIGN-IN, not the exit-2 refusal (nothing written either way). (6) A lone CR becomes a line feed in text-mode reads before the LF-only split. (7) The docstring's `within 2 hours` disagrees with `FAILURE_WINDOW_HOURS = 8` (before this increment). (8) The reports' records: round 1 quoted outputs from before its last edit and elided a mutant; round 2 quoted N4's `PYTHONIOENCODING` run as the default and `git status` without its own report; round 3 left two commands unwritten above their outputs and named `_ascii_line` in the probe.
+ - **The command reference.** The docstring changed in rounds 1 and 2; each builder regenerated docs/cli-reference.json and docs/CLI_REFERENCE.md (in this increment's Scope, as TASK-072's lead asks).
+ - **The mutation sweep.** run/supervisor/TASK-075-mutants.json, fifteen mutants (the probe's and the stdout file's stdout judged like stderr; splitlines; bare strip; no UTF-8 decoding; the detail with %r; the excerpt raw; the result truthy; round 2's exemption restored; each sign-in check removed; main ignoring the result; exit 1 for either; the stderr file read as stdout): 15 of 15 killed, none survived (the first run marked four as errors because their lists of failing cases left out guards that also fail; the lists completed, the four re-run and killed).
++
++### TASK-076: the allowlist test's example mark (2026-11-22, the supervisor's, a test file only)
++- **The change.** tests/test_allowlist.py reads one text through `commands_in`: its fenced bash lines as before, and its inline commands line by line, split at the line feed, a line carrying `<!-- not run -->` skipped (an inline command never spans a line, so the line-by-line reading finds what the whole-text reading found). The docstring states the mark; KNOWN_PROSE and PROSE_EXACT are unchanged; no instruction text carries the mark.
++- **Review A** APPROVE, one Should fix taken: the mark is a line's, and instruction lines hold several commands (42 of 228 lines with inline commands hold more than one, one holds 14), so a marked line would hide an instructed command beside its example; a marked line holding more than one command is now refused (ValueError), with a case, and the docstring says a line that instructs any command never carries the mark. Noted, not changed: the inline loop also reads lines inside fenced blocks (a marked line in a fence would skip its backticked spans; none exists).
++- **The count.** Before the change 115 instructed commands (test_instructed_command_is_allowed) in 260 tests; after it the same 115 ids in the same order, 262 tests with the two R-096 cases. The file: "242 passed, 20 skipped".
++- **The mutation sweep.** run/supervisor/TASK-076-mutants.json, three: the mark ignored, killed by both R-096 cases; every line's commands dropped, killed by the first and by the three cases that read documented inline commands (test_r052_, test_r049_d4_p4_, test_r049_d4_the_guard_; a first run listed only the R-096 case and marked the mutant an error, the list completed and re-run); the refusal removed, killed by the second. 3 of 3 killed, none survived.
++- **Left for the stamp.** R-096 asks the release's CHANGELOG entry to state the mark; that entry is TASK-081's, whose Done when does not name the mark yet: when TASK-081 is packaged its brief carries the sentence.
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index 428c23d..8f7b9aa 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -83,6 +83,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | The pre-push scan | `push-scan.py [<base>]` reads every commit between the base (default origin's HEAD branch) and HEAD, never the base itself: the message, the author and committer lines, each added or renamed file's name and each added line, in two readings of a file where its content marks it, for a path of this computer (a drive and a segment, a Users or home folder and a segment, the application-data segment beside a slash; an angle-bracket segment a placeholder) and an account name as a whole word under caseless compatibility matching (from the profile folder, the login and the per-computer names file, never the command line); each hit printed as `HIT <commit> <place> <kind>` with its place (`message`, `author`, `committer`, `file #k`, `line <path>:<n>` or `line #k:<n>`) and never its value; exit 0 clean, 1 a hit, 2 the range, git or the names file unreadable; its allow entry in settings.bridge.json | bridge/cursor-bridge/push-scan.py; .../settings.bridge.json | tests/test_program_push_scan.py; tests/test_release_t_merge.py | the program release, stage P2 (TASK-067) |
+ | The in-flight program | `in-flight.py <text>` or `in-flight.py --file <path>` appends one line, `<UTC time to the minute, with Z> <text>`, to run/supervisor/in-flight.md of the Workspace the current folder belongs to (the nearest folder holding docs/PROJECT_STATUS.md), creating the folder and the file, with LF line ends, under a lock it waits at most 10 seconds for (on Windows the byte at 2**31, so a reader still reads), and prints it; `--file` takes a file under that Workspace's run/supervisor/, read through no link, at most 65,536 bytes, its line breaks made spaces but a `Paused:` line kept as a line of its own; `--pass <name> <reviewer> [--round <n>] [--cause <cause>]` writes `<time> PASS <name> r<n> <reviewer> <cause>`, the reviewers seven, the causes `bridge_env.ROUND_CAUSES`, the one list the launcher and the pace report read; a text whose first word is PASS, a control or format character, both sources or none, a word outside a list, a log or a folder of it reached through a link, and a log with more than one link are refused, `in-flight: REFUSED - <reason>`, exit 2, nothing written; a short write prints `INCOMPLETE`, exit 1; the loop guard reads the log's last `Paused:` line, an empty one lifting the pause, and its refusal names the log and this program; its allow entry in settings.bridge.json | bridge/cursor-bridge/in-flight.py; .../loop-guard.py; .../bridge_env.py; .../bridge-run.py; .../pace-report.py; .../settings.bridge.json | tests/test_program_in_flight.py; tests/test_loop_guard.py (test_r088_); tests/test_allowlist.py; tests/test_dump_cli.py | the program release, stage P3 (TASK-068); its texts TASK-078 |
+ | The roster's sign-in check | `roster-check.py` knows the Cursor tool's own sign-in line, a line beginning `Error: Authentication required. Please run 'agent login' first` (case-sensitive): on standard output (the probe's, `--stdout-file`) only as the whole output, one non-empty line; on standard error (the probe's, `--stderr-file`) as any whole line; lines split at the line feed alone and trimmed of space, tab, CR and LF alone; the two files read apart. On it the probe returns a falsy `PROBE_SIGN_IN` in its pair and the run, like `--record-failure` (checked before the model argument), prints `SIGN-IN  the Cursor command-line tool is signed out: run cursor-agent login`, writes no failure, mark or resolution and ends with exit 5; every other reply is judged as before, the tool's line beside another stdout line no answer; the probe reads the tool's output as UTF-8 (errors replaced) and prints its details and excerpts in ASCII; the docstring's exit list names it | bridge/cursor-bridge/roster-check.py | tests/test_program_roster_sign_in.py; tests/test_roster_check.py; tests/test_roster_check_a4.py; tests/test_hotfix25a_roster_launcher.py; tests/fixtures/cursor/sign-in-required.txt | the program release, stage P3 (TASK-075); the run sheet's `cursor-agent status` line TASK-078 |
++| The allowlist test's example mark | tests/test_allowlist.py collects an instruction's commands through `commands_in`: each runnable line of its fenced bash blocks, and each inline command on a line that does not carry `<!-- not run -->`, the mark for a command an instruction quotes as an example and does not instruct, stated in the test's docstring; a marked line holding more than one command is refused, so a mark never hides an instructed command; the two skip lists keep what they hold; no instruction text carries the mark yet; the release's CHANGELOG entry states it at the stamp | tests/test_allowlist.py | tests/test_allowlist.py (test_r096_) | the program release, stage P3 (TASK-076) |
+ 
+ ## Resources
+ | Name | Kind | Where it lives | Used by | Provided |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 25a9a59..3e06089 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -17,7 +17,7 @@ Phase: changing
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable, External services
+ Change cycle: the program release (begun 2026-11-13, the owner's word in this chat; its intake's read-back confirmed by the owner 2026-11-13; the field finding F7 added to it by the owner 2026-11-13; its design revision and plan addendum, one subject, `program`, approved by the owner at the design gate 2026-11-13, seven decisions in the question form, the trait External services approved and the carry comparison kept a recorded lead; its scoped revision for F7, one subject with its plan revision, `program-f7`, approved by the owner at its gate 2026-11-14, five decisions in the question form; step: the loop, stage P2 closed 2026-11-19 (twelve increments, its refactoring pass, its review approved by both, its demonstration live), stage P3 next from TASK-068, on Opus 5.5; the owner placed one more item into it 2026-11-14, the diagram design-decision Feedback entry, planned at the next plan revision (INVENTORY, Decisions)); before it release B2, begun 2026-11-04, complete 2026-11-11 (Claude-Cursor Bridge 2026.11.11a)
+ Awaiting user on: nothing
+-Next: stage P3: TASK-076 (TASK-068's in-flight program, TASK-069's pass and cause counting, TASK-070's mutation baseline, TASK-071's empty run parameter, TASK-073's installer word check and kept copy, TASK-074's source check and stamp and TASK-075's sign-in check merged, their rows R-088 to R-091 and R-093 to R-095 planned until TASK-078's texts and the stage's close, which name exit 5 in step 7 and the migration's new `cannot read` reason in calibration; the loop writes its in-flight lines with `in-flight.py` and its review passes with `in-flight.py --pass`; stage P2's least-confident item 3's `git --version` floor on the install's machines and CI's images is the install's, stage P4); TASK-072, approved by Review A and the security audit in three rounds, waits on its branch for Review B gpt-5.6-sol-high when the other-models pool resets on 2026-12-16 (the native rebuild copied the reviewed code from history and was withdrawn: HARDENING, TASK-074), so TASK-078 and the stage's close follow it; the CI watch's wait for a required context not yet listed is still unexercised live (HARDENING, TASK-069); when TASK-078 is packaged its Scope notes take KP-051's Correction, run-parameters.md's `supervisor` gloss and step 8's and the sentinel's reading of a push-scan hit at its place (HARDENING, Stage P2's demonstration); the next plan revision also places the owner's two rules of 2026-11-15, and release G's widening waits for G's planning (both INVENTORY, Decisions); the plan revision that places the owner's diagram design-decision item (2026-11-14) into a later stage, a records pull request of its own; stage P1 (TASK-055 to TASK-058, REFAC-007) closed 2026-11-14, then P2 to P4 (docs/BUILD_PLAN.md, The program release — the plan addendum; docs/DESIGN.md, Change: the program release); each brief names its calls' time and retry limits (the trait External services); the release ends with the owner's install from a run sheet, Context7's setup a step of it. The order after it (INVENTORY, Decisions): the prototype meta workflow (the owner, 2026-11-20; its design on the owner's word), the progress graph, W, G, F, then C, which waits for the TDP's code-map command, D, the trial of the code map, and E last (the owner, 2026-11-15). reAngle and the video factory calibrate when the owner resumes them (R-031, R-037), the TDP in its own session; release T's field items on the TDP (the first stripped suite at its TASK-172; the weekly workflow, rewritten from the frozen block, v7.0.1 since 2026.11.12a, at its next configuration touch) stand in HARDENING, Correction to project end. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++Next: stage P3: TASK-077 (TASK-068 to TASK-071 and TASK-073 to TASK-076 merged, R-096 built, their other rows R-088 to R-091 and R-093 to R-095 planned until TASK-078's texts and the stage's close, which name exit 5 in step 7 and the migration's new `cannot read` reason in calibration; the loop writes its in-flight lines with `in-flight.py` and its review passes with `in-flight.py --pass`; stage P2's least-confident item 3's `git --version` floor on the install's machines and CI's images is the install's, stage P4); TASK-072, approved by Review A and the security audit in three rounds, waits on its branch for Review B gpt-5.6-sol-high when the other-models pool resets on 2026-12-16 (the native rebuild copied the reviewed code from history and was withdrawn: HARDENING, TASK-074), so TASK-078 and the stage's close follow it; the CI watch's wait for a required context not yet listed is still unexercised live (HARDENING, TASK-069); when TASK-078 is packaged its Scope notes take KP-051's Correction, run-parameters.md's `supervisor` gloss and step 8's and the sentinel's reading of a push-scan hit at its place (HARDENING, Stage P2's demonstration); the next plan revision also places the owner's two rules of 2026-11-15, and release G's widening waits for G's planning (both INVENTORY, Decisions); the plan revision that places the owner's diagram design-decision item (2026-11-14) into a later stage, a records pull request of its own; stage P1 (TASK-055 to TASK-058, REFAC-007) closed 2026-11-14, then P2 to P4 (docs/BUILD_PLAN.md, The program release — the plan addendum; docs/DESIGN.md, Change: the program release); each brief names its calls' time and retry limits (the trait External services); the release ends with the owner's install from a run sheet, Context7's setup a step of it. The order after it (INVENTORY, Decisions): the prototype meta workflow (the owner, 2026-11-20; its design on the owner's word), the progress graph, W, G, F, then C, which waits for the TDP's code-map command, D, the trial of the code map, and E last (the owner, 2026-11-15). reAngle and the video factory calibrate when the owner resumes them (R-031, R-037), the TDP in its own session; release T's field items on the TDP (the first stripped suite at its TASK-172; the weekly workflow, rewritten from the frozen block, v7.0.1 since 2026.11.12a, at its next configuration touch) stand in HARDENING, Correction to project end. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
+ Deviations accepted: none; told to the owner (rule 58): stage P2's demonstration line expected push-scan to exit 0 on the stage's own commits, which hold 18 generic drive paths R-087 counts (exit 1; drawn, the texts' reading in TASK-078; HARDENING, Stage P2's demonstration); stage H2's refactoring pass recorded its twelve candidates as next-release leads, nothing merged after the stamp (HARDENING, stage H2's close); TASK-054's viewer check made on GitHub only, Typora not opened (HARDENING, TASK-054); TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions); stage T2's demonstration ran after the install, where the plan says before (HARDENING, Stage T2's demonstration)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -26,7 +26,7 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/working-files.md lists this project's local working files under run/supervisor/ (gitignored), in-flight.md first, the scratch log a resume reads before anything else.
+ Delegated gates: none
+-Remote sync: main at the merge of this pull request, TASK-075's, in sync with origin/main at that merge; local main is fast-forwarded after every merge
++Remote sync: main at the merge of this pull request, TASK-076's, in sync with origin/main at that merge; local main is fast-forwarded after every merge
+ Stage: the program release's stage P2 closed 2026-11-19, stage P1 2026-11-14 (HARDENING, The program release, Stage P1 and Stage P2); release B2 complete 2026-11-11 (its stages H1 and H2 and its project end; HARDENING, Project end of release B2); release T's T1 closed 2026-11-02, T2 2026-11-04, its project end 2026-11-04; release B's stages and project end: docs/archive/STATUS_HISTORY.md. Last reflection: stage P2's close, 2026-11-19 (its review approved by both, Review B on its one permitted re-run after its provider's safety refusal; demonstration live on main c4a3763, 43 of 44 checks, push-scan's exit on the stage's own commits the one item drawn; conformance 25 OK, 0 MISSING, 5 NOTE; ISS-001 recurred, counter 2; ISS-037 opened; ISS-031 closed; Feedback FB-109 to FB-117; Project Summary and User Manual patched); before it the design gate of the scoped revision program-f7, 2026-11-14 (conformance 25 OK, 0 MISSING, 5 NOTE; Feedback FB-107, FB-108); stage P1's close, 2026-11-14 (22 of 22 checks; Feedback FB-102 to FB-106)
+ Deferred increments: none; TASK-027's calibrations of reAngle and the video factory deferred by the owner on 2026-10-31 until they resume (INVENTORY, Deferred)
+ Open issues: ISS-037 worked around (Review B's provider stopped a review of the guards as security activity; one re-run with context approved). ISS-001 recurred, counter 2 (a review log named apart from its snapshot). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-024 recurred, counter 3. ISS-036 recurred, counter 3 (fixed each time; stage P1). ISS-013 mitigated (the plan check's rule, TASK-033, installed). Every other issue fixed or closed: the Issues file in Documents/, and docs/archive/STATUS_HISTORY.md
+diff --git a/docs/REQUIREMENTS.md b/docs/REQUIREMENTS.md
+index 4abcf2f..d2676ab 100644
+--- a/docs/REQUIREMENTS.md
++++ b/docs/REQUIREMENTS.md
+@@ -119,7 +119,7 @@ Revised 2026-11-14 (the field finding F7, a scoped revision of the program relea
+ | R-093 | The release tooling checks the tree it stands in (C21, J5): `bridge-check.py --sources` refuses, with exit 2, where the program does not stand in the tree it checks, and prints both folders on its result line; `tools/make-manifest.py` writes `VERSION` with the file's own line ending. | the evaluation of 2026-11-08, C21 | planned | — |
+ | R-094 | The installer refuses what it does not know and can keep a named copy (C9, C11): `bridge-install.py` checks every word before it does anything, and an unknown option, `--help`, a positional word or a missing value prints the usage and exits 2, the target untouched; `--keep <version>` keeps the named earlier copy beside the one previous release, the value matched against the kept folders' names and never used as a path, a marker beside the copy keeping it over later installs until another `--keep` names another or `--keep none`; `--rollback [<version>]` can name a kept copy, a rollback to the older one removing the newer kept copies and writing `ROLLED-BACK.md` from every entry newer than its target. | the evaluation of 2026-11-01, C9 and C11 | planned | — |
+ | R-095 | A signed-out Cursor tool is told from a failing model (C3): `roster-check.py`, in its probe and in `--record-failure`, knows the tool's own sign-in line, prints `SIGN-IN  the Cursor command-line tool is signed out: run cursor-agent login`, counts no failure against a model or a pool and ends with exit 5; calibration's install run sheet ends with `cursor-agent status`, in the owner's terminal. | the evaluation of 2026-11-01, C3 | planned | — |
+-| R-096 | An instruction may quote a command it does not instruct (C4): `tests/test_allowlist.py` keeps collecting inline commands and skips one on a line that carries the mark `<!-- not run -->`, its two skip lists kept for what they hold; the mark is stated in the test's own docstring and in the release's CHANGELOG entry, since it is a convention for whoever writes the bridge's text and costs no instruction text. | the evaluation of 2026-11-01, C4 (FB-045), with the design's deviation | planned | — |
++| R-096 | An instruction may quote a command it does not instruct (C4): `tests/test_allowlist.py` keeps collecting inline commands and skips one on a line that carries the mark `<!-- not run -->`, its two skip lists kept for what they hold; the mark is stated in the test's own docstring and in the release's CHANGELOG entry, since it is a convention for whoever writes the bridge's text and costs no instruction text. | the evaluation of 2026-11-01, C4 (FB-045), with the design's deviation | built | tests/test_allowlist.py (TASK-076) |
+ | R-097 | The Sunday evaluation's security step is a program (C13): `evaluate-reports.py security` reads, for each of the bridge's projects and by GET alone, the weekly workflow's state and its runs since the last read and the open Dependabot alerts, and writes `Reports/Evaluations/<date>/security.md` in the three kinds release T's design defines and green; a read that fails is a finding with its remedy, never an empty section; no log text beyond a step's exit line enters the file; the window's state stands in the ledger's `_meta`; the project paths stand in the per-computer file `~/.cursor-bridge/projects.json`, which `pace-report.py` reads too, and the program names that file and stops where it is absent; the evaluation command's step 1b names the program. | the evaluation of 2026-11-01, C13 | planned | — |
+ | R-098 | One dependency increment bumps every lock file the scanner fails on (F3; instruction text): the policy's paragraph on a newly published vulnerability says that where the scanner reads several lock files with a new advisory each, the bumps travel in one `DEP` increment and one pull request, since a pull request that fixes one lock still fails on the others; KP-050's Correction is retired to a pointer. | the field finding F3 (the owner, 2026-11-13) | planned | — |
+ | R-099 | Design and planning run on Fable 5.2: rule 48 and its digest line, calibration's report template and the change cycle's two sentences name Fable 5.2, the plan critic's definition carries `model: claude-fable-5-2`, and `tests/test_agent_models.py` holds that value and reads a leftover 5.1 id as legacy. | the owner's word of 2026-11-13 (INVENTORY, Decisions) | planned | — |
+diff --git a/tests/test_allowlist.py b/tests/test_allowlist.py
+index be3d52b..830febe 100644
+--- a/tests/test_allowlist.py
++++ b/tests/test_allowlist.py
+@@ -2,7 +2,13 @@
+ settings and denied by none of its deny rules; the deny rules must catch what they are for.
+ Commands are collected from the fenced bash blocks and the inline code of supervisor.md, its phase
+ modules (TASK-010), and the merge policy. A placeholder such as <nnn> or <sha> is kept as text: a rule that
+-needs the placeholder's position to be a space is a rule that cannot match in practice."""
++needs the placeholder's position to be a space is a rule that cannot match in practice.
++
++The mark `<!-- not run -->` (R-096): an inline command on a line that carries it is not collected. It is for a
++command an instruction quotes as an example and does not instruct, so the text need not reword it to escape the
++check. The mark is a line's, not a command's: a line that instructs any command never carries it, and a marked line
++holding more than one inline command is refused, so a mark never hides an instructed command beside its example.
++The two skip lists below keep what they hold."""
+ import json
+ import os
+ import re
+@@ -23,19 +29,35 @@ EXECUTABLES = ("git ", "gh ", "python ~/.claude/", "cursor-agent ", "npx ", "sem
+                "pytest ", "cat ~/.claude/", "powershell -NoProfile")
+ 
+ 
++NOT_RUN = "<!-- not run -->"
++
++
++def commands_in(text, src):
++    """The commands one text issues: each runnable line of its fenced bash blocks, and each inline command on a line
++    that does not carry NOT_RUN (R-096). An inline command never spans a line, so reading it line by line finds what
++    reading the whole text finds."""
++    found = []
++    for m in re.finditer(r"```(?:bash|sh)\n(.*?)```", text, re.S):
++        for line in m.group(1).splitlines():
++            line = line.strip()
++            if line and not line.startswith("#") and line.startswith(EXECUTABLES):
++                found.append((src, line))
++    for text_line in text.split("\n"):
++        cmds = [m.group(1).strip() for m in re.finditer(r"`([^`\n]+)`", text_line)]
++        cmds = [cmd for cmd in cmds if cmd.startswith(EXECUTABLES) and " " in cmd and len(cmd) < 220]
++        if NOT_RUN in text_line:
++            if len(cmds) > 1:
++                raise ValueError("%s: a line carrying %s holds %d commands; the mark is for a line that quotes one "
++                                 "example: %r" % (src, NOT_RUN, len(cmds), cmds))
++            continue
++        found.extend((src, cmd) for cmd in cmds)
++    return found
++
++
+ def collect_commands():
+     found = []
+     for path in DOCS:
+-        text = open(path, encoding="utf-8").read()
+-        for m in re.finditer(r"```(?:bash|sh)\n(.*?)```", text, re.S):
+-            for line in m.group(1).splitlines():
+-                line = line.strip()
+-                if line and not line.startswith("#") and line.startswith(EXECUTABLES):
+-                    found.append((os.path.basename(path), line))
+-        for m in re.finditer(r"`([^`\n]+)`", text):
+-            cmd = m.group(1).strip()
+-            if cmd.startswith(EXECUTABLES) and " " in cmd and len(cmd) < 220:
+-                found.append((os.path.basename(path), cmd))
++        found.extend(commands_in(open(path, encoding="utf-8").read(), os.path.basename(path)))
+     # the same command text appears many times; test each once
+     seen, out = set(), []
+     for src, cmd in found:
+@@ -114,6 +136,21 @@ def test_no_instructed_command_is_refused_by_the_guard(src, cmd, program, monkey
+     assert reason is None, "%s instructs %r, which the guard refuses: %s" % (src, cmd, reason)
+ 
+ 
++def test_r096_an_inline_command_on_a_line_marked_not_run_is_not_collected():
++    """R-096 (TASK-076): the collector keeps an inline command on an unmarked line and skips one on a line that
++    carries the mark, so an instruction can quote a command as an example without the check reading it as issued."""
++    text = ("Before you start, run `git status --short` and read what it prints.\n"
++            "A command never to run, quoted as an example: `git push --force origin main` " + NOT_RUN + "\n")
++    assert [cmd for _src, cmd in commands_in(text, "sample.md")] == ["git status --short"]
++
++
++def test_r096_a_marked_line_holding_two_commands_is_refused():
++    """R-096 (TASK-076, Review A): the mark is a line's, so a marked line holding an instructed command beside its
++    example would hide that command from the check; such a line is refused, never read silently."""
++    text = ("Run `git fetch -q origin main:main`, never `git push --force origin main` " + NOT_RUN + "\n")
++    with pytest.raises(ValueError, match="holds 2 commands"):
++        commands_in(text, "sample.md")
++
+ def test_documented_matching_examples():
+     assert rule_matches("Bash(git log * main)", "git log --oneline main")
+     assert rule_matches("Bash(ls:*)", "ls -la")
