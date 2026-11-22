@@ -35,6 +35,7 @@ import re
 import stat
 import subprocess
 import sys
+import types
 
 import pytest
 
@@ -291,13 +292,51 @@ def assert_counted_as_today(ws, rc, out, before):
     assert state.get("failures", {}).get(FIRST[0], {}).get("count") == 1, state
 
 
-def test_r095_r2_probe_a_reply_quoting_the_line_on_a_line_of_its_own_is_answered_as_today(ws):
-    """A model's reply on standard output that puts the tool's line on a line of its own after its own words is
-    answered off-script, as today: the profile resolves and no SIGN-IN line is printed."""
+def assert_judged_as_before_round_1(ws, rc, out):
+    """A reply holding the tool's line beside other stdout lines is no answer, as before round 1 (its word Error),
+    and is not the tool's: with every probe given it, no profile is usable (exit 1) and the second is probed."""
+    assert rc == 1, "no usable profile, as before round 1: " + out
+    assert not any(l.lstrip().startswith("SIGN-IN") for l in lines_of(out)), out
+    assert not any(l.lstrip().startswith("RESOLVED") for l in lines_of(out)), out
+    assert not any("answered" in l for l in lines_of(out) if l.lstrip().startswith("probe")), out
+    assert set(SECOND) <= set(ws.called_models()), "the second profile is probed: %r" % ws.called_models()
+
+
+def test_r095_r2_probe_a_reply_quoting_the_line_on_a_line_of_its_own_is_judged_as_before_round_1(ws):
+    """A model's reply on standard output that puts the tool's line on a line of its own after its own words is not
+    the tool's line, and is judged exactly as before round 1. (Corrected in round 3: round 2's case said it was
+    answered, which the code before round 1 never did.)"""
     ws.stand_in(stdout=("Sure. The tool would print:\n" + tool_line() + "\n").encode("ascii"), code=0)
     rc, out = ws.run()
-    assert rc == 0 and "RESOLVED profile 'native'" in out, out
-    assert not any(l.lstrip().startswith("SIGN-IN") for l in lines_of(out)), out
+    assert_judged_as_before_round_1(ws, rc, out)
+
+
+@pytest.mark.parametrize("first, second", [("Update available: 1.2.3", None), (None, "Sure.")],
+                         ids=["banner-first", "line-first"])
+def test_r095_r3_probe_the_line_beside_another_stdout_line_is_no_answer(ws, first, second):
+    """Round 3: the tool's line with any other line on standard output (a banner before it, words after it) is
+    neither the tool's line nor an answer: the reply is judged as before round 1, so a signed-out tool that prints
+    one line more never resolves a profile."""
+    lines = [l for l in (first, tool_line(), second) if l is not None]
+    ws.stand_in(stdout=("\n".join(lines) + "\n").encode("ascii"), code=0)
+    rc, out = ws.run()
+    assert_judged_as_before_round_1(ws, rc, out)
+
+
+def test_r095_r3_probe_returns_a_falsy_signed_out_result_in_its_pair(program, monkeypatch):
+    """Round 3: probe returns a pair whose first value, for a signed-out tool, is the module's constant and is
+    false, on either stream."""
+    rc = program("roster-check")
+    monkeypatch.setattr(rc, "cursor_agent_cmd", lambda: ["cursor-agent"])
+    monkeypatch.setattr(rc.bridge_env, "stripped_env", lambda: {})
+    for code, stdout, stderr in ((0, tool_line() + "\n", ""), (1, "", tool_line() + "\n")):
+        reply = types.SimpleNamespace(returncode=code, stdout=stdout, stderr=stderr)
+        fake = types.SimpleNamespace(run=lambda *a, _reply=reply, **k: _reply, TimeoutExpired=subprocess.TimeoutExpired)
+        monkeypatch.setattr(rc, "subprocess", fake)
+        result = rc.probe(FIRST[0])
+        assert isinstance(result, tuple) and len(result) == 2, result
+        assert result[0] is rc.PROBE_SIGN_IN, result
+        assert not result[0], "the signed-out result is false to any caller that tests truth"
 
 
 def test_r095_r2_record_failure_a_stdout_file_with_the_line_after_other_lines_is_counted_as_today(ws):
@@ -339,6 +378,7 @@ def test_r095_r2_probe_a_reply_beyond_the_consoles_code_page_is_answered_and_pri
     off-script and the program's own output stays ASCII, so reading the reply as UTF-8 never makes printing it fail."""
     ws.stand_in(stdout=b"\xf0\x9f\x98\x80\n", code=0)
     env = dict(ws.env)
+    env["PYTHONIOENCODING"] = "utf-8"  # round 3: a console that would print the emoji raw, so ASCII is the program's
     p = subprocess.run([sys.executable, PROG, str(ws.roster)], capture_output=True, env=env, cwd=str(ws.repo),
                        timeout=300)
     out = (p.stdout + p.stderr).decode("ascii", errors="replace")
