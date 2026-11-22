@@ -286,25 +286,24 @@ def test_task033r2_a_projects_git_configuration_runs_no_program(tmp_path):
 # ---------------------------------------------------------------- default roots (Review A B2, audit A5)
 
 
-PROJECTS_RX = re.compile(r"^PROJECTS = \{.*?^\}", re.S | re.M)
-
-
 def sandbox_bridge(base, projects):
-    """A copy of pace-report.py, bridge_env.py and evaluate-reports.py in <base>/cb, the copy's PROJECTS replaced."""
+    """A copy of pace-report.py, bridge_env.py and evaluate-reports.py in <base>/cb, the project list given as the
+    projects file of a scratch home, <base>/home/.cursor-bridge/projects.json, which run_copy hands the copy as its
+    home (TASK-077, R-097: the list left the program for that file)."""
     cb = base / "cb"
     cb.mkdir(parents=True)
     for name in ("pace-report.py", "bridge_env.py", "evaluate-reports.py"):
         shutil.copyfile(os.path.join(CB, name), str(cb / name))
-    src = (cb / "evaluate-reports.py").read_text(encoding="utf-8")
-    body = "PROJECTS = {\n%s}" % "".join("    %r: %r,\n" % (k, str(v)) for k, v in projects.items())
-    new, n = PROJECTS_RX.subn(lambda m: body, src, count=1)
-    assert n == 1, "evaluate-reports.py's PROJECTS literal was not found"
-    (cb / "evaluate-reports.py").write_text(new, encoding="utf-8")
+    pfile = base / "home" / ".cursor-bridge" / "projects.json"
+    pfile.parent.mkdir(parents=True)
+    pfile.write_text(json.dumps({k: str(v) for k, v in projects.items()}), encoding="utf-8")
     return cb
 
 
 def run_copy(cb, args, cwd, bytecode=False):
-    env = dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull, GIT_TERMINAL_PROMPT="0")
+    home = str(cb.parent / "home")
+    env = dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull, GIT_TERMINAL_PROMPT="0",
+               HOME=home, USERPROFILE=home)
     if bytecode:
         env.pop("PYTHONDONTWRITEBYTECODE", None)
     else:
