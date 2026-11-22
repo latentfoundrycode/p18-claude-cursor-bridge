@@ -12,6 +12,12 @@ or NOTE. It runs at every calibration and every reflection point; each MISSING i
 calibration item, applied as configuration work in the next stage. It never changes anything.
 
 What it checks, with the file it reads (the 0b review corrected several of these):
+  - the weekly dependency scan: a workflow under .github/workflows/ found by a `schedule:`
+    trigger and an OSV-Scanner step (not by file name), its `--lockfile=` set equal, as a set, to
+    the gate's OSV-Scanner step's; NOTE without a GitHub remote (read from the local git
+    configuration alone) or with an inventory Decisions row beginning `Weekly scan:`; MISSING
+    when no scheduled OSV-Scanner exists, a scheduled list differs, or an OSV-Scanner workflow
+    lacks `schedule:`; pins, permissions and exit handling are not compared;
   - the gate workflows (.github/workflows/*.yml), step by step, except the weekly
     dependency-scan file (dependency-scan.yml or dependency-scan.yaml), which is not read for
     gate steps or scanner version lines: a step runs Semgrep,
@@ -75,10 +81,12 @@ What it checks, with the file it reads (the 0b review corrected several of these
   - the private memory notes Claude Code keeps for this project (names only; calibration
     step 2b reviews them, rule 41);
   - the recorded bridge version against the installed one (calibration due).
-Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace.
+Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace, or a malformed
+record header (HEADER MALFORMED, the status file's or the inventory's).
 ASCII-only on purpose (cp1252 consoles). Never writes.
 """
 import configparser
+import stat
 import datetime
 import glob
 import importlib.util
@@ -725,6 +733,191 @@ def _escape_field(value):
     return "".join(parts)
 
 
+def _workflow_triggers(text):
+    """The top-level workflow triggers from `on:` (bare, quoted, block or inline list)."""
+    triggers = set()
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.lstrip()
+        m = re.match(r'^(?:"on"|\'on\'|on):\s*(.*)$', stripped)
+        if not m:
+            i += 1
+            continue
+        rest = m.group(1).strip()
+        if not rest:
+            base_indent = len(line) - len(stripped)
+            child_indent = None
+            i += 1
+            while i < len(lines):
+                sub = lines[i]
+                if not sub.strip():
+                    i += 1
+                    continue
+                sub_indent = len(sub) - len(sub.lstrip())
+                if sub_indent <= base_indent:
+                    break
+                if child_indent is None:
+                    child_indent = sub_indent
+                if sub_indent != child_indent:
+                    i += 1
+                    continue
+                km = re.match(r'^["\']?(\w+)["\']?\s*:', sub.lstrip())
+                if km:
+                    triggers.add(km.group(1))
+                i += 1
+            continue
+        if rest.startswith("["):
+            for part in re.split(r",\s*", rest.strip("[]")):
+                part = part.strip().strip("'\"")
+                if part:
+                    triggers.add(part)
+        else:
+            tok = rest.split()[0].strip("'\"")
+            if tok:
+                triggers.add(tok)
+        i += 1
+    return triggers
+
+
+def _strip_lockfile_quote(val):
+    if len(val) >= 2 and val[0] == val[-1] and val[0] in ("'", '"'):
+        return val[1:-1]
+    return val
+
+
+def _osv_lockfiles(text):
+    locks = set()
+    for _body, _guarded, cmds in workflow_steps(text):
+        if re.search(r"osv-scanner", cmds, re.I):
+            for m in re.finditer(r"--lockfile=([^\s]+)", cmds):
+                locks.add(_strip_lockfile_quote(m.group(1)))
+    return locks
+
+
+def _git_entry_is_link_or_reparse(path):
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return True
+    if stat.S_ISLNK(st.st_mode):
+        return True
+    if sys.platform == "win32":
+        attrs = getattr(st, "st_file_attributes", 0)
+        if attrs & 0x400:
+            return True
+    return False
+
+
+def _own_git_dir(ws):
+    """The repository's git directory for this Workspace alone, without following links."""
+    dot_git = os.path.join(ws, ".git")
+    if not os.path.lexists(dot_git):
+        return None
+    if _git_entry_is_link_or_reparse(dot_git):
+        return None
+    if os.path.isdir(dot_git):
+        return dot_git
+    if not os.path.isfile(dot_git):
+        return None
+    gitdir = None
+    try:
+        with open(dot_git, encoding="utf-8", errors="replace") as f:
+            for raw in f:
+                line = raw.strip()
+                if line.startswith("gitdir:"):
+                    gitdir = line[7:].strip()
+                    break
+    except OSError:
+        return None
+    if not gitdir or gitdir.startswith("-") or "\x00" in gitdir:
+        return None
+    if (len(gitdir) >= 2 and gitdir[0] in "/\\" and gitdir[1] in "/\\"):
+        return None
+    if (
+        len(gitdir) >= 4
+        and gitdir[0] in "/\\"
+        and gitdir[1] == "?"
+        and gitdir[2] == "?"
+        and gitdir[3] in "/\\"
+    ):
+        return None
+    if not os.path.isabs(gitdir):
+        gitdir = os.path.normpath(os.path.join(ws, gitdir))
+    if _git_entry_is_link_or_reparse(gitdir):
+        return None
+    if not os.path.isdir(gitdir):
+        return None
+    return gitdir
+
+
+def _has_github_remote(ws):
+    """True when this repository's own local git config names a github.com remote URL."""
+    git_dir = _own_git_dir(ws)
+    if git_dir is None:
+        return False
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_CONFIG")}
+    env["GIT_DIR"] = git_dir
+    try:
+        p = subprocess.run(
+            ["git", "-c", "core.fsmonitor=false", "config", "--local", "--no-includes",
+             "--get-regexp", r"^remote\..*\.url$"],
+            env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=GH_TIMEOUT, creationflags=NO_WINDOW,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if p.returncode != 0:
+        return False
+    for line in p.stdout.splitlines():
+        parts = line.split(None, 1)
+        if len(parts) == 2 and "github.com" in parts[1].lower():
+            return True
+    return False
+
+
+def _weekly_scan_decision(sections):
+    for row in sections.get("Decisions", []):
+        if row and row[0].startswith("Weekly scan:"):
+            return row[0]
+    return None
+
+
+def _add_weekly_dependency_scan(add, ws, sections, gate_locks, scheduled_locks, osv_no_schedule):
+    for locks in scheduled_locks:
+        if locks == gate_locks:
+            add("OK", "Weekly dependency scan",
+                "pins, permissions and exit handling are not compared; "
+                "a workflow disabled on GitHub is the evaluation's read")
+            return
+    decision = _weekly_scan_decision(sections)
+    if decision is not None:
+        add("NOTE", "Weekly dependency scan", _escape_field(decision))
+        return
+    if not _has_github_remote(ws):
+        add("NOTE", "Weekly dependency scan", "the repository has no GitHub remote")
+        return
+    if scheduled_locks:
+        wlocks = scheduled_locks[0]
+        gate_only = sorted(gate_locks - wlocks)
+        weekly_only = sorted(wlocks - gate_locks)
+        parts = []
+        if gate_only:
+            parts.append("the gate scans " + ", ".join(_escape_field(x) for x in gate_only))
+        if weekly_only:
+            parts.append("the weekly scan scans " + ", ".join(_escape_field(x) for x in weekly_only))
+        add("MISSING", "Weekly dependency scan", "; ".join(parts) if parts else
+            "the weekly scan's --lockfile= list differs from the gate's")
+        return
+    if osv_no_schedule:
+        add("MISSING", "Weekly dependency scan",
+            "a workflow runs OSV-Scanner but has no `schedule:` trigger")
+        return
+    add("MISSING", "Weekly dependency scan",
+        "no workflow file runs OSV-Scanner on a `schedule:` trigger")
+
+
 def calibration_workflows_grades(path, text, phase=None):
     """Calibration grades when judge_workflows_line returned valid (R-027, R-033).
 
@@ -843,6 +1036,21 @@ def main():
 
     # --- the gate workflows, step by step
     workflows = sorted(glob.glob(os.path.join(ws, ".github", "workflows", "*.yml")) + glob.glob(os.path.join(ws, ".github", "workflows", "*.yaml")))
+    weekly_gate_locks = set()
+    weekly_scheduled_locks = []
+    weekly_osv_no_schedule = False
+    for wp in workflows:
+        wtext = read(wp) or ""
+        wtriggers = _workflow_triggers(wtext)
+        wlocks = _osv_lockfiles(wtext)
+        wosv = bool(wlocks) or any(re.search(r"osv-scanner", c, re.I) for _, _, c in workflow_steps(wtext))
+        if wtriggers & {"push", "pull_request"}:
+            weekly_gate_locks |= wlocks
+        if wosv:
+            if "schedule" in wtriggers:
+                weekly_scheduled_locks.append(wlocks)
+            elif not (wtriggers & {"push", "pull_request"}):
+                weekly_osv_no_schedule = True
     wf_text = "\n".join(read(p) or "" for p in workflows)
     gate_workflows = []
     for p in workflows:
@@ -1394,6 +1602,9 @@ def main():
             add("OK", "Calibrated to the installed bridge (%s)" % installed)
         else:
             add("MISSING", "Calibrated to the installed bridge", "the status file says %s, the installed bridge is %s: run /calibrate-bridge" % (recorded, installed))
+
+    _add_weekly_dependency_scan(add, ws, sections, weekly_gate_locks, weekly_scheduled_locks,
+                                weekly_osv_no_schedule)
 
     missing = [r for r in results if r[0] == "MISSING"]
     print("conformance-check: %s" % ws)

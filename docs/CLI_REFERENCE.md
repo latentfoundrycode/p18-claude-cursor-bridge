@@ -308,6 +308,12 @@ or NOTE. It runs at every calibration and every reflection point; each MISSING i
 calibration item, applied as configuration work in the next stage. It never changes anything.
 
 What it checks, with the file it reads (the 0b review corrected several of these):
+  - the weekly dependency scan: a workflow under .github/workflows/ found by a `schedule:`
+    trigger and an OSV-Scanner step (not by file name), its `--lockfile=` set equal, as a set, to
+    the gate's OSV-Scanner step's; NOTE without a GitHub remote (read from the local git
+    configuration alone) or with an inventory Decisions row beginning `Weekly scan:`; MISSING
+    when no scheduled OSV-Scanner exists, a scheduled list differs, or an OSV-Scanner workflow
+    lacks `schedule:`; pins, permissions and exit handling are not compared;
   - the gate workflows (.github/workflows/*.yml), step by step, except the weekly
     dependency-scan file (dependency-scan.yml or dependency-scan.yaml), which is not read for
     gate steps or scanner version lines: a step runs Semgrep,
@@ -371,7 +377,8 @@ What it checks, with the file it reads (the 0b review corrected several of these
   - the private memory notes Claude Code keeps for this project (names only; calibration
     step 2b reviews them, rule 41);
   - the recorded bridge version against the installed one (calibration due).
-Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace.
+Exit 0 = every floor present; 1 = at least one MISSING; 2 = not a workspace, or a malformed
+record header (HEADER MALFORMED, the status file's or the inventory's).
 ASCII-only on purpose (cp1252 consoles). Never writes.
 ```
 
