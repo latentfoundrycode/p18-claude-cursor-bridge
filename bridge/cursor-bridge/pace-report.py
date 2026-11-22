@@ -4,8 +4,9 @@
   python pace-report.py [<project root>...] [--weeks <n>] [--ceiling <n>] [--tokens] [--home <folder>]
 
 Run from any folder. ASCII output only; writes nothing. A project root holds Workspace/ with its
-own .git. With no roots, the roots are evaluate-reports.py's PROJECTS plus the bridge root found
-like that program. Defaults for --weeks (8), --ceiling (bridge_env.REVIEW_ROUNDS), and --home (~)
+own .git. With no roots, the roots are the projects in ~/.cursor-bridge/projects.json (read through
+evaluate-reports.py) plus the bridge root found like that program. Defaults for --weeks (8),
+--ceiling (bridge_env.REVIEW_ROUNDS), and --home (~)
 are resolved in main(), not in the parser. No option is added beyond those.
 
 A counted name is an increment's ID (a string GRAMMAR_ID_PATTERN fullmatches) or PR-<n> (PR-
@@ -141,7 +142,7 @@ def _load_evaluate_reports():
 
 def build_parser():
     ap = argparse.ArgumentParser(description="Weekly pace table per project (read-only).")
-    ap.add_argument("roots", nargs="*", help="project roots (default: evaluate-reports project list)")
+    ap.add_argument("roots", nargs="*", help="project roots (default: ~/.cursor-bridge/projects.json)")
     ap.add_argument("--weeks", type=int, help="ISO weeks to show (1-520, default 8)")
     ap.add_argument("--ceiling", type=int, help="round ceiling (1-100, default REVIEW_ROUNDS)")
     ap.add_argument("--tokens", action="store_true", help="include token columns from session jsonl")
@@ -1322,20 +1323,23 @@ def _project_section(name, root, weeks, ceiling, with_tokens, home, er):
     return "\n".join(lines) + "\n", None
 
 
-def _default_roots(er):
+def _default_roots(er, home):
+    projects, err = er.load_projects(home)
+    if err:
+        return None, err
     roots = []
     seen = set()
-    for path in er.PROJECTS.values():
+    for name, path in sorted(projects.items()):
         ab = os.path.normcase(os.path.abspath(path))
         if ab in seen:
             continue
         seen.add(ab)
-        roots.append((os.path.basename(path), path))
+        roots.append((name, path))
     br = er.bridge_root()
     ab = os.path.normcase(os.path.abspath(br))
     if ab not in seen:
         roots.append((os.path.basename(br), br))
-    return roots
+    return roots, None
 
 
 def _is_project(root):
@@ -1374,7 +1378,10 @@ def main():
                 )
                 return 2
     else:
-        roots = _default_roots(er)
+        roots, perr = _default_roots(er, home)
+        if perr:
+            print("pace-report: %s" % perr)
+            return 2
 
     weeks = _week_range(weeks_n)
     out_parts = []

@@ -455,6 +455,14 @@ evaluate-reports: the report cycle's program (restructuring plan, section 12; re
 - `--out`; default: null; required: false
 - `--since`; default: null; required: false; a date; default the ledger's last extract, else the newest evaluation folder
 
+### Subcommand `security`
+
+#### Options
+
+- `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
+- `--date`; default: null; required: false; evaluation date YYYY-MM-DD (default today)
+- `--seed-from`; default: null; required: false; hand-written evaluation file to seed the window
+
 ## in-flight.py
 
 Path: `bridge/cursor-bridge/in-flight.py`
@@ -616,7 +624,7 @@ Weekly pace table per project (read-only).
 
 ### Positionals
 
-- `roots`; default: null; required: false; project roots (default: evaluate-reports project list)
+- `roots`; default: null; required: false; project roots (default: ~/.cursor-bridge/projects.json)
 
 ### Options
 

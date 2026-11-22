@@ -5,12 +5,17 @@
   python ~/.claude/cursor-bridge/evaluate-reports.py extract [--since <date>] [--out <folder>]
   python ~/.claude/cursor-bridge/evaluate-reports.py record <project> <id> <outcome> [--reason <text>] [--ledger <file>]
   python ~/.claude/cursor-bridge/evaluate-reports.py seed [--ledger <file>] [--evaluations <folder>]
+  python ~/.claude/cursor-bridge/evaluate-reports.py security [--date <YYYY-MM-DD>] [--seed-from <evaluation file>]
 
 Run in the bridge project by the maintainer session (the `/evaluate-reports` command), never by a
 project supervisor. Read-only towards the projects: their documents, their supervisors' notes and
 their session records are read in place and never written; the bridge's own files under Reports/
 are the only output. Never prints a secret: the owner's messages are extracted as typed, and every
 token shaped like a key, and every `NAME=value` of a key-like name, is replaced by a marker.
+
+The projects and their roots are read from `~/.cursor-bridge/projects.json`, a JSON object of
+project name to project root (an absolute folder holding `Workspace/`), when no `--project-root` is
+given. An absent or malformed file is named and refused with exit 2.
 
 What it reads (12.1): each project's `<Name> Issues During Development and Their Solutions.md`
 and `<Name> Claude-Cursor Bridge Feedback.md` (Documents/ beside Workspace/), the private notes
@@ -20,14 +25,18 @@ owner's typed messages and question-form answers from the session records since 
 marks as the owner's own typing, `origin.kind == human`; a compaction summary, app-inserted text,
 a notification and a message from another session are left out; a record is counted once by its
 uuid; a message with a screenshot keeps its text; times are UTC, as the records hold them). The
-projects are reAngle, the TDP, the video factory and, since 2026.10.25a, the bridge's own project
-`Bridge` (E:\\p18-claude-cursor-bridge), whose notes and session records are read from its
-Workspace's folder key only (`E--p18-claude-cursor-bridge-Workspace`): the root's key is the
-maintainer's own and never a report source. Also read: the one `Open issues:` line of each
-project's status file (Workspace/docs/PROJECT_STATUS.md), for the incidents it names as still to
-write (2026.10.25a, C8 of 2026-10-18): a part of the line that says "to write" and names no ISS
-entry the Issues document holds is shown as TO WRITE, so an incident not yet written is not missed
-for a week; nothing else of the status file is read.
+bridge's own project `Bridge` reads its notes and session records from its Workspace's folder key
+only: the root's key is the maintainer's own and never a report source. Also read: the one
+`Open issues:` line of each project's status file (Workspace/docs/PROJECT_STATUS.md), for the
+incidents it names as still to write (2026.10.25a, C8 of 2026-10-18): a part of the line that says
+"to write" and names no ISS entry the Issues document holds is shown as TO WRITE, so an incident
+not yet written is not missed for a week; nothing else of the status file is read.
+
+`security` (R-097) makes GET requests only, through `gh api`, for each project's weekly dependency-
+scan workflow, its runs since the last read and its open Dependabot alerts. It writes
+`Reports/Evaluations/<date>/security.md` and moves the window in the ledger's `_meta.security`.
+`--seed-from` seeds the window from a hand-written evaluation's Dependency scan table. GitHub reads
+use the owner's `gh` login; nothing is written to GitHub.
 
 Entries (12.2), in the documents' own shapes: an Issues entry is each `## ` section (`## ISS-nnn`,
 `## Issue n`, or a plain heading); a Feedback entry is any section whose heading carries `FB-nnn`
@@ -54,7 +63,8 @@ verdict. `seed` enters the first evaluation's tables (`Reports/Evaluations/2026-
 one file per project, matched to that project only) as outcomes, so that the first scheduled run
 raises nothing already handled.
 
-Exit 0 = done; 1 = a document could not be read; 2 = usage. ASCII-only on purpose.
+Exit 0 = done; 1 = a document could not be read or written; 2 = usage or the projects file.
+ASCII-only on purpose.
 """
 import argparse
 import datetime
@@ -63,6 +73,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -70,12 +81,13 @@ sys.path.insert(0, HERE)
 import bridge_env  # noqa: E402
 
 HOME = os.path.expanduser("~")
-PROJECTS = {
-    "reAngle": r"E:\ck04k02s01-reangle-prototype",
-    "TDP": r"E:\p19-technical-documentation-provider",
-    "Video Factory": r"E:\pk02k02s02-short-form-video-factory",
-    "Bridge": r"E:\p18-claude-cursor-bridge",                   # the bridge's own project (2026.10.25a, C1)
-}
+PROJECTS_FILE_LABEL = "~/.cursor-bridge/projects.json"
+HTTPS_ORIGIN_RX = re.compile(r"^https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$")
+SSH_ORIGIN_RX = re.compile(r"^git@github\.com:([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?$")
+DEP_SCAN_SUFFIX = "/dependency-scan.yml"
+EXIT_LINE_RX = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z dependency-scan: OSV-Scanner exit (\d+)$")
+GIT_REMOTE_LIMIT = 30
+SCANNER_OTHER = frozenset(("cancelled", "timed_out", "startup_failure", "skipped", "action_required", "neutral", "stale"))
 # A project whose root's own folder key is the maintainer's session (the bridge's root): only its
 # Workspace's key is a report source, for the notes and the session records alike.
 WORKSPACE_KEY_ONLY = ("Bridge",)
@@ -132,7 +144,7 @@ def project_keys(project, root):
     Workspace's; the Workspace's only for the bridge's own project, whose root key is the
     maintainer's (2026.10.25a; by name, or by the bridge's root under any name)."""
     keys = [project_key(root), project_key(os.path.join(root, "Workspace"))]
-    bridge = os.path.normcase(os.path.abspath(PROJECTS["Bridge"]))
+    bridge = os.path.normcase(os.path.abspath(bridge_root()))
     if project in WORKSPACE_KEY_ONLY or os.path.normcase(os.path.abspath(root)) == bridge:
         keys = keys[1:]
     return keys
@@ -311,10 +323,10 @@ def notes_entries(project_root, home=None, project=None):
     return out
 
 
-def collect_entries(projects=None, home=None, report=None):
+def collect_entries(projects, home=None, report=None):
     """{project: [(source, id, label, body)]} over the three sources, read in place."""
     found = {}
-    for project, root in (projects or PROJECTS).items():
+    for project, root in projects.items():
         rows = []
         docs = documents(root)
         for source, parse in (("issues", issues_entries), ("feedback", feedback_entries)):
@@ -398,12 +410,412 @@ def projects_from(a):
     return {a.project_name or os.path.basename(a.project_root): a.project_root} if getattr(a, "project_root", None) else None
 
 
+def projects_file_path(home=None):
+    return os.path.join(os.path.expanduser(home) if home else os.path.expanduser("~"), ".cursor-bridge", "projects.json")
+
+
+def load_projects(home=None):
+    """(projects dict, None) or (None, refusal text naming PROJECTS_FILE_LABEL)."""
+    path = projects_file_path(home)
+    prefix = "%s holds a JSON object of project name to project root" % PROJECTS_FILE_LABEL
+    if not os.path.isfile(path):
+        return None, "%s; the file is absent" % prefix
+    try:
+        with open(path, encoding="utf-8") as f:
+            raw = f.read()
+    except OSError:
+        return None, "%s; the file could not be read" % prefix
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return None, "%s; the file is not JSON" % prefix
+    if not isinstance(data, dict):
+        return None, "%s; the file is not a JSON object" % prefix
+    out = {}
+    for key, value in data.items():
+        if not isinstance(key, str) or not key:
+            return None, "%s; the file holds an empty key" % prefix
+        if not isinstance(value, str):
+            return None, "%s; a value is not a string" % prefix
+        out[key] = value
+    return out, None
+
+
+def resolve_projects(a):
+    one = projects_from(a)
+    if one is not None:
+        return one, None
+    home = getattr(a, "home", None) or os.path.expanduser("~")
+    return load_projects(home)
+
+
+def ascii_line(text):
+    if not isinstance(text, str):
+        text = str(text)
+    return text.encode("ascii", "backslashreplace").decode("ascii").replace("\n", " ").replace("\r", " ")
+
+
+def parse_utc(text):
+    if not text:
+        return None
+    text = str(text).strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        return datetime.datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def github_repo_from_url(url):
+    url = (url or "").strip()
+    for rx in (HTTPS_ORIGIN_RX, SSH_ORIGIN_RX):
+        m = rx.match(url)
+        if m:
+            return m.group(1), m.group(2)
+    return None
+
+
+def git_origin_repo(project_root):
+    ws = os.path.join(project_root, "Workspace")
+    if not os.path.isdir(ws):
+        return None
+    cmd = ["git", "-C", ws, "remote", "get-url", "origin"]
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            stdin=subprocess.DEVNULL,
+            creationflags=bridge_env.NO_WINDOW,
+            timeout=GIT_REMOTE_LIMIT,
+            text=True,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return github_repo_from_url(proc.stdout.strip())
+
+
+def _gh_api_raw(args):
+    """GH_COMMAND + ['api'] + args. (exit_code, stdout text) or (-1, None) on timeout/start failure."""
+    command = list(bridge_env.GH_COMMAND) + ["api"] + list(args)
+    try:
+        proc = subprocess.run(
+            command,
+            capture_output=True,
+            stdin=subprocess.DEVNULL,
+            creationflags=bridge_env.NO_WINDOW,
+            timeout=bridge_env.GH_API_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        return -1, None
+    except OSError:
+        return -2, None
+    out = proc.stdout.decode("utf-8", errors="replace") if proc.stdout else ""
+    return proc.returncode, out
+
+
+def _gh_api_include(path):
+    rc, text = _gh_api_raw(["-i", path])
+    if text is None:
+        return False, "unreadable", None
+    status = None
+    if "\r\n\r\n" in text:
+        head, _body = text.split("\r\n\r\n", 1)
+        m = re.search(r"HTTP/\S+\s+(\d+)", head)
+        if m:
+            status = int(m.group(1))
+    elif text.startswith("HTTP/"):
+        m = re.search(r"HTTP/\S+\s+(\d+)", text.split("\r\n", 1)[0])
+        if m:
+            status = int(m.group(1))
+    if status == 404:
+        return True, "alerts_off", None
+    if status == 204:
+        return True, "alerts_on", None
+    if status is not None and status >= 400:
+        return False, "http %d" % status, None
+    if rc != 0:
+        return False, "gh exited %d" % rc, None
+    return False, "unreadable", None
+
+
+def _gh_paginate_json(path):
+    rc, text = _gh_api_raw(["--paginate", path])
+    if text is None or rc != 0:
+        return False, "gh exited %d" % (rc if rc >= 0 else 0), None
+    if not text.strip():
+        return True, "", []
+    items, idx, raw = [], 0, text.strip()
+    dec = json.JSONDecoder()
+    while idx < len(raw):
+        while idx < len(raw) and raw[idx].isspace():
+            idx += 1
+        if idx >= len(raw):
+            break
+        try:
+            chunk, end = dec.raw_decode(raw, idx)
+        except ValueError:
+            return False, "not JSON", None
+        if isinstance(chunk, list):
+            items.extend(chunk)
+        idx = end
+    return True, "", items
+
+
+def log_exit_code(log_text):
+    code = None
+    for line in (log_text or "").splitlines():
+        m = EXIT_LINE_RX.match(line.strip("\r"))
+        if m:
+            code = int(m.group(1))
+    return code
+
+
+def security_runs_day(entry, meta):
+    lrr = (entry or {}).get("last_run_read")
+    if lrr:
+        t = parse_utc(lrr)
+        if t:
+            return t.date().isoformat()
+    le = (meta or {}).get("last_extract")
+    if le and DATE_RX.match(str(le)):
+        return str(le)
+    return None
+
+
+def run_in_window(run, last_run_read, had_entry, last_extract):
+    created = parse_utc(run.get("created_at"))
+    if not created:
+        return False
+    if last_run_read:
+        start = parse_utc(last_run_read)
+        if start and created <= start:
+            return False
+        if start:
+            return True
+    if had_entry:
+        return True
+    if last_extract and DATE_RX.match(str(last_extract)):
+        return created.date() > datetime.date.fromisoformat(str(last_extract))
+    return True
+
+
+def dependency_workflow(workflows_body):
+    if not isinstance(workflows_body, dict):
+        return None
+    for wf in workflows_body.get("workflows") or []:
+        path = wf.get("path") or ""
+        if path.endswith(DEP_SCAN_SUFFIX) or path.endswith("dependency-scan.yml"):
+            return wf
+    return None
+
+
+def classify_window_runs(window_runs, owner, repo, standing):
+    completed = [r for r in window_runs if r.get("status") == "completed" and r.get("conclusion")]
+    completed.sort(key=lambda r: r.get("created_at") or "")
+    if standing and not any(r.get("conclusion") == "success" for r in completed):
+        return ("finding", "Open a DEP-<nnn> increment per the merge policy.", str(standing), None, False)
+    if not completed:
+        if any(r.get("status") in ("queued", "in_progress", "waiting") for r in window_runs):
+            return ("no completed run", None, standing, None, False)
+        return (
+            "no completed run",
+            "gh workflow run dependency-scan.yml --repo %s/%s" % (owner, repo),
+            standing,
+            None,
+            False,
+        )
+    last = completed[-1]
+    conclusion = last.get("conclusion")
+    if conclusion == "success":
+        return ("green", None, None, last.get("created_at"), True)
+    if conclusion == "failure":
+        return ("pending_failure", None, standing, last, True)
+    return (
+        "scanner failure",
+        "gh workflow run dependency-scan.yml --repo %s/%s" % (owner, repo),
+        standing,
+        last.get("created_at"),
+        True,
+    )
+
+
+def read_failure_remedy(alerts=False):
+    remedy = "gh auth refresh -s repo for the login's scope"
+    if alerts:
+        remedy += "; the repository's Security tab"
+    return remedy
+
+
+def scan_project(owner, repo, entry, meta, had_entry_before_seed):
+    repo_slash = "%s/%s" % (owner, repo)
+    standing = (entry or {}).get("finding_standing")
+    prev_last = (entry or {}).get("last_run_read")
+    wf_path = "repos/%s/%s/actions/workflows" % (owner, repo)
+    ok, _reason, body = bridge_env._gh_get(wf_path)
+    if not ok:
+        return {"kind": "finding", "remedy": read_failure_remedy(False), "repo": repo_slash,
+                "last_run_read": prev_last, "standing": standing}, None
+    wf = dependency_workflow(body)
+    if wf is None:
+        info = {
+            "kind": "not configured", "remedy": "add dependency-scan.yml in the project's calibration", "repo": repo_slash,
+            "last_run_read": prev_last, "standing": standing, "alerts_line": None, "alerts_off": False,
+        }
+        return info, {"last_run_read": prev_last, "finding_standing": standing}
+    if (wf.get("state") or "") != "active":
+        enable = "gh workflow enable dependency-scan.yml --repo %s/%s" % (owner, repo)
+        rerun = "gh workflow run dependency-scan.yml --repo %s/%s" % (owner, repo)
+        return {
+            "kind": "no completed run", "remedy": "%s; then %s" % (enable, rerun), "repo": repo_slash,
+            "last_run_read": prev_last, "standing": standing, "alerts_line": None, "alerts_off": False,
+            "update": {"last_run_read": prev_last, "finding_standing": standing},
+        }, {"last_run_read": prev_last, "finding_standing": standing}
+    day = security_runs_day(entry, meta) or "1970-01-01"
+    runs_path = "repos/%s/%s/actions/workflows/dependency-scan.yml/runs?created=>=%s&per_page=100" % (owner, repo, day)
+    ok, _reason, runs_body = bridge_env._gh_get(runs_path)
+    if not ok:
+        return {"kind": "finding", "remedy": read_failure_remedy(False), "repo": repo_slash,
+                "last_run_read": prev_last, "standing": standing}, None
+    all_runs = (runs_body or {}).get("workflow_runs") or []
+    window_runs = [r for r in all_runs if run_in_window(r, prev_last, had_entry_before_seed, (meta or {}).get("last_extract"))]
+    kind, remedy, stand_report, last_marker, advance_last = classify_window_runs(window_runs, owner, repo, standing)
+    new_standing = str(stand_report) if kind == "finding" and stand_report else (None if kind == "green" else standing)
+    new_last = prev_last
+    completed = [r for r in window_runs if r.get("status") == "completed" and r.get("conclusion")]
+    if advance_last and completed:
+        new_last = max(completed, key=lambda r: r.get("created_at") or "").get("created_at")
+    if kind == "pending_failure":
+        run = last_marker
+        jobs_path = "repos/%s/%s/actions/runs/%s/jobs" % (owner, repo, run.get("id"))
+        ok, _reason, jobs_body = bridge_env._gh_get(jobs_path)
+        if not ok:
+            return {"kind": "finding", "remedy": read_failure_remedy(False), "repo": repo_slash,
+                    "last_run_read": prev_last, "standing": standing}, None
+        exit_code = None
+        for job in (jobs_body or {}).get("jobs") or []:
+            if job.get("conclusion") != "failure":
+                continue
+            log_path = "repos/%s/%s/actions/jobs/%s/logs" % (owner, repo, job.get("id"))
+            rc_log, log_text = _gh_api_raw([log_path])
+            if log_text is None or rc_log != 0:
+                return {"kind": "finding", "remedy": read_failure_remedy(False), "repo": repo_slash,
+                        "last_run_read": prev_last, "standing": standing}, None
+            exit_code = log_exit_code(log_text)
+            if exit_code is not None:
+                break
+        if exit_code == 1:
+            kind = "finding"
+            remedy = "Open a DEP-<nnn> increment per the merge policy."
+            new_standing = str(run.get("id"))
+        else:
+            kind = "scanner failure"
+            remedy = "gh workflow run dependency-scan.yml --repo %s/%s" % (owner, repo)
+    vuln_path = "repos/%s/%s/vulnerability-alerts" % (owner, repo)
+    v_ok, v_kind, _vbody = _gh_api_include(vuln_path)
+    alerts_line = None
+    alerts_off = False
+    if not v_ok:
+        return {"kind": "finding", "remedy": read_failure_remedy(True), "repo": repo_slash,
+                "last_run_read": prev_last, "standing": standing}, None
+    if v_kind == "alerts_off":
+        alerts_off = True
+        alerts_line = "alerts off"
+    else:
+        alerts_path = "repos/%s/%s/dependabot/alerts?state=open" % (owner, repo)
+        a_ok, _reason, alerts = _gh_paginate_json(alerts_path)
+        if not a_ok:
+            return {"kind": "finding", "remedy": read_failure_remedy(True), "repo": repo_slash,
+                    "last_run_read": prev_last, "standing": standing}, None
+        if not alerts:
+            alerts_line = "No open Dependabot alert."
+        else:
+            parts = []
+            for al in alerts:
+                num = al.get("number")
+                pkg = ((al.get("dependency") or {}).get("package") or {}).get("name") or ""
+                ghsa = ((al.get("security_advisory") or {}).get("ghsa_id") or "")
+                parts.append("alert %s %s %s" % (num, pkg, ghsa))
+            alerts_line = "; ".join(parts)
+    return {
+        "kind": kind, "remedy": remedy, "repo": repo_slash, "last_run_read": new_last, "standing": new_standing,
+        "alerts_line": alerts_line, "alerts_off": alerts_off,
+    }, {"last_run_read": new_last, "finding_standing": new_standing}
+
+
+def project_security_section(name, root, entry, meta, had_entry):
+    pair = git_origin_repo(root)
+    if not pair:
+        prev = (entry or {}).get("last_run_read")
+        stand = (entry or {}).get("finding_standing")
+        return format_security_section(name, {
+            "kind": "no remote",
+            "remedy": "record a GitHub origin on the Workspace checkout",
+            "last_run_read": prev,
+            "standing": stand,
+        }), {"last_run_read": prev, "finding_standing": stand}
+    info, update = scan_project(pair[0], pair[1], entry, meta, had_entry)
+    return format_security_section(name, info), update
+
+
+def format_security_section(project, info):
+    lines = ["## %s" % ascii_line(project), ""]
+    kind = info.get("kind") or "finding"
+    lines.append(ascii_line(kind))
+    if info.get("remedy"):
+        lines.append("Remedy: %s" % ascii_line(info["remedy"]))
+    if info.get("repo"):
+        lines.append("Repository: %s" % ascii_line(info["repo"]))
+    lrr = info.get("last_run_read")
+    lines.append("last run read: %s" % (ascii_line(lrr) if lrr else "none"))
+    stand = info.get("standing")
+    if stand:
+        lines.append("finding standing: run %s" % ascii_line(str(stand)))
+    if info.get("alerts_off"):
+        lines.append("alerts off")
+    elif info.get("alerts_line"):
+        lines.append(ascii_line(info["alerts_line"]))
+    lines.append("")
+    return "\n".join(lines)
+
+
+def parse_seed_security(path):
+    try:
+        text = read(path)
+    except OSError:
+        raise
+    out = {}
+    for line in text.splitlines():
+        if "`" not in line or "last run read:" not in line:
+            continue
+        repos = re.findall(r"`([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)`", line)
+        if not repos:
+            continue
+        m = re.search(r"`last run read:\s*([^`]+)`", line)
+        if not m:
+            continue
+        token = m.group(1).strip()
+        if token.lower() == "none":
+            out[repos[0]] = None
+        else:
+            if not parse_utc(token):
+                continue
+            out[repos[0]] = token
+    return out
+
+
 def cmd_collect(a):
     root = bridge_root()
+    projects, err = resolve_projects(a)
+    if err:
+        print("evaluate-reports: %s" % err)
+        return 2
     ledger_path = a.ledger or os.path.join(root, "Reports", "ledger.json")
     ledger = load_ledger(ledger_path)
     report = []
-    entries = collect_entries(projects_from(a), a.home, report)
+    entries = collect_entries(projects, a.home, report)
     for line in report:
         print("evaluate-reports: " + line)
     rows = [r + (row_tag(r[1], r[5]),) for r in unprocessed(entries, ledger)]
@@ -443,8 +855,12 @@ def cmd_record(a):
     if a.outcome in ("fixed", "pitfall", "planned", "declined") and not a.reason:
         print("evaluate-reports: %s needs --reason (the release, the KP id, the plan section, or why)" % a.outcome)
         return 2
+    projects, err = resolve_projects(a)
+    if err:
+        print("evaluate-reports: %s" % err)
+        return 2
     ledger = load_ledger(ledger_path)
-    entries = collect_entries(projects_from(a), a.home)
+    entries = collect_entries(projects, a.home)
     fp = None
     for source, eid, label, body in entries.get(a.project, []):
         if eid == a.id:
@@ -475,9 +891,12 @@ def cmd_seed(a):
     """The first scheduled run must raise nothing already handled: every entry the first evaluation
     classified (one table file per project, matched to that project only) is recorded with its class."""
     root = bridge_root()
+    projects, err = resolve_projects(a)
+    if err:
+        print("evaluate-reports: %s" % err)
+        return 2
     ledger_path = a.ledger or os.path.join(root, "Reports", "ledger.json")
     ledger = load_ledger(ledger_path)
-    projects = projects_from(a) or PROJECTS
     entries = collect_entries(projects, a.home)
     seeded, skipped = 0, []
     for path in sorted(glob.glob(os.path.join(a.evaluations or os.path.join(root, "Reports", "Evaluations", "2026-10-04"), "*.md"))):
@@ -619,9 +1038,13 @@ def cmd_extract(a):
     ledger_path = a.ledger or os.path.join(root, "Reports", "ledger.json")
     since = a.since or last_run(root, ledger_path)
     out_dir = a.out or os.path.join(root, "Reports", "Evaluations", today())
+    projects, err = resolve_projects(a)
+    if err:
+        print("evaluate-reports: %s" % err)
+        return 2
     os.makedirs(out_dir, exist_ok=True)
     total = 0
-    for project, proot in (projects_from(a) or PROJECTS).items():
+    for project, proot in projects.items():
         rows, seen = [], set()
         for path in session_files(proot, a.home, project):
             rows += owner_messages(path, since, seen)
@@ -637,6 +1060,81 @@ def cmd_extract(a):
     ledger.setdefault("_meta", {})["last_extract"] = today()
     save_ledger(ledger_path, ledger)
     print("evaluate-reports: %d message(s) and answer(s) extracted since %s -> %s" % (total, since, out_dir))
+    return 0
+
+
+def cmd_security(a):
+    root = bridge_root()
+    eval_date = today()
+    if a.date:
+        if not DATE_RX.match(a.date):
+            print("evaluate-reports: --date must be YYYY-MM-DD")
+            return 2
+        try:
+            eval_date = datetime.date.fromisoformat(a.date).isoformat()
+        except ValueError:
+            print("evaluate-reports: --date must be YYYY-MM-DD")
+            return 2
+    projects, err = resolve_projects(a)
+    if err:
+        print("evaluate-reports: %s" % err)
+        return 2
+    if a.seed_from:
+        try:
+            open(a.seed_from, encoding="utf-8").close()
+        except OSError:
+            print("evaluate-reports: cannot read --seed-from file %s" % a.seed_from)
+            return 2
+    ledger_path = os.path.join(root, "Reports", "ledger.json")
+    ledger = load_ledger(ledger_path)
+    meta = ledger.setdefault("_meta", {})
+    security_meta = dict(meta.get("security") or {})
+    seed_by_repo = {}
+    if a.seed_from:
+        try:
+            seed_by_repo = parse_seed_security(a.seed_from)
+        except OSError:
+            print("evaluate-reports: cannot read --seed-from file %s" % a.seed_from)
+            return 2
+    repo_map = {}
+    for project, proot in projects.items():
+        pair = git_origin_repo(proot)
+        if pair:
+            repo_map["%s/%s" % pair] = project
+    orig_security = dict(security_meta)
+    seeded_now = set()
+    for repo_slash, last in seed_by_repo.items():
+        project = repo_map.get(repo_slash)
+        if project and project not in security_meta:
+            security_meta[project] = {"last_run_read": last, "finding_standing": None}
+            seeded_now.add(project)
+    sections = []
+    updates = {}
+    for project in sorted(projects):
+        proot = projects[project]
+        had_entry = project in orig_security or project in seeded_now
+        entry = security_meta.get(project) or {}
+        text, update = project_security_section(project, proot, entry, meta, had_entry)
+        sections.append(text)
+        if update is not None:
+            updates[project] = update
+    body = "# Dependency scan, %s\n\n" % eval_date + "".join(sections)
+    out_dir = os.path.join(root, "Reports", "Evaluations", eval_date)
+    path = os.path.join(out_dir, "security.md")
+    if os.path.isfile(out_dir):
+        print("evaluate-reports: a file could not be read or written (not a directory)")
+        return 1
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(body)
+    except OSError as e:
+        print("evaluate-reports: a file could not be read or written (%s)" % e)
+        return 1
+    for project, upd in updates.items():
+        security_meta[project] = upd
+    meta["security"] = security_meta
+    save_ledger(ledger_path, ledger)
     return 0
 
 
@@ -662,6 +1160,9 @@ def build_parser():
             p.add_argument("--evaluations", help="the folder of the first evaluation's tables (default Reports/Evaluations/2026-10-04)")
         if name == "extract":
             p.add_argument("--since", help="a date; default the ledger's last extract, else the newest evaluation folder")
+    ps = sub.add_parser("security")
+    ps.add_argument("--date", help="evaluation date YYYY-MM-DD (default today)")
+    ps.add_argument("--seed-from", help="hand-written evaluation file to seed the window")
     return ap
 
 
@@ -672,7 +1173,8 @@ def main():
         ap.print_usage()
         return 2
     try:
-        return {"collect": cmd_collect, "record": cmd_record, "seed": cmd_seed, "extract": cmd_extract}[a.cmd](a)
+        return {"collect": cmd_collect, "record": cmd_record, "seed": cmd_seed, "extract": cmd_extract,
+                "security": cmd_security}[a.cmd](a)
     except OSError as e:
         print("evaluate-reports: a file could not be read or written (%s)" % e)
         return 1
