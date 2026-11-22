@@ -318,3 +318,30 @@ def test_r062_records_migrate_rule_in_allow():
     for cmd in ("python ~/.claude/cursor-bridge/records-migrate.py",
                 "python ~/.claude/cursor-bridge/records-migrate.py --check"):
         assert decide(cmd, ALLOW, DENY)[0] == "allow", cmd
+
+def task078_commands():
+    """The in-flight and security-step commands that calibration's step 0 and the evaluation's step 1b instruct
+    (TASK-078): neither file is among DOCS, the texts the loop's own session runs by."""
+    found = []
+    for parts in (("commands", "calibrate-bridge.md"), ("commands", "evaluate-reports.md")):
+        path = os.path.join(CLAUDE, *parts)
+        found.extend(commands_in(open(path, encoding="utf-8").read(), parts[-1]))
+    return [(src, cmd) for src, cmd in found if "in-flight.py" in cmd or "evaluate-reports.py security" in cmd]
+
+
+def test_r088_r097_calibration_s_and_the_evaluation_s_new_commands_pass(program, monkeypatch):
+    """R-088 and R-097 (TASK-078): calibration's step 0 writes the position with in-flight.py, which the settings
+    allow; the evaluation's step 1b runs `evaluate-reports.py security`, which no deny rule hits and the guard does
+    not refuse. That program has no allow rule (TASK-077 added none): the maintainer's evaluation session is asked
+    before it runs, as for the step's other commands."""
+    cmds = task078_commands()
+    assert any(src == "calibrate-bridge.md" and "in-flight.py" in cmd for src, cmd in cmds), cmds
+    assert ("evaluate-reports.md", "python ~/.claude/cursor-bridge/evaluate-reports.py security") in cmds, cmds
+    guard = program("permission-guard")
+    for src, cmd in cmds:
+        verdict, part = decide(cmd, ALLOW, DENY)
+        assert verdict != "deny", "%s: a deny rule hits %r (part %r)" % (src, cmd, part)
+        if "in-flight.py" in cmd:
+            assert verdict == "allow", "%s: no allow rule matches %r" % (src, cmd)
+        runnable = re.sub(r"<[A-Za-z][^<>\n]*>", "placeholder", cmd)
+        assert guard.check(runnable, None) is None, "%s instructs %r, which the guard refuses" % (src, cmd)
