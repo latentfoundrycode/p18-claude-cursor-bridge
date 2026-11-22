@@ -229,6 +229,7 @@ REFUSED_FORMS = [
     ("keep-last-word", ["--target", "{T}", "--keep"]),
     ("keep-before-an-option", ["--target", "{T}", "--keep", "--dry-run"]),
     ("keep-before-target", ["--keep", "--target", "{T}"]),
+    ("keep-with-rollback", ["--target", "{T}", "--rollback", "--keep", A]),
 ]
 
 
@@ -621,3 +622,34 @@ def test_r3_a_stray_file_named_like_the_version_being_saved_never_stops_an_insta
     assert "Traceback" not in out, out
     assert rc == 0 and "MATCHES bridge " + C in out, "a stray file named like the saved version stopped the install: %s" % out
     assert whole_copy(sb.target, B)
+
+
+# ---------------------------------------------------------------- the mutation sweep's cases
+
+def test_sweep_the_marker_names_the_spared_copy_after_a_failed_install_check(world, sb, monkeypatch):
+    """R-094, TASK-073 Done when (a marker file beside the copy keeping it over every later install until another
+    `--keep` names another copy): an install of C with `--keep A` whose install check fails (exit 1) still leaves
+    the marker naming A, the copy its rotation spared, so the install of D after it keeps A beside C. Run in process
+    with the check made to fail; tests/test_rollback.py, which installs the repository's own stamped release,
+    cannot run under a mutant."""
+    import importlib.util
+    for name, value in (("HOME", sb.home), ("USERPROFILE", sb.home), ("LOCALAPPDATA", sb.localappdata),
+                        ("APPDATA", sb.appdata)):
+        monkeypatch.setenv(name, value)
+    spec = importlib.util.spec_from_file_location("bridge_install_of_release_c", world.installer(C))
+    installer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(installer)
+    monkeypatch.setattr(installer, "run_check", lambda target: 1)
+    assert installer.install(sb.target, False, False, A) == 1, "the install with the check made to fail did not exit 1"
+    assert installed_version(sb.target) == C
+    assert kept_versions(sb.target) == [A, B], "the rotation of the failed install did not spare A beside B"
+    markers = marker_files(sb.target)
+    assert markers, "no marker after the failed install"
+    named = []
+    for m in markers:
+        with open(m, encoding="utf-8-sig", errors="replace") as f:
+            named.append(f.read().strip())
+    assert A in named, "after the failed check the marker does not name A, the spared copy: %r" % named
+    install(world, sb, D)
+    assert kept_versions(sb.target) == [A, C], "the install after the failed one did not keep A, the marked copy"
+    assert whole_copy(sb.target, A)

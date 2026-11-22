@@ -78,6 +78,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 
@@ -87,6 +88,7 @@ SUBDIRS = ("commands", "agents", "skills", "cursor-bridge")
 MANIFEST = "cursor-bridge/MANIFEST.json"
 PREVIOUS = "cursor-bridge-previous"
 KEEP_MARKER = ".keep"
+MARKER_READ_MAX = 512
 ROLLED_BACK = os.path.join("cursor-bridge", "ROLLED-BACK.md")
 PROGRAM_IN_HOOK = re.compile(r"cursor-bridge[/\\]([\w.-]+\.py)")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
@@ -369,7 +371,7 @@ def kept_release_names(target):
     if not os.path.isdir(base):
         return []
     return sorted(n for n in os.listdir(base)
-                  if os.path.isdir(os.path.join(base, n)) and not n.endswith(".partial"))
+                  if n != KEEP_MARKER and os.path.isdir(os.path.join(base, n)) and not n.endswith(".partial"))
 
 
 def name_value_problem(value):
@@ -391,7 +393,7 @@ def read_keep_marker(base):
         return None
     try:
         with open(path, encoding="utf-8-sig") as f:
-            return f.read().strip()
+            return f.read(MARKER_READ_MAX).strip()
     except (OSError, UnicodeDecodeError, ValueError):
         return None
 
@@ -469,6 +471,49 @@ def parse_argv(argv):
             "rollback_version": rollback_version, "keep": keep}
 
 
+def previous_base_is_link(path):
+    """True when `path` is a symbolic link or reparse point (a junction on Windows), not followed."""
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return False
+    if stat.S_ISLNK(st.st_mode):
+        return True
+    if os.name == "nt":
+        attrs = getattr(st, "st_file_attributes", 0)
+        return bool(attrs & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+    return False
+
+
+def remove_kept_entry(p):
+    """Remove one entry under cursor-bridge-previous/; never follow a link into its target; ignore errors."""
+    try:
+        st = os.lstat(p)
+    except OSError:
+        return
+    if stat.S_ISLNK(st.st_mode):
+        try:
+            os.unlink(p)
+        except OSError:
+            pass
+        return
+    if os.name == "nt" and stat.S_ISDIR(st.st_mode):
+        attrs = getattr(st, "st_file_attributes", 0)
+        if attrs & stat.FILE_ATTRIBUTE_REPARSE_POINT:
+            try:
+                os.unlink(p) if stat.S_ISLNK(st.st_mode) else os.rmdir(p)
+            except OSError:
+                pass
+            return
+    if stat.S_ISDIR(st.st_mode):
+        shutil.rmtree(p, ignore_errors=True)
+        return
+    try:
+        os.remove(p)
+    except OSError:
+        pass
+
+
 def save_previous(target, version, files, dry, keep=None):
     """Copy the installed release's own files to <target>/cursor-bridge-previous/<version>/.
 
@@ -484,19 +529,20 @@ def save_previous(target, version, files, dry, keep=None):
         marked = None if keep == "none" else keep
     else:
         marked = read_keep_marker(base)
-    if os.path.isdir(base):
+    if previous_base_is_link(base):
+        pass
+    elif os.path.isdir(base):
         for n in os.listdir(base):
             if n == KEEP_MARKER:
                 continue
-            if n == marked or n == version:
+            if marked is not None and n == marked:
                 continue
             p = os.path.join(base, n)
-            if os.path.isdir(p):
-                shutil.rmtree(p, ignore_errors=True)
-            elif os.path.isfile(p):
-                os.remove(p)
+            remove_kept_entry(p)
     else:
         os.makedirs(base, exist_ok=True)
+    if not dry and keep is not None:
+        write_keep_marker(base, keep, False)
     tmp = dest + ".partial"
     for rel in sorted(files):
         src = os.path.join(target, rel.replace("/", os.sep))
@@ -838,9 +884,10 @@ def rollback(target, dry, rollback_version=None):
     if result != 0:
         print("bridge-install: the check above did not pass, so the kept copy of %s stays at %s. Do not run the install command; tell the maintainer." % (prev_version, prev_tree))
         return result
-    shutil.rmtree(prev_tree, ignore_errors=True)
-    for v in newer:
-        shutil.rmtree(os.path.join(base, v), ignore_errors=True)
+    if not previous_base_is_link(base):
+        shutil.rmtree(prev_tree, ignore_errors=True)
+        for v in newer:
+            shutil.rmtree(os.path.join(base, v), ignore_errors=True)
     marked = read_keep_marker(base)
     remaining = kept_release_names(target)
     if marked and marked not in remaining:
