@@ -266,3 +266,115 @@ def test_r095_the_tools_whole_line_quoted_inside_a_model_sentence_is_counted_as_
     assert rc == 4, "a first failure, counted as today: " + out
     assert not any(l.lstrip().startswith("SIGN-IN") for l in lines_of(out)), out
     assert ws.snapshot()["state"] != before["state"], "the failure is written to the state file as today"
+
+
+# Round 2 (the reviews of round 1). On standard output the tool's line is the tool's only when it is the whole of the
+# output: a signed-out tool runs no model, so it prints nothing else there, while a model's reply may quote the line on
+# a line of its own. On standard error, and in --stderr-file, any whole line counts, since launcher lines such as
+# bridge-run's may come before it. Lines are split at the line feed alone and trimmed of spaces, tabs, CR and LF
+# alone, so no other separator starts a line. The probe reads the tool's output as UTF-8.
+
+LAUNCHER_LINE = "bridge-run: slot taken 2026-11-22T05:27:40Z"
+SEPARATORS = [chr(0x0b), chr(0x0c), chr(0x1c), chr(0x85), chr(0x2028)]
+
+
+def tool_line():
+    return sign_in_bytes().decode("ascii").strip()
+
+
+def assert_counted_as_today(ws, rc, out, before):
+    assert rc == 4, "a first failure, counted as today: " + out
+    assert not any(l.lstrip().startswith("SIGN-IN") for l in lines_of(out)), out
+    after = ws.snapshot()
+    assert after["state"] != before["state"], "the failure is written to the state file as today"
+    state = json.loads(after["state"].decode("utf-8"))
+    assert state.get("failures", {}).get(FIRST[0], {}).get("count") == 1, state
+
+
+def test_r095_r2_probe_a_reply_quoting_the_line_on_a_line_of_its_own_is_answered_as_today(ws):
+    """A model's reply on standard output that puts the tool's line on a line of its own after its own words is
+    answered off-script, as today: the profile resolves and no SIGN-IN line is printed."""
+    ws.stand_in(stdout=("Sure. The tool would print:\n" + tool_line() + "\n").encode("ascii"), code=0)
+    rc, out = ws.run()
+    assert rc == 0 and "RESOLVED profile 'native'" in out, out
+    assert not any(l.lstrip().startswith("SIGN-IN") for l in lines_of(out)), out
+
+
+def test_r095_r2_record_failure_a_stdout_file_with_the_line_after_other_lines_is_counted_as_today(ws):
+    out_file = ws.error_file("call.out", ("I will explain the error.\n" + tool_line() + "\n").encode("ascii"))
+    before = ws.snapshot()
+    rc, out = ws.run("--record-failure", FIRST[0], "--stdout-file", out_file)
+    assert_counted_as_today(ws, rc, out, before)
+
+
+def test_r095_r2_record_failure_a_stdout_file_quoting_the_line_beside_a_model_stderr_is_counted_as_today(ws):
+    """The two files are read apart: a model's words on standard error do not make a quoted line on standard
+    output the tool's."""
+    err = ws.error_file("call.err", (MODEL_ERROR_SENTENCE + "\n").encode("ascii"))
+    out_file = ws.error_file("call.out", ("Here is what it said:\n" + tool_line() + "\n").encode("ascii"))
+    before = ws.snapshot()
+    rc, out = ws.run("--record-failure", FIRST[0], "--stderr-file", err, "--stdout-file", out_file)
+    assert_counted_as_today(ws, rc, out, before)
+
+
+@pytest.mark.parametrize("sep", SEPARATORS, ids=["vt", "ff", "fs", "nel", "ls"])
+def test_r095_r2_record_failure_a_separator_other_than_the_line_feed_starts_no_line(ws, sep):
+    err = ws.error_file("call.err", ("note" + sep + tool_line() + "\n").encode("utf-8"))
+    before = ws.snapshot()
+    rc, out = ws.run("--record-failure", FIRST[0], "--stderr-file", err)
+    assert_counted_as_today(ws, rc, out, before)
+
+
+def test_r095_r2_probe_a_reply_beyond_ascii_is_read_as_utf8(ws):
+    """A model's reply holding a character beyond ASCII (A with acute, bytes C3 81) is read as UTF-8 and answered
+    off-script, never lost as no reply."""
+    ws.stand_in(stdout=b"\xc3\x81\n", code=0)
+    rc, out = ws.run()
+    assert rc == 0 and "RESOLVED profile 'native'" in out, out
+    assert "Traceback" not in out and "UnicodeDecodeError" not in out, out
+
+
+def test_r095_r2_probe_a_reply_beyond_the_consoles_code_page_is_answered_and_printed_in_ascii(ws):
+    """A reply holding a character outside the console's code page (an emoji, bytes F0 9F 98 80) is answered
+    off-script and the program's own output stays ASCII, so reading the reply as UTF-8 never makes printing it fail."""
+    ws.stand_in(stdout=b"\xf0\x9f\x98\x80\n", code=0)
+    env = dict(ws.env)
+    p = subprocess.run([sys.executable, PROG, str(ws.roster)], capture_output=True, env=env, cwd=str(ws.repo),
+                       timeout=300)
+    out = (p.stdout + p.stderr).decode("ascii", errors="replace")
+    assert p.returncode == 0 and "RESOLVED profile 'native'" in out, out
+    assert "Traceback" not in out, out
+    p.stdout.decode("ascii")
+
+
+def test_r095_r2_guard_a_stderr_file_with_a_launcher_line_first_is_signed_out(ws):
+    """Guard: on standard error the tool's line counts as any whole line, CRLF endings included."""
+    err = ws.error_file("call.err", (LAUNCHER_LINE + "\r\n" + tool_line() + "\r\n").encode("ascii"))
+    before = ws.snapshot()
+    rc, out = ws.run("--record-failure", FIRST[0], "--stderr-file", err)
+    assert_signed_out(ws, rc, out, before)
+
+
+def test_r095_r2_guard_a_stdout_file_of_the_line_alone_with_blank_lines_is_signed_out(ws):
+    """Guard: on standard output the line alone counts, blank lines and CRLF endings around it included."""
+    out_file = ws.error_file("call.out", ("\r\n" + tool_line() + "\r\n\r\n").encode("ascii"))
+    before = ws.snapshot()
+    rc, out = ws.run("--record-failure", FIRST[0], "--stdout-file", out_file)
+    assert_signed_out(ws, rc, out, before)
+
+
+def test_r095_r2_guard_the_line_on_stderr_beside_a_model_stdout_is_signed_out(ws):
+    """Guard: the tool's line in the --stderr-file is the tool's whatever the --stdout-file holds."""
+    err = ws.error_file("call.err", sign_in_bytes())
+    out_file = ws.error_file("call.out", (MODEL_ERROR_SENTENCE + "\n").encode("ascii"))
+    before = ws.snapshot()
+    rc, out = ws.run("--record-failure", FIRST[0], "--stderr-file", err, "--stdout-file", out_file)
+    assert_signed_out(ws, rc, out, before)
+
+
+def test_r095_r2_guard_the_probe_line_alone_on_stdout_with_blank_lines_is_signed_out(ws):
+    ws.stand_in(stdout=("\r\n" + tool_line() + "\r\n").encode("ascii"), code=0)
+    before = ws.snapshot()
+    rc, out = ws.run()
+    assert_signed_out(ws, rc, out, before)
+    assert_no_second_profile_probe(ws, out)
