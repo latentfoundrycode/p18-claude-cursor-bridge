@@ -1,6 +1,6 @@
 {
   "version": "2026.11.12a",
-  "generated": "2026-11-22 10:14",
+  "generated": "2026-11-22 10:40",
   "files": {
     "agents/cursor-configurator.md": "a8aad7838a9bc5b4f00e13fd3749919158cbe37ec7acfa9a40960600398784bc",
     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
@@ -78,7 +78,7 @@
     "cursor-bridge/design-seeds/x.ai/DESIGN.md": "9c9ef45d8c0c3b9a7622833cdff8bd125ed6bf296a82cc7274215276706e52eb",
     "cursor-bridge/design-seeds/x.ai/README.md": "8560245632010049402a9aaab516e47b1876c660e9fabe2220c7a2be52470e40",
     "cursor-bridge/diagram-check.py": "d8bc790a1196f1f290f410fe8ceb4eee3d812b1c9d903129ba5923cd47b8d015",
-    "cursor-bridge/evaluate-reports.py": "971013f576885bfe563967d42d48fef6055f5d00a8a3d6cd310eac9be614ec2f",
+    "cursor-bridge/evaluate-reports.py": "bbdc785f343eeda5681fa574117dd235dbe50f2437c3ff5073a23747cb840c8a",
     "cursor-bridge/in-flight.py": "aa5e828996aac2144b901eaf6fc4ed54b5697317bcac3539598a113070fad0d1",
     "cursor-bridge/installer-check.ps1": "a662ab0f1d707234d5b1b58de7584b812099cddcec78274b8f15599a3e026cb5",
     "cursor-bridge/inventory-check.py": "957af30e6805540bf7c6be4695f7c3b33f43834f35dbd5a58e0d93bddf913c76",
