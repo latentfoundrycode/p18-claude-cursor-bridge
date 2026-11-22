@@ -1094,7 +1094,7 @@ def format_security_section(project, info):
     if info.get("remedy"):
         lines.append("Remedy: %s" % ascii_line(info["remedy"]))
     stand = info.get("standing")
-    if stand is not None and kind != "finding":
+    if stand is not None and "DEP-" not in (info.get("remedy") or ""):
         lines.append("Remedy: %s" % ascii_line("Open a DEP-<nnn> increment per the merge policy."))
     if info.get("alerts_remedy"):
         lines.append("Remedy: %s" % ascii_line(info["alerts_remedy"]))
