@@ -84,3 +84,9 @@ The file stays after the merge. A change to it takes the full gate (`review-guar
 - 88ede79b92feb26176fa3d58399ae6f91f7da810d2979459c8fce58b540702f0 When all four hold the merge is authorised.
 - 6c26c5362ab69f55c5d4e64be1d4c32c959bd5f21123f224b969e370a0ec1b9a - `supervisor` *(default)* \u2014 you arm and complete
 - 33c2b49030d7be4d36347cfebb028f907ff4868af6711105ceea9ea1d38263ca It reads, read-only, every project's git history and
+- bf64d8349da0386e0e95bd2a68ec578456486d2b523f3c466dbc0b2c8d60a7c6 name: plan-critic description: Adversarially reviews a design document
+- 4f96adbc93f76867ca495a4a00ba38833ed4e2cf2fad2b13bd8eebd8ecee223e ``` Install check: <N> files OK (bridge <version>,
+- 262e7474218cff86a9b728414a829c674418fe546ea81081f3dc036d8362002b **Standing rules.** 1 Never write implementation code. 2
+- 0f8f6db9335a9ae2d8a59e568d1d218d0efd2224f31092eb4607a97a15302550 48. **The session's model follows the phase, and
+- ff738685c16c1dd29e44c05aab99496c5e8904d6b73c64b3ac04af1dd40ae26f 1. **Intake of the change** (Phase 1, scaled).
+- 40ee76f87d9a99d79c0a107b5768ffffa238abb524688ef48c77a189217a4c05 2. **Design revision** (Phase 2, scaled). Pause before
