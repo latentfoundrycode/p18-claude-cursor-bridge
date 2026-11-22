@@ -181,8 +181,12 @@ def path_of(call):
     return ""
 
 
-def no_gh_path():
-    """PATH without any folder that holds a gh, so a read that bypasses the stand-in cannot reach GitHub."""
+def no_gh_path(git_only_dir=None):
+    """PATH without any folder that holds a gh, so a read that bypasses the stand-in cannot reach GitHub.
+
+    Where git shares its folder with gh (/usr/bin on GitHub's Linux runners), that folder goes too;
+    `git_only_dir` then gets a link to the real git alone and is put on the PATH in its place."""
+    real_git = shutil.which("git")
     keep = []
     for d in os.environ.get("PATH", "").split(os.pathsep):
         if not d:
@@ -190,7 +194,16 @@ def no_gh_path():
         if any(os.path.exists(os.path.join(d, n)) for n in ("gh", "gh.exe", "gh.cmd", "gh.bat")):
             continue
         keep.append(d)
-    return os.pathsep.join(keep)
+    path = os.pathsep.join(keep)
+    if real_git and git_only_dir is not None and not shutil.which("git", path=path):
+        real_git = os.path.abspath(real_git)
+        os.makedirs(git_only_dir, exist_ok=True)
+        try:
+            os.symlink(real_git, os.path.join(git_only_dir, os.path.basename(real_git)))
+        except OSError:
+            return path  # no link allowed here: the setup's git assert names the cause
+        path = os.pathsep.join([str(git_only_dir)] + keep)
+    return path
 
 
 def heading_sections(text):
@@ -223,7 +236,7 @@ class Bench:
         (tmp_path / "gh-config-empty").mkdir()
         monkeypatch.setenv("GH_CONFIG_DIR", str(tmp_path / "gh-config-empty"))
         monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-        monkeypatch.setenv("PATH", no_gh_path())
+        monkeypatch.setenv("PATH", no_gh_path(tmp_path / "git-only"))
         assert shutil.which("git"), "test setup: git must stay on PATH once the folders holding gh are left out"
         assert not shutil.which("gh"), "test setup: a real gh is still on PATH"
         self.log = tmp_path / "gh-calls.jsonl"
