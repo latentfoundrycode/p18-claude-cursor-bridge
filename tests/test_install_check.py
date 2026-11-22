@@ -292,3 +292,47 @@ def test_the_stamp_program_writes_nothing_for_an_argument_it_does_not_know():
         p = subprocess.run([sys.executable, stamp] + args, capture_output=True, text=True)
         assert p.returncode == 2 and "nothing was written" in p.stdout, p.stdout + p.stderr
     assert open(manifest, "rb").read() == before
+
+# ---- builder's cases below this line
+
+
+def test_r093_make_manifest_keeps_a_lf_version_file_lf(tmp_path):
+    """R-093: an LF VERSION stays LF across two make-manifest runs; bytes and manifest entry unchanged."""
+    repo = tmp_path / "repo"
+    (repo / "tools").mkdir(parents=True)
+    shutil.copy2(os.path.join(RELEASE, os.pardir, "tools", "make-manifest.py"), str(repo / "tools" / "make-manifest.py"))
+    shutil.copytree(RELEASE, str(repo / "bridge"), ignore=shutil.ignore_patterns("__pycache__"))
+    version_file = repo / "bridge" / "cursor-bridge" / "VERSION"
+    manifest_file = repo / "bridge" / "cursor-bridge" / "MANIFEST.json"
+    version = version_file.read_bytes().decode("ascii").split()[0]
+    version_file.write_bytes(version.encode("ascii") + b"\n")
+    prog = repo / "tools" / "make-manifest.py"
+
+    rc, out = run(prog, tmp_path, "--version", version)
+    assert rc == 0, out
+    first = version_file.read_bytes()
+    assert first.endswith(b"\n") and b"\r" not in first, first
+    first_entry = json.loads(manifest_file.read_text(encoding="utf-8"))["files"]["cursor-bridge/VERSION"]
+
+    rc, out = run(prog, tmp_path, "--version", version)
+    assert rc == 0, out
+    assert version_file.read_bytes() == first
+    second_entry = json.loads(manifest_file.read_text(encoding="utf-8"))["files"]["cursor-bridge/VERSION"]
+    assert second_entry == first_entry
+
+
+def test_r093_make_manifest_writes_a_new_version_file_with_lf(tmp_path):
+    """R-093: with VERSION removed, make-manifest writes the version followed by a single LF."""
+    repo = tmp_path / "repo"
+    (repo / "tools").mkdir(parents=True)
+    shutil.copy2(os.path.join(RELEASE, os.pardir, "tools", "make-manifest.py"), str(repo / "tools" / "make-manifest.py"))
+    shutil.copytree(RELEASE, str(repo / "bridge"), ignore=shutil.ignore_patterns("__pycache__"))
+    version_file = repo / "bridge" / "cursor-bridge" / "VERSION"
+    version = version_file.read_bytes().decode("ascii").split()[0]
+    version_file.unlink()
+    prog = repo / "tools" / "make-manifest.py"
+
+    rc, out = run(prog, tmp_path, "--version", version)
+    assert rc == 0, out
+    data = version_file.read_bytes()
+    assert data == version.encode("ascii") + b"\n", data

@@ -25,7 +25,7 @@ own manifest and nothing more: a source tree has no settings.json, since the own
 not part of it, and the shim is a matter of the machine a release is installed on. In a
 source tree a file the manifest does not list (EXTRA) fails the check as well.
 Exit:   0 = every manifest file OK; 1 = at least one STALE or MISSING;
-        2 = manifest unreadable, or under --sources the program does not stand in the tree it checks.  ASCII-only on purpose (cp1252 consoles).
+        2 = manifest unreadable, or under --sources the program does not stand in the tree it checks, or a folder cannot be resolved.  ASCII-only on purpose (cp1252 consoles).
 """
 import hashlib
 import json
@@ -154,10 +154,28 @@ def main():
         return 2
 
     if sources:
-        here_folder = os.path.realpath(HERE)
-        check_folder = os.path.realpath(os.path.join(root, "cursor-bridge"))
-        if os.path.normcase(here_folder) != os.path.normcase(check_folder):
-            print("RESULT: %s %s" % (here_folder, check_folder))
+        here_abs = os.path.abspath(HERE)
+        here_tree_abs = os.path.abspath(os.path.join(HERE, os.pardir))
+        root_abs = root
+        resolve_failed = False
+        try:
+            here_folder = os.path.realpath(HERE)
+            here_tree = os.path.realpath(os.path.join(HERE, os.pardir))
+        except (OSError, ValueError):
+            resolve_failed = True
+            here_folder = here_abs
+            here_tree = here_tree_abs
+        try:
+            check_tree = os.path.realpath(root)
+        except (OSError, ValueError):
+            resolve_failed = True
+            check_tree = root_abs
+        check_cursor_bridge = os.path.join(check_tree, "cursor-bridge")
+        refuse = resolve_failed or os.path.normcase(here_tree) != os.path.normcase(check_tree)
+        if refuse:
+            alt = os.path.join(root_abs, "cursor-bridge", "bridge-check.py")
+            print('RESULT: REFUSED - this program stands in tree "%s" (program: "%s") but was asked to check tree "%s" (tree: "%s"); run "%s" instead.'
+                  % (here_tree, here_folder, check_tree, check_cursor_bridge, alt))
             return 2
 
     files = manifest.get("files", {})
@@ -226,7 +244,7 @@ def main():
     if sources and (stale or missing or extras):
         # An unlisted file in a release folder would be installed, never kept as part of a
         # previous release and never removed by a later one.
-        print("RESULT: SOURCES DO NOT MATCH their stamp - run tools/make-manifest.py after the last edit, then re-run. %s" % os.path.realpath(HERE))
+        print("RESULT: SOURCES DO NOT MATCH their stamp - run tools/make-manifest.py after the last edit, then re-run. (checked: %s)" % os.path.realpath(HERE))
         return 1
     if stale or missing:
         print("RESULT: NOT CALIBRATED - run the release's bridge-install.py (it copies the files, merges settings.json and installs the shim), then re-run.")
