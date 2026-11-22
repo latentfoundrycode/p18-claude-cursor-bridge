@@ -188,10 +188,11 @@ def test_cfgb3b_argparse_entry_matches_its_parser(tmp_path, name):
 
 
 def test_cfgb3b_evaluate_reports_subcommands_in_order(tmp_path):
-    """Criterion 2: evaluate-reports.py's four sub-commands, each with its own arguments."""
+    """Criterion 2: evaluate-reports.py's sub-commands, each with its own arguments (five since TASK-077, R-097:
+    `security`, the evaluation's security step, after `extract`)."""
     data = _generated(_sandbox(tmp_path / "sb"))
     subs = _entry(data, "evaluate-reports.py")["subcommands"]
-    assert [s["name"] for s in subs] == ["collect", "record", "seed", "extract"]
+    assert [s["name"] for s in subs] == ["collect", "record", "seed", "extract", "security"]
     for s in subs:
         assert set(s) == {"name", "description", "positionals", "options"}
         assert any(o["option_strings"] == ["-h", "--help"] for o in s["options"])
