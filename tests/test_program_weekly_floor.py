@@ -677,7 +677,11 @@ runpy.run_path(target, run_name="__main__")
     "\\\\" + NET_HOST + "\\share\\x",
     "/\\" + NET_HOST + "\\share\\x",
     "\\/" + NET_HOST + "/share/x",
-], ids=["two-slashes", "two-backslashes", "slash-then-backslash", "backslash-then-slash"])
+    "\\??\\UNC\\" + NET_HOST + "\\share",
+    "\\??\\GLOBALROOT\\Device\\Mup\\" + NET_HOST + "\\share",
+    "/??/UNC/" + NET_HOST + "/share",
+], ids=["two-slashes", "two-backslashes", "slash-then-backslash", "backslash-then-slash",
+        "nt-object-unc", "nt-object-globalroot", "nt-object-forward-slashes"])
 def test_rebuild_r2_a_network_gitdir_in_either_slash_order_is_never_touched(tmp_path, gitdir):
     """R-092, TASK-072 (handoff/TASK-072-r2.md, correction 3: a `gitdir:` value beginning with two slashes or two
     backslashes, in either order of slash, is read as no git folder before any os.path call touches it, so that
@@ -685,7 +689,10 @@ def test_rebuild_r2_a_network_gitdir_in_either_slash_order_is_never_touched(tmp_
     check runs under a runner that refuses, and reports, any filesystem call, file open or git launch naming the
     value's host (nohost.invalid, which no resolver answers); the row is NOTE, the repository having no git folder
     of its own. The rebuild's round 1 refused only `//` and two backslashes, so the two mixed orders reached
-    os.lstat (on Windows a network share)."""
+    os.lstat (on Windows a network share). The rebuild's round 2 refused those, but a value in the NT object
+    manager's form (`\\??\\UNC\\<host>\\...`, `\\??\\GLOBALROOT\\Device\\Mup\\...`) is absolute to Python 3.12's
+    ntpath.isabs and reached os.lstat raw, which hands it to the object manager, a network share again (the
+    security audit, rebuild round 2); it is refused too, in either slash, on every platform."""
     ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"))
     os.rename(os.path.join(str(ws), ".git"), str(tmp_path / "old-git"))
     put(ws, ".git", "gitdir: " + gitdir + "\n")
