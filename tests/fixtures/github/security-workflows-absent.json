@@ -1,0 +1,19 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-22 from the captured security-workflows.json (TASK-077): the dependency-scan workflow removed and total_count 1: no weekly scan listed",
+ "request": "repos/OWNER/REPO/actions/workflows",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "total_count": 1,
+  "workflows": [
+   {
+    "id": 374570417,
+    "name": "tests",
+    "path": ".github/workflows/tests.yml",
+    "state": "active"
+   }
+  ]
+ }
+}
