@@ -1,6 +1,6 @@
 {
   "version": "2026.11.12a",
-  "generated": "2026-11-22 18:10",
+  "generated": "2026-11-22 18:23",
   "files": {
     "agents/cursor-configurator.md": "9c0eb6ca7137e955de61cc16e74f5a91450d269f683ebf29cdda23ab40606f89",
     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
@@ -31,9 +31,9 @@
     "cursor-bridge/boundary-check.py": "10aa333b4387f7f14ae85f9edb68fc5e8bda5a17a391f6161004f40cef4e7242",
     "cursor-bridge/bridge-check.py": "be7d6fde0c03b7f04a905770130059b41db05f31f982431c935dc47c95064607",
     "cursor-bridge/bridge-install.py": "59628f4816c797caa0b65036c81db7210ac63f5ca86213087b7065a2c9d96c12",
-    "cursor-bridge/bridge-run.py": "b6fec8ec0f46f48819ceeb2655d7a921d369f1041b2d110222533e24a615296d",
+    "cursor-bridge/bridge-run.py": "4ac3c78830f9d8f2e2acbc4da5ba0def1438c5016263834bcd697bf47692e2ba",
     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
-    "cursor-bridge/bridge_env.py": "c45d9194fc5344ecb537d6f24a4278b05f7a0aad40217d61edb4b0420bd7a108",
+    "cursor-bridge/bridge_env.py": "c00f268c89cfc7a68f4f9753880e38ed73db726e5da04dbea1302a66fb79eb44",
     "cursor-bridge/completion-check.py": "27bfc126a40986f16347307126d909738ce90d71a6d29caa05b898654419249b",
     "cursor-bridge/conformance-check.py": "4f5744439447343f3ccfc7527612e28303826f4676c5ac620e13894d66447aa3",
     "cursor-bridge/cursor-agent.shim": "a524585b139ce42a15edc3ea1e6f6d0ce83dee9c41c5ace7e71e3958e5c73ad7",
@@ -95,7 +95,7 @@
     "cursor-bridge/records-check.py": "6c5ec6e7aef58c634096bc0bf8ed94415e62d16c6a173be166d1f22d445dcd69",
     "cursor-bridge/records-migrate.py": "2d3e07ab28b244c74efdcb49a6ccf0830b6d52559b1243f975e752ff363cdad2",
     "cursor-bridge/refactor-check.py": "4950674a1de1bccf2ac95a4bcec6ab5cc767f1c0a171c01cf164891d1c7d7c36",
-    "cursor-bridge/review-guard.py": "55fe3e9fb99973a2482b7c056b1057fe8dea5472d469501853fb8974d6fb45a6",
+    "cursor-bridge/review-guard.py": "f40efd0817933ce0aef8261ce400e065c9b61c27ec445d0532afb5c44039b19f",
     "cursor-bridge/roster-check.py": "47685971148b2d15797e5a095a236552dbdb6e3cc19283f9314192d913bb4130",
     "cursor-bridge/run-hidden.py": "bcae418e3cca9d7f1be7bf421ce44b879b343613301df4590d9cc45d00f5be5c",
     "cursor-bridge/scope-check.py": "0c9377dbd74236d256a4cbee74b082d0c4a2cd03ab20b2ad6e15a5a40d32b9d5",

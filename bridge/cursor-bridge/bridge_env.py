@@ -4425,6 +4425,16 @@ ROUND_CAUSES = (
     "base update",
 )
 
+_CAUSE_SEPS = "-:(,;" + "\u2013" + "\u2014"
+
+
+def round_cause_word(value):
+    for cause in sorted(ROUND_CAUSES, key=len, reverse=True):
+        rest = value[len(cause):].lstrip()
+        if value.startswith(cause) and (not rest or rest[0] in _CAUSE_SEPS):
+            return cause
+    return None
+
 
 def workspace_of(start):
     """Absolute path of the Workspace that holds start, or None.

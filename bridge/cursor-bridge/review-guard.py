@@ -124,7 +124,6 @@ import bridge_env  # noqa: E402
 GIT_TIMEOUT = 120
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 _SCOPE_CAUSE_CAP = 1048576
-_CAUSE_SEPS = "-:(,;" + "\u2013" + "\u2014"
 CACHE_DIRS = {".venv", "venv", "env", "node_modules", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
               ".tox", ".nox", "dist", "build", ".cache", "target", ".next", ".turbo", "coverage", "site-packages", ".ipynb_checkpoints"}
 PROTECTED_PREFIXES = ("docs/", "handoff/", "run/review/")
@@ -768,7 +767,6 @@ def _cause_on_first_line(text):
     The text after the prefix is stripped of spaces and tabs. The longest cause is tried
     first; what follows is empty or begins with a separator. No regular expression.
     """
-    causes = sorted(bridge_env.ROUND_CAUSES, key=len, reverse=True)
     prefix = "Round cause:"
     for line in (text or "").split("\n"):
         if line.endswith("\r"):
@@ -776,10 +774,9 @@ def _cause_on_first_line(text):
         if not line.startswith(prefix):
             continue
         value = line[len(prefix):].strip(" \t").lower()
-        for cause in causes:
-            rest = value[len(cause):].lstrip()
-            if value.startswith(cause) and (not rest or rest[0] in _CAUSE_SEPS):
-                return cause
+        matched = bridge_env.round_cause_word(value)
+        if matched:
+            return matched
         return "unstated"
     return "unstated"
 
