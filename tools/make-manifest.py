@@ -88,8 +88,16 @@ def main():
                 continue  # written below and hashed after
             files[rel] = norm_hash(p)
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    with open(os.path.join(CB, "VERSION"), "w", encoding="utf-8", newline="\n") as f:
-        f.write("%s\n" % version)
+    version_path = os.path.join(CB, "VERSION")
+    line_ending = b"\n"
+    if os.path.isfile(version_path):
+        existing = open(version_path, "rb").read()
+        if existing.endswith(b"\r\n"):
+            line_ending = b"\r\n"
+        elif existing.endswith(b"\n"):
+            line_ending = b"\n"
+    with open(version_path, "wb") as f:
+        f.write(("%s" % version).encode("ascii") + line_ending)
     files["cursor-bridge/VERSION"] = norm_hash(os.path.join(CB, "VERSION"))
     manifest = {"version": version, "generated": stamp, "files": dict(sorted(files.items()))}
     with open(os.path.join(CB, "MANIFEST.json"), "w", encoding="utf-8", newline="\n") as f:

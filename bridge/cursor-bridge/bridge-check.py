@@ -25,7 +25,7 @@ own manifest and nothing more: a source tree has no settings.json, since the own
 not part of it, and the shim is a matter of the machine a release is installed on. In a
 source tree a file the manifest does not list (EXTRA) fails the check as well.
 Exit:   0 = every manifest file OK; 1 = at least one STALE or MISSING;
-        2 = manifest unreadable.  ASCII-only on purpose (cp1252 consoles).
+        2 = manifest unreadable, or under --sources the program does not stand in the tree it checks.  ASCII-only on purpose (cp1252 consoles).
 """
 import hashlib
 import json
@@ -153,6 +153,13 @@ def main():
         print("bridge-check: cannot read %s (%s)" % (manifest_path, e))
         return 2
 
+    if sources:
+        here_folder = os.path.realpath(HERE)
+        check_folder = os.path.realpath(os.path.join(root, "cursor-bridge"))
+        if os.path.normcase(here_folder) != os.path.normcase(check_folder):
+            print("RESULT: %s %s" % (here_folder, check_folder))
+            return 2
+
     files = manifest.get("files", {})
     ok = stale = missing = 0
     problems = []
@@ -219,12 +226,15 @@ def main():
     if sources and (stale or missing or extras):
         # An unlisted file in a release folder would be installed, never kept as part of a
         # previous release and never removed by a later one.
-        print("RESULT: SOURCES DO NOT MATCH their stamp - run tools/make-manifest.py after the last edit, then re-run.")
+        print("RESULT: SOURCES DO NOT MATCH their stamp - run tools/make-manifest.py after the last edit, then re-run. %s" % os.path.realpath(HERE))
         return 1
     if stale or missing:
         print("RESULT: NOT CALIBRATED - run the release's bridge-install.py (it copies the files, merges settings.json and installs the shim), then re-run.")
         return 1
-    print("RESULT: %s bridge %s" % ("SOURCES MATCH" if sources else "INSTALLED TREE MATCHES", manifest.get("version", "?")))
+    if sources:
+        print("RESULT: SOURCES MATCH bridge %s %s" % (manifest.get("version", "?"), os.path.realpath(HERE)))
+    else:
+        print("RESULT: INSTALLED TREE MATCHES bridge %s" % manifest.get("version", "?"))
     return 0
 
 

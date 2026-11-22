@@ -69,7 +69,7 @@ own manifest and nothing more: a source tree has no settings.json, since the own
 not part of it, and the shim is a matter of the machine a release is installed on. In a
 source tree a file the manifest does not list (EXTRA) fails the check as well.
 Exit:   0 = every manifest file OK; 1 = at least one STALE or MISSING;
-        2 = manifest unreadable.  ASCII-only on purpose (cp1252 consoles).
+        2 = manifest unreadable, or under --sources the program does not stand in the tree it checks.  ASCII-only on purpose (cp1252 consoles).
 ```
 
 ## bridge-install.py
