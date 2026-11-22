@@ -329,30 +329,53 @@ def test_r044_evaluate_reports_runs_the_pace_report_every_week():
 def test_bug031_evaluate_reports_says_what_the_pace_report_counts():
     """BUG-031 (stage B5's review, round 1; core C4 and Review B C, convergent; programs S3, Review B S2 and
     tests-mutation-pace S3 on what the report lists): pace-report.py prints a round's lift as `class`, `owner`,
-    `none` or `unknown` (no record of it), counts as increments only the IDs with a tracked brief where anything is
-    tracked under handoff/ (every ID a squash subject names where nothing is), and lists a stage
-    review only from the guard's rounds files; /evaluate-reports named three lifts and neither limit.
+    `none` or `unknown` (no record of it), counted as increments then only the IDs with a tracked brief where anything
+    was tracked under handoff/ (every ID a squash subject names where nothing is), and lists a stage
+    review only from the guard's rounds files; /evaluate-reports named three lifts and neither limit. Since TASK-069
+    (R-089) a name also counts from a guard rounds record or a tagged pass line, and PR-<n> from a squash naming no
+    counted name; BUG-047 brought the command's sentence to that, and the assertions below pin it.
     enforces: R-044 (the pace section computed from git and the launcher's and the guard's records, "for every
     brief's ID"); bridge/cursor-bridge/pace-report.py (`_lift_map`, the over-the-ceiling list)"""
     t = flat(read(os.path.join(HERE, os.pardir, "bridge", "commands", "evaluate-reports.md")))
     assert "(a class line, the owner's line, `none`, or `unknown` where no launcher row or guard round records it" in t
-    assert "In a project that tracks any file under `handoff/`, an increment is an ID with a tracked brief" in t
-    # BUG-033 (stage B5's review, round 2; BUG-031's Review B, round 3, note): any tracked file under handoff/
-    # switches the count to tracked briefs (`_handoff_untracked`), and a report is no brief (`_ids_with_brief`)
-    assert ("a project that tracks only builder reports there (`<ID>-report.md`, `<ID>-r<N>-report.md`, "
-            "`<ID>-r<N><letter>-report.md`, which are no briefs) counts no increment at all") in t
+    # BUG-047 (stage P3's review, Review B round 1, blocking): since TASK-069 (R-089) a name counts from a tracked
+    # brief, a guard rounds record or a tagged pass line, and PR-<n> from a squash naming no counted name; the
+    # sentence that counted only IDs with a tracked brief, and none in a reports-only handoff/, is retired.
+    # BUG-033's claim that a report is no brief (`_ids_with_brief`) stands.
+    assert ("An increment is a counted name, an ID or `PR-<n>`, counted where it has a tracked brief under `handoff/` "
+            "(a builder report, `<ID>-report.md`, `<ID>-r<N>-report.md` or `<ID>-r<N><letter>-report.md`, is no "
+            "brief), a guard rounds record or a tagged pass line in the in-flight log; `PR-<n>` is also counted by a "
+            "squash on `main` closing `(#<n>)` whose subject names no counted name, merged by that closing number, "
+            "and a `PR-<n>` that `main` does not close is started and not merged; a `STAGE-` or `DESIGN-` name is "
+            "never one") in t
+    # BUG-047 round 2 (Review A, blocking): the cause line is one for the window, printed only where the window
+    # holds a round after the first, and a passes line stands only for a week holding a pass, counted by kind.
+    assert ("Below those lists it prints, once for the window and only where the window holds a round after the "
+            "first, a `Round causes (<n> rounds after the first):` line counting those rounds by their cause, and for "
+            "each week of the window that holds a recorded pass a line counting the passes by reviewer kind, one pass "
+            "per name, "
+            "kind and round, ending `recorded passes only`.") in t
+    assert "Each week also prints a cause line" not in t
+    assert "so one the supervisor built without a brief is not counted" not in t
+    assert "counts no increment at all" not in t
     assert ("(in a project that tracks nothing under `handoff/`, every ID a squash subject names is counted merged, and the "
             "started and rounds cells read `n/a`)") in t
     assert "a stage review is listed only from the review guard's rounds files" in t
     prog = read(os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "pace-report.py"))
     assert 'lifts.get(r, "unknown")' in prog and 'lifts.setdefault(rnd, "none")' in prog
+    assert "recorded passes only" in prog and "is counted where it has a brief under a tracked handoff/, a guard rounds record, or a tagged" in flat(prog)
+    assert "The line, printed only where the window holds at least one round after the first, is `Round causes (<n> rounds after the first): `" in flat(prog)
+    assert "one line per week of the window that holds a recorded pass" in flat(prog)
+    assert "A pass is one per name, reviewer kind and round" in flat(prog)
+    assert "A PR-<n> that main does not close is a name of its own, started and not merged." in flat(prog)
 
 
 def test_bug033_a_project_tracking_only_reports_under_handoff_counts_no_increment(program):
-    """BUG-033 (stage B5's review, round 2; BUG-031's Review B, round 3, note): what evaluate-reports.md now says of a
-    project that tracks only builder reports under handoff/ is what pace-report.py does: any tracked file there
-    switches the count to tracked briefs, and a report is no brief, so no ID is counted; a tracked brief is (the
-    precondition).
+    """BUG-033 (stage B5's review, round 2; BUG-031's Review B, round 3, note): pace-report.py's brief reading for a
+    project that tracks only builder reports under handoff/: any tracked file there switches the count to tracked
+    briefs, and a report is no brief, so no ID is counted from a brief; a tracked brief is (the precondition). Since
+    TASK-069 (R-089) a guard rounds record or a tagged pass line still counts a name, and BUG-047 retired the
+    command's sentence that such a project counts none; its clause that a report is no brief stands.
     enforces: bridge/commands/evaluate-reports.md, step 1 (the pace section's increments); R-044"""
     pr = program("pace-report")
     reports = "handoff/BUG-029-report.md\nhandoff/TASK-031-r2-report.md\nhandoff/TASK-031-r2a-report.md\n"

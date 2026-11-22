@@ -83,3 +83,4 @@ The file stays after the merge. A change to it takes the full gate (`review-guar
 - 56fb7ad692a8804d0b733030416c59a969e08a4eaecee9dcf2e1680c8bd7ea41 **Before every push.** Every commit the push publishes
 - 88ede79b92feb26176fa3d58399ae6f91f7da810d2979459c8fce58b540702f0 When all four hold the merge is authorised.
 - 6c26c5362ab69f55c5d4e64be1d4c32c959bd5f21123f224b969e370a0ec1b9a - `supervisor` *(default)* \u2014 you arm and complete
+- 33c2b49030d7be4d36347cfebb028f907ff4868af6711105ceea9ea1d38263ca It reads, read-only, every project's git history and
