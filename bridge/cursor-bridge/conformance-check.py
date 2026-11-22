@@ -835,6 +835,14 @@ def _own_git_dir(ws):
         return None
     if (len(gitdir) >= 2 and gitdir[0] in "/\\" and gitdir[1] in "/\\"):
         return None
+    if (
+        len(gitdir) >= 4
+        and gitdir[0] in "/\\"
+        and gitdir[1] == "?"
+        and gitdir[2] == "?"
+        and gitdir[3] in "/\\"
+    ):
+        return None
     if not os.path.isabs(gitdir):
         gitdir = os.path.normpath(os.path.join(ws, gitdir))
     if _git_entry_is_link_or_reparse(gitdir):

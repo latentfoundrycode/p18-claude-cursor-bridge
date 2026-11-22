@@ -680,8 +680,11 @@ runpy.run_path(target, run_name="__main__")
     "\\??\\UNC\\" + NET_HOST + "\\share",
     "\\??\\GLOBALROOT\\Device\\Mup\\" + NET_HOST + "\\share",
     "/??/UNC/" + NET_HOST + "/share",
+    "\\??/UNC/" + NET_HOST + "/share",
+    "/??\\UNC\\" + NET_HOST + "\\share",
 ], ids=["two-slashes", "two-backslashes", "slash-then-backslash", "backslash-then-slash",
-        "nt-object-unc", "nt-object-globalroot", "nt-object-forward-slashes"])
+        "nt-object-unc", "nt-object-globalroot", "nt-object-forward-slashes",
+        "nt-object-backslash-then-slash", "nt-object-slash-then-backslash"])
 def test_rebuild_r2_a_network_gitdir_in_either_slash_order_is_never_touched(tmp_path, gitdir):
     """R-092, TASK-072 (handoff/TASK-072-r2.md, correction 3: a `gitdir:` value beginning with two slashes or two
     backslashes, in either order of slash, is read as no git folder before any os.path call touches it, so that
