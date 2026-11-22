@@ -411,18 +411,20 @@ def projects_from(a):
 
 
 def projects_file_path(home=None):
-    return os.path.join(os.path.expanduser(home) if home else os.path.expanduser("~"), ".cursor-bridge", "projects.json")
+    return os.path.join(os.path.expanduser("~"), ".cursor-bridge", "projects.json")
 
 
 def load_projects(home=None):
     """(projects dict, None) or (None, refusal text naming PROJECTS_FILE_LABEL)."""
-    path = projects_file_path(home)
+    path = projects_file_path()
     prefix = "%s holds a JSON object of project name to project root" % PROJECTS_FILE_LABEL
     if not os.path.isfile(path):
         return None, "%s; the file is absent" % prefix
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8-sig") as f:
             raw = f.read()
+    except UnicodeDecodeError:
+        return None, "%s; the file is not UTF-8 text" % prefix
     except OSError:
         return None, "%s; the file could not be read" % prefix
     try:
@@ -445,14 +447,28 @@ def resolve_projects(a):
     one = projects_from(a)
     if one is not None:
         return one, None
-    home = getattr(a, "home", None) or os.path.expanduser("~")
-    return load_projects(home)
+    return load_projects()
+
+
+def printable_ascii(text):
+    if not isinstance(text, str):
+        text = str(text)
+    out = []
+    for ch in text:
+        o = ord(ch)
+        if ch in "\n\r":
+            out.append(" ")
+        elif 0x20 <= o <= 0x7E:
+            out.append(ch)
+        elif o <= 0xFF:
+            out.append("\\x%02x" % o)
+        else:
+            out.append("\\u%04x" % o)
+    return "".join(out)
 
 
 def ascii_line(text):
-    if not isinstance(text, str):
-        text = str(text)
-    return text.encode("ascii", "backslashreplace").decode("ascii").replace("\n", " ").replace("\r", " ")
+    return printable_ascii(text)
 
 
 def parse_utc(text):
@@ -467,20 +483,41 @@ def parse_utc(text):
         return None
 
 
+def _repo_segment_ok(segment):
+    return bool(segment) and not all(c == "." for c in segment)
+
+
 def github_repo_from_url(url):
     url = (url or "").strip()
     for rx in (HTTPS_ORIGIN_RX, SSH_ORIGIN_RX):
         m = rx.match(url)
-        if m:
+        if m and _repo_segment_ok(m.group(1)) and _repo_segment_ok(m.group(2)):
             return m.group(1), m.group(2)
     return None
+
+
+def _git_env():
+    env = os.environ.copy()
+    env["GIT_OPTIONAL_LOCKS"] = "0"
+    env["GIT_NO_LAZY_FETCH"] = "1"
+    for key in (
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_COMMON_DIR",
+        "GIT_NAMESPACE",
+    ):
+        env.pop(key, None)
+    return env
 
 
 def git_origin_repo(project_root):
     ws = os.path.join(project_root, "Workspace")
     if not os.path.isdir(ws):
         return None
-    cmd = ["git", "-C", ws, "remote", "get-url", "origin"]
+    cmd = ["git", "-c", "core.fsmonitor=false", "-C", ws, "remote", "get-url", "origin"]
     try:
         proc = subprocess.run(
             cmd,
@@ -489,6 +526,7 @@ def git_origin_repo(project_root):
             creationflags=bridge_env.NO_WINDOW,
             timeout=GIT_REMOTE_LIMIT,
             text=True,
+            env=_git_env(),
         )
     except (subprocess.TimeoutExpired, OSError):
         return None
@@ -516,37 +554,80 @@ def _gh_api_raw(args):
     return proc.returncode, out
 
 
+def _raw_failure_phrase(rc):
+    if rc == -1:
+        return "timed out"
+    if rc == -2:
+        return "gh could not start"
+    if rc != 0:
+        return "gh exited non-zero"
+    return "reply could not be parsed"
+
+
+def _api_failure_phrase(reason, body):
+    if reason == "timed out":
+        return "timed out"
+    if reason == "gh cannot start":
+        return "gh could not start"
+    if isinstance(body, dict):
+        st = body.get("status")
+        if st is not None and re.fullmatch(r"\d+", str(st)):
+            code = int(st)
+            if code == 403:
+                return "refused (HTTP 403)"
+            if 100 <= code <= 599:
+                return "refused (HTTP %d)" % code
+    if reason == "reply is not JSON":
+        return "reply could not be parsed"
+    return "gh exited non-zero"
+
+
+def _http_status_from_include(text):
+    if not text:
+        return None
+    head = text.split("\r\n\r\n", 1)[0] if "\r\n\r\n" in text else text.split("\n\n", 1)[0]
+    if not head.startswith("HTTP/"):
+        return None
+    m = re.search(r"HTTP/\S+\s+(\d+)", head.split("\r\n", 1)[0].split("\n", 1)[0])
+    if m and re.fullmatch(r"\d+", m.group(1)):
+        return int(m.group(1))
+    return None
+
+
 def _gh_api_include(path):
     rc, text = _gh_api_raw(["-i", path])
     if text is None:
-        return False, "unreadable", None
-    status = None
-    if "\r\n\r\n" in text:
-        head, _body = text.split("\r\n\r\n", 1)
-        m = re.search(r"HTTP/\S+\s+(\d+)", head)
-        if m:
-            status = int(m.group(1))
-    elif text.startswith("HTTP/"):
-        m = re.search(r"HTTP/\S+\s+(\d+)", text.split("\r\n", 1)[0])
-        if m:
-            status = int(m.group(1))
+        return False, _raw_failure_phrase(rc), None
+    status = _http_status_from_include(text)
     if status == 404:
-        return True, "alerts_off", None
+        return True, "", "alerts_off"
     if status == 204:
-        return True, "alerts_on", None
+        return True, "", "alerts_on"
     if status is not None and status >= 400:
-        return False, "http %d" % status, None
+        if status == 403:
+            return False, "refused (HTTP 403)", None
+        return False, "refused (HTTP %d)" % status, None
     if rc != 0:
-        return False, "gh exited %d" % rc, None
-    return False, "unreadable", None
+        return False, "gh exited non-zero", None
+    return False, "reply could not be parsed", None
 
 
 def _gh_paginate_json(path):
     rc, text = _gh_api_raw(["--paginate", path])
-    if text is None or rc != 0:
-        return False, "gh exited %d" % (rc if rc >= 0 else 0), None
+    if text is None:
+        return False, _raw_failure_phrase(rc), None
+    if rc != 0:
+        stripped = text.strip()
+        if stripped:
+            try:
+                body = json.loads(stripped)
+                if isinstance(body, dict):
+                    return False, _api_failure_phrase("", body), None
+            except ValueError:
+                pass
+        return False, "gh exited non-zero", None
     if not text.strip():
-        return True, "", []
+        return False, "reply could not be parsed", None
     items, idx, raw = [], 0, text.strip()
     dec = json.JSONDecoder()
     while idx < len(raw):
@@ -557,9 +638,13 @@ def _gh_paginate_json(path):
         try:
             chunk, end = dec.raw_decode(raw, idx)
         except ValueError:
-            return False, "not JSON", None
-        if isinstance(chunk, list):
-            items.extend(chunk)
+            return False, "reply could not be parsed", None
+        if not isinstance(chunk, list):
+            return False, "reply could not be parsed", None
+        for item in chunk:
+            if not isinstance(item, dict):
+                return False, "reply could not be parsed", None
+        items.extend(chunk)
         idx = end
     return True, "", items
 
@@ -605,41 +690,151 @@ def run_in_window(run, last_run_read, had_entry, last_extract):
 def dependency_workflow(workflows_body):
     if not isinstance(workflows_body, dict):
         return None
-    for wf in workflows_body.get("workflows") or []:
+    wfs = workflows_body.get("workflows")
+    if not isinstance(wfs, list):
+        return None
+    for wf in wfs:
+        if not isinstance(wf, dict):
+            continue
         path = wf.get("path") or ""
-        if path.endswith(DEP_SCAN_SUFFIX) or path.endswith("dependency-scan.yml"):
+        if path.endswith(DEP_SCAN_SUFFIX):
             return wf
     return None
 
 
-def classify_window_runs(window_runs, owner, repo, standing):
-    completed = [r for r in window_runs if r.get("status") == "completed" and r.get("conclusion")]
-    completed.sort(key=lambda r: r.get("created_at") or "")
-    if standing and not any(r.get("conclusion") == "success" for r in completed):
-        return ("finding", "Open a DEP-<nnn> increment per the merge policy.", str(standing), None, False)
+def _digit_id(value):
+    if value is None:
+        return None
+    s = str(value)
+    if not re.fullmatch(r"\d+", s):
+        return None
+    return int(s)
+
+
+def _normalize_standing(value):
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    s = str(value)
+    if re.fullmatch(r"\d+", s):
+        return int(s)
+    return None
+
+
+def _validate_workflows_body(body):
+    if not isinstance(body, dict):
+        return "reply could not be parsed"
+    wfs = body.get("workflows")
+    if not isinstance(wfs, list):
+        return "reply could not be parsed"
+    for wf in wfs:
+        if not isinstance(wf, dict):
+            return "reply could not be parsed"
+    return None
+
+
+def _validate_runs_list(runs):
+    if not isinstance(runs, list):
+        return "reply could not be parsed"
+    for run in runs:
+        if not isinstance(run, dict):
+            return "reply could not be parsed"
+        if not parse_utc(run.get("created_at")):
+            return "reply could not be parsed"
+        if run.get("status") == "completed" and not run.get("conclusion"):
+            return "reply could not be parsed"
+        rid = run.get("id")
+        if rid is not None and not re.fullmatch(r"\d+", str(rid)):
+            return "reply could not be parsed"
+    return None
+
+
+def _validate_jobs_body(body):
+    if not isinstance(body, dict):
+        return "reply could not be parsed"
+    jobs = body.get("jobs")
+    if not isinstance(jobs, list):
+        return "reply could not be parsed"
+    for job in jobs:
+        if not isinstance(job, dict):
+            return "reply could not be parsed"
+        jid = job.get("id")
+        if jid is not None and not re.fullmatch(r"\d+", str(jid)):
+            return "reply could not be parsed"
+    return None
+
+
+def _completed_runs(runs):
+    out = [r for r in runs if r.get("status") == "completed" and r.get("conclusion")]
+    out.sort(key=lambda r: parse_utc(r.get("created_at")) or datetime.datetime.min.replace(tzinfo=datetime.timezone.utc))
+    return out
+
+
+def _standing_cleared(standing_id, prev_last, window_runs, all_runs):
+    if standing_id is None:
+        return True
+    threshold = None
+    for run in all_runs:
+        if _digit_id(run.get("id")) == standing_id:
+            threshold = parse_utc(run.get("created_at"))
+            break
+    if threshold is None and prev_last:
+        threshold = parse_utc(prev_last)
+    if threshold is None:
+        return False
+    for run in window_runs:
+        if run.get("status") == "completed" and run.get("conclusion") == "success":
+            created = parse_utc(run.get("created_at"))
+            if created and created > threshold:
+                return True
+    return False
+
+
+def _run_exit_code(owner, repo, run):
+    run_id = _digit_id(run.get("id"))
+    if run_id is None:
+        return None, ("jobs list", "reply could not be parsed")
+    jobs_path = "repos/%s/%s/actions/runs/%d/jobs" % (owner, repo, run_id)
+    ok, reason, body = bridge_env._gh_get(jobs_path)
+    if not ok:
+        return None, ("jobs list", _api_failure_phrase(reason, body))
+    err = _validate_jobs_body(body)
+    if err:
+        return None, ("jobs list", err)
+    for job in body.get("jobs") or []:
+        if job.get("conclusion") != "failure":
+            continue
+        job_id = _digit_id(job.get("id"))
+        if job_id is None:
+            return None, ("jobs list", "reply could not be parsed")
+        log_path = "repos/%s/%s/actions/jobs/%d/logs" % (owner, repo, job_id)
+        rc_log, log_text = _gh_api_raw([log_path])
+        if log_text is None:
+            return None, ("job log", _raw_failure_phrase(rc_log))
+        if rc_log != 0:
+            return None, ("job log", "gh exited non-zero")
+        code = log_exit_code(log_text)
+        if code is not None:
+            return code, None
+    return None, None
+
+
+def classify_window_runs(window_runs, owner, repo):
+    completed = _completed_runs(window_runs)
+    rerun = "gh workflow run dependency-scan.yml --repo %s/%s" % (owner, repo)
     if not completed:
         if any(r.get("status") in ("queued", "in_progress", "waiting") for r in window_runs):
-            return ("no completed run", None, standing, None, False)
-        return (
-            "no completed run",
-            "gh workflow run dependency-scan.yml --repo %s/%s" % (owner, repo),
-            standing,
-            None,
-            False,
-        )
+            return "no completed run", None, None, False
+        return "no completed run", rerun, None, False
     last = completed[-1]
     conclusion = last.get("conclusion")
+    last_at = last.get("created_at")
     if conclusion == "success":
-        return ("green", None, None, last.get("created_at"), True)
+        return "green", None, last_at, True
     if conclusion == "failure":
-        return ("pending_failure", None, standing, last, True)
-    return (
-        "scanner failure",
-        "gh workflow run dependency-scan.yml --repo %s/%s" % (owner, repo),
-        standing,
-        last.get("created_at"),
-        True,
-    )
+        return "pending_failure", None, last_at, True
+    return "scanner failure", rerun, last_at, True
 
 
 def read_failure_remedy(alerts=False):
@@ -649,107 +844,186 @@ def read_failure_remedy(alerts=False):
     return remedy
 
 
+def _format_alerts(alerts):
+    if not alerts:
+        return "No open Dependabot alert."
+    parts = []
+    for al in alerts:
+        num = al.get("number")
+        pkg = ((al.get("dependency") or {}).get("package") or {}).get("name") or ""
+        ghsa = ((al.get("security_advisory") or {}).get("ghsa_id") or "")
+        parts.append("alert %s %s %s" % (num, pkg, ghsa))
+    return "; ".join(parts)
+
+
+def _read_alerts(owner, repo, read_failures):
+    vuln_path = "repos/%s/%s/vulnerability-alerts" % (owner, repo)
+    v_ok, v_phrase, v_kind = _gh_api_include(vuln_path)
+    if not v_ok:
+        read_failures.append(("alerts check", v_phrase))
+        return None, False, True
+    if v_kind == "alerts_off":
+        return "alerts off", True, False
+    alerts_path = "repos/%s/%s/dependabot/alerts?state=open" % (owner, repo)
+    a_ok, a_phrase, alerts = _gh_paginate_json(alerts_path)
+    if not a_ok:
+        read_failures.append(("open alerts list", a_phrase))
+        return None, False, True
+    return _format_alerts(alerts), False, False
+
+
 def scan_project(owner, repo, entry, meta, had_entry_before_seed):
     repo_slash = "%s/%s" % (owner, repo)
-    standing = (entry or {}).get("finding_standing")
     prev_last = (entry or {}).get("last_run_read")
-    wf_path = "repos/%s/%s/actions/workflows" % (owner, repo)
-    ok, _reason, body = bridge_env._gh_get(wf_path)
-    if not ok:
-        return {"kind": "finding", "remedy": read_failure_remedy(False), "repo": repo_slash,
-                "last_run_read": prev_last, "standing": standing}, None
-    wf = dependency_workflow(body)
-    if wf is None:
-        info = {
-            "kind": "not configured", "remedy": "add dependency-scan.yml in the project's calibration", "repo": repo_slash,
-            "last_run_read": prev_last, "standing": standing, "alerts_line": None, "alerts_off": False,
-        }
-        return info, {"last_run_read": prev_last, "finding_standing": standing}
-    if (wf.get("state") or "") != "active":
-        enable = "gh workflow enable dependency-scan.yml --repo %s/%s" % (owner, repo)
-        rerun = "gh workflow run dependency-scan.yml --repo %s/%s" % (owner, repo)
-        return {
-            "kind": "no completed run", "remedy": "%s; then %s" % (enable, rerun), "repo": repo_slash,
-            "last_run_read": prev_last, "standing": standing, "alerts_line": None, "alerts_off": False,
-            "update": {"last_run_read": prev_last, "finding_standing": standing},
-        }, {"last_run_read": prev_last, "finding_standing": standing}
-    day = security_runs_day(entry, meta) or "1970-01-01"
-    runs_path = "repos/%s/%s/actions/workflows/dependency-scan.yml/runs?created=>=%s&per_page=100" % (owner, repo, day)
-    ok, _reason, runs_body = bridge_env._gh_get(runs_path)
-    if not ok:
-        return {"kind": "finding", "remedy": read_failure_remedy(False), "repo": repo_slash,
-                "last_run_read": prev_last, "standing": standing}, None
-    all_runs = (runs_body or {}).get("workflow_runs") or []
-    window_runs = [r for r in all_runs if run_in_window(r, prev_last, had_entry_before_seed, (meta or {}).get("last_extract"))]
-    kind, remedy, stand_report, last_marker, advance_last = classify_window_runs(window_runs, owner, repo, standing)
-    new_standing = str(stand_report) if kind == "finding" and stand_report else (None if kind == "green" else standing)
+    prev_standing = _normalize_standing((entry or {}).get("finding_standing"))
+    read_failures = []
+    scan_unreadable = False
+    ledger_skip = False
+    kind = None
+    remedy = None
     new_last = prev_last
-    completed = [r for r in window_runs if r.get("status") == "completed" and r.get("conclusion")]
-    if advance_last and completed:
-        new_last = max(completed, key=lambda r: r.get("created_at") or "").get("created_at")
-    if kind == "pending_failure":
-        run = last_marker
-        jobs_path = "repos/%s/%s/actions/runs/%s/jobs" % (owner, repo, run.get("id"))
-        ok, _reason, jobs_body = bridge_env._gh_get(jobs_path)
-        if not ok:
-            return {"kind": "finding", "remedy": read_failure_remedy(False), "repo": repo_slash,
-                    "last_run_read": prev_last, "standing": standing}, None
-        exit_code = None
-        for job in (jobs_body or {}).get("jobs") or []:
-            if job.get("conclusion") != "failure":
-                continue
-            log_path = "repos/%s/%s/actions/jobs/%s/logs" % (owner, repo, job.get("id"))
-            rc_log, log_text = _gh_api_raw([log_path])
-            if log_text is None or rc_log != 0:
-                return {"kind": "finding", "remedy": read_failure_remedy(False), "repo": repo_slash,
-                        "last_run_read": prev_last, "standing": standing}, None
-            exit_code = log_exit_code(log_text)
-            if exit_code is not None:
-                break
-        if exit_code == 1:
-            kind = "finding"
-            remedy = "Open a DEP-<nnn> increment per the merge policy."
-            new_standing = str(run.get("id"))
-        else:
-            kind = "scanner failure"
-            remedy = "gh workflow run dependency-scan.yml --repo %s/%s" % (owner, repo)
-    vuln_path = "repos/%s/%s/vulnerability-alerts" % (owner, repo)
-    v_ok, v_kind, _vbody = _gh_api_include(vuln_path)
-    alerts_line = None
-    alerts_off = False
-    if not v_ok:
-        return {"kind": "finding", "remedy": read_failure_remedy(True), "repo": repo_slash,
-                "last_run_read": prev_last, "standing": standing}, None
-    if v_kind == "alerts_off":
-        alerts_off = True
-        alerts_line = "alerts off"
+    new_standing = prev_standing
+    last_extract = (meta or {}).get("last_extract")
+    wf_path = "repos/%s/%s/actions/workflows" % (owner, repo)
+    ok, reason, body = bridge_env._gh_get(wf_path)
+    if not ok:
+        scan_unreadable = True
+        ledger_skip = True
+        kind = "finding"
+        remedy = read_failure_remedy(False)
+        read_failures.append(("workflows list", _api_failure_phrase(reason, body)))
     else:
-        alerts_path = "repos/%s/%s/dependabot/alerts?state=open" % (owner, repo)
-        a_ok, _reason, alerts = _gh_paginate_json(alerts_path)
-        if not a_ok:
-            return {"kind": "finding", "remedy": read_failure_remedy(True), "repo": repo_slash,
-                    "last_run_read": prev_last, "standing": standing}, None
-        if not alerts:
-            alerts_line = "No open Dependabot alert."
+        wf_err = _validate_workflows_body(body)
+        if wf_err:
+            scan_unreadable = True
+            ledger_skip = True
+            kind = "finding"
+            remedy = read_failure_remedy(False)
+            read_failures.append(("workflows list", wf_err))
         else:
-            parts = []
-            for al in alerts:
-                num = al.get("number")
-                pkg = ((al.get("dependency") or {}).get("package") or {}).get("name") or ""
-                ghsa = ((al.get("security_advisory") or {}).get("ghsa_id") or "")
-                parts.append("alert %s %s %s" % (num, pkg, ghsa))
-            alerts_line = "; ".join(parts)
-    return {
-        "kind": kind, "remedy": remedy, "repo": repo_slash, "last_run_read": new_last, "standing": new_standing,
-        "alerts_line": alerts_line, "alerts_off": alerts_off,
-    }, {"last_run_read": new_last, "finding_standing": new_standing}
+            wf = dependency_workflow(body)
+            if wf is None:
+                kind = "not configured"
+                remedy = "add dependency-scan.yml in the project's calibration"
+                new_standing = prev_standing
+            elif (wf.get("state") or "") != "active":
+                enable = "gh workflow enable dependency-scan.yml --repo %s/%s" % (owner, repo)
+                rerun = "gh workflow run dependency-scan.yml --repo %s/%s" % (owner, repo)
+                kind = "no completed run"
+                remedy = "%s; then %s" % (enable, rerun)
+                new_standing = prev_standing
+            else:
+                day = security_runs_day(entry, meta) or "1970-01-01"
+                runs_path = "repos/%s/%s/actions/workflows/dependency-scan.yml/runs?created=>=%s&per_page=100" % (owner, repo, day)
+                ok, reason, runs_body = bridge_env._gh_get(runs_path)
+                if not ok:
+                    scan_unreadable = True
+                    ledger_skip = True
+                    kind = "finding"
+                    remedy = read_failure_remedy(False)
+                    read_failures.append(("runs list", _api_failure_phrase(reason, runs_body)))
+                elif not isinstance(runs_body, dict):
+                    scan_unreadable = True
+                    ledger_skip = True
+                    kind = "finding"
+                    remedy = read_failure_remedy(False)
+                    read_failures.append(("runs list", "reply could not be parsed"))
+                else:
+                    all_runs = runs_body.get("workflow_runs")
+                    if all_runs is None:
+                        all_runs = []
+                    runs_err = _validate_runs_list(all_runs)
+                    if runs_err:
+                        scan_unreadable = True
+                        ledger_skip = True
+                        kind = "finding"
+                        remedy = read_failure_remedy(False)
+                        read_failures.append(("runs list", runs_err))
+                    else:
+                        window_runs = [r for r in all_runs if run_in_window(r, prev_last, had_entry_before_seed, last_extract)]
+                        week_kind, week_remedy, marker_at, advance_last = classify_window_runs(window_runs, owner, repo)
+                        completed = _completed_runs(window_runs)
+                        if advance_last and completed:
+                            new_last = completed[-1].get("created_at")
+                        failures = [r for r in window_runs if r.get("status") == "completed" and r.get("conclusion") == "failure"]
+                        exit1_id = None
+                        for run in failures:
+                            code, fail = _run_exit_code(owner, repo, run)
+                            if fail:
+                                scan_unreadable = True
+                                ledger_skip = True
+                                kind = "finding"
+                                remedy = read_failure_remedy(False)
+                                read_failures.append(fail)
+                                break
+                            if code == 1:
+                                exit1_id = _digit_id(run.get("id"))
+                        else:
+                            if not scan_unreadable:
+                                cleared = _standing_cleared(prev_standing, prev_last, window_runs, all_runs)
+                                if exit1_id is not None:
+                                    new_standing = exit1_id
+                                elif cleared:
+                                    new_standing = None
+                                else:
+                                    new_standing = prev_standing
+                                if week_kind == "green":
+                                    kind = "green"
+                                    remedy = week_remedy
+                                elif week_kind == "pending_failure":
+                                    last = completed[-1]
+                                    last_code, fail = _run_exit_code(owner, repo, last)
+                                    if fail:
+                                        scan_unreadable = True
+                                        ledger_skip = True
+                                        kind = "finding"
+                                        remedy = read_failure_remedy(False)
+                                        read_failures.append(fail)
+                                    elif last_code == 1:
+                                        kind = "finding"
+                                        remedy = "Open a DEP-<nnn> increment per the merge policy."
+                                    else:
+                                        kind = "scanner failure"
+                                        remedy = "gh workflow run dependency-scan.yml --repo %s/%s" % (owner, repo)
+                                else:
+                                    kind = week_kind
+                                    remedy = week_remedy
+                                if week_kind == "no completed run" and new_standing is not None and not any(
+                                    r.get("status") in ("queued", "in_progress", "waiting") for r in window_runs
+                                ):
+                                    kind = "finding"
+                                    remedy = "Open a DEP-<nnn> increment per the merge policy."
+    alerts_line, alerts_off, alerts_failed = _read_alerts(owner, repo, read_failures)
+    if alerts_failed:
+        remedy = read_failure_remedy(True)
+    scan_success = kind == "green" and alerts_failed
+    if scan_success:
+        kind = "finding"
+    info = {
+        "kind": kind or "finding",
+        "remedy": remedy,
+        "repo": repo_slash,
+        "last_run_read": new_last,
+        "standing": new_standing,
+        "alerts_line": alerts_line,
+        "alerts_off": alerts_off,
+        "read_failures": read_failures,
+        "scan_unreadable": scan_unreadable,
+        "scan_success": scan_success,
+        "alerts_failed": alerts_failed,
+    }
+    if ledger_skip:
+        update = None
+    else:
+        update = {"last_run_read": new_last, "finding_standing": new_standing}
+    return info, update
 
 
 def project_security_section(name, root, entry, meta, had_entry):
     pair = git_origin_repo(root)
     if not pair:
         prev = (entry or {}).get("last_run_read")
-        stand = (entry or {}).get("finding_standing")
+        stand = _normalize_standing((entry or {}).get("finding_standing"))
         return format_security_section(name, {
             "kind": "no remote",
             "remedy": "record a GitHub origin on the Workspace checkout",
@@ -764,6 +1038,12 @@ def format_security_section(project, info):
     lines = ["## %s" % ascii_line(project), ""]
     kind = info.get("kind") or "finding"
     lines.append(ascii_line(kind))
+    if info.get("scan_success"):
+        lines.append(ascii_line("scan: the last completed run ended success"))
+    if info.get("scan_unreadable"):
+        lines.append("the scan could not be read")
+    for read_name, phrase in info.get("read_failures") or []:
+        lines.append("read failed: the %s, %s" % (read_name, phrase))
     if info.get("remedy"):
         lines.append("Remedy: %s" % ascii_line(info["remedy"]))
     if info.get("repo"):
@@ -771,7 +1051,7 @@ def format_security_section(project, info):
     lrr = info.get("last_run_read")
     lines.append("last run read: %s" % (ascii_line(lrr) if lrr else "none"))
     stand = info.get("standing")
-    if stand:
+    if stand is not None:
         lines.append("finding standing: run %s" % ascii_line(str(stand)))
     if info.get("alerts_off"):
         lines.append("alerts off")
