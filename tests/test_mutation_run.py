@@ -472,7 +472,8 @@ def test_r041_timeout_error_continues(tmp_path):
     BUG-047 (stage P3's review, Review A tests1 B1): the test hangs only on the mutated code, so the unmutated
     baseline (TASK-070) passes and the mutant's own run is the one that times out (`(ran)`, run=2), keeping the
     claim on the mutant loop's timeout path; test_r041_pipe_holder_outside_tree_cwd_in_copy_times_out keeps a
-    list that hangs unmutated, for the baseline's own timeout."""
+    list that hangs unmutated, for the baseline's own timeout, and test_r041_baseline_pytest_survives_kill_stops_run
+    a baseline pytest that outlives its kill."""
     ws = workspace(tmp_path)
     init_pkg(ws)
     pid_file = tmp_path / "hang.pid"
@@ -1444,6 +1445,85 @@ def test_loop():
             shutil.rmtree(work, ignore_errors=True)
 
 
+def test_r041_baseline_pytest_survives_kill_stops_run(tmp_path, home_of_the_tests, monkeypatch):
+    """R-041, TASK-031 S7, handoff/TASK-031-r6.md item 6, the baseline's side: a baseline pytest that outlives kill
+    records its list's mutants as timed out and not run, runs no mutant, and ends the run at exit 3.
+
+    BUG-047 round 2 (Review A): the loop runs on the unmutated code, so `run_baselines` returns the list alive."""
+    import io
+    import signal
+    from contextlib import redirect_stderr, redirect_stdout
+
+    mod = load_program("mutation-run")
+    real_kill = mod.kill_tree
+    ws = workspace(tmp_path)
+    init_pkg(ws)
+    loop_pid = tmp_path / "loop.pid"
+    write(ws, "tests/test_loop.py", textwrap.dedent("""
+import os
+LOOP = True
+
+def test_loop():
+    if not LOOP:
+        return
+    open(%r, "w", encoding="utf-8").write(str(os.getpid()))
+    while True:
+        pass
+""" % str(loop_pid).replace("\\", "\\\\")))
+    git(ws, "add", "tests/test_loop.py")
+    body = {"mutants": [
+        {"id": "loop", "file": "tests/test_loop.py", "pairs": [{"old": "LOOP = True", "new": "LOOP = False"}],
+         "tests": ["tests/test_loop.py"], "expect_fail": ["tests/test_loop.py::test_loop"]},
+        {"id": "two", "file": "demo/calc.py", "pairs": [{"old": "return a + b", "new": "return a - b"}],
+         "tests": ["tests/test_calc.py"], "expect_fail": ["tests/test_calc.py::test_add"]},
+    ]}
+    mutants_path(ws, "bsurv", body)
+    git(ws, "add", "run/supervisor/bsurv-mutants.json")
+    scratch = home_of_the_tests / ".cursor-bridge" / "scratch" / "proj"
+    scratch.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(ws)
+    monkeypatch.setenv("HOME", str(home_of_the_tests))
+    monkeypatch.setenv("USERPROFILE", str(home_of_the_tests))
+    monkeypatch.setattr(mod, "kill_tree", lambda _proc: None)
+    monkeypatch.setattr(
+        sys, "argv",
+        ["mutation-run.py", "run/supervisor/bsurv-mutants.json",
+         "--scratch", str(scratch), "--mutant-timeout", "3"],
+    )
+    out_buf = io.StringIO()
+    err_buf = io.StringIO()
+    try:
+        with redirect_stdout(out_buf), redirect_stderr(err_buf):
+            rc = mod.run_main()
+        stdout = out_buf.getvalue()
+        stderr = err_buf.getvalue()
+        assert rc == 3
+        assert "loop: error (timed out) (not run)" in stdout
+        assert "two:" not in stdout
+        assert "counts: run=0 " in stdout
+        assert "pytest did not exit within 3 s after the mutant timeout" in stderr
+        assert "internal error" not in stderr
+        assert loop_pid.is_file()
+    finally:
+        mod.kill_tree = real_kill
+        if loop_pid.is_file():
+            try:
+                lp = int(loop_pid.read_text(encoding="utf-8").strip())
+                if sys.platform == "win32":
+                    subprocess.run(
+                        ["taskkill", "/T", "/F", "/PID", str(lp)],
+                        capture_output=True,
+                        **test_conftest.windowless_kwargs({"stdin": subprocess.DEVNULL, "timeout": 30}),
+                    )
+                else:
+                    os.killpg(os.getpgid(lp), signal.SIGKILL)
+            except (OSError, ValueError, ProcessLookupError):
+                pass
+        work = scratch / "mutation-run-bsurv"
+        if work.is_dir():
+            shutil.rmtree(work, ignore_errors=True)
+
+
 def test_r041_pipe_holder_outside_tree_cwd_in_copy_times_out(tmp_path, home_of_the_tests):
     """R-041, TASK-031 S7, handoff/TASK-031-r6.md item 7: a pipe holder outside the killed tree holds the real pipes until the bound."""
     import signal
@@ -1511,7 +1591,8 @@ def test_hold_pipes():
         assert elapsed >= 30, "the hold on the real pipes did not last through the bounded wait"
         assert elapsed < 5 + 120, "run exceeded bound plus 120 s"
         assert p.returncode == 3
-        assert "phc: error (timed out)" in p.stdout
+        # BUG-047 round 2 (Review A): the hang is the baseline's own, so the mutant is not run, on every platform.
+        assert "phc: error (timed out) (not run)" in p.stdout
         assert "internal error" not in p.stderr
         assert pid_file.is_file()
         assert not (work_sub / "tree" / ".env").exists(), "copied .env must be absent while the holder lives"

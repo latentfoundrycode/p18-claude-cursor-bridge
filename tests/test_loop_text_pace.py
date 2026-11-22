@@ -340,13 +340,19 @@ def test_bug031_evaluate_reports_says_what_the_pace_report_counts():
     # brief, a guard rounds record or a tagged pass line, and PR-<n> from a squash naming no counted name; the
     # sentence that counted only IDs with a tracked brief, and none in a reports-only handoff/, is retired.
     # BUG-033's claim that a report is no brief (`_ids_with_brief`) stands.
-    assert ("An increment is a counted name: an ID with a tracked brief under `handoff/` (a builder report, "
-            "`<ID>-report.md`, `<ID>-r<N>-report.md` or `<ID>-r<N><letter>-report.md`, is no brief), a guard rounds "
-            "record or a tagged pass line in the in-flight log, and `PR-<n>` for a squash on `main` closing `(#<n>)` "
-            "whose subject names no counted name, merged by that closing number; a `STAGE-` or `DESIGN-` name is "
+    assert ("An increment is a counted name, an ID or `PR-<n>`, counted where it has a tracked brief under `handoff/` "
+            "(a builder report, `<ID>-report.md`, `<ID>-r<N>-report.md` or `<ID>-r<N><letter>-report.md`, is no "
+            "brief), a guard rounds record or a tagged pass line in the in-flight log; `PR-<n>` is also counted by a "
+            "squash on `main` closing `(#<n>)` whose subject names no counted name, merged by that closing number, "
+            "and a `PR-<n>` that `main` does not close is started and not merged; a `STAGE-` or `DESIGN-` name is "
             "never one") in t
-    assert ("Each week also prints a cause line, the rounds by their cause, and a passes line by name, reviewer kind "
-            "and round, ending `recorded passes only`.") in t
+    # BUG-047 round 2 (Review A, blocking): the cause line is one for the window, printed only where the window
+    # holds a round after the first, and a passes line stands only for a week holding a pass, counted by kind.
+    assert ("Below those lists it prints, once for the window and only where the window holds a round after the "
+            "first, a `Round causes (<n> rounds after the first):` line counting those rounds by their cause, and for "
+            "each week that holds a recorded pass a line counting the passes by reviewer kind, one pass per name, "
+            "kind and round, ending `recorded passes only`.") in t
+    assert "Each week also prints a cause line" not in t
     assert "so one the supervisor built without a brief is not counted" not in t
     assert "counts no increment at all" not in t
     assert ("(in a project that tracks nothing under `handoff/`, every ID a squash subject names is counted merged, and the "
@@ -355,6 +361,10 @@ def test_bug031_evaluate_reports_says_what_the_pace_report_counts():
     prog = read(os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "pace-report.py"))
     assert 'lifts.get(r, "unknown")' in prog and 'lifts.setdefault(rnd, "none")' in prog
     assert "recorded passes only" in prog and "is counted where it has a brief under a tracked handoff/, a guard rounds record, or a tagged" in flat(prog)
+    assert "The line, printed only where the window holds at least one round after the first, is `Round causes (<n> rounds after the first): `" in flat(prog)
+    assert "one line per week of the window that holds a recorded pass" in flat(prog)
+    assert "A pass is one per name, reviewer kind and round" in flat(prog)
+    assert "A PR-<n> that main does not close is a name of its own, started and not merged." in flat(prog)
 
 
 def test_bug033_a_project_tracking_only_reports_under_handoff_counts_no_increment(program):
