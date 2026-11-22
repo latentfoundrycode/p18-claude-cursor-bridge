@@ -22,9 +22,11 @@ Pool is inferred from the id per Cursor's docs: Grok (any effort/host prefix) an
 the "Cursor Models" pool (native); every third-party model is "Other Models".
 A profile is skipped when other_pool is "exhausted" and any of its models is in the other
 pool. Unless --no-probe, the builder and Review B of a candidate profile are each sent a
-one-word request through `cursor-agent -p -f --model <id>`; a refusal, empty reply,
+  one-word request through `cursor-agent -p -f --model <id>`; a refusal, empty reply,
 usage-limit message or timeout marks the profile unusable (this catches hard failures only,
-never a nearly-empty quota); any other reply counts as answered, off-script. The chosen
+never a nearly-empty quota); any other reply counts as answered, off-script. When the tool
+itself is signed out, its own sign-in line ends the run (exit 5, SIGN-IN) and counts no failure.
+The chosen
 profile's three families must be distinct. The result is written to
 docs/ROSTER.resolved.json for the delegate and Review B commands to read, and only when it
 changes (the time of every check goes to the state file as last_resolved), so a check
@@ -60,7 +62,7 @@ unavailable marks and failure counts, and says so. Timestamps are UTC. ROSTER_NO
 overrides "now" for tests.
 Exit 0 = resolved; 1 = no usable profile, a family collision, or a command mismatch;
 2 = cannot read or a wrong model argument; 3 = pool/model marked exhausted, re-resolve;
-4 = transient, retry once; 5 = repeated connection failures or time-outs, tell the owner.
+4 = transient, retry once; 5 = repeated connection failures or time-outs, or the Cursor tool signed out (SIGN-IN), tell the owner.
 ASCII-only on purpose.
 """
 import datetime
@@ -86,6 +88,9 @@ STATE_KEYS = ("other_pool", "exhausted_at", "exhausted_reason", "auto_exhausted_
 NL = chr(10)
 PROBE_PROMPT = "Reply with exactly the single word OK and nothing else."
 PROBE_TIMEOUT = 150
+SIGN_IN_PREFIX = "Error: Authentication required. Please run 'agent login' first"
+SIGN_IN_LINE = "SIGN-IN  the Cursor command-line tool is signed out: run cursor-agent login"
+PROBE_SIGN_IN = object()
 
 FAMILY_PREFIXES = [
     ("claude", "anthropic"), ("anthropic", "anthropic"),
@@ -174,6 +179,16 @@ def cursor_agent_cmd():
     return bridge_env.cursor_agent_launcher()
 
 
+def tool_sign_in_line_present(text):
+    """True when a line in text is the Cursor tool's own sign-in line (prefix at line start only)."""
+    if not text:
+        return False
+    for line in text.splitlines():
+        if line.strip().startswith(SIGN_IN_PREFIX):
+            return True
+    return False
+
+
 def probe(model_id):
     """Return (ok, detail). ok when the model replied 'OK' (case-insensitive) within the timeout, or
     replied something else that is not a usage-limit message: answered off-script, so the model is
@@ -194,6 +209,8 @@ def probe(model_id):
         return False, "timeout after %ds" % PROBE_TIMEOUT
     except FileNotFoundError:
         return False, "cursor-agent launcher not executable: %s" % launcher[0]
+    if tool_sign_in_line_present(p.stdout or "") or tool_sign_in_line_present(p.stderr or ""):
+        return PROBE_SIGN_IN, ""
     out = (p.stdout or "").strip()
     if p.returncode == 0 and out.strip().strip(".").upper() == "OK":
         return True, "answered"
@@ -375,7 +392,10 @@ def expire_unavailable(roster):
 def record_failure(path, roster, model, text):
     """Mark the model's pool exhausted on a usage-limit message or a second consecutive
     failure within FAILURE_WINDOW_HOURS; a connection error is transient and never counted;
-    otherwise count it. Writes the roster. Returns the exit code (2, 3 or 4)."""
+    otherwise count it. Writes the roster. Returns the exit code (2, 3, 4 or 5)."""
+    if tool_sign_in_line_present(text):
+        print(SIGN_IN_LINE)
+        return 5
     if model not in roster_models(roster):
         print("CANNOT RECORD: %r is not a model in this roster (%s)" % (model, ", ".join(sorted(roster_models(roster)))))
         print("               the argument after --record-failure must be the model id of the failed call; nothing was changed")
@@ -553,6 +573,10 @@ def main():
             usable = True
             for role, mid in (("builder", b_id), ("review_b", r_id)):
                 ok, detail = probe(mid)
+                if ok is PROBE_SIGN_IN:
+                    print("    probe %-8s %s: tool sign-in required" % (role, mid))
+                    print(SIGN_IN_LINE)
+                    return 5
                 print("    probe %-8s %s: %s" % (role, mid, detail))
                 if not ok:
                     usable = False
