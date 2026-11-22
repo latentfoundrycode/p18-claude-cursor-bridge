@@ -323,6 +323,31 @@ def test_r095_r3_probe_the_line_beside_another_stdout_line_is_no_answer(ws, firs
     assert_judged_as_before_round_1(ws, rc, out)
 
 
+@pytest.mark.parametrize("lead", [chr(0x0c), chr(0xa0)], ids=["ff", "nbsp"])
+def test_r095_r3_record_failure_a_line_led_by_another_space_is_not_the_tools(ws, lead):
+    """Accept (the supervisor's): a line is trimmed of space, tab, CR and LF alone, so a line that a form feed or a
+    no-break space leads is not the tool's line, and the failure is counted as today."""
+    err = ws.error_file("call.err", (lead + tool_line() + "\n").encode("utf-8"))
+    before = ws.snapshot()
+    rc, out = ws.run("--record-failure", FIRST[0], "--stderr-file", err)
+    assert_counted_as_today(ws, rc, out, before)
+
+
+def test_r095_r3_record_failure_prints_its_excerpt_in_ascii(ws):
+    """Accept (the supervisor's): the excerpt of a counted failure prints in ASCII even on a UTF-8 console, while
+    the failure is counted as today."""
+    err = ws.error_file("call.err", ("The model said " + chr(0x1F600) + " and stopped.\n").encode("utf-8"))
+    before = ws.snapshot()
+    env = dict(ws.env)
+    env["PYTHONIOENCODING"] = "utf-8"
+    p = subprocess.run([sys.executable, PROG, str(ws.roster), "--record-failure", FIRST[0], "--stderr-file", err],
+                       capture_output=True, env=env, cwd=str(ws.repo), timeout=300)
+    out = (p.stdout + p.stderr).decode("ascii", errors="replace")
+    assert_counted_as_today(ws, p.returncode, out, before)
+    assert "excerpt:" in out, out
+    p.stdout.decode("ascii")
+
+
 def test_r095_r3_probe_returns_a_falsy_signed_out_result_in_its_pair(program, monkeypatch):
     """Round 3: probe returns a pair whose first value, for a signed-out tool, is the module's constant and is
     false, on either stream."""
