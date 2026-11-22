@@ -617,3 +617,84 @@ def test_r3_a_gitdir_target_that_is_a_link_is_not_followed(tmp_path):
         assert status == "NOTE", out
     finally:
         unlink_dir(named)
+
+
+# ---------------------------------------------------------------- rebuild round 2: a network gitdir, either slash order
+
+NET_HOST = "nohost.invalid"
+
+GUARD_RUNNER = r'''
+import os, runpy, subprocess, sys
+MARK = "nohost.invalid"
+
+
+def touched(what):
+    sys.stderr.write("TOUCHED-NETWORK-PATH %s\n" % what)
+    raise OSError("the test refuses a filesystem or git call on the network path")
+
+
+def hit(value):
+    try:
+        return MARK in os.fsdecode(value).lower()
+    except TypeError:
+        return MARK in str(value).lower()
+
+
+def guard(name, fn):
+    def wrapped(path, *a, **k):
+        if hit(path):
+            touched(name)
+        return fn(path, *a, **k)
+    return wrapped
+
+
+for name in ("lstat", "stat", "scandir", "listdir"):
+    setattr(os, name, guard(name, getattr(os, name)))
+for name in ("isdir", "isfile", "exists", "lexists", "islink", "realpath"):
+    setattr(os.path, name, guard(name, getattr(os.path, name)))
+import builtins
+builtins.open = guard("open", builtins.open)
+_Popen = subprocess.Popen
+
+
+class GuardedPopen(_Popen):
+    def __init__(self, args, *a, **k):
+        env = k.get("env") or {}
+        if any(hit(v) for v in env.values()) or any(hit(x) for x in (args if isinstance(args, (list, tuple)) else [args])):
+            touched("subprocess")
+        super().__init__(args, *a, **k)
+
+
+subprocess.Popen = GuardedPopen
+target = sys.argv[1]
+sys.argv = sys.argv[1:]
+runpy.run_path(target, run_name="__main__")
+'''
+
+
+@pytest.mark.parametrize("gitdir", [
+    "//" + NET_HOST + "/share/x",
+    "\\\\" + NET_HOST + "\\share\\x",
+    "/\\" + NET_HOST + "\\share\\x",
+    "\\/" + NET_HOST + "/share/x",
+], ids=["two-slashes", "two-backslashes", "slash-then-backslash", "backslash-then-slash"])
+def test_rebuild_r2_a_network_gitdir_in_either_slash_order_is_never_touched(tmp_path, gitdir):
+    """R-092, TASK-072 (handoff/TASK-072-r2.md, correction 3: a `gitdir:` value beginning with two slashes or two
+    backslashes, in either order of slash, is read as no git folder before any os.path call touches it, so that
+    reading the row never opens a network connection): the security audit of the native rebuild, round 1. The
+    check runs under a runner that refuses, and reports, any filesystem call, file open or git launch naming the
+    value's host (nohost.invalid, which no resolver answers); the row is NOTE, the repository having no git folder
+    of its own. The rebuild's round 1 refused only `//` and two backslashes, so the two mixed orders reached
+    os.lstat (on Windows a network share)."""
+    ws = make_project(tmp_path, gate("--lockfile='requirements.txt:requirements.lock'"))
+    os.rename(os.path.join(str(ws), ".git"), str(tmp_path / "old-git"))
+    put(ws, ".git", "gitdir: " + gitdir + "\n")
+    runner = tmp_path / "guard_runner.py"
+    runner.write_text(GUARD_RUNNER, encoding="utf-8")
+    kw = suite_conftest.windowless_kwargs({"capture_output": True, "text": True, "encoding": "utf-8",
+                                           "errors": "replace", "timeout": 300})
+    p = subprocess.run([sys.executable, str(runner), CONFORMANCE, str(ws), "--offline"], cwd=str(ws), **kw)
+    out = p.stdout + p.stderr
+    assert "TOUCHED-NETWORK-PATH" not in out, out
+    status, _detail = weekly_row(out)
+    assert status == "NOTE", out
