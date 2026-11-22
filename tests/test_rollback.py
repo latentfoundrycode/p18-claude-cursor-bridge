@@ -448,3 +448,37 @@ def test_a_rollback_killed_part_way_is_finished_with_the_release_folders_install
     note = (target / "cursor-bridge" / "ROLLED-BACK.md").read_text(encoding="utf-8")
     assert "## " + NEW_VERSION in note, "the note written before the files changed survives the repeated run"
     assert not (target / "cursor-bridge-previous").exists()
+
+
+# ---- builder's cases below this line
+
+
+def test_r094_keep_with_rollback_is_refused(tmp_path, installed_old_then_new):
+    """R-094: --keep given together with --rollback is refused with exit 2 and changes nothing."""
+    target, _ = installed_old_then_new
+    rc, out = run(NEW_INSTALLER, tmp_path, "--rollback", "--target", str(target), "--keep", OLD_VERSION)
+    assert rc == 2 and "Traceback" not in out, out
+    assert "--keep" in out and "--rollback" in out
+    assert version_of(target) == NEW_VERSION
+    assert (target / "cursor-bridge-previous" / OLD_VERSION).is_dir()
+    assert not (target / "cursor-bridge" / "ROLLED-BACK.md").exists()
+
+
+def test_r094_marker_names_the_spare_after_a_failed_install_check(tmp_path, old_release, monkeypatch, capsys):
+    """R-094: after a failed install check the marker names the copy the rotation spared, and the next install keeps it."""
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "localappdata"))
+    target = tmp_path / ".claude"
+    target.mkdir()
+    (target / "settings.json").write_text(json.dumps(OWNER, indent=2), encoding="utf-8")
+    assert install_new(tmp_path, target)[0] == 0
+    assert install_old(tmp_path, old_release, target)[0] == 0
+    bi = load_installer(RELEASE)
+    with monkeypatch.context() as m:
+        m.setattr(bi, "run_check", lambda t: 1)
+        assert bi.install(str(target), False, anyway=True, keep=NEW_VERSION) == 1
+    marker = target / "cursor-bridge-previous" / ".keep"
+    assert marker.is_file() and marker.read_text(encoding="utf-8").strip() == NEW_VERSION
+    assert (target / "cursor-bridge-previous" / NEW_VERSION / "cursor-bridge" / "session-start.py").is_file()
+    capsys.readouterr()
+    assert install_new(tmp_path, target)[0] == 0
+    assert (target / "cursor-bridge-previous" / NEW_VERSION / "cursor-bridge" / "session-start.py").is_file()
