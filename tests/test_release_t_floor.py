@@ -109,72 +109,30 @@ FROZEN = (
     "          exit \"$code\"\n"
 )
 
-# --- the Sunday evaluation
-EV_NOTE = ("Before the extract, note the ledger's `_meta.last_extract`, the previous run's date, which the extract "
-           "rewrites: it opens the window step 1b reads.")
-EV_HEAD = ("1b. **Read the weekly dependency scan and the Dependabot alerts**, for every project, a week with nothing new "
-           "included (R-052; the three kinds below are the bridge design's, `docs/DESIGN.md`, \"The weekly dependency "
-           "scan\"). `<owner>/<repo>` is the project's GitHub repository, read from its `origin` remote. First the "
-           "workflow's state:")
-EV_COMMANDS = (
-    "gh workflow list --all --repo <owner>/<repo>",
-    "gh run list --repo <owner>/<repo> --workflow dependency-scan.yml --created \">=<the ledger's _meta.last_extract>\" "
-    "--json databaseId,createdAt,status,conclusion",
-    "gh run view <run id> --repo <owner>/<repo> --log-failed",
-    "gh api repos/<owner>/<repo>/vulnerability-alerts",
-    "gh api --paginate \"repos/<owner>/<repo>/dependabot/alerts?state=open\"",
+# --- the Sunday evaluation (TASK-078, R-097: step 1b is the security step's command; the window, the kinds and the
+# alerts reading are evaluate-reports.py's, held by tests/test_program_security_step.py)
+EV_NOTE = "Before the extract, run step 1b. Then:"
+EV_HEAD = ("1b. **The weekly dependency scan and the Dependabot alerts**, for every project, a week with nothing new "
+           "included (R-052, R-097), run before the extract, which rewrites the ledger's `_meta.last_extract` that the "
+           "window of a project with no earlier read falls back on:")
+EV_COMMAND = "python ~/.claude/cursor-bridge/evaluate-reports.py security"
+EV_SENTENCES = (
+    "(a finding, a scanner failure, no completed run since the previous evaluation, the three of the bridge design's "
+    "\"The weekly dependency scan\"; or `not configured`, `no remote`, or green)",
+    # Review A of TASK-078, B1: the program writes `alerts off` beside a green kind; R-052 makes it a finding
+    "its alerts and the remedy; `alerts off` and each open alert are findings of their own, beside the kind, "
+    "whatever the kind reads.",
+    "A finding is fixed by a `DEP-<nnn>` increment (the merge policy's procedure), never by an unreviewed change; a 403 "
+    "is the login's scope, named in a run sheet for the owner, never a token in text;",
+    "Step 4's **Dependency scan** section is that file's, written every week beside the Pace section; a finding is an "
+    "entry of the evaluation like any other.",
 )
-EV_WINDOW = (
-    "The date is a day and the schedule runs on the morning of the evaluation's own Sunday, so that list also holds "
-    "the runs the previous evaluation read. The window is the listed runs whose `createdAt` is later than the `last "
-    "run read:` time the previous evaluation's Dependency scan section gives for the project, every listed run where "
-    "that section reads `last run read: none`, and, where no previous section names the project, the listed runs "
-    "whose `createdAt` falls on a later day than that date, so a run of that day cannot cover this Sunday; each "
-    "evaluation's section gives, per project, `last run read: <createdAt>`, the creation time of the newest "
-    "completed run of its window, or the previous section's value where the window completed none, `none` where "
-    "there was no previous one, so a run still in progress at the reading is read the next Sunday (an older one "
-    "beside a newer completed run goes unread, the newer run's time passing it), and a late or missing schedule "
-    "leaves the window without a completed run. A run re-run from the Actions tab keeps its creation time and is not "
-    "read again; the rerun this step names, `gh workflow run`, starts a new run. While a finding stands, the section "
-    "also gives `finding standing: run <id>`, carried from each section to the next until a later run ends "
-    "`success`, so the finding is reported every week it stands, beside whatever kind the week's own runs show.")
-EV_NOT_CONFIGURED = (
-    "A list that holds no `dependency-scan` names a project that has not received the workflow yet (one not "
-    "calibrated to release T): it is written `not configured`, its calibration's item, with `last run read: none`, "
-    "and no run is read for it.")
 EV_EVERY_WEEK = (
     "and the evaluation file only those and its Pace and Dependency scan sections (the ledger keeps the run's date)",
     "a creeping slowdown named the week it starts; then the **Dependency scan** section step 1b gives.",
     "In a week with nothing new the file is written all the same, holding the Pace and Dependency scan sections and "
     "any entry the owner's messages raised.",
     "A Sunday with nothing new writes the Pace and Dependency scan sections and any entry the owner's messages raised.",
-)
-EV_SENTENCES = (
-    "Any disabled state of the workflow (`disabled_inactivity`, `disabled_manually`) is the third kind below whatever "
-    "its runs show: GitHub disables a public repository's scheduled workflows after 60 days with no activity, and "
-    "`gh run list` lists no run of a disabled workflow without `--all`.",
-    "**A finding**: a completed run of the window ended `failure` and its exit line reads `exit 1`, a flaw in a "
-    "dependency, fixed by a `DEP-<nnn>` increment (the merge policy's procedure), never by an unreviewed change; it "
-    "stands until a later run ends `success`, in this window or a later one.",
-    "**A scanner failure**: the window's last completed run proved nothing, a `failure` with "
-    "another exit code or no exit line at all, or any conclusion other than `success` and `failure`; it is reported "
-    "with the rerun's one command, `gh workflow run dependency-scan.yml --repo <owner>/<repo>`, and the rerun is read at "
-    "the next evaluation, a finding that stands reported beside it, superseded by nothing but a `success`.",
-    "**No completed run since the previous evaluation**: the workflow disabled, no run of the window listed, a list the "
-    "login cannot read, or only runs still queued or in progress, a finding of its own and never green (KP-005: silence "
-    "is not green), reported with its remedy: where the workflow is disabled, a run sheet for the project's owner "
-    "(`gh workflow enable dependency-scan.yml`, then `gh workflow run dependency-scan.yml`); where no run is listed, the "
-    "rerun command; where a run is in progress, none, the next Sunday reading it.",
-    "A window whose last completed run ended `success`, with no finding standing, is green.",
-    "answers 204 where the alerts are enabled and 404 where they are not, a 404 the finding \"alerts off\" and the "
-    "second call not made; after a 204,",
-    "lists the open alerts, every page of them, an empty list being alerts on with nothing open. A 403 on either call is "
-    "the login's scope, named in a run sheet for the owner, never a token in text, the project's Security tab the "
-    "fallback.",
-    "Step 4's file gives each project's kind, its `last run read:` time and any `finding standing:` run, its alerts and "
-    "the remedy in a **Dependency scan** "
-    "section, written every week beside the Pace section; a finding of either is an entry of the evaluation like any "
-    "other.",
 )
 
 # --- T12 and T19
@@ -308,18 +266,17 @@ def test_r052_the_block_s_pins_are_the_floor_s():
 
 
 def test_r052_evaluate_reports_reads_the_scan_in_three_kinds():
+    """R-052's weekly read, since TASK-078 (R-097) the security step's one command, run before the extract."""
     text = read(EVALUATE)
     t = flat(text)
     assert EV_NOTE in t
     assert t.index(EV_NOTE) < t.index("python ~/.claude/cursor-bridge/evaluate-reports.py extract")
     assert EV_HEAD in t
     assert t.index("pace-report.py --tokens") < t.index(EV_HEAD) < t.index("2. **Classify**")
-    lines = bash_blocks(text)
-    for cmd in EV_COMMANDS:
-        assert cmd in lines, cmd
-    for sentence in EV_SENTENCES + (EV_WINDOW, EV_NOT_CONFIGURED) + EV_EVERY_WEEK:
+    assert EV_COMMAND in bash_blocks(text)
+    for sentence in EV_SENTENCES + EV_EVERY_WEEK:
         assert sentence in t, sentence[:60]
-    assert t.index(EV_WINDOW) < t.index("--log-failed")
+    assert "gh run list" not in t and "gh api" not in t, "step 1b's reads are the program's"
     assert "Pace section and any entry" not in t, "a nothing-new week names the Dependency scan section too"
 
 

@@ -201,7 +201,9 @@ def test_bug042_the_evaluation_reads_the_list_by_what_it_prints():
     `dependency-scan`, never its file, so a reading of the file's name made every configured project `not configured`."""
     text = flat(read(BRIDGE, "commands", "evaluate-reports.md"))
     assert "A list that holds no `dependency-scan.yml`" not in text
-    assert "A list that holds no `dependency-scan` names a project that has not received the workflow yet" in text
+    # TASK-078 (R-097): step 1b is the security step's command, and the program reads the list; the text names the kind
+    assert "python ~/.claude/cursor-bridge/evaluate-reports.py security" in text
+    assert "or `not configured`, `no remote`, or green" in text
     assert "name: dependency-scan\n" in weekly(), "the name the list prints"
 
 
@@ -211,9 +213,10 @@ def test_bug042_the_guide_and_the_evaluation_know_the_stop_s_two_cases():
     waiting for a newer pin as its calibration's item, which that calibration cannot act on."""
     guide = flat(read(BRIDGE, "cursor-bridge", "Cursor-Project-Configuration.md"))
     assert "Two cases go without it, each with its reason in `docs/INVENTORY.md` (`cursor-configurator`, the stop): a project with no GitHub remote has nowhere to run it, and a floor pin newer than the block's waits for the bridge release that carries the newer pin." in guide
+    # TASK-078 (R-097): the security step names the two cases by its kinds; the recorded reason is the inventory's row
     text = flat(read(BRIDGE, "commands", "evaluate-reports.md"))
-    assert "A project with no GitHub remote has no list to read and no alerts: it is written `no remote`, with the reason its inventory records, a finding where it records none, and no run and no alert is read for it." in text
-    assert "Where its inventory records that the file waits for the bridge release that carries a newer floor pin, that reason takes the place of the calibration's item." in text
+    assert "or `not configured`, `no remote`, or green" in text
+    assert "For a project written `no remote` or `not configured`, read its inventory's Decisions row that begins `Weekly scan:`: the reason it records (no GitHub remote, or a newer floor pin waiting for the bridge release that carries it) takes the place of the finding or the calibration's item, and a project that records none keeps them." in text
 
 
 def test_bug042_negative_a_stripped_suite_launch_gets_its_key_file(tmp_path):

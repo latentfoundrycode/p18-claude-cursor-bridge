@@ -870,7 +870,8 @@ every finding of an increment's review outside the five goes to `docs/HARDENING.
     runs only what needs no key. The session record keeps the value.
 54. **A pause writes the position down first.** When the owner pauses the project, in any
     wording, before you wait: `Awaiting user on: paused by the owner — resume on their word`,
-    `In flight:`, `Next:` with the exact next action, `Working files:`; move every script or
+    `Next:` with the exact next action, `Working files:`, and the live position in the in-flight
+    log (`python ~/.claude/cursor-bridge/in-flight.py "<text>"`); move every script or
     note you need that exists only in this session (its temporary folder, this conversation)
     into `run/supervisor/` (gitignored), and confirm in one line. Your working files live
     there always, listed on the `Working files:` line, never in a session's temporary folder,

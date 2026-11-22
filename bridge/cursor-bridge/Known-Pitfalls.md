@@ -415,10 +415,6 @@ it applies.** Each heading states its pitfall in one sentence, since the heading
 - **Correction (2026.10.10b):** the guard reads a start as ISO or epoch, a wake-up by its next time or its cron expression, a launched command under any type name; it records its input under `run/supervisor/loop-guard-input.json` so the next such difference has evidence.
 - **Applies:** every program that reads a hook's input. The sign: a refusal whose reason contradicts what the session can see (a builder "started 0s ago", a scheduled wake-up "not seen").
 
-### KP-041 — Writing the In-flight line during a review is GATE-INTEGRITY
-- **Surfaced:** reAngle, 2026-10-10: rule 43 said to write the waited-on agent on the status file's In-flight line, while a Review B ran on a snapshot of the tree; the write changed the reviewed tree, which `review-guard.py verify` reports.
-- **Correction (2026.10.10b):** the live position goes to `run/supervisor/in-flight.md`, the one place the supervisor writes while a snapshot is under review.
-
 ### KP-042 — A test-writing subagent left polling loops behind, which the guard counted as the supervisor's agents
 - **Surfaced:** reAngle, 2026-10-10 (pull request 86): four `until grep -q ^exit <task output>; do sleep 15; done` loops, left by a subagent polling task-output files that no longer existed, ran on; the loop guard (under 2026.10.10a's defects) listed them among the supervisor's agents.
 - **Cause:** a subagent waited on its own background commands with a shell loop instead of the app's notification, and nothing ended the loops when their files vanished.
@@ -470,13 +466,13 @@ it applies.** Each heading states its pitfall in one sentence, since the heading
 ### KP-050 — A vulnerability newly published against a pinned lock entry failed every pull request at once
 - **Surfaced:** the TDP, 2026-09-29 and 2026-10-01 (DEP-001, DEP-002; gotcha 16): OSV-Scanner failed every open pull request after an advisory was published for a pinned dependency none of them touched; the supervisor had to invent the procedure.
 - **Cause:** the scanner reads the lockfile, so a new advisory blocks every branch regardless of its diff.
-- **Correction:** the merge policy's procedure (release A5): a separate `DEP-<nnn>` increment off `main` bumps the pin, writes the change-log entry and passes the sentinel, both reviews and CI; it merges first, then `main` is merged into each blocked branch; nothing in a blocked branch is edited to pass.
+- **Correction:** the merge policy's paragraph on a vulnerability newly published in a pinned library.
 - **Applies:** every project with a lock-reading scanner in CI. The sign: several pull requests failing the scanner on the same advisory on the same day.
 
 ### KP-051 — A CI watch started right after a push reported the previous commit's finished run
 - **Surfaced:** the TDP, 2026-09-30 (TASK-117-r2; gotcha 14): the watch ended green on the run of the commit before the push, since the new run had not started when the watch began.
 - **Cause:** the watch takes the newest run it sees, not the run of the pushed head.
-- **Correction:** when a watch ends, the green run's head is confirmed to equal the pushed head (`gh pr view <n> --json statusCheckRollup,headRefOid`) before the merge; `premerge` checks the pull request's head as well; the maintainer's own rule is the same (a release is handed over only after its checks ran green on the pushed head, 2026-10-11).
+- **Correction:** when a watch ends, `review-guard.py ready <n>` confirms the required checks ran green on the pushed head before the merge (step 8); `premerge` checks the pull request's head as well; the maintainer's own rule is the same (a release is handed over only after its checks ran green on the pushed head, 2026-10-11).
 - **Applies:** every CI watch. The sign: a watch that ends within seconds of the push.
 
 ### KP-052 — An escape typed in a here-document arrived as the real character

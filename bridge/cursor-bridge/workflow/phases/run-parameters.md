@@ -28,7 +28,7 @@ one combined brief (rule 29). The parameters:
      begins.
 2. **Merge authority** — who completes a merge to `main` once the full gate holds (CI green,
    Review A and Review B APPROVE, no gate-integrity flag).
-   - `supervisor` *(default)* — you arm and complete the merge yourself (step 8, the merge
+   - `supervisor` *(default)* — you complete the merge yourself (step 8, the merge
      policy). This is what "AI-handled automatic merging" in the guides means, and it needs
      the per-repo setup the startup guide describes.
    - `owner` — you do everything up to the merge, then stop with **"READY TO MERGE"**: the
