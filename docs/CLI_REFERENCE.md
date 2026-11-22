@@ -80,8 +80,8 @@ Path: `bridge/cursor-bridge/bridge-install.py`
 bridge-install: install or update the bridge into ~/.claude from a release folder, and
 take a release back.
 
-  python <release>/cursor-bridge/bridge-install.py [--target <path-to-.claude>] [--dry-run] [--anyway]
-  python <release>/cursor-bridge/bridge-install.py --rollback [--target <path-to-.claude>] [--dry-run]
+  python <release>/cursor-bridge/bridge-install.py [--target <path-to-.claude>] [--dry-run] [--anyway] [--keep <version>|none]
+  python <release>/cursor-bridge/bridge-install.py --rollback [<version>] [--target <path-to-.claude>] [--dry-run]
 
 The release folder is the one this file lives in (its parent is the release tree: commands/,
 agents/, skills/, cursor-bridge/; in the bridge's repository that tree is `bridge/`). Both
@@ -125,22 +125,29 @@ Installing:
      and reviewer runs get, %USERPROFILE%/.cursor-bridge/agent-home (KP-038);
   4. runs bridge-check.py on the result and prints its verdict.
 
-Taking a release back (--rollback) is the same replacement with the kept release as its
-source, so every install exercises the way back: the files, the allow and deny entries and
-the hooks only the newer release added go, the owner's keys stay, the kept release's shim
-is installed. The "If rolled back" items of the release taken back are written to
-cursor-bridge/ROLLED-BACK.md for /calibrate-bridge (the restored changelog no longer holds
-them; the next install removes the note), bridge-check.py runs on the result, and the kept
-copy is removed only when that check passes. A kept copy that is not complete, or not the
-release as shipped, is refused before anything changes.
+--keep <version> marks a folder already under <target>/cursor-bridge-previous/ so the next
+installs keep it beside the one previous release (until another --keep or --keep none). The
+value is the folder's name, not a path.
+
+Taking a release back (--rollback, or --rollback <version> for an older kept copy) is the
+same replacement with the kept release as its source, so every install exercises the way
+back: the files, the allow and deny entries and the hooks only the newer release added go,
+the owner's keys stay, the kept release's shim is installed. The "If rolled back" items of
+the release taken back are written to cursor-bridge/ROLLED-BACK.md for /calibrate-bridge
+(the restored changelog no longer holds them; the next install removes the note),
+bridge-check.py runs on the result, and the kept copy is removed only when that check
+passes (every kept copy newer than the target goes then too). A kept copy that is not
+complete, or not the release as shipped, is refused before anything changes.
 
 The bridge is installed once per computer, so an install and a rollback reach every project:
 the release's changelog entry says what a project that had calibrated forward must restore
 ("If rolled back"), and /calibrate-bridge applies it.
 
-Exit 0 = installed (or rolled back) and verified; 1 = verification failed; 2 = refused,
-stopped by a file that could not be read or written (the same command can be run again),
-or nothing to roll back to. ASCII-only on purpose (cp1252 consoles).
+Exit 0 = installed (or rolled back) and verified; 1 = verification failed; 2 = refused
+(a word the command line does not know, a missing value, or a --keep or --rollback value
+that is not exactly the name of a kept folder), stopped by a file that could not be read
+or written (the same command can be run again), or nothing to roll back to. ASCII-only on
+purpose (cp1252 consoles).
 ```
 
 ## bridge-run.py

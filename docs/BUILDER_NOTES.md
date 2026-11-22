@@ -115,3 +115,5 @@
 
 2026-11-21 TASK-072-r2: Git for Windows 2.53's `git config --local` already skips include directives, the global file, and `GIT_CONFIG_COUNT` / `GIT_CONFIG_PARAMETERS` (those pairs show up only when no file scope is given), so dropping `--local`, `--no-includes`, or the `GIT_CONFIG*` strip one at a time leaves the round-2 remote cases green; all three stay, as the brief requires.
 2026-11-21 TASK-072-r3: CPython compiles `stat.FILE_ATTRIBUTE_REPARSE_POINT` only on Windows, so `_own_git_dir` reads it with `getattr(..., 0)`; a bare name raises `AttributeError` on Linux while stating an ordinary `.git` directory, and that error is not an `OSError`, so it would leave the function.
+
+2026-11-21 TASK-073-r2: `git checkout -- bridge-install.py` during mutation checks reverts the whole file; keep a sidecar copy and re-run `make-manifest.py` if a scratch file was hashed before deletion.
