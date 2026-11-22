@@ -254,3 +254,15 @@ def test_r095_a_model_sentence_in_an_error_file_is_counted_as_today(ws):
     assert after["state"] != before["state"], "the failure is written to the state file as today"
     state = json.loads(after["state"].decode("utf-8"))
     assert state.get("failures", {}).get(FIRST[0], {}).get("count") == 1, state
+
+
+def test_r095_the_tools_whole_line_quoted_inside_a_model_sentence_is_counted_as_today(ws):
+    """Guard: the tool's line is matched as a whole line as the tool prints it, so a model's sentence that quotes
+    the whole of it after other words is a first failure, counted as today."""
+    line = sign_in_bytes().decode("ascii").strip()
+    err = ws.error_file("call.err", ("The tool said: " + line + " and stopped.\n").encode("ascii"))
+    before = ws.snapshot()
+    rc, out = ws.run("--record-failure", FIRST[0], "--stderr-file", err)
+    assert rc == 4, "a first failure, counted as today: " + out
+    assert not any(l.lstrip().startswith("SIGN-IN") for l in lines_of(out)), out
+    assert ws.snapshot()["state"] != before["state"], "the failure is written to the state file as today"
