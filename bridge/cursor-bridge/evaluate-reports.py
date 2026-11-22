@@ -85,6 +85,7 @@ PROJECTS_FILE_LABEL = "~/.cursor-bridge/projects.json"
 HTTPS_ORIGIN_RX = re.compile(r"^https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$")
 SSH_ORIGIN_RX = re.compile(r"^git@github\.com:([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?$")
 DEP_SCAN_SUFFIX = "/dependency-scan.yml"
+DEP_SCAN_RERUN = "gh workflow run dependency-scan.yml --repo %s/%s"
 EXIT_LINE_RX = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z dependency-scan: OSV-Scanner exit (\d+)$")
 GIT_REMOTE_LIMIT = 30
 SCANNER_OTHER = frozenset(("cancelled", "timed_out", "startup_failure", "skipped", "action_required", "neutral", "stale"))
@@ -499,23 +500,6 @@ def github_repo_from_url(url):
     return None
 
 
-def _git_env():
-    env = os.environ.copy()
-    env["GIT_OPTIONAL_LOCKS"] = "0"
-    env["GIT_NO_LAZY_FETCH"] = "1"
-    for key in (
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_COMMON_DIR",
-        "GIT_NAMESPACE",
-    ):
-        env.pop(key, None)
-    return env
-
-
 def git_origin_repo(project_root):
     ws = os.path.join(project_root, "Workspace")
     git_dir = os.path.join(ws, ".git")
@@ -530,7 +514,7 @@ def git_origin_repo(project_root):
             creationflags=bridge_env.NO_WINDOW,
             timeout=GIT_REMOTE_LIMIT,
             text=True,
-            env=_git_env(),
+            env=bridge_env.git_read_env(),
         )
     except (subprocess.TimeoutExpired, OSError):
         return None
@@ -832,7 +816,7 @@ def _run_exit_code(owner, repo, run):
 
 def classify_window_runs(window_runs, owner, repo):
     completed = _completed_runs(window_runs)
-    rerun = "gh workflow run dependency-scan.yml --repo %s/%s" % (owner, repo)
+    rerun = DEP_SCAN_RERUN % (owner, repo)
     if not completed:
         if any(r.get("status") in ("queued", "in_progress", "waiting") for r in window_runs):
             return "no completed run", None, None, False
@@ -916,7 +900,7 @@ def scan_project(owner, repo, entry, meta, had_entry_before_seed):
     prev_standing = _normalize_standing((entry or {}).get("finding_standing"))
     read_failures = []
     scan_unreadable = False
-    ledger_skip = False
+    failure = None
     kind = None
     remedy = None
     new_last = prev_last
@@ -925,19 +909,11 @@ def scan_project(owner, repo, entry, meta, had_entry_before_seed):
     wf_path = "repos/%s/%s/actions/workflows" % (owner, repo)
     ok, reason, body = bridge_env._gh_get(wf_path)
     if not ok:
-        scan_unreadable = True
-        ledger_skip = True
-        kind = "finding"
-        remedy = read_failure_remedy(False)
-        read_failures.append(("workflows list", _api_failure_phrase(reason, body)))
+        failure = ("workflows list", _api_failure_phrase(reason, body))
     else:
         wf_err = _validate_workflows_body(body)
         if wf_err:
-            scan_unreadable = True
-            ledger_skip = True
-            kind = "finding"
-            remedy = read_failure_remedy(False)
-            read_failures.append(("workflows list", wf_err))
+            failure = ("workflows list", wf_err)
         else:
             wf = dependency_workflow(body)
             if wf is None:
@@ -946,7 +922,7 @@ def scan_project(owner, repo, entry, meta, had_entry_before_seed):
                 new_standing = prev_standing
             elif (wf.get("state") or "") != "active":
                 enable = "gh workflow enable dependency-scan.yml --repo %s/%s" % (owner, repo)
-                rerun = "gh workflow run dependency-scan.yml --repo %s/%s" % (owner, repo)
+                rerun = DEP_SCAN_RERUN % (owner, repo)
                 kind = "no completed run"
                 remedy = "%s; then %s" % (enable, rerun)
                 new_standing = prev_standing
@@ -955,89 +931,64 @@ def scan_project(owner, repo, entry, meta, had_entry_before_seed):
                 runs_path = "repos/%s/%s/actions/workflows/dependency-scan.yml/runs?created=>=%s&per_page=100" % (owner, repo, day)
                 ok, reason, runs_body = bridge_env._gh_get(runs_path)
                 if not ok:
-                    scan_unreadable = True
-                    ledger_skip = True
-                    kind = "finding"
-                    remedy = read_failure_remedy(False)
-                    read_failures.append(("runs list", _api_failure_phrase(reason, runs_body)))
-                elif not isinstance(runs_body, dict):
-                    scan_unreadable = True
-                    ledger_skip = True
-                    kind = "finding"
-                    remedy = read_failure_remedy(False)
-                    read_failures.append(("runs list", "reply could not be parsed"))
+                    failure = ("runs list", _api_failure_phrase(reason, runs_body))
                 else:
-                    all_runs = runs_body.get("workflow_runs")
-                    if not isinstance(all_runs, list):
-                        scan_unreadable = True
-                        ledger_skip = True
-                        kind = "finding"
-                        remedy = read_failure_remedy(False)
-                        read_failures.append(("runs list", "reply could not be parsed"))
+                    all_runs = runs_body.get("workflow_runs") if isinstance(runs_body, dict) else None
+                    runs_err = _validate_runs_list(all_runs)
+                    if runs_err:
+                        failure = ("runs list", runs_err)
                     else:
-                        runs_err = _validate_runs_list(all_runs)
-                        if runs_err:
-                            scan_unreadable = True
-                            ledger_skip = True
-                            kind = "finding"
-                            remedy = read_failure_remedy(False)
-                            read_failures.append(("runs list", runs_err))
+                        window_runs = [r for r in all_runs if run_in_window(r, prev_last, had_entry_before_seed, last_extract)]
+                        week_kind, week_remedy, marker_at, advance_last = classify_window_runs(window_runs, owner, repo)
+                        completed = _completed_runs(window_runs)
+                        if advance_last and completed:
+                            new_last = completed[-1].get("created_at")
+                        failures = [r for r in window_runs if r.get("status") == "completed" and r.get("conclusion") == "failure"]
+                        exit1_id = None
+                        exit1_at = None
+                        for run in failures:
+                            code, fail = _run_exit_code(owner, repo, run)
+                            if fail:
+                                failure = fail
+                                break
+                            if code == 1:
+                                created = parse_utc(run.get("created_at"))
+                                rid = _digit_id(run.get("id"))
+                                if rid is not None and created and (exit1_at is None or created > exit1_at):
+                                    exit1_id = rid
+                                    exit1_at = created
                         else:
-                            window_runs = [r for r in all_runs if run_in_window(r, prev_last, had_entry_before_seed, last_extract)]
-                            week_kind, week_remedy, marker_at, advance_last = classify_window_runs(window_runs, owner, repo)
-                            completed = _completed_runs(window_runs)
-                            if advance_last and completed:
-                                new_last = completed[-1].get("created_at")
-                            failures = [r for r in window_runs if r.get("status") == "completed" and r.get("conclusion") == "failure"]
-                            exit1_id = None
-                            exit1_at = None
-                            for run in failures:
-                                code, fail = _run_exit_code(owner, repo, run)
-                                if fail:
-                                    scan_unreadable = True
-                                    ledger_skip = True
-                                    kind = "finding"
-                                    remedy = read_failure_remedy(False)
-                                    read_failures.append(fail)
-                                    break
-                                if code == 1:
-                                    created = parse_utc(run.get("created_at"))
-                                    rid = _digit_id(run.get("id"))
-                                    if rid is not None and created and (exit1_at is None or created > exit1_at):
-                                        exit1_id = rid
-                                        exit1_at = created
+                            cleared = _standing_cleared(prev_standing, prev_last, window_runs, all_runs)
+                            if exit1_id is not None and not _standing_cleared(exit1_id, prev_last, window_runs, all_runs):
+                                new_standing = exit1_id
+                            elif exit1_id is not None:
+                                new_standing = None
+                            elif cleared:
+                                new_standing = None
                             else:
-                                if not scan_unreadable:
-                                    cleared = _standing_cleared(prev_standing, prev_last, window_runs, all_runs)
-                                    if exit1_id is not None and not _standing_cleared(exit1_id, prev_last, window_runs, all_runs):
-                                        new_standing = exit1_id
-                                    elif exit1_id is not None:
-                                        new_standing = None
-                                    elif cleared:
-                                        new_standing = None
-                                    else:
-                                        new_standing = prev_standing
-                                    if week_kind == "green":
-                                        kind = "green"
-                                        remedy = week_remedy
-                                    elif week_kind == "pending_failure":
-                                        last = completed[-1]
-                                        last_code, fail = _run_exit_code(owner, repo, last)
-                                        if fail:
-                                            scan_unreadable = True
-                                            ledger_skip = True
-                                            kind = "finding"
-                                            remedy = read_failure_remedy(False)
-                                            read_failures.append(fail)
-                                        elif last_code == 1:
-                                            kind = "finding"
-                                            remedy = "Open a DEP-<nnn> increment per the merge policy."
-                                        else:
-                                            kind = "scanner failure"
-                                            remedy = "gh workflow run dependency-scan.yml --repo %s/%s" % (owner, repo)
-                                    else:
-                                        kind = week_kind
-                                        remedy = week_remedy
+                                new_standing = prev_standing
+                            if week_kind == "green":
+                                kind = "green"
+                                remedy = week_remedy
+                            elif week_kind == "pending_failure":
+                                last = completed[-1]
+                                last_code, fail = _run_exit_code(owner, repo, last)
+                                if fail:
+                                    failure = fail
+                                elif last_code == 1:
+                                    kind = "finding"
+                                    remedy = "Open a DEP-<nnn> increment per the merge policy."
+                                else:
+                                    kind = "scanner failure"
+                                    remedy = DEP_SCAN_RERUN % (owner, repo)
+                            else:
+                                kind = week_kind
+                                remedy = week_remedy
+    if failure is not None:
+        scan_unreadable = True
+        kind = "finding"
+        remedy = read_failure_remedy(False)
+        read_failures.append(failure)
     alerts_line, alerts_off, alerts_failed = _read_alerts(owner, repo, read_failures)
     alerts_remedy = read_failure_remedy(True) if alerts_failed else None
     scan_success = kind == "green" and alerts_failed
@@ -1057,7 +1008,7 @@ def scan_project(owner, repo, entry, meta, had_entry_before_seed):
         "alerts_failed": alerts_failed,
         "alerts_remedy": alerts_remedy,
     }
-    if ledger_skip:
+    if scan_unreadable:
         update = None
     else:
         update = {"last_run_read": new_last, "finding_standing": new_standing}

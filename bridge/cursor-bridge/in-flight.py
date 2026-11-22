@@ -24,15 +24,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import bridge_env
 
-REVIEWERS = (
-    "review-a",
-    "review-b",
-    "security-auditor",
-    "design-auditor",
-    "plan-critic",
-    "design-critic-b",
-    "supervisor",
-)
 FILE_LIMIT = 65536
 LOCK_SECONDS = 10
 LOG_NAME = os.path.join("run", "supervisor", "in-flight.md")
@@ -254,7 +245,7 @@ def _pass_text(args):
     name, reviewer = args.pass_name
     if re.fullmatch(bridge_env.GRAMMAR_ID_PATTERN, name) is None:
         return None, "the name is not an id"
-    if reviewer not in REVIEWERS:
+    if reviewer not in bridge_env.REVIEWERS:
         return None, "the reviewer is outside the list"
     if args.round is not None and (args.round < 1 or args.round > 999):
         return None, "the round is outside 1 to 999"

@@ -1000,10 +1000,9 @@ def round_cause(brief_text):
     if not m:
         return "unstated", "the brief has no `Round cause:` line (one of: %s); logged as unstated" % ", ".join(ROUND_CAUSES)
     value = m.group(1).lower()
-    for cause in sorted(ROUND_CAUSES, key=len, reverse=True):
-        rest = value[len(cause):].lstrip()
-        if value.startswith(cause) and (not rest or rest[0] in "-:(,;–—"):
-            return cause, None
+    matched = bridge_env.round_cause_word(value)
+    if matched:
+        return matched, None
     return "unstated", "the brief's `Round cause:` names none of: %s; logged as unstated" % ", ".join(ROUND_CAUSES)
 
 
