@@ -11,8 +11,13 @@ The forms these tests pin:
   that RESULT line names the folder.
 - tools/make-manifest.py writes bridge/cursor-bridge/VERSION with the line ending the file already has: a CRLF file
   stays CRLF, and a second run leaves its bytes and its MANIFEST.json entry as the first run wrote them.
-- Not pinned: the wording of the refusal beyond naming both folders; the message text around the folders on the
-  RESULT line; which separator or letter case the folders are printed in. The check without --sources is held by
+- Round 2 (the security audit of round 1): the tree checked is the whole of `--root`, resolved, so a `--root` whose
+  `cursor-bridge` is a link or junction into the program's tree, its other folders standing elsewhere, is refused
+  like any other tree; a `--root` that cannot be resolved (a Windows device name such as CON) is refused with exit 2
+  and no traceback; the refusal's line begins `RESULT: REFUSED` and names both folders, readable where they hold
+  spaces.
+- Not pinned: the wording of the refusal beyond `RESULT: REFUSED` and both folders; the message text around the
+  folders on the RESULT line; which separator or letter case the folders are printed in. The check without --sources is held by
   tests/test_install_check.py and is not repeated here.
 
 Isolation: every run is a subprocess whose HOME, USERPROFILE, LOCALAPPDATA and APPDATA are folders under pytest's
@@ -152,3 +157,49 @@ def test_r093_make_manifest_keeps_a_crlf_version_file_crlf(tmp_path):
     assert version_file.read_bytes() == first
     second_entry = json.loads(manifest_file.read_text(encoding="utf-8"))["files"]["cursor-bridge/VERSION"]
     assert second_entry == first_entry
+
+
+# ---------------------------------------------------------------- round 2 (the security audit of round 1)
+
+def link_folder(target, link):
+    """Make `link` a directory link to `target`: a junction on Windows, a symbolic link elsewhere."""
+    if sys.platform == "win32":
+        import _winapi
+        _winapi.CreateJunction(str(target), str(link))
+    else:
+        os.symlink(str(target), str(link), target_is_directory=True)
+
+
+def test_r093_r2_a_tree_whose_cursor_bridge_is_linked_into_the_program_tree_is_refused(tmp_path):
+    a = copy_release(tmp_path / "A")
+    x = tmp_path / "X"
+    x.mkdir()
+    for sub in os.listdir(str(a)):
+        if sub != "cursor-bridge":
+            src = a / sub
+            if src.is_dir():
+                shutil.copytree(str(src), str(x / sub), ignore=shutil.ignore_patterns("__pycache__"))
+            else:
+                shutil.copy2(str(src), str(x / sub))
+    link_folder(a / "cursor-bridge", x / "cursor-bridge")
+    rc, out = run(a / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", x, "--sources", "--quiet")
+    assert rc == 2, "X is another tree, whatever its cursor-bridge resolves to: " + out
+    assert names(out, a / "cursor-bridge") and resolved(x) in norm(out), out
+    assert hashed_nothing(out) and "SOURCES MATCH" not in out and "SOURCES DO NOT MATCH" not in out, out
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="a Windows device name")
+def test_r093_r2_a_device_name_as_root_is_refused_without_a_traceback(tmp_path):
+    a = copy_release(tmp_path / "A")
+    rc, out = run(a / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", "CON", "--sources", "--quiet")
+    assert rc == 2 and "Traceback" not in out, out
+    assert hashed_nothing(out) and "SOURCES MATCH" not in out, out
+
+
+def test_r093_r2_the_refusal_says_it_refused_and_names_both_folders(tmp_path):
+    a = copy_release(tmp_path / "tree A")
+    b = copy_release(tmp_path / "tree B")
+    rc, out = run(a / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", b, "--sources", "--quiet")
+    assert rc == 2, out
+    line = result_line(out, "RESULT: REFUSED")
+    assert names(line, a / "cursor-bridge") and resolved(b) in norm(line), line
