@@ -67,17 +67,21 @@ def test_r047_t26_the_pause_before_planning_work_with_a_push_notification():
     """T26 (rule 48): a plan revision mid-build and a change's design are planning work; the supervisor pauses before
     them and names the model to set, with a push notification when the owner has Remote Control on; the change
     cycle's item 2 says the same for a change's design."""
+    # the model's name is pinned in tests/test_agent_models.py (R-099, rule 52); the sentence is held around it
     assert ("A plan revision mid-build and a change's design are planning work: you pause before each, name the "
-            "model to set (Fable 5.1, as for a design revision), and, where the owner has Remote Control on, send a "
+            "model to set (Fable ") in rule(48)
+    assert (", as for a design revision), and, where the owner has Remote Control on, send a "
             "push notification (`PushNotification`) carrying that line, since the owner may be away from the screen; "
             "the work starts on the owner's word that the model is set.") in rule(48)
     # Review A, round 1, S1: the rule's "nothing else waits" names planning work's exception
     assert ("report leads with the switch and nothing else waits on it, save planning work (below), which waits "
             "for the switch.") in rule(48)
+    design_revision = item(read(CHANGE_CYCLE), 2, "Design revision")
     assert ("Pause before it: a change's design is planning work (rule 48), so you stop, the report naming the "
-            "model to set, Fable 5.1, with a push notification (`PushNotification`) carrying that line where the "
+            "model to set, Fable ") in design_revision
+    assert (", with a push notification (`PushNotification`) carrying that line where the "
             "owner has Remote Control on; the design starts on the owner's word that the model is set.") in \
-        item(read(CHANGE_CYCLE), 2, "Design revision")
+        design_revision
 
 
 def test_r048_d11_a_turn_ending_on_a_run_names_its_limit():

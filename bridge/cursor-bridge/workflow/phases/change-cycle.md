@@ -19,7 +19,7 @@ re-presented. Set `Phase: changing` and record the request in `PROJECT_STATUS.md
 Keep the step the change has reached on the `Change cycle:` line, rewritten as each step is reached or its gate passes, so that a resume after a compaction starts where the change stands and asks no approval twice.
 
 1. **Intake of the change** (Phase 1, scaled). The session is on Opus 5.5 from the build:
-   your first report leads with *set this session to Fable 5.1 before the design work* (rule
+   your first report leads with *set this session to Fable 5.2 before the design work* (rule
    48), and the design gate's report says *back to Opus 5.5*. Interrogate the request the
    same way as a new project's description — gaps, contradictions, better options, and in the same form (intake.md's sorting of questions: the change's features and behaviour as a conversation in the owner's own words, a parameter in the question form) — but only about the
    delta: what changes, what explicitly stays, and the **impact on existing behaviour**
@@ -30,7 +30,7 @@ Keep the step the change has reached on the `Change cycle:` line, rewritten as e
    Features already satisfies is answered by pointing at the feature, not by proposing it;
    a request that reverses a Decision is named as such, with the recorded reason, and goes
    through the gates as a change to that decision. A report of **several defects** is triaged before any of them is diagnosed — the `root-cause-first` skill's step 0: shared cause binned only on evidence, otherwise one at a time. The item ends with a confirmation inside intake, not a gate: `intake.md`'s closing confirmation, its "The gate" step, which this item runs with the rest of `intake.md`'s procedure, is the confirmation a change cycle runs, outside the three gates rule 34 names. Read the change back to the owner — what changes, what stays, which existing behaviour alters — and take their confirmation, named on `Awaiting user on:` while it waits, as any intake question is.
-2. **Design revision** (Phase 2, scaled). Pause before it: a change's design is planning work (rule 48), so you stop, the report naming the model to set, Fable 5.1, with a push notification (`PushNotification`) carrying that line where the owner has Remote Control on; the design starts on the owner's word that the model is set. Append a dated **Change: <name>** section to
+2. **Design revision** (Phase 2, scaled). Pause before it: a change's design is planning work (rule 48), so you stop, the report naming the model to set, Fable 5.2, with a push notification (`PushNotification`) carrying that line where the owner has Remote Control on; the design starts on the owner's word that the model is set. Append a dated **Change: <name>** section to
    `docs/DESIGN.md` — what changes in the architecture, data model, interfaces, security
    context, or delivery, and why; the unchanged design is referenced, not rewritten. **Revise the diagrams the change touches** the same way they were drafted — specialists, top-down, `python ~/.claude/cursor-bridge/diagram-check.py --mode design` — and select any catalogue kind the change newly needs; a project designed before diagram-based planning gets at least its component diagram (with its element map) and, if it stores data, its entity-relationship diagram at its first change cycle. Run
    the two-critic loop of Phase 2, with its ceiling, on the delta section with the existing design as context (release A3; the subject is the change's name). Gate: present
