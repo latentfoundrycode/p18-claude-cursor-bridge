@@ -963,6 +963,8 @@ profile's three families must be distinct. The result is written to
 docs/ROSTER.resolved.json for the delegate and Review B commands to read, and only when it
 changes (the time of every check goes to the state file as last_resolved), so a check
 before a snapshot leaves the tree clean.
+When the Cursor tool itself is signed out, its own sign-in line (the whole of standard output,
+or any whole line of standard error) ends the run with SIGN-IN, exit 5, and counts no failure.
 The family rule governs Review B only (2026.10.25a): Review B is never of the family of the
 last builder run of the branch under review (none for a branch with no builder run). When
 the chosen profile's Review B is of that family - the change in flight was built under
@@ -994,7 +996,7 @@ unavailable marks and failure counts, and says so. Timestamps are UTC. ROSTER_NO
 overrides "now" for tests.
 Exit 0 = resolved; 1 = no usable profile, a family collision, or a command mismatch;
 2 = cannot read or a wrong model argument; 3 = pool/model marked exhausted, re-resolve;
-4 = transient, retry once; 5 = repeated connection failures or time-outs, tell the owner.
+4 = transient, retry once; 5 = repeated connection failures or time-outs, or the Cursor tool signed out (SIGN-IN), tell the owner.
 ASCII-only on purpose.
 ```
 
