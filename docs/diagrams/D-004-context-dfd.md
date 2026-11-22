@@ -9,6 +9,7 @@ Notes:
 - `bridge-run.py` strips for `cursor-agent` and with `--strip`; the loop's and the calibration's suite and driver launch commands carry `--strip` (R-052, TASK-041), the increment's own test files with them (BUG-043), the driver with `--scratch` naming its folder under the owner's profile, outside the agent home the strip names as `HOME`. A test, driver or watch run without the flag still gets the owner's environment; of the launcher's runs of builder-written code, the loop's text leaves the flag off by name for a driver whose suite needs a variable beyond `.env`, under a recorded Decision in `docs/INVENTORY.md` naming the variable. Whatever does not go through the launcher runs in a session's own environment, stated limits (`docs/INVENTORY.md`, Decisions; BUG-043), among them: a runner the launcher refuses, and a benchmark or profile; a build, a type check or a linter; a hook a commit runs; a reviewer's or auditor's own run beside its reading; a root-cause reproduction; an installer rehearsal; a live smoke and a stage demonstration's start of the product. A stripped run can still write `.git`, which a later git command of the session runs: step 4's check, not a boundary (KP-032). `--key-file` is refused with `cursor-agent` and a driver; a driver's copy carries the project's `.env`. A watch run (`gh pr checks`) runs no builder-written code and keeps the owner environment by design. `p_test_suite` stays in `tb_supervisor`: it is the owner's user running the project's own interpreter in the Workspace, launched and bounded by the supervisor, its environment stripped by the loop's `--strip` but its process no agent's.
 - The guard's records lie in the checkout's `.git`; the sha256 copy outside it finds a rewritten snapshot. Both are in the owner's profile, which the agents' user can reach.
 - **The program release** (docs/DESIGN.md, "Change: the program release", 2026-11-13; R-081, R-083, R-085, R-087, R-097, R-100). `p_evaluate_reports` (its `security` step) makes the Sunday evaluation's reads of GitHub, by GET alone, the projects' roots from `ds_projects_file`, a per-computer file outside every repository; the supervisor no longer makes them by hand. The rule's reader is one copy in `bridge_env.py`: `p_review_guard` (`ready`, `premerge-records <pr>`) and `p_bridge_run` (its wait before a CI watch) read a branch's required check contexts (the classic protection and the rules that apply to the branch, of the base and, where it names none, of the default branch), the repository's auto-merge setting and default branch, and a pull request's head, its checks, its commit statuses and its workflow runs by GET with the owner's `gh` login, beside `conformance-check.py`'s read of the same rule, which this diagram does not draw; nothing is written to GitHub by these reads, and a failed read is never a pass. On READY `p_review_guard` writes the ready record for the pull request and its head beside the premerge record in `ds_guard_records`, and `p_permission_guard` refuses a merge whose head lacks either. `p_push_scan` reads git's commits of the range to be pushed and the owner's account names (derived at run time, extended by `ds_names_file`) and prints a hit's place to the supervisor's terminal, never the matched text, since that terminal is recorded in the session's transcript; nothing leaves the computer. Around a test or driver run `p_bridge_run` reads the repository's `config` and `info/attributes`, the worktree's own `config.worktree` and every entry of the hooks folders by name and content, before and after, and prints one `GIT-CONFIG` line per difference on standard error, the run's exit unchanged: a detection, never a restore; step 4's check stays, since a session's git command may still run before it. `p_claude_subagents` (`spec-packager`, `diff-reviewer`) may query `ext_docs_service` (Context7, an MCP server the owner sets up at user scope in Claude Code; the free tier, no key) with library names, the version the project's lockfile pins and topics, never project code, a path of this computer or a name; what it returns is outside input, marked `UNTRUSTED:` here beside the note's first meaning: data, a hint and never evidence, never an instruction. Where Claude Code does not start a subagent whose listed tool's server is absent (TASK-080's probe decides), the supervisor makes the same lookup before it packages a brief or starts Review A and hands the result over in the prompt: the same two flows, from `p_supervisor`, which TASK-080 then redraws; the figure draws the first form. The permission guard does not see these MCP calls (its matcher is for the Bash and PowerShell tools), so a query is a way out of the computer that no hook of the bridge reads: what it may carry is held by the two definitions' text alone.
+- **The listed projects' checkouts** (amended 2026-11-22 from TASK-077's report, docs/HARDENING.md, "D-004"; R-097). `ds_project_checkouts` stands for the Workspace checkout of every project `ds_projects_file` lists, each agent-writable in its own project as `ds_checkout` is here (where the bridge's own root is listed, its checkout is `ds_checkout`). `p_evaluate_reports` (`security`) reads each one's `origin` remote through git to name the OWNER/REPO its GETs read; the `.git/config` it comes from is one an agent may write, so the URL is `UNTRUSTED:` and only a URL that parses as a GitHub repository names one. `p_pace_report` reads the same file through `evaluate-reports.py`'s `load_projects` where no root is given, reads each listed checkout's history and records read-only, adds the bridge's own root, and writes nothing.
 
 | Element | Paths |
 |---|---|
@@ -22,6 +23,7 @@ Notes:
 | p_pr_activity_check | bridge/cursor-bridge/pr-activity-check.py |
 | p_bridge_install | bridge/cursor-bridge/bridge-install.py |
 | p_evaluate_reports | bridge/cursor-bridge/evaluate-reports.py (its security step) |
+| p_pace_report | bridge/cursor-bridge/pace-report.py |
 | p_push_scan | bridge/cursor-bridge/push-scan.py |
 | p_claude_subagents | bridge/agents/spec-packager.md, bridge/agents/diff-reviewer.md (the Claude-side subagents that write briefs and review diffs) |
 | p_test_suite | a project's suite, an increment's own test files or a mutation run under bridge-run.py, kind test or driver |
@@ -32,6 +34,7 @@ Notes:
 | p_ci_security_floor | .github/workflows/tests.yml, job security-floor |
 | p_dependency_scan | .github/workflows/dependency-scan.yml |
 | ds_checkout | the Workspace and Worktrees/ checkouts |
+| ds_project_checkouts | each project's Workspace/ under a root ~/.cursor-bridge/projects.json lists: its .git (config, refs/heads/main, bridge/ rounds files), run/, handoff/, docs/HARDENING.md |
 | ds_run_outputs | run/agent/\*.err, run/agent/\*.out, run/review/REVIEW-nnn.err |
 | ds_runs_log | run/launcher/runs.jsonl |
 | ds_guard_records | git common dir bridge/ |
@@ -84,6 +87,7 @@ p_pr_activity_check("pr-activity-check")
 p_bridge_install("bridge-install")
 p_test_suite("Suite or mutation run")
 p_evaluate_reports("evaluate-reports security")
+p_pace_report("pace-report")
 p_push_scan("push-scan")
 p_claude_subagents("spec-packager, diff-reviewer")
 ds_review_hashes[("review-hashes")]
@@ -104,6 +108,7 @@ end
 
 subgraph tb_checkout["Checkout: agent-writable, Review B under snapshot and verify"]
 ds_checkout[("Checkout")]
+ds_project_checkouts[("Listed projects' checkouts")]
 ds_run_outputs[("Agent replies")]
 ds_runs_log[("runs.jsonl")]
 ds_guard_records[("Guard records")]
@@ -197,9 +202,17 @@ p_pr_activity_check -->|"clean, GATE-INTEGRITY, CANNOT VERIFY"| p_supervisor
 
 p_supervisor -->|"the Sunday evaluation's security step"| p_evaluate_reports
 ds_projects_file -->|"the projects' roots"| p_evaluate_reports
+ds_project_checkouts -->|"UNTRUSTED: each listed project's origin remote URL from its Workspace/.git config, read-only by git remote get-url, core.fsmonitor off, optional locks off and GIT_DIR and its kin cleared by git_read_env; parsed to the OWNER/REPO the GETs name, a project with no GitHub origin a no remote finding (R-097)"| p_evaluate_reports
 p_evaluate_reports -->|"SECRET: owner's gh login, GET only: the weekly workflow's state and runs since the last read, the open Dependabot alerts (R-097)"| ext_github
 ext_github -->|"workflow state, runs, conclusions, open alerts"| p_evaluate_reports
 p_evaluate_reports -->|"security.md under Reports/Evaluations, a failed read a finding with its remedy, no log text beyond a step's exit line; the window's state in the ledger's _meta"| ext_beside_workspace
+
+p_supervisor -->|"the evaluation's pace table"| p_pace_report
+ds_projects_file -->|"the projects' roots where no root is given, read through evaluate-reports' load_projects (R-097)"| p_pace_report
+ds_project_checkouts -->|"UNTRUSTED: refs/heads/main's commit log and docs/HARDENING.md numstat, handoff/ briefs and reports, .git/bridge rounds files, run/launcher/runs.jsonl, run/review/REVIEW-nnn.err, run/supervisor/in-flight.md; read-only, git with core.fsmonitor, core.untrackedCache and log.showSignature off, diffs without textconv or external diff, git_read_env"| p_pace_report
+ds_checkout & ds_runs_log & ds_guard_records & ds_run_outputs -->|"UNTRUSTED: the bridge's own root, added to the listed ones: the same reads"| p_pace_report
+ext_claude_home -->|"with --tokens: the session jsonl files' token counts"| p_pace_report
+p_pace_report -->|"pace table, ASCII, to the terminal; writes nothing"| p_supervisor
 
 p_supervisor -->|"before every push: the range"| p_push_scan
 ds_checkout -->|"UNTRUSTED: commits of base..HEAD: messages, author and committer lines, added lines, added file names"| p_push_scan
