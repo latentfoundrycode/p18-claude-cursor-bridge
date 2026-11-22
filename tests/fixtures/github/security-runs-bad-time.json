@@ -1,0 +1,37 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-22 from the captured security-runs.json (TASK-077 round 2): the newer run's created_at replaced by the text not a time (it does not parse) and its conclusion by failure",
+ "request": "repos/OWNER/REPO/actions/workflows/dependency-scan.yml/runs?created=>=2026-11-08",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "total_count": 2,
+  "workflow_runs": [
+   {
+    "id": 43721483811,
+    "name": "dependency-scan",
+    "workflow_id": 405069030,
+    "path": ".github/workflows/dependency-scan.yml",
+    "event": "schedule",
+    "run_number": 3,
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "failure",
+    "created_at": "not a time"
+   },
+   {
+    "id": 42484637835,
+    "name": "dependency-scan",
+    "workflow_id": 405069030,
+    "path": ".github/workflows/dependency-scan.yml",
+    "event": "schedule",
+    "run_number": 2,
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-11-08T13:22:14Z"
+   }
+  ]
+ }
+}

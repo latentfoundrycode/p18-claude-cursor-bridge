@@ -1,0 +1,11 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-22 from the captured security-alerts-none.json (TASK-077 round 2): the body replaced by the object {\"message\": \"x\"} with status 200 and gh exit 0: not an array",
+ "request": "repos/OWNER/REPO/dependabot/alerts?state=open",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "message": "x"
+ }
+}

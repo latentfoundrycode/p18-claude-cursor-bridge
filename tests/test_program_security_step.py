@@ -817,3 +817,566 @@ def test_r097_pace_report_with_no_roots_names_an_absent_projects_file(bench):
     assert "projects.json" in out, "pace-report does not name the absent projects file:\n%s" % out
     for old in OLD_PROJECT_DIRS:
         assert old not in out, "pace-report still read a path the program held (%s):\n%s" % (old, out)
+
+
+# ================================================================ round 2: the supervisor's rulings (handoff/TASK-077-r2.md)
+
+import datetime
+import traceback
+
+EARLY = "2026-11-01T00:00:00Z"          # a window start before both captured runs, so both are of the window
+
+
+def run_caught(bench, route_map=None, *extra):
+    """bench.run, with an exception out of main() turned into printed text (a Traceback the cases assert against)."""
+    try:
+        return bench.run(route_map, *extra)
+    except Exception:
+        got = bench.capsys.readouterr()
+        return "raised", got.out + got.err + traceback.format_exc()
+
+
+def main_caught(bench, argv):
+    """Run the program's main() with argv (no stand-in), the working folder in the scratch bridge root."""
+    mod = bench.load()
+    bench.mp.chdir(str(bench.root / "Workspace"))
+    bench.mp.setattr(sys, "argv", argv)
+    bench.capsys.readouterr()
+    try:
+        rc = mod.main()
+        tb = ""
+    except SystemExit as e:
+        rc, tb = e.code, ""
+    except Exception:
+        rc, tb = "raised", traceback.format_exc()
+    got = bench.capsys.readouterr()
+    return rc, got.out + got.err + tb
+
+
+def fail_gh_call(bench, marker, how):
+    """Make the gh call whose arguments hold `marker` time out (how="timeout") or fail to start (how="start")."""
+    real = subprocess.run
+
+    def fake(cmd, *a, **k):
+        if isinstance(cmd, (list, tuple)) and str(bench.standin) in [str(x) for x in cmd] \
+                and any(marker in str(x) for x in cmd):
+            if how == "timeout":
+                raise subprocess.TimeoutExpired(cmd, k.get("timeout") or 30)
+            raise FileNotFoundError(2, "No such file or directory", "gh")
+        return real(cmd, *a, **k)
+
+    bench.mp.setattr(subprocess, "run", fake)
+
+
+def record_git_calls(bench):
+    """Record (argv, env) of every git call made through subprocess.run from here on."""
+    seen = []
+    real = subprocess.run
+
+    def fake(cmd, *a, **k):
+        if isinstance(cmd, (list, tuple)) and cmd and os.path.basename(str(cmd[0])).lower() in ("git", "git.exe"):
+            seen.append(([str(x) for x in cmd], k.get("env")))
+        return real(cmd, *a, **k)
+
+    bench.mp.setattr(subprocess, "run", fake)
+    return seen
+
+
+def standing_line(run_id, text):
+    return re.search(r"finding standing\W+run\W+%s\b" % re.escape(str(run_id)), text, re.I) is not None
+
+
+def says_no_alert_open(sec):
+    return any(has(r"\balert", l) and (has(r"\b(no|none|nothing|0)\b[^\n]*\bopen\b", l) or has(r"\bopen\b[^\n]*\b(none|0)\b", l))
+               for l in sec.splitlines())
+
+
+def failure_line(sec, read, how):
+    """A line of the section naming the read and how it failed (Ruling 5's phrase, its wording beyond these not pinned)."""
+    return any(has(read, l) and has(how, l) for l in sec.splitlines())
+
+
+def utc(text):
+    return datetime.datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith("Z") else text)
+
+
+# ---------------------------------------------------------------- Rulings 1-3: every failed run read, the standing finding
+
+
+def test_r097_an_earlier_exit_1_failure_stands_beside_a_later_cancelled_run(bench):
+    """A window of [a failure whose log reads exit 1, a later cancelled run]: the week's kind is a scanner failure with the
+    rerun command, and beside it the finding stands by the failed run's id; the failed run's jobs and its failed job's log are
+    read; the ledger holds that id standing and last_run_read at the cancelled run's time.
+    enforces: handoff/TASK-077-r2.md Ruling 1; handoff/TASK-077.md R5 (c), R6."""
+    one_project(bench, last_run_read=EARLY)
+    r = routes(runs="security-runs-failed-then-cancelled.json", log="security-log-finding.json")
+    r["repos/OWNER/REPO/actions/runs/%s/jobs" % OLD_RUN] = "security-jobs-failed-older.json"
+    rc, out = bench.run(r)
+    sec = bench.section("Alpha", out)
+    assert standing_line(OLD_RUN, sec), "the exit-1 failure of run %s does not stand beside the week's kind:\n%s" % (OLD_RUN, sec)
+    assert has(r"scanner failure", sec) and RERUN in sec, "the week's kind (the cancelled run) is not a scanner failure with `%s`:\n%s" % (RERUN, sec)
+    assert not has(r"\bgreen\b", sec), "a section with a finding says green:\n%s" % sec
+    paths = bench.paths()
+    assert any(p.startswith("repos/OWNER/REPO/actions/runs/%s/jobs" % OLD_RUN) for p in paths), "the failed run's jobs were not read: %r" % paths
+    assert any(p.startswith("repos/OWNER/REPO/actions/jobs/%s/logs" % JOB) for p in paths), "the failed job's log was not read: %r" % paths
+    w = bench.window("Alpha")
+    assert str(w.get("finding_standing")) == OLD_RUN, "the finding of run %s does not stand in the ledger: %r" % (OLD_RUN, w)
+    assert w.get("last_run_read") == NEW_RUN_AT, "last_run_read is not the cancelled run's time: %r" % w
+    assert_clean_file(bench, out)
+    assert_get_only(bench)
+
+
+def test_r097_a_standing_finding_does_not_hide_the_weeks_cancelled_run(bench):
+    """A finding standing (run OLD) and a cancelled run in the window: the week's kind is a scanner failure with the rerun
+    command, the standing line beside it, and last_run_read moves to the cancelled run.
+    enforces: handoff/TASK-077-r2.md Ruling 2; handoff/TASK-077.md R6, R11."""
+    one_project(bench, last_run_read=OLD_RUN_AT, finding=int(OLD_RUN))
+    rc, out = bench.run(routes(runs="security-runs-cancelled.json"))
+    sec = bench.section("Alpha", out)
+    assert has(r"scanner failure", sec) and RERUN in sec, "the week's cancelled run is not reported as a scanner failure with `%s`:\n%s" % (RERUN, sec)
+    assert standing_line(OLD_RUN, sec), "the standing finding (run %s) is not beside the week's kind:\n%s" % (OLD_RUN, sec)
+    w = bench.window("Alpha")
+    assert w.get("last_run_read") == NEW_RUN_AT, "last_run_read did not move to the window's completed run: %r" % w
+    assert str(w.get("finding_standing")) == OLD_RUN, "the standing finding was dropped: %r" % w
+
+
+def test_r097_a_standing_finding_does_not_skip_reading_a_new_failure(bench):
+    """A finding standing (run OLD) and a new failure in the window whose log reads exit 1: the new run's jobs and its failed
+    job's log are read (the stand-in's log), and the newer finding stands.
+    enforces: handoff/TASK-077-r2.md Rulings 1 and 2; handoff/TASK-077.md R5 (c)."""
+    one_project(bench, last_run_read=OLD_RUN_AT, finding=int(OLD_RUN))
+    rc, out = bench.run(routes(runs="security-runs-failed.json", jobs="security-jobs-failed.json", log="security-log-finding.json"))
+    paths = bench.paths()
+    assert any(p.startswith("repos/OWNER/REPO/actions/runs/%s/jobs" % NEW_RUN) for p in paths), "the new failed run's jobs were not read: %r" % paths
+    assert any(p.startswith("repos/OWNER/REPO/actions/jobs/%s/logs" % JOB) for p in paths), "the new failed job's log was not read: %r" % paths
+    sec = bench.section("Alpha", out)
+    assert has(r"\bfinding\b", sec) and "DEP-" in sec, "the new finding is not reported with a DEP- increment:\n%s" % sec
+    w = bench.window("Alpha")
+    assert str(w.get("finding_standing")) == NEW_RUN, "the newest exit-1 run does not stand: %r" % w
+    assert w.get("last_run_read") == NEW_RUN_AT, "last_run_read did not move: %r" % w
+    assert_clean_file(bench, out)
+
+
+def test_r097_a_success_later_than_the_standing_run_clears_it_though_not_last(bench):
+    """A finding standing (a run older than the window, its time unknown), the window [success, later cancelled]: the success
+    is later than last_run_read, so the finding is cleared: no finding standing line, the ledger's finding_standing null.
+    enforces: handoff/TASK-077-r2.md Ruling 3; handoff/TASK-077.md R6."""
+    standing = "41000000001"
+    one_project(bench, last_run_read=EARLY, finding=int(standing))
+    rc, out = bench.run(routes(runs="security-runs-cancelled.json"))
+    sec = bench.section("Alpha", out)
+    assert not has(r"finding standing", sec) and standing not in sec, "the finding cleared by a later success still stands:\n%s" % sec
+    assert has(r"scanner failure", sec), "the week's kind (the last run cancelled) is not a scanner failure:\n%s" % sec
+    w = bench.window("Alpha")
+    assert w.get("finding_standing") is None, "the cleared finding still stands in the ledger: %r" % w
+    assert w.get("last_run_read") == NEW_RUN_AT, "last_run_read did not move: %r" % w
+
+
+# ---------------------------------------------------------------- Ruling 4: the alerts read for every project with a remote
+
+
+def test_r097_the_alerts_are_read_for_a_project_not_configured(bench):
+    """No dependency-scan workflow and one open alert: not configured, and the alert named by its number (#41) and package.
+    enforces: handoff/TASK-077-r2.md Ruling 4; handoff/TASK-077.md R5 (d) (e), R9."""
+    one_project(bench)
+    rc, out = bench.run(routes(workflows="security-workflows-absent.json", alerts="security-alerts-one.json"))
+    sec = bench.section("Alpha", out)
+    assert has(r"not configured", sec), "the section does not say not configured:\n%s" % sec
+    assert re.search(r"(?<!\d)41(?!\d)", sec) and "requests" in sec, "the open alert (41, requests) is not named:\n%s" % sec
+    paths = bench.paths()
+    assert any(p.startswith("repos/OWNER/REPO/vulnerability-alerts") for p in paths), "the alerts check was not made: %r" % paths
+    assert any(p.startswith("repos/OWNER/REPO/dependabot/alerts") for p in paths), "the open alerts were not listed: %r" % paths
+    assert_get_only(bench)
+
+
+def test_r097_the_alerts_are_read_for_a_disabled_workflow(bench):
+    """A disabled workflow and the alerts off: no completed run, and alerts off written; the alerts check made.
+    enforces: handoff/TASK-077-r2.md Ruling 4; handoff/TASK-077.md R5 (d), R9."""
+    one_project(bench)
+    rc, out = bench.run(routes(workflows="security-workflows-disabled.json", vuln="security-vulnerability-alerts-off.json"))
+    sec = bench.section("Alpha", out)
+    assert has(r"no completed run", sec), "the disabled workflow is not no completed run:\n%s" % sec
+    paths = bench.paths()
+    assert any(p.startswith("repos/OWNER/REPO/vulnerability-alerts") for p in paths), "the alerts check was not made: %r" % paths
+    assert has(r"alerts off", sec), "the section does not say alerts off:\n%s" % sec
+    assert not any("dependabot/alerts" in p for p in paths), "the open alerts were listed after a 404: %r" % paths
+
+
+def test_r097_the_alerts_are_read_after_a_failed_workflows_read(bench):
+    """The workflows list refused (403) and one open alert: the alerts are still read and the alert named.
+    enforces: handoff/TASK-077-r2.md Ruling 4; handoff/TASK-077.md R5 (d) (e), R7."""
+    one_project(bench)
+    rc, out = bench.run(routes(workflows="security-forbidden.json", alerts="security-alerts-one.json"))
+    paths = bench.paths()
+    assert any(p.startswith("repos/OWNER/REPO/vulnerability-alerts") for p in paths), "the alerts check was not made: %r" % paths
+    assert any(p.startswith("repos/OWNER/REPO/dependabot/alerts") for p in paths), "the open alerts were not listed: %r" % paths
+    sec = bench.section("Alpha", out)
+    assert re.search(r"(?<!\d)41(?!\d)", sec) and "requests" in sec, "the open alert (41, requests) is not named:\n%s" % sec
+    assert not has(r"\bgreen\b", sec), "a failed read reported green:\n%s" % sec
+
+
+# ---------------------------------------------------------------- Ruling 5: a failed read names the read and the failure
+
+
+PHRASED_FAILURES = {
+    "the workflows list, gh exited non-zero": dict(route=("repos/OWNER/REPO/actions/workflows", "!crash"),
+                                                   read=r"workflows list", how=r"non-zero", alerts=False),
+    "the runs list refused (403)": dict(route=("repos/OWNER/REPO/actions/workflows/dependency-scan.yml/runs", "security-forbidden.json"),
+                                        read=r"runs list", how=r"\b403\b", alerts=False),
+    "the runs list timed out": dict(inject=("dependency-scan.yml/runs", "timeout"), read=r"runs list", how=r"timed out", alerts=False),
+    "the jobs list refused (403)": dict(kw=dict(runs="security-runs-failed.json"),
+                                        route=("repos/OWNER/REPO/actions/runs/%s/jobs" % NEW_RUN, "security-forbidden.json"),
+                                        read=r"jobs list", how=r"\b403\b", alerts=False),
+    "the job log, gh exited non-zero": dict(kw=dict(runs="security-runs-failed.json", jobs="security-jobs-failed.json"),
+                                            route=("repos/OWNER/REPO/actions/jobs/%s/logs" % JOB, "!crash"),
+                                            read=r"job log", how=r"non-zero", alerts=False),
+    "the alerts check, gh could not start": dict(inject=("vulnerability-alerts", "start"), read=r"alerts check",
+                                                 how=r"could not start", alerts=True),
+    "the open alerts list refused (403)": dict(route=("repos/OWNER/REPO/dependabot/alerts", "security-forbidden.json"),
+                                               read=r"open alerts list", how=r"\b403\b", alerts=True),
+}
+
+
+@pytest.mark.parametrize("case", sorted(PHRASED_FAILURES))
+def test_r097_a_failed_read_names_which_read_failed_and_how(bench, case):
+    """A failed read is written on a line naming the read (workflows list, runs list, jobs list, job log, alerts check, open
+    alerts list) and how it failed (refused (HTTP 403), timed out, gh could not start, gh exited non-zero); the remedy names
+    the login's scope (and the Security tab for the alerts' reads); a failed (a)-(c) read's kind line says the scan could not
+    be read, the word finding kept; never green. The wording around the read's name and the failure's word is not pinned.
+    enforces: handoff/TASK-077-r2.md Ruling 5; handoff/TASK-077.md R7."""
+    spec = PHRASED_FAILURES[case]
+    one_project(bench)
+    r = routes(**spec.get("kw", {}))
+    if spec.get("route"):
+        r[spec["route"][0]] = spec["route"][1]
+    if spec.get("inject"):
+        fail_gh_call(bench, *spec["inject"])
+    rc, out = run_caught(bench, r)
+    assert "Traceback" not in out, "%s ended in a traceback:\n%s" % (case, out)
+    sec = bench.section("Alpha", out)
+    assert failure_line(sec, spec["read"], spec["how"]), \
+        "%s: no line names the read (%s) and how it failed (%s):\n%s" % (case, spec["read"], spec["how"], sec)
+    assert has(r"\bfinding\b", sec), "%s: the word finding is not in the section:\n%s" % (case, sec)
+    assert has(r"\bscope\b|gh auth refresh -s", sec), "%s: the remedy does not name the login's scope:\n%s" % (case, sec)
+    if spec["alerts"]:
+        assert has(r"security tab", sec), "%s: the remedy does not name the repository's Security tab:\n%s" % (case, sec)
+    else:
+        assert has(r"could not be read", sec), "%s: the kind line does not say the scan could not be read:\n%s" % (case, sec)
+    assert not has(r"\bgreen\b", sec), "%s reported green:\n%s" % (case, sec)
+    assert FAKE_TOKEN not in out, "a token was printed"
+    assert_clean_file(bench, out)
+
+
+def test_r097_a_failed_alerts_read_keeps_the_scans_own_result(bench):
+    """A green scan and the open alerts list refused (403): the section holds the alerts' failure (the open alerts list, 403)
+    with the Security tab remedy, and the scan's own result still stated, by the newest run read's time. Reading of Ruling 5
+    with R6: a section whose alerts read failed is not a green section, so the word green is not in it; the scan's kind is
+    shown by its last run read and by being neither a scanner failure nor no completed run.
+    enforces: handoff/TASK-077-r2.md Ruling 5; handoff/TASK-077.md R6, R7."""
+    one_project(bench)
+    rc, out = bench.run(routes(alerts="security-forbidden.json"))
+    sec = bench.section("Alpha", out)
+    assert failure_line(sec, r"open alerts list", r"\b403\b"), "no line names the open alerts list's failure (403):\n%s" % sec
+    assert has(r"security tab", sec), "the alerts failure's remedy does not name the Security tab:\n%s" % sec
+    assert NEW_RUN_AT in sec, "the scan's own result (the run read at %s) is not stated beside the alerts failure:\n%s" % (NEW_RUN_AT, sec)
+    assert not has(r"scanner failure", sec) and not has(r"no completed run", sec), "the scan's kind was replaced:\n%s" % sec
+    assert not has(r"\bgreen\b", sec), "a section whose alerts read failed says green:\n%s" % sec
+
+
+# ---------------------------------------------------------------- Ruling 6: printable ASCII only
+
+
+def visible_escape(code, text):
+    return re.search(r"\\(x%02x|u%04x)" % (code, code), text, re.I) is not None
+
+
+def test_r097_control_bytes_and_non_ascii_are_written_as_visible_escapes(bench):
+    """An open alert whose package name and advisory id hold ESC, TAB, BEL, DEL and a non-ASCII letter, and a project name
+    holding a control byte: security.md holds no byte outside 0x20-0x7E but LF/CR, and each is written as a visible escape
+    (\\xNN or \\uNNNN).
+    enforces: handoff/TASK-077-r2.md Ruling 6; handoff/TASK-077.md R10."""
+    name = "Al\x01pha"
+    root = bench.project(name)
+    bench.write_projects({name: root})
+    bench.write_ledger({name: {"last_run_read": OLD_RUN_AT, "finding_standing": None}})
+    rc, out = bench.run(routes(alerts="security-alerts-control.json"))
+    assert_clean_file(bench, out)
+    text = bench.report(out)
+    assert visible_escape(0x01, text) and "pha" in text, "the project name's control byte is not a visible escape:\n%s" % text
+    for code in (0x1B, 0x09, 0x07, 0x7F, 0xE9, 0xFC):
+        assert visible_escape(code, text), "the character 0x%02X is not written as a visible escape:\n%s" % (code, text)
+    assert re.search(r"(?<!\d)42(?!\d)", text), "the open alert (42) is not named:\n%s" % text
+
+
+def test_r097_pace_report_prints_names_as_printable_ascii(bench):
+    """pace-report's _ascii_name: ESC, TAB, DEL and a non-ASCII letter written as visible escapes, nothing outside 0x20-0x7E.
+    enforces: handoff/TASK-077-r2.md Ruling 6."""
+    bench.mp.syspath_prepend(BRIDGE)
+    spec = importlib.util.spec_from_file_location("pace_report_t077", PACE)
+    pace = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(pace)
+    got = pace._ascii_name("Al\x1bpha\tbe\x7ftaé")
+    bad = sorted(set(hex(ord(c)) for c in got if not 0x20 <= ord(c) <= 0x7E))
+    assert not bad, "_ascii_name left characters outside 0x20-0x7E: %r in %r" % (bad, got)
+    for code in (0x1B, 0x09, 0x7F, 0xE9):
+        assert visible_escape(code, got), "_ascii_name does not write 0x%02X as a visible escape: %r" % (code, got)
+
+
+# ---------------------------------------------------------------- Ruling 7: reading the projects file
+
+
+def test_r097_a_utf16_projects_file_is_refused_without_a_traceback(bench):
+    """A UTF-16 projects file: refused with its reason (not UTF-8 text), the file named, exit 2, no traceback, nothing
+    written, no read.
+    enforces: handoff/TASK-077-r2.md Ruling 7; handoff/TASK-077.md R2."""
+    root = bench.project("Alpha")
+    bench.projects_file.parent.mkdir(parents=True, exist_ok=True)
+    bench.projects_file.write_bytes(json.dumps({"Alpha": str(root)}).encode("utf-16"))
+    before = bench.write_ledger({})
+    rc, out = run_caught(bench, routes())
+    assert "Traceback" not in out, "a UTF-16 projects file ended in a traceback:\n%s" % out
+    assert rc == 2, "exit %r, not 2:\n%s" % (rc, out)
+    assert "projects.json" in out and has(r"utf-?8", out), "the refusal does not name the file and say it is not UTF-8 text:\n%s" % out
+    assert not bench.out_dir.exists(), "something was written under Reports/Evaluations/%s" % DATE
+    assert bench.ledger_path.read_bytes() == before, "the ledger changed"
+    assert bench.calls() == [], "a read was made: %r" % bench.calls()
+
+
+def test_r097_a_projects_file_with_a_byte_order_mark_is_accepted(bench):
+    """A UTF-8 projects file starting with a byte-order mark: accepted, exit 0, the project's section written.
+    enforces: handoff/TASK-077-r2.md Ruling 7; handoff/TASK-077.md R2."""
+    root = bench.project("Alpha")
+    bench.projects_file.parent.mkdir(parents=True, exist_ok=True)
+    bench.projects_file.write_bytes(b"\xef\xbb\xbf" + json.dumps({"Alpha": str(root)}).encode("utf-8"))
+    bench.write_ledger({"Alpha": {"last_run_read": OLD_RUN_AT, "finding_standing": None}})
+    rc, out = run_caught(bench, routes())
+    assert rc == 0, "a projects file with a byte-order mark was refused (exit %r):\n%s" % (rc, out)
+    sec = bench.section("Alpha", out)
+    assert has(r"\bgreen\b", sec), "the project's section was not written from the file:\n%s" % sec
+
+
+def other_home_with_zulu(bench):
+    """A second folder holding its own .cursor-bridge/projects.json naming Zulu (a project), for --home."""
+    zulu = bench.project("Zulu")
+    other = bench.tmp / "sessions-home"
+    (other / ".cursor-bridge").mkdir(parents=True)
+    (other / ".cursor-bridge" / "projects.json").write_text(json.dumps({"Zulu": str(zulu)}), encoding="utf-8")
+    return other
+
+
+def test_r097_collect_home_never_chooses_the_projects_file(bench):
+    """collect --home <folder>: the projects file is still the one under the user's home (~), never the --home folder's.
+    enforces: handoff/TASK-077-r2.md Ruling 7; handoff/TASK-077.md R2."""
+    root = bench.project("Alpha")
+    docs = root / "Documents"
+    docs.mkdir()
+    (docs / "Alpha Issues During Development and Their Solutions.md").write_text(
+        "# Alpha - Issues During Development and Their Solutions\n\n## ISS-001 - The first issue\nContext: the first.\n",
+        encoding="utf-8")
+    bench.write_projects({"Alpha": root})
+    other = other_home_with_zulu(bench)
+    bench.write_ledger({})
+    rc, out = main_caught(bench, ["evaluate-reports.py", "collect", "--home", str(other)])
+    assert "Alpha issues: 1 entries" in out, "collect --home did not read the projects of ~/.cursor-bridge/projects.json:\n%s" % out
+    assert "Zulu" not in out, "collect --home read the projects file of the --home folder:\n%s" % out
+    assert "Traceback" not in out, out
+
+
+def test_r097_pace_report_home_never_chooses_the_projects_file(bench):
+    """pace-report.py --home <folder> with no roots: the projects of ~/.cursor-bridge/projects.json, not the --home folder's.
+    enforces: handoff/TASK-077-r2.md Ruling 7; handoff/TASK-077.md R15."""
+    alpha = bench.project("Alpha")
+    bench.write_projects({"Alpha": alpha})
+    other = other_home_with_zulu(bench)
+    rc, out, err = run_pace_split(bench, "--home", str(other))
+    heads = [l for l in out.splitlines() if l.startswith("#")]
+    assert any(re.search(r"Alpha|alpha-root", h) for h in heads), "pace-report --home did not read ~'s projects file:\n%s%s" % (out, err)
+    assert not any(re.search(r"Zulu|zulu-root", h) for h in heads), "pace-report --home read the --home folder's projects file:\n%s" % out
+
+
+# ---------------------------------------------------------------- Ruling 8: run and job ids
+
+
+def test_r097_a_run_id_that_is_not_digits_is_a_failed_read_and_never_a_path(bench):
+    """A failed run listed with the id ../../../user: no call holds that text; the runs list is a failed read (reply could
+    not be parsed); never green; the ledger entry as it stood.
+    enforces: handoff/TASK-077-r2.md Ruling 8; handoff/TASK-077.md R5, R7."""
+    one_project(bench)
+    rc, out = run_caught(bench, routes(runs="security-runs-bad-id.json", jobs="security-jobs-failed.json", log="security-log-finding.json"))
+    assert not any("../../../user" in a or "/user/" in a for c in bench.calls() for a in c), \
+        "a run id that is not digits entered a call: %r" % bench.calls()
+    assert "Traceback" not in out, out
+    sec = bench.section("Alpha", out)
+    assert failure_line(sec, r"runs list", r"pars"), "the runs list is not a failed read (reply could not be parsed):\n%s" % sec
+    assert not has(r"\bgreen\b", sec), "a failed read reported green:\n%s" % sec
+    assert bench.window("Alpha") == {"last_run_read": OLD_RUN_AT, "finding_standing": None}, \
+        "the ledger entry changed after a failed runs read: %r" % bench.window("Alpha")
+
+
+def test_r097_finding_standing_is_stored_as_an_int(bench):
+    """A finding of the window: the ledger's finding_standing is the run id as an int.
+    enforces: handoff/TASK-077-r2.md Ruling 8; handoff/TASK-077.md R11."""
+    one_project(bench)
+    rc, out = bench.run(routes(runs="security-runs-failed.json", jobs="security-jobs-failed.json", log="security-log-finding.json"))
+    w = bench.window("Alpha")
+    fs = w.get("finding_standing")
+    assert isinstance(fs, int) and not isinstance(fs, bool) and fs == int(NEW_RUN), "finding_standing is not the int %s: %r" % (NEW_RUN, w)
+
+
+def test_r097_a_digits_string_standing_from_an_older_ledger_is_kept_as_an_int(bench):
+    """An older ledger holding finding_standing as a digits string: accepted, reported by its run, stored back as an int.
+    enforces: handoff/TASK-077-r2.md Ruling 8; handoff/TASK-077.md R6, R11."""
+    one_project(bench, last_run_read=NEW_RUN_AT, finding=OLD_RUN)
+    rc, out = bench.run(routes())
+    sec = bench.section("Alpha", out)
+    assert standing_line(OLD_RUN, sec), "the standing finding (run %s) is not reported:\n%s" % (OLD_RUN, sec)
+    fs = bench.window("Alpha").get("finding_standing")
+    assert isinstance(fs, int) and not isinstance(fs, bool) and fs == int(OLD_RUN), "finding_standing is not the int %s: %r" % (OLD_RUN, fs)
+
+
+# ---------------------------------------------------------------- Ruling 9: unexpected reply shapes
+
+
+BAD_ALERTS = {
+    "an array of non-objects": "security-alerts-not-objects.json",
+    "an object with exit 0": "security-alerts-object.json",
+    "an empty body with exit 0": "security-alerts-empty.json",
+}
+
+
+@pytest.mark.parametrize("case", sorted(BAD_ALERTS))
+def test_r097_an_open_alerts_reply_of_an_unexpected_shape_is_a_failed_read(bench, case):
+    """The open alerts list answers [1, 2], {"message": "x"} or nothing (exit 0): a failed read of the open alerts list with
+    the Security tab remedy, never the no-alert line, never a traceback.
+    enforces: handoff/TASK-077-r2.md Ruling 9; handoff/TASK-077.md R7, R9."""
+    one_project(bench)
+    rc, out = run_caught(bench, routes(alerts=BAD_ALERTS[case]))
+    assert "Traceback" not in out, "%s ended in a traceback:\n%s" % (case, out)
+    sec = bench.section("Alpha", out)
+    assert not says_no_alert_open(sec), "%s was read as no alert open:\n%s" % (case, sec)
+    assert failure_line(sec, r"open alerts list", r"pars|read failed|fail"), "%s is not a failed read of the open alerts list:\n%s" % (case, sec)
+    assert has(r"security tab", sec), "%s: the remedy does not name the Security tab:\n%s" % (case, sec)
+    assert not has(r"\bgreen\b", sec), "%s reported green:\n%s" % (case, sec)
+
+
+# ---------------------------------------------------------------- Rulings 10-11: malformed runs, order by time
+
+
+MALFORMED_RUNS = {
+    "a created_at that does not parse": "security-runs-bad-time.json",
+    "a completed run with no conclusion": "security-runs-no-conclusion.json",
+}
+
+
+@pytest.mark.parametrize("case", sorted(MALFORMED_RUNS))
+def test_r097_a_malformed_run_fails_the_runs_read(bench, case):
+    """The newest listed run malformed (its created_at does not parse, or completed with no conclusion) behind an older
+    success: not green, a failed read of the runs list, the ledger entry as it stood.
+    enforces: handoff/TASK-077-r2.md Ruling 10; handoff/TASK-077.md R7, R11."""
+    one_project(bench, last_run_read=EARLY)
+    rc, out = run_caught(bench, routes(runs=MALFORMED_RUNS[case]))
+    assert "Traceback" not in out, out
+    sec = bench.section("Alpha", out)
+    assert not has(r"\bgreen\b", sec), "%s was dropped and the older success read green:\n%s" % (case, sec)
+    assert failure_line(sec, r"runs list", r"pars|read failed|fail"), "%s is not a failed read of the runs list:\n%s" % (case, sec)
+    assert bench.window("Alpha") == {"last_run_read": EARLY, "finding_standing": None}, \
+        "the ledger entry changed after a failed runs read: %r" % bench.window("Alpha")
+
+
+def test_r097_the_newest_run_is_chosen_by_time_not_by_text(bench):
+    """Two runs listed out of time order, created_at in the Z and +00:00 forms: the later by time (a success, earlier as
+    text) decides: green, and last_run_read is that run's time.
+    enforces: handoff/TASK-077-r2.md Ruling 11; handoff/TASK-077.md R6, R11."""
+    one_project(bench)
+    rc, out = bench.run(routes(runs="security-runs-out-of-order.json"))
+    sec = bench.section("Alpha", out)
+    assert has(r"\bgreen\b", sec) and not has(r"scanner failure", sec), "the newest run by time (a success) did not decide:\n%s" % sec
+    lrr = bench.window("Alpha").get("last_run_read")
+    assert lrr and utc(lrr) == utc("2026-11-15T13:54:53.900+00:00"), "last_run_read is not the newest run's time: %r" % lrr
+
+
+# ---------------------------------------------------------------- Rulings 12-14: the workflow, the remote, the git call
+
+
+def test_r097_a_lookalike_workflow_path_is_not_configured(bench):
+    """A workflow whose path ends in my-dependency-scan.yml only: not configured, no run read.
+    enforces: handoff/TASK-077-r2.md Ruling 12; handoff/TASK-077.md R5 (b)."""
+    one_project(bench)
+    rc, out = bench.run(routes(workflows="security-workflows-lookalike.json"))
+    sec = bench.section("Alpha", out)
+    assert has(r"not configured", sec), "a path ending in my-dependency-scan.yml was taken for the workflow:\n%s" % sec
+    assert not any("/runs" in p for p in bench.paths()), "a run was read for a lookalike workflow: %r" % bench.paths()
+
+
+@pytest.mark.parametrize("origin", ["https://github.com/../..", "git@github.com:./REPO.git"])
+def test_r097_an_owner_or_repo_of_dots_only_is_no_remote(bench, origin):
+    """An origin whose owner or repository segment is dots only: no remote, and no gh call.
+    enforces: handoff/TASK-077-r2.md Ruling 13; handoff/TASK-077.md R4."""
+    one_project(bench, origin=origin)
+    rc, out = run_caught(bench, routes())
+    assert bench.calls() == [], "a gh call was made for the origin %s: %r" % (origin, bench.calls())
+    sec = bench.section("Alpha", out)
+    assert has(r"no remote", sec), "the origin %s is not no remote:\n%s" % (origin, sec)
+
+
+def test_r097_the_origin_read_runs_git_with_fsmonitor_off(bench):
+    """The git call reading origin carries -c core.fsmonitor=false (recorded from subprocess.run in the program).
+    enforces: handoff/TASK-077-r2.md Ruling 14; handoff/TASK-077.md R4."""
+    one_project(bench)
+    seen = record_git_calls(bench)
+    rc, out = bench.run(routes())
+    assert seen, "no git call was recorded (the origin read goes through subprocess.run):\n%s" % out
+    for argv, _env in seen:
+        pairs = list(zip(argv, argv[1:]))
+        assert ("-c", "core.fsmonitor=false") in pairs or "-ccore.fsmonitor=false" in argv, \
+            "a git call without -c core.fsmonitor=false: %r" % argv
+
+
+def test_r097_git_dir_from_the_environment_does_not_choose_the_origin(bench):
+    """GIT_DIR in the environment, pointing at another checkout whose origin is OWNER/DECOY: the project's own origin
+    (OWNER/REPO) is still read, and no call names OWNER/DECOY.
+    enforces: handoff/TASK-077-r2.md Ruling 14; handoff/TASK-077.md R4."""
+    one_project(bench)
+    decoy = bench.tmp / "decoy"
+    decoy.mkdir()
+    bench.git(decoy, "init", "-q")
+    bench.git(decoy, "remote", "add", "origin", "https://github.com/OWNER/DECOY.git")
+    bench.mp.setenv("GIT_DIR", str(decoy / ".git"))
+    rc, out = bench.run(routes())
+    assert not any("OWNER/DECOY" in a for c in bench.calls() for a in c), "GIT_DIR chose the origin read: %r" % bench.calls()
+    sec = bench.section("Alpha", out)
+    assert "OWNER/REPO" in sec and has(r"\bgreen\b", sec), "the project's own origin (OWNER/REPO) was not read:\n%s" % sec
+
+
+# ---------------------------------------------------------------- Ruling 15: pace-report's default roots
+
+
+def run_pace_split(bench, *args):
+    env = dict(os.environ)
+    p = subprocess.run([sys.executable, PACE, "--weeks", "1"] + list(args), cwd=str(bench.root / "Workspace"), env=env,
+                       capture_output=True, text=True, timeout=600)
+    return p.returncode, p.stdout, p.stderr
+
+
+def test_r097_pace_report_names_roots_by_folder_in_the_files_order(bench):
+    """pace-report.py with no roots: a project named Alpha at a folder alpha-root is headed alpha-root, and the roots keep
+    the projects file's order (Zulu's zulu-root before alpha-root).
+    enforces: handoff/TASK-077-r2.md Ruling 15; handoff/TASK-077.md R15."""
+    zulu = bench.project("Zulu")
+    alpha = bench.project("Alpha")
+    bench.write_projects({"Zulu": zulu, "Alpha": alpha})
+    rc, out, err = run_pace_split(bench)
+    heads = [l for l in out.splitlines() if re.match(r"^#+ ", l)]
+    za = [i for i, h in enumerate(heads) if "zulu-root" in h]
+    aa = [i for i, h in enumerate(heads) if "alpha-root" in h]
+    assert aa and za, "the roots are not headed by their folders' basenames (alpha-root, zulu-root): %r\n%s" % (heads, err)
+    assert za[0] < aa[0], "the roots do not keep the projects file's order (zulu-root first): %r" % heads
+
+
+def test_r097_pace_report_refuses_an_absent_projects_file_on_stderr(bench):
+    """pace-report.py with no roots and no projects file: the refusal naming the file on stderr, exit 2.
+    enforces: handoff/TASK-077-r2.md Ruling 15; handoff/TASK-077.md R15."""
+    rc, out, err = run_pace_split(bench)
+    assert "projects.json" in err, "the refusal is not on stderr:\nstdout:\n%s\nstderr:\n%s" % (out, err)
+    assert "projects.json" not in out, "the refusal went to stdout:\n%s" % out
+    assert rc == 2, "exit %r, not 2:\n%s%s" % (rc, out, err)
