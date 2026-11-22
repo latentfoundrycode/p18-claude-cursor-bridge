@@ -956,15 +956,15 @@ Pool is inferred from the id per Cursor's docs: Grok (any effort/host prefix) an
 the "Cursor Models" pool (native); every third-party model is "Other Models".
 A profile is skipped when other_pool is "exhausted" and any of its models is in the other
 pool. Unless --no-probe, the builder and Review B of a candidate profile are each sent a
-  one-word request through `cursor-agent -p -f --model <id>`; a refusal, empty reply,
+one-word request through `cursor-agent -p -f --model <id>`; a refusal, empty reply,
 usage-limit message or timeout marks the profile unusable (this catches hard failures only,
-never a nearly-empty quota); any other reply counts as answered, off-script. When the tool
-itself is signed out, its own sign-in line ends the run (exit 5, SIGN-IN) and counts no failure.
-The chosen
+never a nearly-empty quota); any other reply counts as answered, off-script. The chosen
 profile's three families must be distinct. The result is written to
 docs/ROSTER.resolved.json for the delegate and Review B commands to read, and only when it
 changes (the time of every check goes to the state file as last_resolved), so a check
 before a snapshot leaves the tree clean.
+When the Cursor tool itself is signed out, its own sign-in line (the whole of standard output,
+or any whole line of standard error) ends the run with SIGN-IN, exit 5, and counts no failure.
 The family rule governs Review B only (2026.10.25a): Review B is never of the family of the
 last builder run of the branch under review (none for a branch with no builder run). When
 the chosen profile's Review B is of that family - the change in flight was built under
