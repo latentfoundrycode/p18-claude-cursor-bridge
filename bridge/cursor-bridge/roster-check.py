@@ -217,22 +217,16 @@ def tool_sign_in_on_stderr(text):
 
 def tool_sign_in_on_stdout(text):
     """True when standard output is only the tool's sign-in line (one non-empty trimmed line)."""
-    non_empty = [_trim_line_edges(line) for line in _lf_lines(text) if _trim_line_edges(line)]
+    non_empty = []
+    for line in _lf_lines(text):
+        trimmed = _trim_line_edges(line)
+        if trimmed:
+            non_empty.append(trimmed)
     return len(non_empty) == 1 and non_empty[0].startswith(SIGN_IN_PREFIX)
 
 
 def _ascii_line(text):
     return (text or "").encode("ascii", errors="backslashreplace").decode("ascii")
-
-
-def _stdout_for_probe_errors(out):
-    """Lines of a model stdout reply, without lines that are the tool's sign-in line (quoted on their own)."""
-    parts = []
-    for line in _lf_lines(out):
-        trimmed = _trim_line_edges(line)
-        if trimmed and not trimmed.startswith(SIGN_IN_PREFIX):
-            parts.append(trimmed)
-    return NL.join(parts)
 
 
 def probe(model_id):
@@ -261,10 +255,9 @@ def probe(model_id):
     out = (p.stdout or "").strip()
     if p.returncode == 0 and out.strip().strip(".").upper() == "OK":
         return True, "answered"
-    err_probe = _stdout_for_probe_errors(out)
     if (p.returncode == 0 and out and classify_failure(out + " " + (p.stderr or ""))[0] == "OTHER"
             and not re.search(r"(?i)\b(error|exception|failed|failure|traceback|unavailable|not available|denied|unauthori[sz]ed|forbidden"
-                              r"|invalid|not found|unknown model|cannot use|not supported)\b", err_probe)):
+                              r"|invalid|not found|unknown model|cannot use|not supported)\b", out)):
         return True, "answered off-script: %a" % out.replace(NL, " ")[:80]
     err =(p.stderr or "").strip().replace("\n", " ")[:200]
     return False, "exit %d; stdout=%a; stderr=%a" % (p.returncode, out[:80], err)
