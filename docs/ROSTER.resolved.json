@@ -10,6 +10,10 @@
   },
   "other_pool": "exhausted",
   "probed": true,
-  "resolved_at": "2026-11-21T19:56 UTC",
-  "reset_day": 16
+  "resolved_at": "2026-11-22T03:18 UTC",
+  "reset_day": 16,
+  "rebuild": {
+    "built_by": "grok-4.7-medium",
+    "rebuild_with": "composer-2.5"
+  }
 }
