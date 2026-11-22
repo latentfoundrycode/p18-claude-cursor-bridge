@@ -119,6 +119,9 @@ EV_COMMAND = "python ~/.claude/cursor-bridge/evaluate-reports.py security"
 EV_SENTENCES = (
     "(a finding, a scanner failure, no completed run since the previous evaluation, the three of the bridge design's "
     "\"The weekly dependency scan\"; or `not configured`, `no remote`, or green)",
+    # Review A of TASK-078, B1: the program writes `alerts off` beside a green kind; R-052 makes it a finding
+    "its alerts and the remedy; `alerts off` and each open alert are findings of their own, beside the kind, "
+    "whatever the kind reads.",
     "A finding is fixed by a `DEP-<nnn>` increment (the merge policy's procedure), never by an unreviewed change; a 403 "
     "is the login's scope, named in a run sheet for the owner, never a token in text;",
     "Step 4's **Dependency scan** section is that file's, written every week beside the Pace section; a finding is an "
