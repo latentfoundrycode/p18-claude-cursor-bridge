@@ -1,0 +1,1589 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 61e0d55..f410093 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.11.12a",
+-  "generated": "2026-11-22 00:43",
++  "generated": "2026-11-22 05:09",
+   "files": {
+     "agents/cursor-configurator.md": "a8aad7838a9bc5b4f00e13fd3749919158cbe37ec7acfa9a40960600398784bc",
+     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
+@@ -29,7 +29,7 @@
+     "cursor-bridge/VERSION": "d02d17b53caad2df1b9d9e1450986dec98b6fb326b5470ca81a7d60ff91fdc88",
+     "cursor-bridge/bench-check.py": "ea34fa87a1f3383cd34600f48a817a23b6fc0cd4ad461a77b796baf05ef2643e",
+     "cursor-bridge/boundary-check.py": "10aa333b4387f7f14ae85f9edb68fc5e8bda5a17a391f6161004f40cef4e7242",
+-    "cursor-bridge/bridge-check.py": "2e3af785b847076210979e6e5f775d2550ecd960600cd0e18210920d2b0babd1",
++    "cursor-bridge/bridge-check.py": "be7d6fde0c03b7f04a905770130059b41db05f31f982431c935dc47c95064607",
+     "cursor-bridge/bridge-install.py": "59628f4816c797caa0b65036c81db7210ac63f5ca86213087b7065a2c9d96c12",
+     "cursor-bridge/bridge-run.py": "b6fec8ec0f46f48819ceeb2655d7a921d369f1041b2d110222533e24a615296d",
+     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
+diff --git a/bridge/cursor-bridge/bridge-check.py b/bridge/cursor-bridge/bridge-check.py
+index ae9b8dd..b8589d6 100644
+--- a/bridge/cursor-bridge/bridge-check.py
++++ b/bridge/cursor-bridge/bridge-check.py
+@@ -25,7 +25,7 @@ own manifest and nothing more: a source tree has no settings.json, since the own
+ not part of it, and the shim is a matter of the machine a release is installed on. In a
+ source tree a file the manifest does not list (EXTRA) fails the check as well.
+ Exit:   0 = every manifest file OK; 1 = at least one STALE or MISSING;
+-        2 = manifest unreadable.  ASCII-only on purpose (cp1252 consoles).
++        2 = manifest unreadable, or under --sources the program does not stand in the tree it checks, or its folder is not named cursor-bridge, or a folder cannot be resolved.  ASCII-only on purpose (cp1252 consoles).
+ """
+ import hashlib
+ import json
+@@ -36,6 +36,27 @@ import sys
+ HERE = os.path.dirname(os.path.abspath(__file__))
+ 
+ 
++def escape_folder(path):
++    """Print a folder path without control chars or quotes that could break or forge a line."""
++    out = []
++    for ch in path:
++        o = ord(ch)
++        if o < 32:
++            if ch == "\n":
++                out.append("\\n")
++            elif ch == "\r":
++                out.append("\\r")
++            elif ch == "\t":
++                out.append("\\t")
++            else:
++                out.append("\\x%02x" % o)
++        elif ch == '"':
++            out.append('\\"')
++        else:
++            out.append(ch)
++    return "".join(out)
++
++
+ def norm_hash(path):
+     with open(path, "rb") as f:
+         data = f.read()
+@@ -153,6 +174,39 @@ def main():
+         print("bridge-check: cannot read %s (%s)" % (manifest_path, e))
+         return 2
+ 
++    if sources:
++        resolve_failed = False
++        try:
++            here_folder = os.path.realpath(HERE)
++            here_tree = os.path.dirname(here_folder)
++        except (OSError, ValueError):
++            resolve_failed = True
++            here_folder = os.path.abspath(HERE)
++            here_tree = os.path.abspath(os.path.join(HERE, os.pardir))
++        try:
++            check_tree = os.path.realpath(root)
++        except (OSError, ValueError):
++            resolve_failed = True
++            check_tree = root
++        check_cursor_bridge = os.path.join(check_tree, "cursor-bridge")
++        if resolve_failed:
++            alt = os.path.join(root, "cursor-bridge", "bridge-check.py")
++            print('RESULT: REFUSED - this program stands in tree "%s" (program: "%s") but was asked to check tree "%s" (cursor-bridge: "%s"); run "%s" instead.'
++                  % (escape_folder(here_tree), escape_folder(here_folder), escape_folder(check_tree),
++                     escape_folder(check_cursor_bridge), escape_folder(alt)))
++            return 2
++        if os.path.normcase(os.path.basename(here_folder)) != os.path.normcase("cursor-bridge"):
++            print('RESULT: REFUSED - this program\'s folder is not named cursor-bridge (program: "%s"); run the copy in that tree\'s cursor-bridge folder instead.'
++                  % escape_folder(here_folder))
++            return 2
++        if os.path.normcase(here_tree) != os.path.normcase(check_tree):
++            alt = os.path.join(check_tree, "cursor-bridge", "bridge-check.py")
++            print('RESULT: REFUSED - this program stands in tree "%s" (program: "%s") but was asked to check tree "%s" (cursor-bridge: "%s"); run "%s" instead.'
++                  % (escape_folder(here_tree), escape_folder(here_folder), escape_folder(check_tree),
++                     escape_folder(check_cursor_bridge), escape_folder(alt)))
++            return 2
++        root = check_tree
++
+     files = manifest.get("files", {})
+     ok = stale = missing = 0
+     problems = []
+@@ -208,8 +262,9 @@ def main():
+                 if rel not in files and not rel.endswith("MANIFEST.json") and "__pycache__" not in rel:
+                     extras.append(rel)
+ 
++    ver_at = escape_folder(root) if sources else root
+     print("bridge-check: version %s (%s) at %s" % (
+-        manifest.get("version", "?"), manifest.get("generated", "?"), root))
++        manifest.get("version", "?"), manifest.get("generated", "?"), ver_at))
+     for kind, rel in problems:
+         print("  %-8s %s" % (kind, rel))
+     if extras and (sources or not quiet):
+@@ -219,12 +274,15 @@ def main():
+     if sources and (stale or missing or extras):
+         # An unlisted file in a release folder would be installed, never kept as part of a
+         # previous release and never removed by a later one.
+-        print("RESULT: SOURCES DO NOT MATCH their stamp - run tools/make-manifest.py after the last edit, then re-run.")
++        print("RESULT: SOURCES DO NOT MATCH their stamp - run tools/make-manifest.py after the last edit, then re-run. (checked: %s)" % escape_folder(os.path.realpath(HERE)))
+         return 1
+     if stale or missing:
+         print("RESULT: NOT CALIBRATED - run the release's bridge-install.py (it copies the files, merges settings.json and installs the shim), then re-run.")
+         return 1
+-    print("RESULT: %s bridge %s" % ("SOURCES MATCH" if sources else "INSTALLED TREE MATCHES", manifest.get("version", "?")))
++    if sources:
++        print("RESULT: SOURCES MATCH bridge %s %s" % (manifest.get("version", "?"), escape_folder(os.path.realpath(HERE))))
++    else:
++        print("RESULT: INSTALLED TREE MATCHES bridge %s" % manifest.get("version", "?"))
+     return 0
+ 
+ 
+diff --git a/docs/CLI_REFERENCE.md b/docs/CLI_REFERENCE.md
+index f718bbb..9450337 100644
+--- a/docs/CLI_REFERENCE.md
++++ b/docs/CLI_REFERENCE.md
+@@ -69,7 +69,7 @@ own manifest and nothing more: a source tree has no settings.json, since the own
+ not part of it, and the shim is a matter of the machine a release is installed on. In a
+ source tree a file the manifest does not list (EXTRA) fails the check as well.
+ Exit:   0 = every manifest file OK; 1 = at least one STALE or MISSING;
+-        2 = manifest unreadable.  ASCII-only on purpose (cp1252 consoles).
++        2 = manifest unreadable, or under --sources the program does not stand in the tree it checks, or its folder is not named cursor-bridge, or a folder cannot be resolved.  ASCII-only on purpose (cp1252 consoles).
+ ```
+ 
+ ## bridge-install.py
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index 69d9fad..1c2b65d 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -2370,3 +2370,14 @@ Each is fixed by the next increment that edits its record.
+ - **The builder's assumptions, dispositioned.** Round 1's item 2 (non-version folders not removed) was false and its mutation lines single-test runs: corrected in round 2's report. Round 2: an orphan marker counts as no mark; stray files removed; cp1252: accepted. Round 3 wrote none, which Review A found untrue (the F4 line below).
+ - **Leads, recorded, not fixed (each needs a hand-made layout under the owner's own `~/.claude`).** (1) With a linked `cursor-bridge-previous` the marker is still written, cleared or removed through the link (`write_keep_marker` at the rotation and after the check, and rollback's stale-marker cleanup), and the rotation and rollback's removals are skipped silently, so copies pile up and a later bare `--rollback` can roll forward (Review A S1, the audit 2 and 4). (2) A stray entry the rotation cannot remove, named like the version being saved or like its `.partial`, or spared because the stored marker names it, still stops every install at the rename with the stopped line, whose "run the same command again" does not help; round 3's report says the install continues (Review A S2, the audit 1). (3) The builder's failed-check case in tests/test_rollback.py: its second half reinstalls the same version, so `save_previous` never runs and it proves nothing (Review A S4, the audit 3). (4) A folder or link named `.keep` makes `write_keep_marker` fail after the rotation (exit 2, the stopped line); `open(path, "w")` follows a link named `.keep` (the audit 5). (5) `kept_release_names` uses `os.path.isdir`, so a junction entry is listed and accepted by `--keep` and `--rollback <version>`, the rollback reading the release from the link's target (the audit 6). (6) With no name filter, a hand-made folder under `cursor-bridge-previous/` sorting after a target counts as a newer kept copy and is removed by `--rollback <version>`, and is picked by a bare `--rollback`, which refuses it (Review A, round 2). (7) The marker bound is 512 characters, not bytes; the `os.unlink` branch in `remove_kept_entry`'s junction case is dead and `if not dry` before the rotation's marker write redundant (both reviewers). (8) The reports' quoted `git status --short` omitted the report itself in rounds 2 and 3 (F7). (9) Round 2's builder ran `git checkout -- bridge-install.py` during its mutation checks, a command the brief reserves; its note says so; nothing of it reached the tree (Review A, round 2).
+ - **The mutation sweep.** run/supervisor/TASK-073-mutants.json, twenty mutants (an unknown word, a twice-given option and a positional word skipped; `--target` taking an option as its value; `--keep` with `--rollback` accepted; the name matched case-insensitively and as a path; the stored marker and this run's `--keep` ignored at the rotation; the rollback version ignored; newer copies kept; a stale `.partial` kept; the marker read without the BOM or with decode errors escaping; only lettered versions listed; the dry run's keep line silent; the rotation through a linked base; a file removal error escaping; the saved version's name spared; the marker not rewritten at the rotation): every mutant killed (counts: run=20 cached=0 killed=20 survived=0 not applied=0 error=0 expected survive=0, the second run; the first errored m05, m09 and m20, judged by tests/test_rollback.py, which installs the repository's own stamped bridge/ and so refuses every install under any mutant as not stamped; the supervisor added two acceptance cases that hold those behaviours with releases stamped as made, a refused --keep with --rollback and an in-process failed install check whose next install is a later version, which also answers lead 3, and the mutants are judged by the acceptance file alone).
++
++### TASK-074: the release tooling checks the tree it stands in (2026-11-22, three builder rounds, the native profile)
++- **TASK-072's rebuild, withdrawn (before this increment).** With the other-models pool exhausted (until 2026-12-16), step 3b has the native builder rebuild TASK-072, built by grok-4.7-medium, before a grok Review B reads it. The rebuild re-issued handoff/TASK-072.md to composer-2.5 (2026-11-22T03:20:08Z) from a checkpoint that reset conformance-check.py to main's: its output was byte-identical to the old round 3 (30d0452), staged, its report saying it restored the reviewed implementation. The brief allows `git log`, and the old code stands on the branch, so a re-issued brief does not rebuild. The launcher's family check reads the branch's last builder run and would have passed it. Withdrawn (the checkpoint reverted); TASK-072 waits for the cross-family reviewer. Lead: a rebuild brief forbids reading other revisions of the files it rebuilds (or rebuilds on a branch without them), and the launcher or the guard compares a rebuild's output with the old builder's commits; until then a rebuild under step 3b is not proof of another family's work.
++- **The supervisor's tests.** tests/test_program_release_tooling.py, drafted by a subagent: seven cases, on the checkpoint "7 failed"; three round-2 cases (on round 1 "3 failed, 7 passed"); five round-3 cases (on round 2 "4 failed, 11 passed", the fifth, a Windows device path that raises while resolved, red on the checkpoint and holding the except branch round 2's own mutant showed untested); after round 3, for the mutation run, `copy_release` stamps each copy as it stands (each case judges the program's logic, the repository's own stamp being CI's step) and one case holds the version line naming the resolved `--root`.
++- **Round 1** (composer-2.5). The program's folder compared with `<--root>/cursor-bridge`, both resolved; the RESULT lines name the folder; make-manifest keeps VERSION's ending. "22 passed". Review A APPROVE (the bare refusal line); the security audit REJECT: `--root CON` on Windows raised `OSError` from `realpath` (Python 3.12), a traceback and exit 1; a `--root` whose `cursor-bridge` is a junction into the program's tree passed; VERSION emptied by a failing encode.
++- **Round 2** (Round cause: security). A resolve failure a refusal; the whole `--root` compared; `RESULT: REFUSED` labelled and quoted; the bytes built before the write; two builder cases for LF. "27 passed". Both APPROVE, both with one Should fix: `realpath(join(HERE, pardir))` collapses the dot-dot before resolving on Windows and after it on POSIX, so the platforms disagree and a MATCH line could name a folder other than the one checked.
++- **Round 3, the ceiling** (Round cause: brief error, round 2's brief having given `realpath(dirname(HERE))`, which resolves the lexical parent too). The program's tree is the parent of its own folder resolved, that folder named `cursor-bridge`; the files read under the resolved `--root`; printed folders escaped. "32 passed". Both APPROVE, nothing of the five blocking classes.
++- **The builder's assumptions, dispositioned.** Round 1 wrote none (accepted by Review A: realpath resolves junctions; the final-two-bytes rule a choice). Round 2: other device names (the audit found only `\\.\CON\<sub>` raises), cp1252 rendering, mixed endings: accepted. Round 3: DEL and U+0085, U+2028, U+2029 unescaped (lead 2), POSIX links left to CI's Ubuntu run, M3 uncaught (killed by the supervisor's added case).
++- **Leads, recorded, not fixed.** (1) The extended-length spelling `\\?\<tree>` of the program's own tree is refused (realpath keeps the prefix on one side; rounds 1 to 3). (2) `escape_folder` leaves DEL, U+0085, U+2028 and U+2029 as they are: on a UTF-8 stdout (Ubuntu, `PYTHONIOENCODING=utf-8`) a `--root` holding them splits under `str.splitlines` into lines that begin `RESULT:`, the first still `RESULT: REFUSED`, exit 2; and a refusal can carry `SOURCES MATCH` text inside a folder name, escaped. (3) The STALE, MISSING and EXTRA lines print the tree's file names unescaped (before this increment): on POSIX a name holding a newline puts a line beginning `RESULT:` before the real one, exit still 1. (4) Links inside the checked tree (a file or a `commands/`, `agents/`, `skills/` folder linking out) are followed when hashing, as make-manifest follows them. (5) On a case-sensitive Windows folder holding both `Cursor-Bridge` and `cursor-bridge` the name check and the tree comparison pass under normcase while the files are read under the other folder. (6) The comparison and the hashing are separate steps; a component swapped for a link between them is read. (7) The name refusal names no path to run; `os.path.realpath(HERE)` is recomputed for the RESULT lines outside the try. (8) `--root` as the last word raises IndexError (before this increment). (9) No threat model is recorded for bridge-check.py (INVENTORY, Decisions, covers the session-start hook only). (10) The reports' records: round 1 restated mutation counts in prose and one did not match its command; round 2 cut a mutant's text and a refusal quote; round 3 quoted outputs from before its last edit, rewrote backslashes as slashes, and quoted the device-path refusal from a run Git Bash had rewritten to a drive path, so it never exercised the device path (the case does).
++- **The command reference.** The docstring's exit line changed in each round; the supervisor regenerated docs/cli-reference.json and docs/CLI_REFERENCE.md each time (the pre-commit gate refused the stale reference). The lead of TASK-072 stands: a plan entry whose increment changes a program's docstring names both files in its Scope.
++- **The mutation sweep.** run/supervisor/TASK-074-mutants.json, eleven mutants (the program tree from the lexical parent; the folder name unchecked; the files read under the root as spelled; folders printed unescaped; a resolve failure uncaught; the refusal exiting 1; the tree comparison removed; the MATCH and DO NOT MATCH lines naming no folder; VERSION always LF; VERSION always CRLF): 11 of 11 killed, none survived and none erred, the acceptance files run on the unmutated copy first (2026-11-22).
+diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
+index 863a181..3feb119 100644
+--- a/docs/INVENTORY.md
++++ b/docs/INVENTORY.md
+@@ -29,7 +29,7 @@ The bridge already exists (releases 0, A1a–A5). This inventory is opened as th
+ | Supervisor workflow | The governing instructions the supervisor runs a project by | bridge/commands/supervisor.md | tests/ | pre-B |
+ | Bridge programs | The one-shot checks and launchers the loop relies on | bridge/cursor-bridge/*.py | tests/ | pre-B |
+ | Governance conventions | The reference texts (merge policy, delivery, diagrams, performance, observability, pitfalls) | bridge/cursor-bridge/*.md | tests/ | pre-B |
+-| Install & lifecycle | Install, upgrade-in-place, take-back of the bridge on one computer; a release carrying the installed version but other files is refused, `--anyway` installing it with a no-way-back warning (BUG-034); one release kept as the way back; the run sheet's one check of every install, the installer's exit 0 on its `RESULT: INSTALLED TREE MATCHES` line (BUG-037); every word of the command line read first, an unknown option, `--help`, `-h`, a positional word, an option given twice or missing its value refused with the usage, exit 2, nothing read or written; `--keep <version>` or `--keep none` marks one kept copy (a `.keep` file in `cursor-bridge-previous/`) that every later install keeps beside the one previous release, this run's value deciding the rotation, the value matched exactly against the kept folders' names and never used as a path; `--rollback [<version>]` restores the named kept copy, removes the newer ones and writes `ROLLED-BACK.md` from every newer entry; a linked `cursor-bridge-previous` is never rotated through (TASK-073) | bridge/cursor-bridge/bridge-install.py; bridge/commands/calibrate-bridge.md | tests/; tests/test_bug034.py; tests/test_bug037.py; tests/test_rollback.py; tests/test_program_install_keep.py | release A1a; release B (BUG-034, BUG-037); the program release, stage P3 (TASK-073) |
++| Install & lifecycle | Install, upgrade-in-place, take-back of the bridge on one computer; a release carrying the installed version but other files is refused, `--anyway` installing it with a no-way-back warning (BUG-034); one release kept as the way back; the run sheet's one check of every install, the installer's exit 0 on its `RESULT: INSTALLED TREE MATCHES` line (BUG-037); every word of the command line read first, an unknown option, `--help`, `-h`, a positional word, an option given twice or missing its value refused with the usage, exit 2, nothing read or written; `--keep <version>` or `--keep none` marks one kept copy (a `.keep` file in `cursor-bridge-previous/`) that every later install keeps beside the one previous release, this run's value deciding the rotation, the value matched exactly against the kept folders' names and never used as a path; `--rollback [<version>]` restores the named kept copy, removes the newer ones and writes `ROLLED-BACK.md` from every newer entry; a linked `cursor-bridge-previous` is never rotated through (TASK-073); the source check, `bridge-check.py --sources`, checks only the tree the program physically stands in: the program's folder resolved, named `cursor-bridge`, its parent compared with the resolved `--root`, a difference or a folder that cannot be resolved refused with exit 2 and one `RESULT: REFUSED` line naming each folder before anything is hashed, the files then read under the resolved `--root`, the folders printed on the version and RESULT lines with control characters and quotes escaped; `tools/make-manifest.py` writes `VERSION` with the line ending the file has (TASK-074) | bridge/cursor-bridge/bridge-install.py; bridge/cursor-bridge/bridge-check.py; tools/make-manifest.py; bridge/commands/calibrate-bridge.md | tests/; tests/test_bug034.py; tests/test_bug037.py; tests/test_rollback.py; tests/test_program_install_keep.py; tests/test_program_release_tooling.py; tests/test_install_check.py | release A1a; release B (BUG-034, BUG-037); the program release, stage P3 (TASK-073, TASK-074) |
+ | Conditional-workflow model | The core's statement of the five layers, add/replace/set, inheritance and the order additions apply in | bridge/commands/supervisor.md, "Main and conditional workflows" | tests/test_workflow_model.py | release B (TASK-003) |
+ | The open list | Every product type, sub-type and trait with its definition, default traits, workflow name and written flag; the add/change procedure | bridge/cursor-bridge/workflow/open-list.md | tests/test_open_list.py | release B (TASK-004) |
+ | The extension-point registry | Every phase module with its replaceable flag, and every point a conditional workflow may change, each with its declaring module, the kinds of change it accepts and whether it applies per part or per project; how a conditional workflow names a point | bridge/cursor-bridge/workflow/extension-points.md | tests/test_extension_points.py | release B (TASK-005) |
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index 80d5d86..79a7322 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -12,12 +12,12 @@ stage: "the program release's stage P2 closed 2026-11-19, stage P1 2026-11-14 (H
+ open_issues: ["ISS-037 worked around (Review B's provider stopped a review of the guards as security activity; one re-run with context approved)", "ISS-001 recurred, counter 2 (a review log named apart from its snapshot)", "ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on)", "ISS-024 recurred, counter 3", "ISS-036 recurred, counter 3 (fixed each time; stage P1)", "ISS-013 mitigated (the plan check's rule, TASK-033, installed)", "Every other issue fixed or closed: the Issues file in Documents/, and docs/archive/STATUS_HISTORY.md"]
+ ---
+ # Project Status
+-Last updated: 2026-11-21
++Last updated: 2026-11-22
+ Phase: changing
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable, External services
+ Change cycle: the program release (begun 2026-11-13, the owner's word in this chat; its intake's read-back confirmed by the owner 2026-11-13; the field finding F7 added to it by the owner 2026-11-13; its design revision and plan addendum, one subject, `program`, approved by the owner at the design gate 2026-11-13, seven decisions in the question form, the trait External services approved and the carry comparison kept a recorded lead; its scoped revision for F7, one subject with its plan revision, `program-f7`, approved by the owner at its gate 2026-11-14, five decisions in the question form; step: the loop, stage P2 closed 2026-11-19 (twelve increments, its refactoring pass, its review approved by both, its demonstration live), stage P3 next from TASK-068, on Opus 5.5; the owner placed one more item into it 2026-11-14, the diagram design-decision Feedback entry, planned at the next plan revision (INVENTORY, Decisions)); before it release B2, begun 2026-11-04, complete 2026-11-11 (Claude-Cursor Bridge 2026.11.11a)
+ Awaiting user on: nothing
+-Next: stage P3: TASK-072 (built in three rounds and approved by Review A and the security audit; rebuilt by the native builder before the native Review B reads it, since the cross-family reviewer's pool is exhausted until 2026-12-16 and the owner's answer of 2026-11-21 is to work with the fallback suite now), then TASK-074 (TASK-068's in-flight program, TASK-069's pass and cause counting, TASK-070's mutation baseline, TASK-071's empty run parameter and TASK-073's installer word check and kept copy merged, their rows R-088 to R-091 and R-094 planned until TASK-078's texts and the stage's close, which name exit 5 in step 7 and the migration's new `cannot read` reason in calibration; the loop writes its in-flight lines with `in-flight.py` and its review passes with `in-flight.py --pass`; stage P2's least-confident item 3's `git --version` floor on the install's machines and CI's images is the install's, stage P4); the CI watch's wait for a required context not yet listed is still unexercised live (HARDENING, TASK-069); when TASK-078 is packaged its Scope notes take KP-051's Correction, run-parameters.md's `supervisor` gloss and step 8's and the sentinel's reading of a push-scan hit at its place (HARDENING, Stage P2's demonstration); the next plan revision also places the owner's two rules of 2026-11-15, and release G's widening waits for G's planning (both INVENTORY, Decisions); the plan revision that places the owner's diagram design-decision item (2026-11-14) into a later stage, a records pull request of its own; stage P1 (TASK-055 to TASK-058, REFAC-007) closed 2026-11-14, then P2 to P4 (docs/BUILD_PLAN.md, The program release — the plan addendum; docs/DESIGN.md, Change: the program release); each brief names its calls' time and retry limits (the trait External services); the release ends with the owner's install from a run sheet, Context7's setup a step of it. The order after it (INVENTORY, Decisions): the prototype meta workflow (the owner, 2026-11-20; its design on the owner's word), the progress graph, W, G, F, then C, which waits for the TDP's code-map command, D, the trial of the code map, and E last (the owner, 2026-11-15). reAngle and the video factory calibrate when the owner resumes them (R-031, R-037), the TDP in its own session; release T's field items on the TDP (the first stripped suite at its TASK-172; the weekly workflow, rewritten from the frozen block, v7.0.1 since 2026.11.12a, at its next configuration touch) stand in HARDENING, Correction to project end. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++Next: stage P3: TASK-075 (TASK-068's in-flight program, TASK-069's pass and cause counting, TASK-070's mutation baseline, TASK-071's empty run parameter, TASK-073's installer word check and kept copy and TASK-074's source check and stamp merged, their rows R-088 to R-091, R-093 and R-094 planned until TASK-078's texts and the stage's close, which name exit 5 in step 7 and the migration's new `cannot read` reason in calibration; the loop writes its in-flight lines with `in-flight.py` and its review passes with `in-flight.py --pass`; stage P2's least-confident item 3's `git --version` floor on the install's machines and CI's images is the install's, stage P4); TASK-072, approved by Review A and the security audit in three rounds, waits on its branch for Review B gpt-5.6-sol-high when the other-models pool resets on 2026-12-16 (the native rebuild copied the reviewed code from history and was withdrawn: HARDENING, TASK-074), so TASK-078 and the stage's close follow it; the CI watch's wait for a required context not yet listed is still unexercised live (HARDENING, TASK-069); when TASK-078 is packaged its Scope notes take KP-051's Correction, run-parameters.md's `supervisor` gloss and step 8's and the sentinel's reading of a push-scan hit at its place (HARDENING, Stage P2's demonstration); the next plan revision also places the owner's two rules of 2026-11-15, and release G's widening waits for G's planning (both INVENTORY, Decisions); the plan revision that places the owner's diagram design-decision item (2026-11-14) into a later stage, a records pull request of its own; stage P1 (TASK-055 to TASK-058, REFAC-007) closed 2026-11-14, then P2 to P4 (docs/BUILD_PLAN.md, The program release — the plan addendum; docs/DESIGN.md, Change: the program release); each brief names its calls' time and retry limits (the trait External services); the release ends with the owner's install from a run sheet, Context7's setup a step of it. The order after it (INVENTORY, Decisions): the prototype meta workflow (the owner, 2026-11-20; its design on the owner's word), the progress graph, W, G, F, then C, which waits for the TDP's code-map command, D, the trial of the code map, and E last (the owner, 2026-11-15). reAngle and the video factory calibrate when the owner resumes them (R-031, R-037), the TDP in its own session; release T's field items on the TDP (the first stripped suite at its TASK-172; the weekly workflow, rewritten from the frozen block, v7.0.1 since 2026.11.12a, at its next configuration touch) stand in HARDENING, Correction to project end. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
+ Deviations accepted: none; told to the owner (rule 58): stage P2's demonstration line expected push-scan to exit 0 on the stage's own commits, which hold 18 generic drive paths R-087 counts (exit 1; drawn, the texts' reading in TASK-078; HARDENING, Stage P2's demonstration); stage H2's refactoring pass recorded its twelve candidates as next-release leads, nothing merged after the stamp (HARDENING, stage H2's close); TASK-054's viewer check made on GitHub only, Typora not opened (HARDENING, TASK-054); TASK-019's local web app sets `install-script`, not the plan's `installer`; TASK-034's empty week keeps the owner's-message entries (INVENTORY, Decisions); stage T2's demonstration ran after the install, where the plan says before (HARDENING, Stage T2's demonstration)
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -26,7 +26,7 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/working-files.md lists this project's local working files under run/supervisor/ (gitignored), in-flight.md first, the scratch log a resume reads before anything else.
+ Delegated gates: none
+-Remote sync: main at the merge of this pull request, TASK-073's, in sync with origin/main at that merge; local main is fast-forwarded after every merge
++Remote sync: main at the merge of this pull request, TASK-074's, in sync with origin/main at that merge; local main is fast-forwarded after every merge
+ Stage: the program release's stage P2 closed 2026-11-19, stage P1 2026-11-14 (HARDENING, The program release, Stage P1 and Stage P2); release B2 complete 2026-11-11 (its stages H1 and H2 and its project end; HARDENING, Project end of release B2); release T's T1 closed 2026-11-02, T2 2026-11-04, its project end 2026-11-04; release B's stages and project end: docs/archive/STATUS_HISTORY.md. Last reflection: stage P2's close, 2026-11-19 (its review approved by both, Review B on its one permitted re-run after its provider's safety refusal; demonstration live on main c4a3763, 43 of 44 checks, push-scan's exit on the stage's own commits the one item drawn; conformance 25 OK, 0 MISSING, 5 NOTE; ISS-001 recurred, counter 2; ISS-037 opened; ISS-031 closed; Feedback FB-109 to FB-117; Project Summary and User Manual patched); before it the design gate of the scoped revision program-f7, 2026-11-14 (conformance 25 OK, 0 MISSING, 5 NOTE; Feedback FB-107, FB-108); stage P1's close, 2026-11-14 (22 of 22 checks; Feedback FB-102 to FB-106)
+ Deferred increments: none; TASK-027's calibrations of reAngle and the video factory deferred by the owner on 2026-10-31 until they resume (INVENTORY, Deferred)
+ Open issues: ISS-037 worked around (Review B's provider stopped a review of the guards as security activity; one re-run with context approved). ISS-001 recurred, counter 2 (a review log named apart from its snapshot). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-024 recurred, counter 3. ISS-036 recurred, counter 3 (fixed each time; stage P1). ISS-013 mitigated (the plan check's rule, TASK-033, installed). Every other issue fixed or closed: the Issues file in Documents/, and docs/archive/STATUS_HISTORY.md
+diff --git a/docs/cli-reference.json b/docs/cli-reference.json
+index 121518b..7974aa7 100644
+--- a/docs/cli-reference.json
++++ b/docs/cli-reference.json
+@@ -16,7 +16,7 @@
+       "name": "bridge-check.py",
+       "path": "bridge/cursor-bridge/bridge-check.py",
+       "source": "docstring",
+-      "usage": "bridge-check: verify that the installed bridge tree matches its manifest.\n\nThe maintainer ships MANIFEST.json (file -> sha256, plus the version) with every\nbridge release. This script hashes the live tree it is installed in and reports,\nper file: OK, STALE (content differs), MISSING (not installed), and any EXTRA\ngovernance files not in the manifest (informational). Line endings are normalized\nbefore hashing, so a CRLF copy of an LF file is still OK.\n\nTwo files are not fingerprinted but compared by content (KP-030, KP-032):\n- settings.json is shared with Claude Code and the owner, so only the bridge-owned entries\n  (cursor-bridge/settings.bridge.json: allow and deny rules, hooks) must be present;\n  everything else in it is the owner's and is ignored, except a hook that runs a\n  cursor-bridge program which is not installed: that is reported, because it blocks;\n- the cursor-agent shim at %LOCALAPPDATA%/cursor-agent/cursor-agent must equal\n  cursor-bridge/cursor-agent.shim (Windows only);\n- the agent's home folder %USERPROFILE%/.cursor-bridge/agent-home must hold its .cursor\n  link (KP-038; Windows only).\n\nUsage:  python ~/.claude/cursor-bridge/bridge-check.py [--root <path-to-.claude>] [--quiet]\n        python bridge/cursor-bridge/bridge-check.py --root bridge --sources [--quiet]\n\n--sources checks a source tree (the `bridge/` folder of the bridge's repository) against its\nown manifest and nothing more: a source tree has no settings.json, since the owner's file is\nnot part of it, and the shim is a matter of the machine a release is installed on. In a\nsource tree a file the manifest does not list (EXTRA) fails the check as well.\nExit:   0 = every manifest file OK; 1 = at least one STALE or MISSING;\n        2 = manifest unreadable.  ASCII-only on purpose (cp1252 consoles).\n"
++      "usage": "bridge-check: verify that the installed bridge tree matches its manifest.\n\nThe maintainer ships MANIFEST.json (file -> sha256, plus the version) with every\nbridge release. This script hashes the live tree it is installed in and reports,\nper file: OK, STALE (content differs), MISSING (not installed), and any EXTRA\ngovernance files not in the manifest (informational). Line endings are normalized\nbefore hashing, so a CRLF copy of an LF file is still OK.\n\nTwo files are not fingerprinted but compared by content (KP-030, KP-032):\n- settings.json is shared with Claude Code and the owner, so only the bridge-owned entries\n  (cursor-bridge/settings.bridge.json: allow and deny rules, hooks) must be present;\n  everything else in it is the owner's and is ignored, except a hook that runs a\n  cursor-bridge program which is not installed: that is reported, because it blocks;\n- the cursor-agent shim at %LOCALAPPDATA%/cursor-agent/cursor-agent must equal\n  cursor-bridge/cursor-agent.shim (Windows only);\n- the agent's home folder %USERPROFILE%/.cursor-bridge/agent-home must hold its .cursor\n  link (KP-038; Windows only).\n\nUsage:  python ~/.claude/cursor-bridge/bridge-check.py [--root <path-to-.claude>] [--quiet]\n        python bridge/cursor-bridge/bridge-check.py --root bridge --sources [--quiet]\n\n--sources checks a source tree (the `bridge/` folder of the bridge's repository) against its\nown manifest and nothing more: a source tree has no settings.json, since the owner's file is\nnot part of it, and the shim is a matter of the machine a release is installed on. In a\nsource tree a file the manifest does not list (EXTRA) fails the check as well.\nExit:   0 = every manifest file OK; 1 = at least one STALE or MISSING;\n        2 = manifest unreadable, or under --sources the program does not stand in the tree it checks, or its folder is not named cursor-bridge, or a folder cannot be resolved.  ASCII-only on purpose (cp1252 consoles).\n"
+     },
+     {
+       "name": "bridge-install.py",
+diff --git a/handoff/TASK-074-r1-report.md b/handoff/TASK-074-r1-report.md
+new file mode 100644
+index 0000000..82ce960
+--- /dev/null
++++ b/handoff/TASK-074-r1-report.md
+@@ -0,0 +1,100 @@
++# TASK-074 round-1 report
++
++## Files changed or created
++
++- `bridge/cursor-bridge/bridge-check.py`
++- `tools/make-manifest.py`
++- `bridge/cursor-bridge/MANIFEST.json` (regenerated via `make-manifest.py`, not hand-edited)
++- `handoff/TASK-074-r1-report.md`
++
++## Summary
++
++Under `--sources`, `bridge-check.py` now compares `os.path.realpath(HERE)` with `os.path.realpath(<--root>/cursor-bridge)` after the manifest is read from `HERE` but before any manifest file under `--root` is hashed; on mismatch it prints `RESULT:` naming both resolved folders and exits 2 with no per-file verdict lines. When the folders agree, success and failure RESULT lines under `--sources` include the resolved `cursor-bridge` folder after `bridge <version>`. The non-`--sources` path is unchanged. `make-manifest.py` preserves the existing `VERSION` line ending (CR LF or LF; new file gets LF). The manifest was regenerated; no new tests were appended to `tests/test_install_check.py`.
++
++## Requirements R1–R7
++
++- **R1:** `main()` lines 156–161 run the folder comparison after manifest JSON is read (lines 148–154) and before the hash loop (lines 166–178). On mismatch it prints `RESULT: <tmp>/A/cursor-bridge <tmp>/B/cursor-bridge` (both `os.path.realpath` values) and returns 2.
++- **R2:** `main()` lines 229 and 235 append `os.path.realpath(HERE)` to the `SOURCES DO NOT MATCH` and `SOURCES MATCH` RESULT lines when `--sources` is set and the tree is checked.
++- **R3:** The comparison block is guarded by `if sources:` only; installed-tree RESULT at line 237 and all non-`--sources` checks are as before.
++- **R4:** Module docstring lines 27–28 extend exit 2 to name the `--sources` tree refusal.
++- **R5:** `main()` in `make-manifest.py` lines 91–100 read existing `VERSION` bytes, pick `line_ending`, and write via binary `open(..., "wb")`.
++- **R6:** Both programs were verified with the Done-section ASCII one-liner.
++- **R7:** `MANIFEST.json` regenerated; `git diff -- bridge/cursor-bridge/VERSION` is empty and `VERSION` does not appear in `git status --short`.
++
++## Builder tests added to `tests/test_install_check.py`
++
++None.
++
++## Mutation self-check
++
++- **M1** (skip folder comparison): `2 failed, 5 passed in 6.24s` — `test_r093_a_check_of_another_tree_is_refused_naming_both_folders`
++- **M2** (refusal exits 1 instead of 2): `2 failed, 5 passed in 4.94s` — `test_r093_a_check_of_another_tree_is_refused_naming_both_folders`
++- **M3** (`RESULT: SOURCES MATCH` omits folder): `3 failed, 4 passed in 5.40s` — `test_r093_the_tree_the_program_stands_in_matches_and_its_result_names_the_folder`
++- **M4** (`make-manifest.py` always writes LF): `1 failed in 1.26s` — `test_r093_make_manifest_keeps_a_crlf_version_file_crlf`
++
++## Commands and output
++
++Commit for counts below: `ebb4c23a399ca1933bafddd31fd6e6cf23280ca8`. Working tree had uncommitted changes (`M` on the three bridge/tool files above).
++
++### 1. `git status --short`
++
++```
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/bridge-check.py
++ M tools/make-manifest.py
++```
++
++### 2. `python tools/make-manifest.py`
++
++```
++make-manifest: version 2026.11.12a, 148 files hashed, VERSION + MANIFEST.json written
++```
++
++### 3. `python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py tests/test_install_check.py`
++
++```
++......................                                                   [100%]
++22 passed in 26.31s
++```
++
++### 4. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++```
++bridge-check: version 2026.11.12a (2026-11-22 04:42) at <Workspace>/bridge
++bridge-check: 148 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.12a <Workspace>/bridge/cursor-bridge
++```
++
++(exit code 0)
++
++### 5. `python tools/dump-cli.py --check`
++
++```
++docs/cli-reference.json
++docs/CLI_REFERENCE.md
++```
++
++(exit code 1; docstring exit list changed — supervisor regenerates CLI docs)
++
++### 6. `python -c "[open(p,'rb').read().decode('ascii') for p in ('bridge/cursor-bridge/bridge-check.py','tools/make-manifest.py')]; print('ascii ok')"`
++
++```
++ascii ok
++```
++
++### 7. `git diff -- bridge/cursor-bridge/VERSION`
++
++(no output)
++
++### 8. `git rev-parse HEAD` and `git status --short`
++
++```
++ebb4c23a399ca1933bafddd31fd6e6cf23280ca8
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/bridge-check.py
++ M tools/make-manifest.py
++```
++
++## Assumed, not verified
++
++Assumed, not verified: none.
+\ No newline at end of file
+diff --git a/handoff/TASK-074-r2-report.md b/handoff/TASK-074-r2-report.md
+new file mode 100644
+index 0000000..6d9410b
+--- /dev/null
++++ b/handoff/TASK-074-r2-report.md
+@@ -0,0 +1,149 @@
++# TASK-074 round 2 report
++
++## Files changed or created
++
++- `bridge/cursor-bridge/bridge-check.py`
++- `tools/make-manifest.py`
++- `bridge/cursor-bridge/MANIFEST.json` (via `python tools/make-manifest.py` only)
++- `tests/test_install_check.py` (marker line and two R6 cases appended)
++- `handoff/TASK-074-r2-report.md`
++
++## Summary
++
++Round 2 hardens `bridge-check.py --sources` so refusal compares the whole `--root` tree to the program's tree, catches resolve failures without a traceback, and prints a single labelled `RESULT: REFUSED` line that names both trees and points at the checked tree's own `bridge-check.py`; the SOURCES DO NOT MATCH line labels the checked folder. `make-manifest.py` now reads VERSION in a `with` block, assembles UTF-8 bytes before writing, and drops the redundant LF `elif`. Two R-093 line-ending cases were appended below the marker in `tests/test_install_check.py`. MANIFEST was regenerated; all scoped tests pass.
++
++## Requirements (R1-R8)
++
++- **R1:** `main()` lines 160-172 catch `OSError` and `ValueError` from `os.path.realpath` on `HERE`, its parent, and `root`; `resolve_failed` forces refusal at 174-179 with exit 2 and no hashing.
++- **R2:** `main()` line 174 compares `os.path.normcase(here_tree)` to `os.path.normcase(check_tree)` where `here_tree` is `realpath` of `dirname(HERE)` and `check_tree` is `realpath(root)`; round 1's `cursor-bridge`-only comparison was removed in favour of this whole-tree check.
++- **R3:** `main()` lines 176-178 print one `RESULT: REFUSED` line with quoted `program` and `tree` folders plus the alternate `bridge-check.py` path; for `--root CON` on Windows the line is `RESULT: REFUSED - this program stands in tree "<Workspace>/bridge" (program: "<Workspace>/bridge/cursor-bridge") but was asked to check tree "\\.\CON" (tree: "\\.\CON\cursor-bridge"); run "\\.\CON\cursor-bridge\bridge-check.py" instead.`; for `--root "<tmp>/tree B"` with program in `<tmp>/tree A` the same template names both spaced trees and their `cursor-bridge` subpaths in quotes.
++- **R4:** `main()` line 247 appends `(checked: <folder>)` on the SOURCES DO NOT MATCH line; the SOURCES MATCH line at 253 is unchanged.
++- **R5:** `main()` in `tools/make-manifest.py` lines 93-100 read VERSION inside `with open`, set `version_bytes` at 98 before the write `open` at 99, use UTF-8 encode, and omit the dead `elif` for LF.
++- **R6:** Appended `test_r093_make_manifest_keeps_a_lf_version_file_lf` and `test_r093_make_manifest_writes_a_new_version_file_with_lf` below the marker in `tests/test_install_check.py`.
++- **R7:** This report quotes mutants and pytest summaries in fenced blocks from the listed commands.
++- **R8:** Without `--sources` behaviour is unchanged; docstring exit-2 line 28 adds "or a folder cannot be resolved"; no new options; VERSION untouched (`git diff -- bridge/cursor-bridge/VERSION` empty).
++
++## Mutation self-check
++
++**M1** skip the whole-root comparison (only the `cursor-bridge` comparison kept):
++
++```python
++        check_cursor_bridge = os.path.realpath(os.path.join(root, "cursor-bridge"))
++        refuse = resolve_failed or os.path.normcase(here_folder) != os.path.normcase(check_cursor_bridge)
++```
++
++Command: `python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py`
++
++```
++2 failed, 8 passed in 6.21s
++```
++
++Caught: `test_r093_r2_a_tree_whose_cursor_bridge_is_linked_into_the_program_tree_is_refused`
++
++**M2** the resolve failure of R1 is not caught:
++
++```python
++        here_folder = os.path.realpath(HERE)
++        here_tree = os.path.realpath(os.path.join(HERE, os.pardir))
++        check_tree = os.path.realpath(root)
++        check_cursor_bridge = os.path.join(check_tree, "cursor-bridge")
++        refuse = os.path.normcase(here_tree) != os.path.normcase(check_tree)
++```
++
++Command: `python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py`
++
++```
++10 passed in 5.47s
++```
++
++not caught: with whole-tree comparison, `--root CON` refuses on tree mismatch before any path that raised in round 1; a case that calls `os.path.realpath` on `root` where that alone raises (not merely mismatches) would catch this mutant.
++
++**M3** the refusal line loses `RESULT: REFUSED`:
++
++```python
++            print('RESULT: DENIED - this program stands in tree "%s" ...
++```
++
++Command: `python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py`
++
++```
++1 failed, 9 passed in 5.94s
++```
++
++Caught: `test_r093_r2_the_refusal_says_it_refused_and_names_both_folders`
++
++**M4** make-manifest opens VERSION for writing before encoding: not caught; `version_bytes = ("%s" % version).encode("utf-8") + line_ending` is built at `tools/make-manifest.py` line 98 before `with open(version_path, "wb")` at line 99, and the version has already passed the CHANGELOG pattern at line 76 so the encode cannot fail in practice.
++
++## Verification commands
++
++Commit for counts: `100850a64f8be10f7f8d7b450fed37c3f696a282` (unchanged); working tree had uncommitted changes at report time.
++
++**1.** `git status --short`
++
++```
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/bridge-check.py
++ M tests/test_install_check.py
++ M tools/make-manifest.py
++```
++
++**2.** `python tools/make-manifest.py`
++
++```
++make-manifest: version 2026.11.12a, 148 files hashed, VERSION + MANIFEST.json written
++```
++
++**3.** `python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py tests/test_install_check.py`
++
++```
++27 passed in 28.00s
++```
++
++**4.** `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++```
++bridge-check: version 2026.11.12a (2026-11-22 04:54) at <Workspace>/bridge
++bridge-check: 148 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.12a <Workspace>/bridge/cursor-bridge
++```
++
++(exit 0)
++
++**5.** `python tools/dump-cli.py --check`
++
++```
++docs/cli-reference.json
++docs/CLI_REFERENCE.md
++```
++
++(exit 1; docstring exit-2 clause changed; supervisor regenerates CLI reference)
++
++**6.** `python -c "[open(p,'rb').read().decode('ascii') for p in ('bridge/cursor-bridge/bridge-check.py','tools/make-manifest.py')]; print('ascii ok')"`
++
++```
++ascii ok
++```
++
++**7.** `git diff -- bridge/cursor-bridge/VERSION`
++
++```
++(no output)
++```
++
++**8.** `git rev-parse HEAD` and `git status --short`
++
++```
++100850a64f8be10f7f8d7b450fed37c3f696a282
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/bridge-check.py
++ M tests/test_install_check.py
++ M tools/make-manifest.py
++```
++
++(`bridge/cursor-bridge/VERSION` not listed)
++
++## Assumed, not verified
++
++- Other Windows device names besides `CON` (`NUL`, `COM1`, reserved names with extensions) that make `os.path.realpath(root)` raise versus refuse only on tree mismatch — brief pins `CON` only; exercising each name in pytest would confirm.
++- Whether the quoted refusal line renders cleanly on a strict cp1252 console when paths contain characters outside that code page — tests use ASCII temp paths; a manual cp1252 run with non-ASCII path segments would confirm.
++- A `VERSION` file whose last line ending is neither bare LF nor CRLF (e.g. mixed or no final newline) — R5 leaves default LF for new bytes; deleting and re-stamping on such a file would confirm behaviour.
+\ No newline at end of file
+diff --git a/handoff/TASK-074-r2.md b/handoff/TASK-074-r2.md
+new file mode 100644
+index 0000000..13d96f2
+--- /dev/null
++++ b/handoff/TASK-074-r2.md
+@@ -0,0 +1,190 @@
++---
++record: brief
++header: 1
++id: "TASK-074"
++round: 2
++satisfies: [R-093]
++scope: ["bridge/cursor-bridge/bridge-check.py", "tools/make-manifest.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_install_check.py", "docs/BUILDER_NOTES.md", "handoff/TASK-074-r2-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# TASK-074 round 2: the refusal covers the whole tree, survives a name it cannot resolve, and says what it is (R-093)
++
++Round cause: security - the security audit of round 1 rejected it (a defect of the class the brief's own acceptance criterion names: an exception escaping as a traceback on hostile input), with Should fix findings from both reviewers.
++
++## Objective
++Round 1 (committed at 961d8bf; its brief is `handoff/TASK-074.md`, its report `handoff/TASK-074-r1-report.md`) made `bridge/cursor-bridge/bridge-check.py --sources` refuse, with exit 2, a check where the program does not stand in the tree it checks, and made `tools/make-manifest.py` keep `VERSION`'s line ending. Its reviews found that the refusal can be bypassed and can crash: it compares only `<--root>/cursor-bridge`, so a tree whose `cursor-bridge` is a link into the program's tree is checked (its other folders hashed under the unresolved root) and passes; a `--root` that cannot be resolved (`CON` on Windows) escapes as a traceback; and the refusal line says neither that it refused nor which folder is which. This round repairs those findings and the smaller ones listed under Requirements, nothing else. Everything round 1 achieved stays: the 7 round-1 acceptance cases pass on round 1 and must still pass.
++
++Satisfies: R-093 - The release tooling checks the tree it stands in (C21, J5): `bridge-check.py --sources` refuses, with exit 2, where the program does not stand in the tree it checks, and prints both folders on its result line; `tools/make-manifest.py` writes `VERSION` with the file's own line ending. (Its row in `docs/REQUIREMENTS.md` is line 119.)
++
++## Scope
++Files and directories you may create or modify:
++- bridge/cursor-bridge/bridge-check.py
++- tools/make-manifest.py
++- bridge/cursor-bridge/MANIFEST.json
++- tests/test_install_check.py
++- docs/BUILDER_NOTES.md
++- handoff/TASK-074-r2-report.md
++
++Limits on these paths:
++- `bridge/cursor-bridge/MANIFEST.json` changes only by running `python tools/make-manifest.py` (Done), never by hand.
++- `tests/test_install_check.py`: every existing case must pass **unedited**. Append a line `# ---- builder's cases below this line` at the very end of the file, and your cases (Requirements R6) below it. Nothing above that line changes.
++- `tests/test_program_release_tooling.py` is the supervisor's acceptance file (10 cases, committed at 67b515a). It is **read-only** for you: read it whole and run it, never edit it. If a case seems wrong, stop and report it by its test id.
++
++Do not modify anything else.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration (`.github/`)
++- docs/ and handoff/, except the files the Scope section names. `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` are the supervisor's: they are already regenerated for round 1's docstring, and if this round changes the docstring again the supervisor regenerates them after your build. Do not run `python tools/dump-cli.py` without `--check`, and do not edit either file.
++- `bridge/cursor-bridge/VERSION` (make-manifest rewrites it; its content must stay unchanged, Done), `bridge/cursor-bridge/CHANGELOG.md` (no CHANGELOG entry), and every other file under `bridge/`.
++- `tools/dump-cli.py` and every other file under `tools/`. In `tools/make-manifest.py`, the unused helper `read_version()` (lines 62-66) is not this round's.
++- `--root` given as the last word raises `IndexError` (`bridge-check.py:147`, pre-existing): the supervisor has routed it to `docs/HARDENING.md`. Do not fix it.
++- Every test file other than `tests/test_install_check.py`; `tests/test_program_release_tooling.py` included (read-only).
++- Any mutation script or mutants file: the mutation run is the supervisor's, after your run.
++- `~/.claude`, `~/.cursor-bridge` and any real installation: you never install anything and never run the installed `bridge-check.py`.
++
++## Context
++**The design that binds this increment.** `docs/DESIGN.md` line 363, the bullet `*C21 and J5.*`: "`bridge-check.py --sources` refuses (exit 2) where the program does not stand in the tree it checks, and prints both folders on its result line. `tools/make-manifest.py` writes `VERSION` with the file's own line ending." The plan entry is `docs/BUILD_PLAN.md`, `### TASK-074` (line 1936), its `Done when` on line 1945.
++
++**`bridge/cursor-bridge/bridge-check.py` after round 1 (246 lines; read it whole).**
++- The docstring's exit list, lines 27-28: `Exit:   0 = every manifest file OK; 1 = at least one STALE or MISSING;` / `        2 = manifest unreadable, or under --sources the program does not stand in the tree it checks.  ASCII-only on purpose (cp1252 consoles).`
++- `HERE = os.path.dirname(os.path.abspath(__file__))` (line 36).
++- `main()` (lines 141-238): `root` defaults to `os.path.abspath(os.path.join(HERE, os.pardir))` (line 143), `--root` read as `os.path.abspath(argv[argv.index("--root") + 1])` (line 147); the manifest read from `HERE` (lines 148-154). Round 1's comparison, lines 156-161:
++  ```
++  if sources:
++      here_folder = os.path.realpath(HERE)
++      check_folder = os.path.realpath(os.path.join(root, "cursor-bridge"))
++      if os.path.normcase(here_folder) != os.path.normcase(check_folder):
++          print("RESULT: %s %s" % (here_folder, check_folder))
++          return 2
++  ```
++  Then the manifest's files are hashed under the unresolved `root` (line 169), the EXTRA walk covers `commands`, `agents`, `skills` and `cursor-bridge` under that `root` (lines 209-216), and the RESULT lines: `RESULT: SOURCES DO NOT MATCH their stamp - run tools/make-manifest.py after the last edit, then re-run. %s` with `os.path.realpath(HERE)` (line 229, exit 1) and `RESULT: SOURCES MATCH bridge %s %s` with the version and `os.path.realpath(HERE)` (line 235, exit 0).
++- The program is recorded in the command reference from its module docstring; keep it free of argparse (no `ArgumentParser`, no `build_parser()`), and add no option.
++
++**`tools/make-manifest.py` after round 1 (112 lines).** Lines 91-100:
++  ```
++  version_path = os.path.join(CB, "VERSION")
++  line_ending = b"\n"
++  if os.path.isfile(version_path):
++      existing = open(version_path, "rb").read()
++      if existing.endswith(b"\r\n"):
++          line_ending = b"\r\n"
++      elif existing.endswith(b"\n"):
++          line_ending = b"\n"
++  with open(version_path, "wb") as f:
++      f.write(("%s" % version).encode("ascii") + line_ending)
++  ```
++  Before round 1 it wrote VERSION with `open(..., "w", encoding="utf-8", newline="\n")`, i.e. UTF-8. The version it writes has passed `version not in changelog_versions()` (line 76), whose pattern is `^## (\d{4}\.\d{2}\.\d{2}[a-z]?)\b`. The bridge's own `VERSION` in this checkout is CRLF, `2026.11.12a`, which is also the newest CHANGELOG entry.
++
++**The acceptance tests.** `tests/test_program_release_tooling.py`, 10 cases at 67b515a; its module docstring (lines 1-26) states the forms it pins and what it leaves open. Read it whole. On round 1's code: 3 failed, 7 passed (the 3 failing are the `test_r093_r2_` cases). `norm(text)` turns backslashes into `/` and, on Windows, lower-cases; `resolved(folder)` is `norm(os.path.realpath(folder))`; `names(text, folder)` is `resolved(folder) in norm(text)`, a substring test. What each refusal case looks for, which settles how the refusal names its folders:
++- `test_r093_a_check_of_another_tree_is_refused_naming_both_folders` and `test_r093_a_stale_other_tree_is_refused_not_judged` (program in `A`, `--root B`, plain folders): exit 2; the output, anywhere, names `A/cursor-bridge` resolved **and `B/cursor-bridge` resolved**; nothing hashed (`hashed_nothing`: no line whose first word after leading spaces is `OK`, `STALE`, `MISSING` or `EXTRA`, no `bridge-check:` line holding `OK,`); no `RESULT: SOURCES MATCH`; the stale case also no `STALE` anywhere.
++- `test_r093_r2_a_tree_whose_cursor_bridge_is_linked_into_the_program_tree_is_refused` (program in `A`; `--root X`, where `X` holds copies of A's other folders and `X/cursor-bridge` is a junction, or on Linux a symbolic link, to `A/cursor-bridge`): exit 2; the output names `A/cursor-bridge` resolved **and `X` resolved** (`os.path.realpath(X/cursor-bridge)` is A's folder, so printing only that does not name X); nothing hashed; neither `SOURCES MATCH` nor `SOURCES DO NOT MATCH` anywhere.
++- `test_r093_r2_a_device_name_as_root_is_refused_without_a_traceback` (Windows only; `--root CON`): exit 2, no `Traceback`, nothing hashed, no `SOURCES MATCH`. On Python 3.12, `os.path.abspath("CON")` is `\\.\CON` (backslash, backslash, dot, backslash, CON), and the non-strict `os.path.realpath` of `\\.\CON\cursor-bridge` raises `OSError` (WinError 1168); this is the audit's Must fix.
++- `test_r093_r2_the_refusal_says_it_refused_and_names_both_folders` (program in `tree A`, `--root "tree B"`, folders with a space): the last line starting `RESULT: REFUSED` holds `tree A/cursor-bridge` resolved and `tree B` resolved.
++- So: the program's folder printed as `os.path.realpath(HERE)` meets every case. For the tree asked for, `os.path.realpath(root)` alone fails the two round-1 refusal cases (they look for `B/cursor-bridge`), and `os.path.realpath(<root>/cursor-bridge)` alone fails the linked case (it is A's folder); a spelling that holds the resolved root followed by `cursor-bridge` (the resolved root joined with `cursor-bridge`, not resolved again) meets all of them, as does printing both the resolved root and its `cursor-bridge` folder. Your choice, as long as all 10 cases pass.
++- The matching cases (`--root <tree>`, `--root .` with the working folder at the tree, `--root <tree>/cursor-bridge/..`) need exit 0 and the folder on the `RESULT: SOURCES MATCH` line; the EXTRA case needs exit 1 and the folder on the `RESULT: SOURCES DO NOT MATCH` line. The stamp case needs a CRLF VERSION kept CRLF across two runs.
++
++Each case copies this repository's `bridge/` with its `MANIFEST.json`, so the cases where the program checks its own tree pass only once `MANIFEST.json` has been regenerated after your last edit of `bridge-check.py`. Run `python tools/make-manifest.py` before the pytest command (Done).
++
++**The existing tests that hold the unchanged behaviour.** `tests/test_install_check.py` line 224 asserts `"RESULT: SOURCES MATCH bridge" in out` for the repository's own tree (nothing may come between `SOURCES MATCH` and `bridge`); line 235 asserts `"SOURCES DO NOT MATCH" in out`. Its cases without `--sources` (`RESULT: INSTALLED TREE MATCHES`, lines 70 and 280) hold the installed-tree check, which does not change. Its `run(prog, tmp_path, *args)` helper (lines 29-35) runs a program as a subprocess with `LOCALAPPDATA` under `tmp_path`.
++
++**The CI step that must still pass.** `.github/workflows/tests.yml` line 29: `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`, run from the repository root on Windows and Ubuntu, exit 0. Line 31 runs `python tools/dump-cli.py --check`: it exits 0 at HEAD; if you change the docstring, it reports `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` stale until the supervisor regenerates them. Quote its output either way; do not fix it.
++
++**External services.** None. This increment makes no external call, so there is no call time and no retry limit to record. Make no network call. The session's `claude --version` is not used by this increment.
++
++**Trust boundaries and security context.** ASVS level 2 (`docs/INVENTORY.md`, Decisions, line 140). `.cursor/rules/secure-coding.mdc` is in force for you. Input crossing into these programs: the command-line words (`--root` is any text, a device name and a path through a link included) and the files and links of the tree checked or stamped. The refusal is the boundary: under `--sources` no file under a `--root` other than the program's own tree is read or hashed, and hostile input never ends in a traceback.
++
++**Development data.** The inventory's decision (`docs/INVENTORY.md`, Decisions, line 135): "Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet (§15 condition 1, A1a condition 1)". For you: run `bridge-check.py` only as `bridge/cursor-bridge/bridge-check.py` of this Workspace (Done) or through the tests on their copies under `tmp_path`; run `tools/make-manifest.py` of this Workspace only in the Done steps and the mutation procedure, and in your own cases only a copy under `tmp_path`; never run the installed copy under your home folder, never run `bridge-install.py`, and never point `--root` at your home folder.
++
++**Host.** Windows 11 with the owner's Python 3.12. CI also runs on Ubuntu.
++
++## Diagrams
++None. The plan entry names no diagram for this increment.
++
++## Requirements
++Round 1's requirements (`handoff/TASK-074.md`, R1-R7) still hold except where a requirement below changes them. Each finding below is one requirement.
++
++1. **R1. A folder that cannot be resolved is a refusal** (Must fix, security audit; `bridge/cursor-bridge/bridge-check.py:157-158`). With `--root CON --sources` on Windows, `os.path.realpath` raises `OSError` [WinError 1168] for `\\.\CON\cursor-bridge`; the traceback escapes and the exit is 1. Required: any `OSError` or `ValueError` raised while resolving either folder under `--sources` is a refusal: exit 2, the refusal line of R3 naming both folders (where resolving failed, the unresolved spelling the program had, i.e. the `root` it read, or `HERE`), no traceback, nothing hashed. Case: `test_r093_r2_a_device_name_as_root_is_refused_without_a_traceback`.
++2. **R2. The tree checked is the whole `--root`** (Should fix, security audit; `bridge/cursor-bridge/bridge-check.py:158`, with the hashing at line 169 and the EXTRA walk at line 211). Round 1 compares only `realpath(<root>/cursor-bridge)`, but `commands/`, `agents/` and `skills/` are hashed under the unresolved root, so a tree `X` whose `cursor-bridge` is a junction to the program's tree passes (round 1 printed `SOURCES MATCH` for it). Required: compare `os.path.realpath(root)` with `os.path.realpath(os.path.dirname(HERE))` (the program's tree), both under `os.path.normcase`; where they differ, refuse (exit 2, R3) before any file is hashed. Whether round 1's `cursor-bridge` comparison stays beside it is your choice; the round-1 cases must still pass. The refusal names the program's folder (its `cursor-bridge` folder or its tree) and the tree asked for, in a spelling that meets every case (Context, "The acceptance tests"). Case: `test_r093_r2_a_tree_whose_cursor_bridge_is_linked_into_the_program_tree_is_refused`.
++3. **R3. The refusal says what it is** (Should fix, Review A and the security audit; `bridge/cursor-bridge/bridge-check.py:160`). Round 1's line, `RESULT: <a> <b>`, says neither that it refused, nor which folder is which, nor what to do, and with spaces in the folders nothing marks where one ends. Required: one line beginning `RESULT: REFUSED` that labels the program's folder and the tree asked for (each folder after its own label, delimited so that a folder with spaces reads as one, for example in quotes), and says to run the tree's own `bridge-check.py` instead (that is, `<the tree asked for>/cursor-bridge/bridge-check.py`). The line never holds `SOURCES MATCH` or `SOURCES DO NOT MATCH`. It is the only RESULT line of a refused run. Case: `test_r093_r2_the_refusal_says_it_refused_and_names_both_folders` (folders hold spaces).
++4. **R4. The folder on the do-not-match line is labelled** (Consider, taken; Review A; `bridge/cursor-bridge/bridge-check.py:229`). The folder appended after `then re-run.` reads as part of the instruction. Required: label it, for example `(checked: <folder>)`; the folder stays on that line (`test_r093_an_unlisted_file_in_the_tree_it_stands_in_fails_with_the_folder_named` needs it), and the line still holds `SOURCES DO NOT MATCH`. The `RESULT: SOURCES MATCH bridge <version> <folder>` line may take the same label after the version, or stay as it is; nothing may come between `SOURCES MATCH` and `bridge`.
++5. **R5. make-manifest writes VERSION safely** (Consider, taken; the audit and Review A; `tools/make-manifest.py:94-100`). Required: read the existing VERSION inside a `with` block; build the bytes to write (the version, encoded, and the line ending) before opening the file for writing, so that a failing encode never leaves VERSION empty; encode as UTF-8, as before round 1, rather than ASCII; drop the dead `elif` that sets `line_ending` to the default it already holds. The line-ending rule is unchanged: CRLF stays CRLF, LF stays LF, a new file is LF; the manifest entry for VERSION is unchanged across runs.
++6. **R6. The two line-ending rules no test held get cases** (Consider, taken; Review A). Round 1's criteria "an LF VERSION stays LF" and "a new VERSION is written LF" have no test. Required: two cases below the marker line in `tests/test_install_check.py`, each naming R-093 in its docstring: (a) a VERSION ending in LF stays LF, with no CR in it, after two runs, its bytes and its `MANIFEST.json` entry the same after the second as after the first; (b) with VERSION removed, a run writes it as the version followed by a single LF. Each case runs a copy of `tools/make-manifest.py` beside a copy of `bridge/` under `tmp_path` (as `test_r093_make_manifest_keeps_a_crlf_version_file_crlf` does), passing `--version` with the version the copy's VERSION held; never the Workspace's own `tools/make-manifest.py`, which would stamp this repository.
++7. **R7. The report's records** (Records, Review A). The round-1 report restated mutation counts in prose, M4's count did not match its command (its line shows `1 failed in 1.26s`, a single test, not the listed command), and the mutants were not given with their text. Required: the round-2 report quotes each mutant's text and each pytest summary line in fenced blocks, each from the exact command this brief lists for it (Constraints, the mutation self-check).
++8. **R8. What stays.** Without `--sources` nothing changes. Under `--sources`, where the program stands in the tree it checks (in any spelling of `--root`), every verdict, line and exit code is as after round 1 apart from R4. No option added; no argparse; both programs ASCII-only; no path of this computer hard-coded. If the docstring's exit-2 clause needs a word for R1 (a folder that cannot be resolved), one short ASCII clause is allowed; nothing else in the docstring changes. `MANIFEST.json` is regenerated after your last edit under `bridge/`; the version stays `2026.11.12a`, and `git diff -- bridge/cursor-bridge/VERSION` is empty.
++
++## Acceptance criteria
++- [ ] `tests/test_program_release_tooling.py` passes whole, unedited: 10 cases (on Windows; on Linux the device case is skipped).
++- [ ] `tests/test_install_check.py` passes, every existing case unedited; the two cases of R6 sit below the marker line and name R-093 in their docstrings.
++- [ ] `--root CON --sources` on Windows exits 2 with a `RESULT: REFUSED` line and no traceback (R1).
++- [ ] A `--root` whose `cursor-bridge` is a link into the program's tree is refused, exit 2, nothing hashed (R2).
++- [ ] A refused run prints exactly one RESULT line, beginning `RESULT: REFUSED`, labelling both folders readably when they hold spaces and naming the tree's own `bridge-check.py` to run instead (R3).
++- [ ] The folder on the `SOURCES DO NOT MATCH` line carries a label (R4).
++- [ ] make-manifest reads VERSION in a `with` block, builds the bytes before opening it for writing, encodes UTF-8, and has no dead `elif` (R5).
++- [ ] `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`, from the Workspace root, exits 0 and prints `RESULT: SOURCES MATCH bridge 2026.11.12a` with the folder after it.
++- [ ] MANIFEST regenerated; `git status --short` does not list `bridge/cursor-bridge/VERSION`; `git diff -- bridge/cursor-bridge/VERSION` is empty.
++- [ ] Both programs decode as ASCII.
++- [ ] R-093 is fully met, with no stand-in, placeholder or "later" text. The tests naming R-093 are the supervisor's acceptance tests and your two R6 cases.
++- [ ] No option added, no new dependency, configuration key or environment variable, no network call. No new Semgrep high finding. No exception escapes as a traceback (ASVS L2).
++
++## Constraints
++- Do not add dependencies (the standard library and the pytest already used only).
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it, and everything you produce goes inside it.
++- Do not edit `tests/test_program_release_tooling.py`, any existing case of `tests/test_install_check.py`, or anything else outside Scope. If a test case seems wrong, stop and report it by its test id instead of working around it.
++- If the brief, the rules, or the tooling got in your way (an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason), append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item. One paragraph is one line. Line breaks only between blocks.
++- **No owner's names, no paths.** Nothing you write (code, the notes line, the report) holds a path of this computer or a user name. In the report write `<Workspace>` for the repository folder and `<tmp>` for a temporary folder, including in quoted command output (the CI-step command prints the resolved folder: replace it with `<Workspace>/bridge/cursor-bridge` in the quote).
++- This increment talks to no external service. Do not add a call to any service or the network.
++- Any console process your code launches on Windows is created windowless (`creationflags=subprocess.CREATE_NO_WINDOW` in Python, `0` on other platforms). This increment needs no new process in a program; your two test cases run `make-manifest.py` the way the existing `run` helper of `tests/test_install_check.py` already does.
++- Never start a server, a watcher or a daemon that outlives a test. Run every command synchronously, in the foreground, and wait for it to end. Leave nothing running when you finish.
++- Do not fix by suppressing the symptom: R1 catches `OSError` and `ValueError` from resolving the two folders only, never a broad `except Exception` around the check or around `main()`.
++- Do not refactor code outside the scope, even if it looks wrong. In both programs change only what R1-R8 need; every other message, refusal and exit code stays as it is.
++- Never run the product, a migration, a seed or a test against the owner's live data (Context, "Development data").
++- A value the brief marks as the owner's: none in this increment.
++- Follow existing conventions in the files you touch: ASCII program text, `main()` returning the exit code, messages beginning `bridge-check: ` or `make-manifest: `, RESULT lines beginning `RESULT: `.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`, `restore`. You read with `git status`, `git diff`, `git log` and `git rev-parse` only.
++- Numbers: none are parsed by this increment.
++- Every verification command the Done section asks you to run is written there in full. Run exactly those. **Do NOT run the whole `tests/` tree** (`python -m pytest`, `python -m pytest tests`, or any command that collects all of it): the whole suite is CI's run.
++- **Mutation self-check (by hand, in process, no script in the diff).** The supervisor's mutation run comes after yours. Apply each of M1-M3 by hand, one at a time, to `bridge-check.py`; run `python tools/make-manifest.py` (otherwise the copied tree is STALE and every case fails for the wrong reason); run exactly `python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py`; revert the mutant by hand; run `python tools/make-manifest.py` again; confirm with `git diff` that the revert is exact. In the report give each mutant's label and text, the exact command, and its pytest summary line in a fenced block, with the id of one test it made fail; if it is not caught, write `not caught` and one line on the case that would catch it (do not add that case).
++  - M1 skip the whole-root comparison of R2 (only the `cursor-bridge` comparison kept).
++  - M2 the resolve failure of R1 is not caught.
++  - M3 the refusal line loses `RESULT: REFUSED`.
++  - M4 make-manifest opens VERSION for writing before encoding. Prove this one by reading, not by running: write `not caught` and why no case can make the encode fail (the version has passed the CHANGELOG pattern of line 76 before it is written), and name the line where the bytes are built before the `open` for writing.
++- **Known failures.** On round 1's code the acceptance file gives 3 failed, 7 passed (the 3 `test_r093_r2_` cases). If a case of either test file fails that your change did not cause, report it by its test id with its failure lines and fix none.
++- Prefer reuse over new code: `HERE`, the existing `root` reading, round 1's comparison block, and the standard library (`os.path.realpath`, `os.path.normcase`). Write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a security, observability or accessibility requirement stated above.
++- Rules in force for you: `.cursor/rules/secure-coding.mdc`, `.cursor/rules/workspace-boundary.mdc` and the frozen `minimal-code.mdc`.
++
++## Done
++Your report is the file `handoff/TASK-074-r2-report.md`, which you write as you go: what you did, what you changed, what you ran and what it printed, and what you could not do, so that nothing of it is lost if your run ends early. It names no computer path and no user name: write `<Workspace>` for the repository folder and `<tmp>` for a temporary folder, including in quoted command output.
++
++When you finish, it holds:
++- a list of every file you changed or created;
++- a one-paragraph summary of what you did;
++- for R1-R8, one line each on what meets it, naming the functions and their lines as the file stands after your change; for R2 whether round 1's `cursor-bridge` comparison stayed; for R3 the exact refusal line of `test_r093_r2_the_refusal_says_it_refused_and_names_both_folders`'s situation, with `<tmp>` for the folders, and the line printed for `--root CON`;
++- your two R6 cases, by test id;
++- the mutation self-check, M1-M4, each with its label, its text, its command and its pytest summary line in a fenced block, and the test id that caught it (M4: `not caught` and why);
++- every command of the list below with its output;
++- a section headed exactly `Assumed, not verified`, as the report's last section.
++
++The `Assumed, not verified` section lists every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. Examples: which other Windows device names (`NUL`, `COM1`, `CON.txt`) raise from `os.path.realpath` and which resolve; how `os.path.realpath` treats a junction under `~/.claude` that points into a Workspace; what a `VERSION` file with mixed line endings is written with; whether the refusal line prints readably on a cp1252 console. One item per line: what you assumed - why - what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Run these from the Workspace root, in this order, after your last edit, each on its own, synchronously in the foreground, with no `PYTHONPATH` or other environment change:
++1. `git status --short`
++2. `python tools/make-manifest.py` (expect `make-manifest: version 2026.11.12a, ...`)
++3. `python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py tests/test_install_check.py`
++4. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` (expect `RESULT: SOURCES MATCH bridge 2026.11.12a` with the folder after it, exit 0)
++5. `python tools/dump-cli.py --check` (exit 0 if the docstring is unchanged; if you changed it, expect `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` reported stale; quote its output and fix nothing; the supervisor regenerates both)
++6. `python -c "[open(p,'rb').read().decode('ascii') for p in ('bridge/cursor-bridge/bridge-check.py','tools/make-manifest.py')]; print('ascii ok')"` (expect `ascii ok`)
++7. `git diff -- bridge/cursor-bridge/VERSION` (expect no output)
++8. `git rev-parse HEAD` and `git status --short` (`bridge/cursor-bridge/VERSION` must not be listed; if it is, report it and do not restore it)
++
++Quoting rules:
++- Every command you ran is quoted in the report with the lines it printed, verbatim, in a fenced block.
++- Each pytest summary line is quoted verbatim in a fenced block, from the exact command listed for it. Never restate a count in prose.
++- A claim that a check passed quotes the output line that shows it.
++- Each mutation is listed by its label and its text, with what caught it.
++- A command you did not run is written `not run`, never described as run.
++- Write the report's results after step 8, naming the commit its counts belong to (`git rev-parse HEAD`) and whether the working tree then held uncommitted changes (`git status --short`).
++
++Your last message is the summary and the report file's path, and nothing follows it. The supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/handoff/TASK-074-r3-report.md b/handoff/TASK-074-r3-report.md
+new file mode 100644
+index 0000000..e72e1be
+--- /dev/null
++++ b/handoff/TASK-074-r3-report.md
+@@ -0,0 +1,180 @@
++# TASK-074 round 3 report
++
++## Files changed or created
++
++- `bridge/cursor-bridge/bridge-check.py`
++- `bridge/cursor-bridge/MANIFEST.json` (regenerated via `python tools/make-manifest.py`)
++- `handoff/TASK-074-r3-report.md`
++
++## Summary
++
++Round 3 replaces round 2's program-tree formula with `os.path.dirname(os.path.realpath(HERE))`, adds a `cursor-bridge` folder-name refusal, runs manifest hashing and the EXTRA walk under the resolved `--root`, escapes C0 control characters and embedded double quotes on folders printed under `--sources`, and relabels the refusal line so the fourth quoted path is `(cursor-bridge: ...)` rather than `(tree: ...)`.
++
++## R1–R7
++
++- **R1:** `main()` lines 179–181 set `here_tree = os.path.dirname(here_folder)` after `here_folder = os.path.realpath(HERE)`; line 202 compares `here_tree` to `check_tree` with `os.path.normcase`.
++- **R2:** `main()` lines 198–201 refuse when `os.path.basename(here_folder)` is not `cursor-bridge` (compared with `os.path.normcase`).
++- **R3:** `main()` line 208 assigns `root = check_tree` before the manifest hash loop (lines 213–225) and EXTRA walk (lines 256–263); lines 265–267 and 276–282 print paths through `escape_folder` where `--sources` names the tree or program folder.
++- **R4:** `escape_folder()` lines 39–57 escape U+0000–U+001F as `\n`, `\r`, `\t`, or `\xNN`, and `"` as `\"`; backslashes and spaces are left literal.
++- **R5:** `main()` lines 179–190 catch only `(OSError, ValueError)` around resolving `HERE` and `root`, set `resolve_failed`, and lines 192–197 refuse without hashing.
++- **R6:** `here_abs` and `root_abs` are gone; refusal prints use labels `program`, `cursor-bridge` (for the asked tree's `cursor-bridge` folder), and a single `RESULT: REFUSED` line per run.
++- **R7:** Refusal samples and mutation output are quoted below.
++
++## Done step 5 refusal line
++
++Command:
++
++```
++python bridge/cursor-bridge/bridge-check.py --root 'no such/tree B' --sources --quiet
++```
++
++```
++RESULT: REFUSED - this program stands in tree "<Workspace>/bridge" (program: "<Workspace>/bridge/cursor-bridge") but was asked to check tree "<Workspace>/no such/tree B" (cursor-bridge: "<Workspace>/no such/tree B/cursor-bridge"); run "<Workspace>/no such/tree B/cursor-bridge/bridge-check.py" instead.
++```
++
++## Done step 6 refusal line
++
++Command:
++
++```
++python bridge/cursor-bridge/bridge-check.py --root '\\.\CON\sub' --sources --quiet
++```
++
++```
++RESULT: REFUSED - this program stands in tree "<Workspace>/bridge" (program: "<Workspace>/bridge/cursor-bridge") but was asked to check tree "<Workspace>/CON/sub" (cursor-bridge: "<Workspace>/CON/sub/cursor-bridge"); run "<Workspace>/CON/sub/cursor-bridge/bridge-check.py" instead.
++```
++
++## Mutation self-check
++
++**M1** — the program's tree computed as `os.path.realpath(os.path.join(HERE, os.pardir))` again (replace `here_tree = os.path.dirname(here_folder)` with `here_tree = os.path.realpath(os.path.join(HERE, os.pardir))`).
++
++```
++python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py
++```
++
++```
++2 failed, 13 passed in 7.80s
++```
++
++Caught by `test_r093_r3_a_program_reached_through_a_link_from_another_tree_is_refused_for_that_tree` and `test_r093_r3_a_program_whose_own_folder_is_a_link_into_a_tree_checks_that_tree`.
++
++**M2** — the `cursor-bridge` name check of R2 removed (delete the `os.path.basename(here_folder)` block).
++
++```
++python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py
++```
++
++```
++1 failed, 14 passed in 8.37s
++```
++
++Caught by `test_r093_r3_a_copy_of_the_program_in_a_folder_of_another_name_is_refused`.
++
++**M3** — the hashing (and the EXTRA walk) under the unresolved `root` again (omit `root = check_tree`).
++
++```
++python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py
++```
++
++```
++15 passed in 8.03s
++```
++
++not caught — every acceptance layout that agrees on trees uses a `--root` whose resolved path equals the spelling passed to `os.path.join` for file access.
++
++**M4** — the escape of R4 removed (`escape_folder` returns `path` unchanged).
++
++```
++python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py
++```
++
++```
++1 failed, 14 passed in 8.10s
++```
++
++Caught by `test_r093_r3_a_folder_name_cannot_add_a_result_line`.
++
++**M5** — the `except` of R5 removed (bare `os.path.realpath` for `HERE` and `root`, no `resolve_failed` branch).
++
++```
++python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py
++```
++
++```
++1 failed, 14 passed in 7.66s
++```
++
++Caught by `test_r093_r3_a_folder_that_raises_while_resolved_is_refused_without_a_traceback`.
++
++## Verification commands
++
++**1.** `git status --short`
++
++```
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/bridge-check.py
++```
++
++**2.** `python tools/make-manifest.py`
++
++```
++make-manifest: version 2026.11.12a, 148 files hashed, VERSION + MANIFEST.json written
++```
++
++**3.** `python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py tests/test_install_check.py`
++
++```
++................................                                         [100%]
++32 passed in 29.95s
++```
++
++**4.** `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++```
++bridge-check: version 2026.11.12a (2026-11-22 05:07) at <Workspace>/bridge
++bridge-check: 148 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.12a <Workspace>/bridge/cursor-bridge
++```
++
++(exit 0)
++
++**5.** See R7 section above (exit 2).
++
++**6.** See R7 section above (exit 2, no `Traceback`).
++
++**7.** `python tools/dump-cli.py --check`
++
++```
++docs/cli-reference.json
++docs/CLI_REFERENCE.md
++```
++
++(exit non-zero; docstring exit-2 clause added for R2 — supervisor regenerates CLI docs.)
++
++**8.** `python -c "[open(p,'rb').read().decode('ascii') for p in ('bridge/cursor-bridge/bridge-check.py','tools/make-manifest.py')]; print('ascii ok')"`
++
++```
++ascii ok
++```
++
++**9.** `git diff -- bridge/cursor-bridge/VERSION`
++
++```
++(no output)
++```
++
++**10.** `git rev-parse HEAD` and `git status --short`
++
++```
++7fdc7fc84a08c70f458838ef78cd0caae799111f
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/bridge-check.py
++```
++
++Results above belong to commit `7fdc7fc84a08c70f458838ef78cd0caae799111f` with uncommitted changes as shown.
++
++## Assumed, not verified
++
++- DEL (U+007F) and line-breaking characters U+0085, U+2028, and U+2029 are not escaped in `escape_folder` — only C0 (U+0000–U+001F) and `"` are — because no test supplies them and the brief allows naming that gap.
++- POSIX `os.path.realpath` behaviour when the program's own directory is a symlink into another tree is exercised on CI's Ubuntu runner but not on this Windows-only builder run — reliance is on `test_r093_r3_a_program_whose_own_folder_is_a_link_into_a_tree_checks_that_tree` in CI.
++- M3 would only fail if a test used a `--root` spelling that resolves differently from the path used for `os.path.join` while the tree-comparison still agreed — no such layout appears in the acceptance file.
+\ No newline at end of file
+diff --git a/handoff/TASK-074-r3.md b/handoff/TASK-074-r3.md
+new file mode 100644
+index 0000000..40e7f97
+--- /dev/null
++++ b/handoff/TASK-074-r3.md
+@@ -0,0 +1,173 @@
++---
++record: brief
++header: 1
++id: "TASK-074"
++round: 3
++satisfies: [R-093]
++scope: ["bridge/cursor-bridge/bridge-check.py", "tools/make-manifest.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_install_check.py", "docs/BUILDER_NOTES.md", "handoff/TASK-074-r3-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# TASK-074 round 3: the program's tree is where the program physically stands (R-093)
++
++Round cause: brief error - both reviewers approved round 2; this round is taken for their Should fix findings, which share one cause: the program tree's formula, which round 2's brief gave as `os.path.realpath(os.path.dirname(HERE))` and which resolves the lexical parent instead of the parent of the program's resolved folder.
++
++## Objective
++Round 1 (`handoff/TASK-074.md`) made `bridge/cursor-bridge/bridge-check.py --sources` refuse, with exit 2, a check where the program does not stand in the tree it checks, and made `tools/make-manifest.py` keep `VERSION`'s line ending; round 2 (`handoff/TASK-074-r2.md`, committed at cff5974, report `handoff/TASK-074-r2-report.md`) widened the comparison to the whole `--root`, made a folder that cannot be resolved a refusal, and gave the refusal its `RESULT: REFUSED` line. Both reviewers approved round 2. Their remaining findings share one cause: the program's tree is computed as `os.path.realpath(os.path.join(HERE, os.pardir))`, which Windows resolves after collapsing the `..` (so a program reached through a link is taken for the tree it was reached from) and POSIX resolves before. This round replaces that formula with one rule, the program's tree is where the program physically stands, and carries the small findings that follow from it. **This is the last round of TASK-074 (the ceiling round): anything left after it goes to `docs/HARDENING.md` unless it is of a blocking class.** Do exactly R1-R7; nothing else.
++
++Satisfies: R-093 - The release tooling checks the tree it stands in (C21, J5): `bridge-check.py --sources` refuses, with exit 2, where the program does not stand in the tree it checks, and prints both folders on its result line; `tools/make-manifest.py` writes `VERSION` with the file's own line ending. (Its row in `docs/REQUIREMENTS.md` is line 119.)
++
++## Scope
++Files and directories you may create or modify:
++- bridge/cursor-bridge/bridge-check.py
++- tools/make-manifest.py
++- bridge/cursor-bridge/MANIFEST.json
++- tests/test_install_check.py
++- docs/BUILDER_NOTES.md
++- handoff/TASK-074-r3-report.md
++
++Limits on these paths:
++- `tools/make-manifest.py`: no finding of this round touches it; leave it as round 2 left it (lines 91-100). It is in Scope only because the rounds share one Scope.
++- `bridge/cursor-bridge/MANIFEST.json` changes only by running `python tools/make-manifest.py` (Done), never by hand.
++- `tests/test_install_check.py`: every case above the line `# ---- builder's cases below this line` (line 296) passes **unedited**; round 2's two cases below it (`test_r093_make_manifest_keeps_a_lf_version_file_lf`, `test_r093_make_manifest_writes_a_new_version_file_with_lf`) stay as they are. No case is required this round.
++- `tests/test_program_release_tooling.py` is the supervisor's acceptance file (15 cases, committed at 0d178f5). It is **read-only** for you: read it whole and run it, never edit it. If a case seems wrong, stop and report it by its test id.
++
++Do not modify anything else.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration (`.github/`)
++- docs/ and handoff/, except the files the Scope section names. `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` are the supervisor's: they are regenerated for round 2's docstring, and if this round changes the docstring again the supervisor regenerates them after your build. Do not run `python tools/dump-cli.py` without `--check`, and do not edit either file.
++- `bridge/cursor-bridge/VERSION` (make-manifest rewrites it; its content must stay unchanged, Done), `bridge/cursor-bridge/CHANGELOG.md`, and every other file under `bridge/`.
++- `tools/dump-cli.py` and every other file under `tools/`.
++- Routed to `docs/HARDENING.md` by the supervisor; do not fix them: the extended-length spelling `\\?\<tree>` of the program's own tree given as `--root` is refused (as in rounds 1 and 2); `--root` as the last word raises `IndexError` (pre-existing, line 147); the Windows junction layout Review A noted.
++- Every test file other than `tests/test_install_check.py`; `tests/test_program_release_tooling.py` included (read-only).
++- Any mutation script or mutants file: the mutation run is the supervisor's, after your run.
++- `~/.claude`, `~/.cursor-bridge` and any real installation: you never install anything and never run the installed `bridge-check.py`.
++
++## Context
++**The design that binds this increment.** `docs/DESIGN.md` line 363, the bullet `*C21 and J5.*`: "`bridge-check.py --sources` refuses (exit 2) where the program does not stand in the tree it checks, and prints both folders on its result line. `tools/make-manifest.py` writes `VERSION` with the file's own line ending." The plan entry is `docs/BUILD_PLAN.md`, `### TASK-074` (line 1936), its `Done when` on line 1945.
++
++**`bridge/cursor-bridge/bridge-check.py` after round 2 (264 lines; read it whole).**
++- Docstring exit list, lines 27-28, exit 2: `manifest unreadable, or under --sources the program does not stand in the tree it checks, or a folder cannot be resolved.`
++- `HERE = os.path.dirname(os.path.abspath(__file__))` (line 36): the folder the program was started through, not resolved.
++- `main()` (lines 141-256): `root` is `os.path.abspath(...)` of `--root` or of `HERE/..` (lines 143, 147); the manifest is read from `HERE` (lines 148-154). Round 2's comparison, lines 156-179: `here_abs = os.path.abspath(HERE)` (157, used only as a fallback), `here_tree_abs` (158), `root_abs = root` (159, an alias); `here_folder = os.path.realpath(HERE)` and `here_tree = os.path.realpath(os.path.join(HERE, os.pardir))` (162-163) and `check_tree = os.path.realpath(root)` (169), each in a `try` that catches `(OSError, ValueError)` and falls back to the unresolved spelling (164-167, 170-172); `check_cursor_bridge = os.path.join(check_tree, "cursor-bridge")` (173); `refuse = resolve_failed or os.path.normcase(here_tree) != os.path.normcase(check_tree)` (174); the refusal (176-179) prints `RESULT: REFUSED - this program stands in tree "%s" (program: "%s") but was asked to check tree "%s" (tree: "%s"); run "%s" instead.` with `here_tree, here_folder, check_tree, check_cursor_bridge, alt` and returns 2; there the label `tree:` stands before the asked-for tree's `cursor-bridge` folder.
++- After an agreeing comparison: the manifest's files are hashed under the unresolved `root` (line 187), `check_settings(root)` without `--sources` (199), the EXTRA walk under `root` (229-234), the version line `bridge-check: version %s (%s) at %s` with `root` (236-237), `RESULT: SOURCES DO NOT MATCH their stamp - run tools/make-manifest.py after the last edit, then re-run. (checked: %s)` with `os.path.realpath(HERE)` (247, exit 1), `RESULT: SOURCES MATCH bridge %s %s` with the version and `os.path.realpath(HERE)` (253, exit 0).
++- Keep the program free of argparse (it is recorded in the command reference from its docstring); add no option.
++
++**The acceptance tests.** `tests/test_program_release_tooling.py`, 15 cases at 0d178f5; its module docstring (lines 1-32) states the forms it pins and what it leaves open; read it whole. On round 2's code: 4 failed, 11 passed. Helpers: `norm(text)` turns backslashes into `/` and, on Windows, lower-cases; `resolved(folder)` is `norm(os.path.realpath(folder))`; `names(text, folder)` is `resolved(folder) in norm(text)`, a substring test; `hashed_nothing(out)` is no line whose first word after leading spaces is `OK`, `STALE`, `MISSING` or `EXTRA` and no `bridge-check:` line holding `OK,`; `link_folder(target, link)` makes a junction on Windows, a symbolic link elsewhere. The round-3 cases:
++- `test_r093_r3_a_program_reached_through_a_link_from_another_tree_is_refused_for_that_tree`: tree `X` holds copies of A's other folders and `X/cursor-bridge` is a link to `A/cursor-bridge`; the program is started as `X/cursor-bridge/bridge-check.py` with `--root X`. Exit 2, a `RESULT: REFUSED` line, nothing hashed. (Round 2 accepts it on Windows: the `..` is collapsed to `X` before resolving.)
++- `test_r093_r3_a_program_whose_own_folder_is_a_link_into_a_tree_checks_that_tree`: `Y/cursor-bridge` is a link to `A/cursor-bridge`; the program is started as `Y/cursor-bridge/bridge-check.py` with `--root A`. Exit 0, and the last `RESULT: SOURCES MATCH` line names `A/cursor-bridge` resolved.
++- `test_r093_r3_a_folder_that_raises_while_resolved_is_refused_without_a_traceback` (Windows only): `--root \\.\CON\sub` (backslash, backslash, dot, backslash, `CON`, backslash, `sub`). Exit 2, no `Traceback`, a `RESULT: REFUSED` line, nothing hashed. It passes on round 2 and is the case that now holds the `except` branch round 2's own mutant M2 showed untested.
++- `test_r093_r3_a_copy_of_the_program_in_a_folder_of_another_name_is_refused`: `A/other` is a copy of `A/cursor-bridge`; the program is started as `A/other/bridge-check.py` with `--root A`. Exit 2, a `RESULT: REFUSED` line, nothing hashed.
++- `test_r093_r3_a_folder_name_cannot_add_a_result_line`: `--root` is `<tmp>/no-such` followed by a newline and `RESULT: SOURCES MATCH bridge 0`. Exit 2, and exactly one line of the output begins `RESULT:`, and it begins `RESULT: REFUSED` (the test splits with `str.splitlines()`).
++- The earlier 10 cases must still pass. What the earlier refusal cases look for in the output: the round-1 cases (program in `A`, `--root B`) the resolved `A/cursor-bridge` and the resolved `B/cursor-bridge`; `test_r093_r2_a_tree_whose_cursor_bridge_is_linked_into_the_program_tree_is_refused` the resolved `A/cursor-bridge` and the resolved `X`, and neither `SOURCES MATCH` nor `SOURCES DO NOT MATCH`; `test_r093_r2_the_refusal_says_it_refused_and_names_both_folders` (folders `tree A`, `tree B`, with a space) the resolved `tree A/cursor-bridge` and the resolved `tree B` on the `RESULT: REFUSED` line. The matching cases need the folder on the `RESULT: SOURCES MATCH` line (and on the `RESULT: SOURCES DO NOT MATCH` line in the EXTRA case). Since the tests compare with backslashes turned into `/`, a folder printed with doubled backslashes (as `repr` prints it) fails them on Windows.
++
++Each case copies this repository's `bridge/` with its `MANIFEST.json`, so the cases where the program checks its own tree pass only once `MANIFEST.json` has been regenerated after your last edit of `bridge-check.py`. Run `python tools/make-manifest.py` before the pytest command (Done).
++
++**The existing tests that hold the unchanged behaviour.** `tests/test_install_check.py` line 224 asserts `"RESULT: SOURCES MATCH bridge" in out` for the repository's own tree (nothing may come between `SOURCES MATCH` and `bridge`); line 235 asserts `"SOURCES DO NOT MATCH" in out`; the cases without `--sources` (`RESULT: INSTALLED TREE MATCHES`, lines 70 and 280) hold the installed-tree check, which does not change.
++
++**The CI step that must still pass.** `.github/workflows/tests.yml` line 29: `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`, run from the repository root on Windows and Ubuntu, exit 0. Line 31 runs `python tools/dump-cli.py --check`: exit 0 at HEAD; if you change the docstring, it reports `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` stale until the supervisor regenerates them. Quote its output either way; do not fix it.
++
++**External services.** None. This increment makes no external call, so there is no call time and no retry limit to record. Make no network call. The session's `claude --version` is not used by this increment.
++
++**Trust boundaries and security context.** ASVS level 2 (`docs/INVENTORY.md`, Decisions, line 140). `.cursor/rules/secure-coding.mdc` is in force for you. Input crossing into this program: the command-line words (`--root` is any text: a device path, a path through a link, a path holding control characters), the folders and links of the tree checked, and the path the program was started through (a link may stand anywhere in it). Under `--sources` no file under a tree other than the one the program physically stands in is read or hashed, hostile input never ends in a traceback, and nothing in a folder name can forge an output line.
++
++**Development data.** The inventory's decision (`docs/INVENTORY.md`, Decisions, line 135): "Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet (§15 condition 1, A1a condition 1)". For you: run `bridge-check.py` only as `bridge/cursor-bridge/bridge-check.py` of this Workspace (Done) or through the tests on their copies under `tmp_path`; run `tools/make-manifest.py` of this Workspace only in the Done steps and the mutation procedure; never run the installed copy under your home folder, never run `bridge-install.py`, and never point `--root` at your home folder.
++
++**Host.** Windows 11 with the owner's Python 3.12. CI also runs on Ubuntu.
++
++## Diagrams
++None. The plan entry names no diagram for this increment.
++
++## Requirements
++Rounds 1 and 2's requirements still hold except where a requirement below replaces them; R1 replaces round 2's comparison formula. Each finding is one requirement.
++
++1. **R1. The program's tree is where the program physically stands** (Review A, Should fix 2, and the security audit's Should fix; `bridge/cursor-bridge/bridge-check.py:158,163`). Under `--sources`: the program's folder is `os.path.realpath(HERE)`; the program's tree is `os.path.dirname` of that resolved folder. `os.path.realpath(os.path.join(HERE, os.pardir))` and `os.path.realpath(os.path.dirname(HERE))` are not used for the tree (Windows collapses the `..` before resolving, POSIX after, so the platforms disagree; and the lexical parent of a linked folder is the wrong tree). The tree checked is `os.path.realpath(root)`; the two trees are compared under `os.path.normcase`; where they differ, refuse (exit 2, one `RESULT: REFUSED` line, R6) before any file is hashed. Cases: `test_r093_r3_a_program_reached_through_a_link_from_another_tree_is_refused_for_that_tree`, `test_r093_r3_a_program_whose_own_folder_is_a_link_into_a_tree_checks_that_tree`.
++2. **R2. The program's folder is named `cursor-bridge`** (security audit, Consider, taken; `bridge/cursor-bridge/bridge-check.py:174`). Under `--sources`, where `os.path.normcase(os.path.basename(<the program's resolved folder>))` is not `os.path.normcase("cursor-bridge")`, refuse: exit 2, one `RESULT: REFUSED` line that says the program's folder is not named `cursor-bridge`, nothing hashed. Case: `test_r093_r3_a_copy_of_the_program_in_a_folder_of_another_name_is_refused`.
++3. **R3. The tree checked is the resolved one** (security audit, Consider, taken; `bridge/cursor-bridge/bridge-check.py:187,229`). Under `--sources`, after the comparison agrees, the hashing of the manifest's files and the EXTRA walk run under the resolved `--root` (the tree checked), not under the spelling given. The version line (`bridge-check: version ... at <folder>`) and the RESULT lines then name the folder actually checked. The match line keeps `RESULT: SOURCES MATCH bridge <version>` first and the folder after it (`tests/test_install_check.py:224`); the do-not-match line keeps its `(checked: <folder>)` label. Without `--sources` nothing changes: `root` stays as it is read today.
++4. **R4. A folder name cannot add a line** (security audit, Consider, taken; `bridge/cursor-bridge/bridge-check.py:177`). Every folder printed on a RESULT line, and on the version line under `--sources`, is printed with its control characters escaped: a newline, a carriage return and every other C0 character (U+0000 to U+001F) shown as a backslash escape (for example `\n`, `\r`, `\x1b`), and the quote character used around a folder escaped where it occurs inside the folder. Backslashes and spaces in a folder are printed as they are (doubling backslashes, as `repr` does, breaks the tests' folder match on Windows). Escaping DEL (U+007F) and the other characters `str.splitlines` breaks on (U+0085, U+2028, U+2029) as well is allowed; if you do not, name it in `Assumed, not verified`. Case: `test_r093_r3_a_folder_name_cannot_add_a_result_line`.
++5. **R5. The `except` branch stays** (Review A, Should fix 1). A folder that raises `OSError` or `ValueError` while it is resolved, the program's folder or the tree asked for, is a refusal: exit 2, one `RESULT: REFUSED` line naming the unresolved spelling where resolving failed, no traceback, nothing hashed. Only those two exceptions are caught, only around the resolving; no broad `except`. Cases: `test_r093_r3_a_folder_that_raises_while_resolved_is_refused_without_a_traceback`, `test_r093_r2_a_device_name_as_root_is_refused_without_a_traceback` (both Windows only).
++6. **R6. No dead aliases; each folder labelled for what it is** (Review A, Consider, taken; `bridge/cursor-bridge/bridge-check.py:157,159,177`). Drop `here_abs` and `root_abs` (aliases of values the code already holds). The refusal line labels each folder it prints for what it is: the program's folder, the program's tree, the tree asked for, and the asked-for tree's `cursor-bridge` folder labelled as that folder, not as the tree. It still begins `RESULT: REFUSED`, still says to run the asked-for tree's own `bridge-check.py` instead, keeps each folder in quotes (escaped per R4), names the folders every refusal case looks for (Context, "The acceptance tests"), and never holds `SOURCES MATCH` or `SOURCES DO NOT MATCH`. A refused run prints exactly one RESULT line.
++7. **R7. The report's records** (Review A, Should fix 3 and 4). The report quotes, in fenced blocks: the exact refusal line for a folder holding spaces and for the device path, each from Done steps 5 and 6 (a run of the Workspace's program, with `<Workspace>` replacing the repository folder); each mutant's full text; and each pytest summary line, from the exact command listed for it. Its `Assumed, not verified` section names what this round relies on that no test runs (for example the POSIX behaviour of R1 on a link, which CI's Ubuntu runner exercises but your run does not).
++
++Unchanged: no option added; no argparse; ASCII-only program text; no path of this computer hard-coded; if the docstring needs a word for R2 (a program folder not named `cursor-bridge`), one short ASCII clause in the exit-2 line is allowed and nothing else in it changes; `MANIFEST.json` regenerated after your last edit under `bridge/`, the version staying `2026.11.12a`, `git diff -- bridge/cursor-bridge/VERSION` empty.
++
++## Acceptance criteria
++- [ ] `tests/test_program_release_tooling.py` passes whole, unedited: 15 cases on Windows (on Linux the Windows-only cases are skipped).
++- [ ] `tests/test_install_check.py` passes, every case unedited.
++- [ ] The program's tree is `os.path.dirname(os.path.realpath(HERE))`; no `realpath` of `HERE/..` or of `dirname(HERE)` is left in the program (R1).
++- [ ] A program in a folder not named `cursor-bridge` refuses under `--sources` (R2).
++- [ ] Under `--sources`, hashing and the EXTRA walk run under the resolved `--root`, and the version and RESULT lines name it (R3).
++- [ ] A `--root` holding a newline yields exactly one RESULT line, `RESULT: REFUSED` (R4).
++- [ ] A folder that raises while resolved is refused with exit 2 and no traceback (R5).
++- [ ] `here_abs` and `root_abs` are gone; the refusal labels the program's folder, the program's tree, the tree asked for and that tree's `cursor-bridge` folder each for what it is (R6).
++- [ ] `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`, from the Workspace root, exits 0 and prints `RESULT: SOURCES MATCH bridge 2026.11.12a` with the folder after it.
++- [ ] MANIFEST regenerated; `git status --short` does not list `bridge/cursor-bridge/VERSION`; `git diff -- bridge/cursor-bridge/VERSION` is empty.
++- [ ] Both programs decode as ASCII.
++- [ ] R-093 is fully met, with no stand-in, placeholder or "later" text. The tests naming R-093 are the supervisor's acceptance tests and round 2's two builder cases.
++- [ ] No option added, no new dependency, configuration key or environment variable, no network call. No new Semgrep high finding. No exception escapes as a traceback (ASVS L2).
++
++## Constraints
++- Do not add dependencies (the standard library and the pytest already used only).
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it, and everything you produce goes inside it.
++- Do not edit `tests/test_program_release_tooling.py`, any case of `tests/test_install_check.py`, or anything else outside Scope. If a test case seems wrong, stop and report it by its test id instead of working around it.
++- If the brief, the rules, or the tooling got in your way (an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason), append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item. One paragraph is one line. Line breaks only between blocks.
++- **No owner's names, no paths.** Nothing you write (code, the notes line, the report) holds a path of this computer or a user name. In the report write `<Workspace>` for the repository folder and `<tmp>` for a temporary folder, including in quoted command output.
++- This increment talks to no external service. Do not add a call to any service or the network.
++- Any console process your code launches on Windows is created windowless (`creationflags=subprocess.CREATE_NO_WINDOW` in Python, `0` on other platforms). This increment needs no new process.
++- Never start a server, a watcher or a daemon that outlives a test. Run every command synchronously, in the foreground, and wait for it to end. Leave nothing running when you finish.
++- Do not fix by suppressing the symptom: no broad `except`, no `try` around `main()`; only `OSError` and `ValueError`, only around the resolving (R5).
++- Do not refactor code outside the scope, even if it looks wrong. Change only what R1-R7 need; every other message, refusal and exit code stays as it is.
++- Never run the product, a migration, a seed or a test against the owner's live data (Context, "Development data").
++- A value the brief marks as the owner's: none in this increment.
++- Follow existing conventions in the file you touch: ASCII program text, `main()` returning the exit code, messages beginning `bridge-check: `, RESULT lines beginning `RESULT: `.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`, `restore`. You read with `git status`, `git diff`, `git log` and `git rev-parse` only.
++- Numbers: none are parsed by this increment.
++- Every verification command the Done section asks you to run is written there in full. Run exactly those. **Do NOT run the whole `tests/` tree** (`python -m pytest`, `python -m pytest tests`, or any command that collects all of it): the whole suite is CI's run.
++- **Mutation self-check (by hand, in process, no script in the diff).** The supervisor's mutation run comes after yours. Apply each mutant by hand, one at a time, to `bridge-check.py`; run `python tools/make-manifest.py` (otherwise the copied tree is STALE and every case fails for the wrong reason); run exactly `python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py`; revert the mutant by hand; run `python tools/make-manifest.py` again; confirm with `git diff` that the revert is exact. In the report give each mutant's label and full text, the exact command, and its pytest summary line in a fenced block, with the id of one test it made fail; if it is not caught, write `not caught` and one line on why or on the case that would catch it (do not add that case):
++  - M1 the program's tree computed as `os.path.realpath(os.path.join(HERE, os.pardir))` again.
++  - M2 the `cursor-bridge` name check of R2 removed.
++  - M3 the hashing (and the EXTRA walk) under the unresolved `root` again. If no case catches it, you may prove it by reading instead of running: write `not caught` and why (after the trees agree, the given spelling and the resolved one reach the same files, except across a change made between the comparison and the hashing).
++  - M4 the escape of R4 removed.
++  - M5 the `except` of R5 removed (the resolving no longer caught).
++- **Known failures.** On round 2's code the acceptance file gives 4 failed, 11 passed. If a case of either test file fails that your change did not cause, report it by its test id with its failure lines and fix none.
++- Prefer reuse over new code: `HERE`, the existing `root` reading, round 2's comparison block and refusal line, and the standard library (`os.path.realpath`, `os.path.dirname`, `os.path.basename`, `os.path.normcase`). Write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a security, observability or accessibility requirement stated above.
++- Rules in force for you: `.cursor/rules/secure-coding.mdc`, `.cursor/rules/workspace-boundary.mdc` and the frozen `minimal-code.mdc`.
++
++## Done
++Your report is the file `handoff/TASK-074-r3-report.md`, which you write as you go: what you did, what you changed, what you ran and what it printed, and what you could not do, so that nothing of it is lost if your run ends early. It names no computer path and no user name: write `<Workspace>` for the repository folder and `<tmp>` for a temporary folder, including in quoted command output.
++
++When you finish, it holds:
++- a list of every file you changed or created;
++- a one-paragraph summary of what you did;
++- for R1-R7, one line each on what meets it, naming the functions and their lines as the file stands after your change; for R4 which characters are escaped and how;
++- the two refusal lines of R7 (Done steps 5 and 6), each in a fenced block with its command;
++- the mutation self-check, M1-M5, each with its label, its full text, its command and its pytest summary line in a fenced block, and the test id that caught it (or `not caught` and why);
++- every command of the list below with its output;
++- a section headed exactly `Assumed, not verified`, as the report's last section.
++
++The `Assumed, not verified` section lists every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm, and what this round relies on that no test runs. Examples: how `os.path.realpath` resolves a symbolic link to the program's folder on POSIX; whether a junction under `~/.claude` pointing into a Workspace makes the installed program check that Workspace's tree; which characters besides C0 a console or a reader splits a line on. One item per line: what you assumed - why - what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Run these from the Workspace root, in this order, after your last edit, each on its own, synchronously in the foreground, with no `PYTHONPATH` or other environment change. The single quotes in steps 5 and 6 keep the words as they are in PowerShell and in bash alike; neither run reads or writes a file under the folder it names.
++1. `git status --short`
++2. `python tools/make-manifest.py` (expect `make-manifest: version 2026.11.12a, ...`)
++3. `python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py tests/test_install_check.py`
++4. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` (expect `RESULT: SOURCES MATCH bridge 2026.11.12a` with the folder after it, exit 0)
++5. `python bridge/cursor-bridge/bridge-check.py --root 'no such/tree B' --sources --quiet` (expect exit 2 and one `RESULT: REFUSED` line naming a folder that holds `tree B`)
++6. `python bridge/cursor-bridge/bridge-check.py --root '\\.\CON\sub' --sources --quiet` (Windows; expect exit 2, one `RESULT: REFUSED` line, no `Traceback`)
++7. `python tools/dump-cli.py --check` (exit 0 if the docstring is unchanged; if you changed it, expect `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` reported stale; quote its output and fix nothing; the supervisor regenerates both)
++8. `python -c "[open(p,'rb').read().decode('ascii') for p in ('bridge/cursor-bridge/bridge-check.py','tools/make-manifest.py')]; print('ascii ok')"` (expect `ascii ok`)
++9. `git diff -- bridge/cursor-bridge/VERSION` (expect no output)
++10. `git rev-parse HEAD` and `git status --short` (`bridge/cursor-bridge/VERSION` must not be listed; if it is, report it and do not restore it)
++
++Quoting rules:
++- Every command you ran is quoted in the report with the lines it printed, verbatim, in a fenced block.
++- Each pytest summary line is quoted verbatim in a fenced block, from the exact command listed for it. Never restate a count in prose.
++- A claim that a check passed quotes the output line that shows it.
++- Each mutation is listed by its label and its full text, with what caught it.
++- A command you did not run is written `not run`, never described as run.
++- Write the report's results after step 10, naming the commit its counts belong to (`git rev-parse HEAD`) and whether the working tree then held uncommitted changes (`git status --short`).
++
++Your last message is the summary and the report file's path, and nothing follows it. The supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/handoff/TASK-074.md b/handoff/TASK-074.md
+new file mode 100644
+index 0000000..f695a4a
+--- /dev/null
++++ b/handoff/TASK-074.md
+@@ -0,0 +1,156 @@
++---
++record: brief
++header: 1
++id: "TASK-074"
++round: 1
++satisfies: [R-093]
++scope: ["bridge/cursor-bridge/bridge-check.py", "tools/make-manifest.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_install_check.py", "docs/BUILDER_NOTES.md", "handoff/TASK-074-r1-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# TASK-074: The release tooling checks the tree it stands in (R-093)
++
++## Objective
++Two small defects in the release tooling. First, `bridge/cursor-bridge/bridge-check.py --sources` checks the tree named by `--root` against the manifest that sits beside the program itself (`HERE/MANIFEST.json`), so the installed copy under `~/.claude/cursor-bridge`, run with `--root <Workspace>/bridge --sources`, judges a source tree against the installed release's manifest and its verdict means nothing. After this increment, under `--sources` only, the program compares the folder it stands in, resolved, with `<--root>/cursor-bridge`, resolved; where they differ it prints both folders and exits 2 before any file is hashed, and where they agree it runs as today and its RESULT line names the folder. Second, `tools/make-manifest.py` always writes `bridge/cursor-bridge/VERSION` with an LF line ending, so on a checkout where that file is CRLF every stamp rewrites its bytes (see `docs/BUILDER_NOTES.md`, the line dated 2026-10-17 BUG-002-r1, and the TASK-073 brief that had to `git restore` it); after this increment it keeps the line ending the file already has.
++
++Satisfies: R-093 - The release tooling checks the tree it stands in (C21, J5): `bridge-check.py --sources` refuses, with exit 2, where the program does not stand in the tree it checks, and prints both folders on its result line; `tools/make-manifest.py` writes `VERSION` with the file's own line ending. (Its row in `docs/REQUIREMENTS.md` is line 119.)
++
++## Scope
++Files and directories you may create or modify:
++- bridge/cursor-bridge/bridge-check.py
++- tools/make-manifest.py
++- bridge/cursor-bridge/MANIFEST.json
++- tests/test_install_check.py
++- docs/BUILDER_NOTES.md
++- handoff/TASK-074-r1-report.md
++
++Limits on these paths:
++- `bridge/cursor-bridge/MANIFEST.json` changes only by running `python tools/make-manifest.py` (Done), never by hand.
++- `tests/test_install_check.py`: every existing case must pass **unedited**. The one edit allowed is appending cases of your own at the very end, below a line you add, `# ---- builder's cases below this line`, each naming R-093 in its docstring. None is required.
++- `tests/test_program_release_tooling.py` is the supervisor's acceptance file, committed at HEAD. It is **read-only** for you: read it whole and run it, never edit it. If a case seems wrong, stop and report it by its test id.
++
++Do not modify anything else.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration (`.github/`)
++- docs/ and handoff/, except the files the Scope section names. In particular `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` are the supervisor's: it regenerates them after your build. Do not run `python tools/dump-cli.py` without `--check`, and do not edit either file.
++- `bridge/cursor-bridge/VERSION` (make-manifest rewrites it; after your change its content must be unchanged, Done), `bridge/cursor-bridge/CHANGELOG.md` (no CHANGELOG entry in this increment), and every other file under `bridge/`.
++- `tools/dump-cli.py` and every other file under `tools/`.
++- Every test file other than `tests/test_install_check.py`; `tests/test_program_release_tooling.py` included (read-only).
++- Any mutation script or mutants file: the mutation run is the supervisor's, after your run.
++- `~/.claude`, `~/.cursor-bridge` and any real installation: you never install anything and never run the installed `bridge-check.py`.
++
++## Context
++**The design that binds this increment.** `docs/DESIGN.md` line 363, the bullet `*C21 and J5.*`: "`bridge-check.py --sources` refuses (exit 2) where the program does not stand in the tree it checks, and prints both folders on its result line. `tools/make-manifest.py` writes `VERSION` with the file's own line ending." The plan entry is `docs/BUILD_PLAN.md`, `### TASK-074` (line 1936); its `Done when` (line 1945): "`bridge-check.py --sources` compares the folder the program itself stands in, resolved, with `<the tree it checks>/cursor-bridge`, and where they differ prints both folders and exits 2 before it hashes anything, so that the installed copy is never taken for a check of a source tree; where they agree its result line names both folders and its verdict and exit codes are as today; the check without `--sources` is unchanged; `tools/make-manifest.py` writes `VERSION` with the line ending the file has, and a tree whose `VERSION` ends in CRLF yields the same manifest hash for it before and after a second run; ... MANIFEST regenerated; no option added; no new dependency."
++
++**`bridge/cursor-bridge/bridge-check.py` as it stands (236 lines; read it whole).**
++- Module docstring lines 2-29. Usage lines 20-21; the `--sources` paragraph lines 23-26; the exit list lines 27-28: `Exit:   0 = every manifest file OK; 1 = at least one STALE or MISSING;` / `        2 = manifest unreadable.  ASCII-only on purpose (cp1252 consoles).`
++- `HERE = os.path.dirname(os.path.abspath(__file__))` (line 36): the folder the program stands in.
++- `main()` (lines 141-228): `root` defaults to `os.path.abspath(os.path.join(HERE, os.pardir))` (line 143); `--quiet` and `--sources` by membership (lines 144-145); `--root` read as `os.path.abspath(argv[argv.index("--root") + 1])` (lines 146-147); the manifest is always read from `HERE` (lines 148-154, exit 2 when unreadable); the loop over the manifest's files hashes each one under `root` (lines 159-171); settings, shim and agent home are skipped under `--sources` (lines 173-200); EXTRA files are collected (lines 202-209); then it prints `bridge-check: version %s (%s) at %s` (line 211), one line per problem as `  %-8s %s` (lines 213-214), the EXTRA lines (215-217), the count line `bridge-check: %d OK, %d STALE, %d MISSING, %d EXTRA` (line 218), and one RESULT line: under `--sources` with any STALE, MISSING or EXTRA, `RESULT: SOURCES DO NOT MATCH their stamp - run tools/make-manifest.py after the last edit, then re-run.` and exit 1 (lines 219-223); otherwise `RESULT: %s bridge %s` with `SOURCES MATCH` or `INSTALLED TREE MATCHES` and the version, exit 0 (line 227).
++- The command reference records this program from its module docstring (`tools/dump-cli.py`, `classify_program`, line 182): a file whose text holds `ArgumentParser` without a top-level `build_parser()` makes dump-cli fail. Keep the program free of argparse; no option is added.
++
++**`tools/make-manifest.py` as it stands (104 lines).** `CB` is `bridge/cursor-bridge` under the repository root found from the program's own location (line 29-31). `main()` hashes every file under `bridge/` except `MANIFEST.json` and `.pyc` files, skips `cursor-bridge/VERSION` in the walk (lines 87-88), then writes VERSION with `open(..., "w", encoding="utf-8", newline="\n")` and `f.write("%s\n" % version)` (lines 91-92), hashes it with `norm_hash` (line 93, which turns CRLF into LF before hashing, so the manifest entry is the same for a CRLF and an LF file), and writes `MANIFEST.json` (lines 94-97). The bridge's own `VERSION` in this checkout is CRLF (`2026.11.12a` then CR LF); the newest `## ` entry of `bridge/cursor-bridge/CHANGELOG.md` is `2026.11.12a`, so a plain `python tools/make-manifest.py` stamps that same version. `.gitattributes` holds only `.githooks/** text eol=lf`.
++
++**The acceptance tests.** `tests/test_program_release_tooling.py` (7 cases, all red at HEAD, the checkpoint) fixes the interface; its module docstring (lines 1-21) states the forms it pins and what it leaves open. Read it whole. Each case copies this repository's `bridge/` (and for the stamp case `tools/make-manifest.py`) under pytest's `tmp_path` and runs the copy's program as a subprocess, with HOME, USERPROFILE, LOCALAPPDATA and APPDATA pointed at scratch folders. What it pins, in short:
++- A refused run (the program in tree A, `--root` tree B): exit 2; the output names A's `cursor-bridge` folder and B's, each as `os.path.realpath` gives it (the test compares with backslashes turned into `/` and, on Windows, lower case); no line whose first word after leading spaces is `OK`, `STALE`, `MISSING` or `EXTRA`, no `bridge-check:` line holding `OK,`; and no `RESULT: SOURCES MATCH` anywhere. This holds also when B holds a stale file.
++- A run where the program stands in the tree it checks (`--root <tree>`, `--root .` with the working folder at the tree, `--root <tree>/cursor-bridge/..`): exit 0, and the last line starting `RESULT: SOURCES MATCH` holds the folder `<tree>/cursor-bridge` as `os.path.realpath` gives it; with an unlisted file it is exit 1, the line `  EXTRA    cursor-bridge/left-behind.md ...`, and the last line starting `RESULT: SOURCES DO NOT MATCH` holds that folder.
++- The stamp: with VERSION written as `<version>` CR LF, two runs of `make-manifest.py --version <version>` each exit 0; after the first VERSION still ends in CR LF and holds no bare LF; the second leaves VERSION's bytes and its `MANIFEST.json` entry as the first wrote them.
++- Not pinned: the refusal's wording beyond the two folders, the text around the folder on the RESULT line, separator and letter case.
++
++Because each case copies the repository's `bridge/` with its `MANIFEST.json`, the cases where the program checks its own tree pass only once `MANIFEST.json` has been regenerated after your edit of `bridge-check.py` (before that, `bridge-check.py` itself is STALE in the copy). Run `python tools/make-manifest.py` before the pytest command (Done).
++
++**The existing tests that hold the unchanged behaviour.** `tests/test_install_check.py` line 224 asserts `"RESULT: SOURCES MATCH bridge" in out` for the repository's own tree: the folder you add to that line must therefore come after `bridge <version>`, never between `SOURCES MATCH` and `bridge`. Line 235 asserts `"SOURCES DO NOT MATCH" in out`. The cases without `--sources` (`RESULT: INSTALLED TREE MATCHES`, lines 70 and 280, and `tests/test_program_install_keep.py`, which looks for `MATCHES bridge <version>`) hold the installed-tree check, which this increment does not change. `tests/test_release_b_ci_floor.py:116` pins the CI step's command text, which does not change.
++
++**The CI step that must still pass.** `.github/workflows/tests.yml` line 29: `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`, run from the repository root on Windows and Ubuntu. There the program stands in `bridge/cursor-bridge`, so it must pass, exit 0. Line 31 runs `python tools/dump-cli.py --check`: if you extend the docstring's exit list (allowed, Requirements R4), that check reports `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` stale until the supervisor regenerates them after your build. Expect that, quote it in the report, and do not fix it.
++
++**External services.** None. This increment makes no external call, so there is no call time and no retry limit to record. Make no network call. The session's `claude --version` is not used by this increment.
++
++**Trust boundaries and security context.** ASVS level 2 (`docs/INVENTORY.md`, Decisions, line 140). `.cursor/rules/secure-coding.mdc` is in force for you. Input crossing into these programs: the command-line words (`--root` is any text), and the files of the tree checked or stamped. The refusal is the boundary this increment adds: under `--sources` no file under a `--root` other than the program's own tree is read or hashed. No exception escapes as a traceback.
++
++**Development data.** The inventory's decision (`docs/INVENTORY.md`, Decisions, line 135): "Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet (§15 condition 1, A1a condition 1)". For you: run `bridge-check.py` only as `bridge/cursor-bridge/bridge-check.py` of this Workspace (Done) or through the tests on their copies under `tmp_path`; never run the installed copy under your home folder, never run `bridge-install.py`, and never point `--root` at your home folder.
++
++**Host.** Windows 11 with the owner's Python 3.12. CI also runs on Ubuntu.
++
++## Diagrams
++None. The plan entry names no diagram for this increment.
++
++## Requirements
++1. **R1. The refusal.** Under `--sources` only, `bridge-check.py` compares `os.path.realpath` of the folder it stands in (`HERE`) with `os.path.realpath` of `<root>/cursor-bridge`, where `<root>` is the `--root` value as the program reads it today (or its default). Comparing both with `os.path.normcase` as well is allowed. The comparison runs before the loop over the manifest's files (before any file is hashed). Where the two differ, it prints a line beginning `RESULT: ` that names both resolved folders, and exits 2. That run prints no per-file verdict line, no `bridge-check: ... OK, ...` count line, and neither `RESULT: SOURCES MATCH` nor `SOURCES DO NOT MATCH` (the refusal is not a verdict on the tree). A missing `<root>/cursor-bridge` is a difference like any other.
++2. **R2. The agreeing check.** Where the two agree, every verdict, line and exit code is as today, except that the RESULT line, both `RESULT: SOURCES MATCH bridge <version>` and `RESULT: SOURCES DO NOT MATCH ...`, also names the resolved folder (once is enough, since the two resolved folders are the same; print it as `os.path.realpath` gives it). On the match line the folder comes after `bridge <version>` (Context, line 224 of `tests/test_install_check.py`).
++3. **R3. Without `--sources` nothing changes:** no comparison, no new line, the same RESULT lines and exit codes.
++4. **R4. The docstring.** The module docstring's exit list may be extended so that exit 2 also names this refusal (one short clause, ASCII). Nothing else in the docstring needs to change. No option is added; no argparse.
++5. **R5. The stamp's line ending.** `tools/make-manifest.py` writes `bridge/cursor-bridge/VERSION` with the line ending the existing file has: a file ending in CR LF stays CR LF, a file ending in LF stays LF, and a new file (none there before) is written with LF. The content stays the version followed by one line ending. The manifest entry for `cursor-bridge/VERSION` is unchanged across two runs (it already is, through `norm_hash`). Nothing else in the program's behaviour changes (its usage, its refusals, the files it hashes, the order and format of `MANIFEST.json`).
++6. **R6. ASCII.** Both programs stay ASCII-only (their docstrings say why), and every line you add anywhere is ASCII. No path of this computer is hard-coded in a program, a test or a message.
++7. **R7. The manifest.** `bridge/cursor-bridge/MANIFEST.json` is regenerated with `python tools/make-manifest.py` after your last edit under `bridge/`; the version stays `2026.11.12a`, what `bridge/cursor-bridge/VERSION` holds, and `git diff -- bridge/cursor-bridge/VERSION` shows no change.
++
++## Acceptance criteria
++- [ ] `tests/test_program_release_tooling.py` passes whole, unedited (7 cases).
++- [ ] `tests/test_install_check.py` passes, every existing case unedited; any case you added sits below the marker line and names R-093 in its docstring.
++- [ ] `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`, run from the Workspace root, exits 0 and prints `RESULT: SOURCES MATCH bridge 2026.11.12a` followed by the resolved `bridge/cursor-bridge` folder.
++- [ ] Under `--sources` with another tree, exit 2, both folders named, nothing hashed (R1); without `--sources`, output and exit codes as before (R3).
++- [ ] `tools/make-manifest.py` keeps a CRLF `VERSION` CRLF and an LF one LF, writes a new one LF, and two runs leave `VERSION` and its manifest entry byte-identical (R5).
++- [ ] MANIFEST regenerated; `git status --short` does not list `bridge/cursor-bridge/VERSION`, and `git diff -- bridge/cursor-bridge/VERSION` is empty (R7).
++- [ ] Both programs decode as ASCII (R6).
++- [ ] R-093 is fully met, with no stand-in, placeholder or "later" text. The tests naming R-093 are the supervisor's acceptance tests.
++- [ ] No option added, no new dependency, configuration key or environment variable, no network call. No new Semgrep high finding. No exception escapes as a traceback (ASVS L2).
++
++## Constraints
++- Do not add dependencies (the standard library and the pytest already used only).
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it, and everything you produce goes inside it.
++- Do not edit `tests/test_program_release_tooling.py`, any existing case of `tests/test_install_check.py`, or anything else outside Scope. If a test case seems wrong, stop and report it by its test id instead of working around it.
++- If the brief, the rules, or the tooling got in your way (an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason), append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item. One paragraph is one line. Line breaks only between blocks.
++- **No owner's names, no paths.** Nothing you write (code, the notes line, the report) holds a path of this computer or a user name. In the report write `<Workspace>` for the repository folder and `<tmp>` for a temporary folder, including in quoted command output (the CI-step command prints the resolved folder: replace it with `<Workspace>/bridge/cursor-bridge` in the quote).
++- This increment talks to no external service. Do not add a call to any service or the network.
++- Any console process your code launches on Windows is created windowless (`creationflags=subprocess.CREATE_NO_WINDOW` in Python, `0` on other platforms). This increment needs no new process.
++- Never start a server, a watcher or a daemon that outlives a test. Run every command synchronously, in the foreground, and wait for it to end. Leave nothing running when you finish.
++- Do not refactor code outside the scope, even if it looks wrong. In both programs change only what R1-R7 need; every other message, refusal and exit code stays as it is.
++- Never run the product, a migration, a seed or a test against the owner's live data (Context, "Development data").
++- A value the brief marks as the owner's: none in this increment.
++- Follow existing conventions in the files you touch: ASCII program text, `main()` returning the exit code, messages beginning `bridge-check: ` or `make-manifest: ` (the RESULT lines begin `RESULT: `).
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`, `restore`. You read with `git status`, `git diff`, `git log` and `git rev-parse` only.
++- Numbers: none are parsed by this increment.
++- Every verification command the Done section asks you to run is written there in full. Run exactly those. **Do NOT run the whole `tests/` tree** (`python -m pytest`, `python -m pytest tests`, or any command that collects all of it): the whole suite is CI's run.
++- **Mutation self-check (by hand, in process, no script in the diff).** The supervisor's mutation run comes after yours. Before you finish, apply each of these by hand, one at a time; after applying a mutant to `bridge-check.py` run `python tools/make-manifest.py` (otherwise the copied tree is STALE and every case fails for the wrong reason), then run `python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py`, then revert the mutant by hand and run `python tools/make-manifest.py` again; confirm with `git diff` that each revert is exact. List each in the report by its label and text, with the pytest summary line and the id of one test it made fail. If one is not caught, write `not caught` and one line on the case that would catch it (do not add that case):
++  - M1 the folder comparison is skipped, so another tree is checked as today.
++  - M2 the refusal exits 1 instead of 2.
++  - M3 the `RESULT: SOURCES MATCH` line no longer names the folder.
++  - M4 `make-manifest.py` writes `VERSION` with LF whatever the existing file holds (today's line 91-92).
++- **Known failures.** All 7 acceptance cases fail before your change. If a case of either test file fails that your change did not cause, report it by its test id with its failure lines and fix none.
++- Prefer reuse over new code: `HERE`, the existing `root` reading and the standard library (`os.path.realpath`). Write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a security, observability or accessibility requirement stated above.
++- Rules in force for you: `.cursor/rules/secure-coding.mdc`, `.cursor/rules/workspace-boundary.mdc` and the frozen `minimal-code.mdc`.
++
++## Done
++Your report is the file `handoff/TASK-074-r1-report.md`, which you write as you go: what you did, what you changed, what you ran and what it printed, and what you could not do, so that nothing of it is lost if your run ends early. It names no computer path and no user name: write `<Workspace>` for the repository folder and `<tmp>` for a temporary folder, including in quoted command output.
++
++When you finish, it holds:
++- a list of every file you changed or created;
++- a one-paragraph summary of what you did;
++- for R1-R7, one line each on what meets it, naming the functions and their lines as the file stands after your change; for R1 also whether the comparison runs before or after the manifest is read, and the exact refusal line with `<tmp>` for the folders;
++- any case you added to `tests/test_install_check.py`, by test id;
++- the mutation self-check list, M1-M4, each with its pytest summary line and the test id that caught it (or `not caught` and the case that would);
++- every command of the list below with its output;
++- a section headed exactly `Assumed, not verified`, as the report's last section.
++
++The `Assumed, not verified` section lists every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm. Examples: how `os.path.realpath` treats a junction or a symbolic link under `~/.claude` on Windows; what a `VERSION` file with mixed line endings is written with; whether the folder on the RESULT line prints readably on a cp1252 console. One item per line: what you assumed - why - what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Run these from the Workspace root, in this order, after your last edit, each on its own, synchronously in the foreground, with no `PYTHONPATH` or other environment change:
++1. `git status --short`
++2. `python tools/make-manifest.py` (expect `make-manifest: version 2026.11.12a, ...`)
++3. `python -m pytest -p no:cacheprovider -q tests/test_program_release_tooling.py tests/test_install_check.py`
++4. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` (expect `RESULT: SOURCES MATCH bridge 2026.11.12a` with the folder after it, exit 0)
++5. `python tools/dump-cli.py --check` (if you changed the docstring, expect it to report `docs/cli-reference.json` and `docs/CLI_REFERENCE.md` stale; quote its output and fix nothing; the supervisor regenerates both)
++6. `python -c "[open(p,'rb').read().decode('ascii') for p in ('bridge/cursor-bridge/bridge-check.py','tools/make-manifest.py')]; print('ascii ok')"` (expect `ascii ok`)
++7. `git diff -- bridge/cursor-bridge/VERSION` (expect no output)
++8. `git rev-parse HEAD` and `git status --short` (`bridge/cursor-bridge/VERSION` must not be listed; if it is, report it and do not restore it)
++
++Quoting rules:
++- Every command you ran is quoted in the report with the lines it printed, verbatim, in a fenced block.
++- Each pytest summary line is quoted verbatim in a fenced block. Never restate a count in prose.
++- A claim that a check passed quotes the output line that shows it.
++- Each mutation is listed by its label and text, with what caught it.
++- A command you did not run is written `not run`, never described as run.
++- Write the report's results after step 8, naming the commit its counts belong to (`git rev-parse HEAD`) and whether the working tree then held uncommitted changes (`git status --short`).
++
++Your last message is the summary and the report file's path, and nothing follows it. The supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/tests/test_install_check.py b/tests/test_install_check.py
+index 12fb539..63d6155 100644
+--- a/tests/test_install_check.py
++++ b/tests/test_install_check.py
+@@ -292,3 +292,47 @@ def test_the_stamp_program_writes_nothing_for_an_argument_it_does_not_know():
+         p = subprocess.run([sys.executable, stamp] + args, capture_output=True, text=True)
+         assert p.returncode == 2 and "nothing was written" in p.stdout, p.stdout + p.stderr
+     assert open(manifest, "rb").read() == before
++
++# ---- builder's cases below this line
++
++
++def test_r093_make_manifest_keeps_a_lf_version_file_lf(tmp_path):
++    """R-093: an LF VERSION stays LF across two make-manifest runs; bytes and manifest entry unchanged."""
++    repo = tmp_path / "repo"
++    (repo / "tools").mkdir(parents=True)
++    shutil.copy2(os.path.join(RELEASE, os.pardir, "tools", "make-manifest.py"), str(repo / "tools" / "make-manifest.py"))
++    shutil.copytree(RELEASE, str(repo / "bridge"), ignore=shutil.ignore_patterns("__pycache__"))
++    version_file = repo / "bridge" / "cursor-bridge" / "VERSION"
++    manifest_file = repo / "bridge" / "cursor-bridge" / "MANIFEST.json"
++    version = version_file.read_bytes().decode("ascii").split()[0]
++    version_file.write_bytes(version.encode("ascii") + b"\n")
++    prog = repo / "tools" / "make-manifest.py"
++
++    rc, out = run(prog, tmp_path, "--version", version)
++    assert rc == 0, out
++    first = version_file.read_bytes()
++    assert first.endswith(b"\n") and b"\r" not in first, first
++    first_entry = json.loads(manifest_file.read_text(encoding="utf-8"))["files"]["cursor-bridge/VERSION"]
++
++    rc, out = run(prog, tmp_path, "--version", version)
++    assert rc == 0, out
++    assert version_file.read_bytes() == first
++    second_entry = json.loads(manifest_file.read_text(encoding="utf-8"))["files"]["cursor-bridge/VERSION"]
++    assert second_entry == first_entry
++
++
++def test_r093_make_manifest_writes_a_new_version_file_with_lf(tmp_path):
++    """R-093: with VERSION removed, make-manifest writes the version followed by a single LF."""
++    repo = tmp_path / "repo"
++    (repo / "tools").mkdir(parents=True)
++    shutil.copy2(os.path.join(RELEASE, os.pardir, "tools", "make-manifest.py"), str(repo / "tools" / "make-manifest.py"))
++    shutil.copytree(RELEASE, str(repo / "bridge"), ignore=shutil.ignore_patterns("__pycache__"))
++    version_file = repo / "bridge" / "cursor-bridge" / "VERSION"
++    version = version_file.read_bytes().decode("ascii").split()[0]
++    version_file.unlink()
++    prog = repo / "tools" / "make-manifest.py"
++
++    rc, out = run(prog, tmp_path, "--version", version)
++    assert rc == 0, out
++    data = version_file.read_bytes()
++    assert data == version.encode("ascii") + b"\n", data
+diff --git a/tests/test_program_release_tooling.py b/tests/test_program_release_tooling.py
+new file mode 100644
+index 0000000..fd9fa64
+--- /dev/null
++++ b/tests/test_program_release_tooling.py
+@@ -0,0 +1,304 @@
++"""TASK-074, the supervisor's acceptance tests (R-093): the release tooling checks the tree it stands in.
++
++enforces: docs/REQUIREMENTS.md R-093; docs/BUILD_PLAN.md, TASK-074's Done when; docs/DESIGN.md, C21 and J5.
++
++The forms these tests pin:
++- bridge/cursor-bridge/bridge-check.py --sources compares the folder the program stands in, resolved, with
++  `<--root>/cursor-bridge`, resolved. Where they differ it exits 2, names both folders and has hashed nothing: no
++  per-file verdict (OK, STALE, MISSING, EXTRA) and no `bridge-check: ... OK, ...` count line, even where the tree it
++  was pointed at holds a stale file. Where they agree, in any spelling of --root (a relative `.`, a path with a `..`),
++  the check runs as today, exit 0 with `RESULT: SOURCES MATCH` or exit 1 with `RESULT: SOURCES DO NOT MATCH`, and
++  that RESULT line names the folder.
++- tools/make-manifest.py writes bridge/cursor-bridge/VERSION with the line ending the file already has: a CRLF file
++  stays CRLF, and a second run leaves its bytes and its MANIFEST.json entry as the first run wrote them.
++- Round 2 (the security audit of round 1): the tree checked is the whole of `--root`, resolved, so a `--root` whose
++  `cursor-bridge` is a link or junction into the program's tree, its other folders standing elsewhere, is refused
++  like any other tree; a `--root` that cannot be resolved (a Windows device name such as CON) is refused with exit 2
++  and no traceback; the refusal's line begins `RESULT: REFUSED` and names both folders, readable where they hold
++  spaces.
++- Round 3 (both reviews of round 2): the program's tree is where the program physically stands, the parent of its
++  own folder resolved, and that folder is named `cursor-bridge`; so a program reached through a link from another
++  tree is refused for that tree, a program whose own folder is a link into a tree checks that tree, and a copy of the
++  program in a folder of another name is refused; a folder that raises while it is resolved (`\\\\.\\CON\\<sub>` on
++  Windows) is refused with exit 2 and no traceback; a folder printed on the RESULT line cannot add a second RESULT
++  line (control characters escaped).
++- Not pinned: the wording of the refusal beyond `RESULT: REFUSED` and both folders; the message text around the
++  folders on the RESULT line; which separator or letter case the folders are printed in. The check without --sources is held by
++  tests/test_install_check.py and is not repeated here.
++
++Isolation: every run is a subprocess whose HOME, USERPROFILE, LOCALAPPDATA and APPDATA are folders under pytest's
++temporary folder; the trees checked and stamped are copies of this repository's bridge/ (and tools/make-manifest.py)
++under that folder, and the programs run are those copies.
++"""
++import hashlib
++import json
++import os
++import shutil
++import subprocess
++import sys
++
++import pytest
++
++ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++SOURCE_RELEASE = os.path.join(ROOT, "bridge")
++MAKE_MANIFEST = os.path.join(ROOT, "tools", "make-manifest.py")
++
++
++def stamp_hash(path):
++    """A file's fingerprint as bridge-check.py and make-manifest.py compute it (CRLF and a BOM ignored)."""
++    with open(path, "rb") as f:
++        data = f.read().replace(b"\r\n", b"\n")
++    if data.startswith(b"\xef\xbb\xbf"):
++        data = data[3:]
++    return hashlib.sha256(data).hexdigest()
++
++
++def copy_release(dest):
++    """Copy this repository's bridge/ to `dest` and stamp the copy as it stands, so a case judges the program's
++    logic on a tree that matches its manifest (the repository's own stamp is CI's step, not these cases')."""
++    shutil.copytree(SOURCE_RELEASE, str(dest), ignore=shutil.ignore_patterns("__pycache__"))
++    manifest_path = os.path.join(str(dest), "cursor-bridge", "MANIFEST.json")
++    with open(manifest_path, encoding="utf-8") as f:
++        manifest = json.load(f)
++    for rel in list(manifest.get("files", {})):
++        p = os.path.join(str(dest), *rel.split("/"))
++        if os.path.isfile(p):
++            manifest["files"][rel] = stamp_hash(p)
++    with open(manifest_path, "w", encoding="utf-8", newline="\n") as f:
++        json.dump(manifest, f, indent=2)
++        f.write("\n")
++    return dest
++
++
++def run(prog, tmp_path, *args, cwd=None):
++    env = dict(os.environ)
++    for name in ("LOCALAPPDATA", "APPDATA", "HOME", "USERPROFILE"):
++        folder = tmp_path / ("scratch-" + name.lower())
++        folder.mkdir(exist_ok=True)
++        env[name] = str(folder)
++    p = subprocess.run([sys.executable, str(prog)] + [str(a) for a in args], capture_output=True, text=True,
++                       errors="replace", env=env, cwd=str(cwd) if cwd else None)
++    return p.returncode, p.stdout + p.stderr
++
++
++def norm(text):
++    text = text.replace("\\", "/")
++    return text.lower() if sys.platform == "win32" else text
++
++
++def resolved(folder):
++    return norm(os.path.realpath(str(folder)))
++
++
++def names(text, folder):
++    """True where `text` names `folder`, resolved, in either separator (and any case on Windows)."""
++    return resolved(folder) in norm(text)
++
++
++def result_line(out, start):
++    lines = [ln for ln in out.splitlines() if ln.startswith(start)]
++    assert lines, "no line starting %r in:\n%s" % (start, out)
++    return lines[-1]
++
++
++def hashed_nothing(out):
++    for ln in out.splitlines():
++        s = ln.strip()
++        if ln.startswith("bridge-check:") and "OK," in ln:
++            return False
++        if s.split(" ")[0] in ("OK", "STALE", "MISSING", "EXTRA"):
++            return False
++    return True
++
++
++# ---------------------------------------------------------------- bridge-check.py --sources
++
++def test_r093_a_check_of_another_tree_is_refused_naming_both_folders(tmp_path):
++    a = copy_release(tmp_path / "A")
++    b = copy_release(tmp_path / "B")
++    rc, out = run(a / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", b, "--sources", "--quiet")
++    assert rc == 2, out
++    assert names(out, a / "cursor-bridge") and names(out, b / "cursor-bridge"), out
++    assert hashed_nothing(out), "the refusal comes before any file is hashed: " + out
++    assert "RESULT: SOURCES MATCH" not in out, out
++
++
++def test_r093_a_stale_other_tree_is_refused_not_judged(tmp_path):
++    a = copy_release(tmp_path / "A")
++    b = copy_release(tmp_path / "B")
++    with open(b / "commands" / "supervisor.md", "a", encoding="utf-8") as f:
++        f.write("\nedited after the stamp\n")
++    rc, out = run(a / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", b, "--sources", "--quiet")
++    assert rc == 2, "the other tree is refused, not judged stale: " + out
++    assert names(out, a / "cursor-bridge") and names(out, b / "cursor-bridge"), out
++    assert "STALE" not in out and hashed_nothing(out), out
++
++
++def test_r093_the_tree_the_program_stands_in_matches_and_its_result_names_the_folder(tmp_path):
++    tree = copy_release(tmp_path / "bridge")
++    rc, out = run(tree / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", tree, "--sources", "--quiet")
++    assert rc == 0, out
++    assert names(result_line(out, "RESULT: SOURCES MATCH"), tree / "cursor-bridge"), out
++
++
++@pytest.mark.parametrize("spelling", ["dot", "dotdot"])
++def test_r093_another_spelling_of_the_same_tree_is_not_refused(tmp_path, spelling):
++    tree = copy_release(tmp_path / "bridge")
++    prog = tree / "cursor-bridge" / "bridge-check.py"
++    if spelling == "dot":
++        rc, out = run(prog, tmp_path, "--root", ".", "--sources", "--quiet", cwd=tree)
++    else:
++        rc, out = run(prog, tmp_path, "--root", os.path.join(str(tree), "cursor-bridge", os.pardir), "--sources", "--quiet")
++    assert rc == 0, out
++    assert names(result_line(out, "RESULT: SOURCES MATCH"), tree / "cursor-bridge"), out
++
++
++def test_r093_an_unlisted_file_in_the_tree_it_stands_in_fails_with_the_folder_named(tmp_path):
++    tree = copy_release(tmp_path / "bridge")
++    (tree / "cursor-bridge" / "left-behind.md").write_text("x", encoding="utf-8")
++    rc, out = run(tree / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", tree, "--sources", "--quiet")
++    assert rc == 1 and "EXTRA    cursor-bridge/left-behind.md" in out, out
++    assert names(result_line(out, "RESULT: SOURCES DO NOT MATCH"), tree / "cursor-bridge"), out
++
++
++# ---------------------------------------------------------------- tools/make-manifest.py
++
++def test_r093_make_manifest_keeps_a_crlf_version_file_crlf(tmp_path):
++    repo = tmp_path / "repo"
++    (repo / "tools").mkdir(parents=True)
++    shutil.copy2(MAKE_MANIFEST, str(repo / "tools" / "make-manifest.py"))
++    copy_release(repo / "bridge")
++    version_file = repo / "bridge" / "cursor-bridge" / "VERSION"
++    manifest_file = repo / "bridge" / "cursor-bridge" / "MANIFEST.json"
++    version = version_file.read_bytes().decode("ascii").split()[0]
++    version_file.write_bytes(version.encode("ascii") + b"\r\n")
++    prog = repo / "tools" / "make-manifest.py"
++
++    rc, out = run(prog, tmp_path, "--version", version)
++    assert rc == 0, out
++    first = version_file.read_bytes()
++    assert first.endswith(b"\r\n") and b"\n" not in first.replace(b"\r\n", b""), first
++    first_entry = json.loads(manifest_file.read_text(encoding="utf-8"))["files"]["cursor-bridge/VERSION"]
++
++    rc, out = run(prog, tmp_path, "--version", version)
++    assert rc == 0, out
++    assert version_file.read_bytes() == first
++    second_entry = json.loads(manifest_file.read_text(encoding="utf-8"))["files"]["cursor-bridge/VERSION"]
++    assert second_entry == first_entry
++
++
++# ---------------------------------------------------------------- round 2 (the security audit of round 1)
++
++def link_folder(target, link):
++    """Make `link` a directory link to `target`: a junction on Windows, a symbolic link elsewhere."""
++    if sys.platform == "win32":
++        import _winapi
++        _winapi.CreateJunction(str(target), str(link))
++    else:
++        os.symlink(str(target), str(link), target_is_directory=True)
++
++
++def test_r093_r2_a_tree_whose_cursor_bridge_is_linked_into_the_program_tree_is_refused(tmp_path):
++    a = copy_release(tmp_path / "A")
++    x = tmp_path / "X"
++    x.mkdir()
++    for sub in os.listdir(str(a)):
++        if sub != "cursor-bridge":
++            src = a / sub
++            if src.is_dir():
++                shutil.copytree(str(src), str(x / sub), ignore=shutil.ignore_patterns("__pycache__"))
++            else:
++                shutil.copy2(str(src), str(x / sub))
++    link_folder(a / "cursor-bridge", x / "cursor-bridge")
++    rc, out = run(a / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", x, "--sources", "--quiet")
++    assert rc == 2, "X is another tree, whatever its cursor-bridge resolves to: " + out
++    assert names(out, a / "cursor-bridge") and resolved(x) in norm(out), out
++    assert hashed_nothing(out) and "SOURCES MATCH" not in out and "SOURCES DO NOT MATCH" not in out, out
++
++
++@pytest.mark.skipif(sys.platform != "win32", reason="a Windows device name")
++def test_r093_r2_a_device_name_as_root_is_refused_without_a_traceback(tmp_path):
++    a = copy_release(tmp_path / "A")
++    rc, out = run(a / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", "CON", "--sources", "--quiet")
++    assert rc == 2 and "Traceback" not in out, out
++    assert hashed_nothing(out) and "SOURCES MATCH" not in out, out
++
++
++def test_r093_r2_the_refusal_says_it_refused_and_names_both_folders(tmp_path):
++    a = copy_release(tmp_path / "tree A")
++    b = copy_release(tmp_path / "tree B")
++    rc, out = run(a / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", b, "--sources", "--quiet")
++    assert rc == 2, out
++    line = result_line(out, "RESULT: REFUSED")
++    assert names(line, a / "cursor-bridge") and resolved(b) in norm(line), line
++
++
++# ---------------------------------------------------------------- round 3 (both reviews of round 2)
++
++def tree_beside(a, x):
++    """Make tree `x` hold copies of every part of tree `a` but its cursor-bridge folder."""
++    x.mkdir()
++    for sub in os.listdir(str(a)):
++        if sub != "cursor-bridge":
++            src = a / sub
++            if src.is_dir():
++                shutil.copytree(str(src), str(x / sub), ignore=shutil.ignore_patterns("__pycache__"))
++            else:
++                shutil.copy2(str(src), str(x / sub))
++
++
++def test_r093_r3_a_program_reached_through_a_link_from_another_tree_is_refused_for_that_tree(tmp_path):
++    a = copy_release(tmp_path / "A")
++    x = tmp_path / "X"
++    tree_beside(a, x)
++    link_folder(a / "cursor-bridge", x / "cursor-bridge")
++    rc, out = run(x / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", x, "--sources", "--quiet")
++    assert rc == 2, "the program stands in A, whatever folder it was started through: " + out
++    assert result_line(out, "RESULT: REFUSED") and hashed_nothing(out), out
++
++
++def test_r093_r3_a_program_whose_own_folder_is_a_link_into_a_tree_checks_that_tree(tmp_path):
++    a = copy_release(tmp_path / "A")
++    y = tmp_path / "Y"
++    y.mkdir()
++    link_folder(a / "cursor-bridge", y / "cursor-bridge")
++    rc, out = run(y / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", a, "--sources", "--quiet")
++    assert rc == 0, "the program and its manifest are A's own: " + out
++    assert names(result_line(out, "RESULT: SOURCES MATCH"), a / "cursor-bridge"), out
++
++
++@pytest.mark.skipif(sys.platform != "win32", reason="a Windows device path")
++def test_r093_r3_a_folder_that_raises_while_resolved_is_refused_without_a_traceback(tmp_path):
++    a = copy_release(tmp_path / "A")
++    rc, out = run(a / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", "\\\\.\\CON\\sub", "--sources", "--quiet")
++    assert rc == 2 and "Traceback" not in out, out
++    assert result_line(out, "RESULT: REFUSED") and hashed_nothing(out), out
++
++
++def test_r093_r3_a_copy_of_the_program_in_a_folder_of_another_name_is_refused(tmp_path):
++    a = copy_release(tmp_path / "A")
++    shutil.copytree(str(a / "cursor-bridge"), str(a / "other"), ignore=shutil.ignore_patterns("__pycache__"))
++    rc, out = run(a / "other" / "bridge-check.py", tmp_path, "--root", a, "--sources", "--quiet")
++    assert rc == 2, "A's cursor-bridge is not checked against another folder's manifest: " + out
++    assert result_line(out, "RESULT: REFUSED") and hashed_nothing(out), out
++
++
++def test_r093_r3_a_folder_name_cannot_add_a_result_line(tmp_path):
++    a = copy_release(tmp_path / "A")
++    forged = str(tmp_path / "no-such") + "\nRESULT: SOURCES MATCH bridge 0"
++    rc, out = run(a / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", forged, "--sources", "--quiet")
++    assert rc == 2, out
++    results = [ln for ln in out.splitlines() if ln.startswith("RESULT:")]
++    assert len(results) == 1 and results[0].startswith("RESULT: REFUSED"), out
++
++
++def test_r093_r3_the_version_line_names_the_tree_checked_not_the_spelling_given(tmp_path):
++    """The supervisor's, added after round 3 for the mutation run: the files are read under the resolved --root,
++    which the version line names, not under the link the caller spelled."""
++    tree = copy_release(tmp_path / "bridge")
++    j = tmp_path / "J"
++    link_folder(tree, j)
++    rc, out = run(tree / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", j, "--sources", "--quiet")
++    assert rc == 0, out
++    line = result_line(out, "bridge-check: version")
++    assert resolved(tree) in norm(line) and norm(str(j)) not in norm(line), line
+diff --git a/tools/make-manifest.py b/tools/make-manifest.py
+index 134c1fc..6920fd0 100644
+--- a/tools/make-manifest.py
++++ b/tools/make-manifest.py
+@@ -88,8 +88,16 @@ def main():
+                 continue  # written below and hashed after
+             files[rel] = norm_hash(p)
+     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+-    with open(os.path.join(CB, "VERSION"), "w", encoding="utf-8", newline="\n") as f:
+-        f.write("%s\n" % version)
++    version_path = os.path.join(CB, "VERSION")
++    line_ending = b"\n"
++    if os.path.isfile(version_path):
++        with open(version_path, "rb") as f:
++            existing = f.read()
++        if existing.endswith(b"\r\n"):
++            line_ending = b"\r\n"
++    version_bytes = ("%s" % version).encode("utf-8") + line_ending
++    with open(version_path, "wb") as f:
++        f.write(version_bytes)
+     files["cursor-bridge/VERSION"] = norm_hash(os.path.join(CB, "VERSION"))
+     manifest = {"version": version, "generated": stamp, "files": dict(sorted(files.items()))}
+     with open(os.path.join(CB, "MANIFEST.json"), "w", encoding="utf-8", newline="\n") as f:
