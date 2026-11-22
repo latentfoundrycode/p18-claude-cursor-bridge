@@ -833,7 +833,7 @@ def _own_git_dir(ws):
         return None
     if not gitdir or gitdir.startswith("-") or "\x00" in gitdir:
         return None
-    if gitdir.startswith("//") or gitdir.startswith("\\\\"):
+    if (len(gitdir) >= 2 and gitdir[0] in "/\\" and gitdir[1] in "/\\"):
         return None
     if not os.path.isabs(gitdir):
         gitdir = os.path.normpath(os.path.join(ws, gitdir))
