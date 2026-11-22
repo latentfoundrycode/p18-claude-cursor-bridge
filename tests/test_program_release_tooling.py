@@ -16,6 +16,12 @@ The forms these tests pin:
   like any other tree; a `--root` that cannot be resolved (a Windows device name such as CON) is refused with exit 2
   and no traceback; the refusal's line begins `RESULT: REFUSED` and names both folders, readable where they hold
   spaces.
+- Round 3 (both reviews of round 2): the program's tree is where the program physically stands, the parent of its
+  own folder resolved, and that folder is named `cursor-bridge`; so a program reached through a link from another
+  tree is refused for that tree, a program whose own folder is a link into a tree checks that tree, and a copy of the
+  program in a folder of another name is refused; a folder that raises while it is resolved (`\\\\.\\CON\\<sub>` on
+  Windows) is refused with exit 2 and no traceback; a folder printed on the RESULT line cannot add a second RESULT
+  line (control characters escaped).
 - Not pinned: the wording of the refusal beyond `RESULT: REFUSED` and both folders; the message text around the
   folders on the RESULT line; which separator or letter case the folders are printed in. The check without --sources is held by
   tests/test_install_check.py and is not repeated here.
@@ -203,3 +209,62 @@ def test_r093_r2_the_refusal_says_it_refused_and_names_both_folders(tmp_path):
     assert rc == 2, out
     line = result_line(out, "RESULT: REFUSED")
     assert names(line, a / "cursor-bridge") and resolved(b) in norm(line), line
+
+
+# ---------------------------------------------------------------- round 3 (both reviews of round 2)
+
+def tree_beside(a, x):
+    """Make tree `x` hold copies of every part of tree `a` but its cursor-bridge folder."""
+    x.mkdir()
+    for sub in os.listdir(str(a)):
+        if sub != "cursor-bridge":
+            src = a / sub
+            if src.is_dir():
+                shutil.copytree(str(src), str(x / sub), ignore=shutil.ignore_patterns("__pycache__"))
+            else:
+                shutil.copy2(str(src), str(x / sub))
+
+
+def test_r093_r3_a_program_reached_through_a_link_from_another_tree_is_refused_for_that_tree(tmp_path):
+    a = copy_release(tmp_path / "A")
+    x = tmp_path / "X"
+    tree_beside(a, x)
+    link_folder(a / "cursor-bridge", x / "cursor-bridge")
+    rc, out = run(x / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", x, "--sources", "--quiet")
+    assert rc == 2, "the program stands in A, whatever folder it was started through: " + out
+    assert result_line(out, "RESULT: REFUSED") and hashed_nothing(out), out
+
+
+def test_r093_r3_a_program_whose_own_folder_is_a_link_into_a_tree_checks_that_tree(tmp_path):
+    a = copy_release(tmp_path / "A")
+    y = tmp_path / "Y"
+    y.mkdir()
+    link_folder(a / "cursor-bridge", y / "cursor-bridge")
+    rc, out = run(y / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", a, "--sources", "--quiet")
+    assert rc == 0, "the program and its manifest are A's own: " + out
+    assert names(result_line(out, "RESULT: SOURCES MATCH"), a / "cursor-bridge"), out
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="a Windows device path")
+def test_r093_r3_a_folder_that_raises_while_resolved_is_refused_without_a_traceback(tmp_path):
+    a = copy_release(tmp_path / "A")
+    rc, out = run(a / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", "\\\\.\\CON\\sub", "--sources", "--quiet")
+    assert rc == 2 and "Traceback" not in out, out
+    assert result_line(out, "RESULT: REFUSED") and hashed_nothing(out), out
+
+
+def test_r093_r3_a_copy_of_the_program_in_a_folder_of_another_name_is_refused(tmp_path):
+    a = copy_release(tmp_path / "A")
+    shutil.copytree(str(a / "cursor-bridge"), str(a / "other"), ignore=shutil.ignore_patterns("__pycache__"))
+    rc, out = run(a / "other" / "bridge-check.py", tmp_path, "--root", a, "--sources", "--quiet")
+    assert rc == 2, "A's cursor-bridge is not checked against another folder's manifest: " + out
+    assert result_line(out, "RESULT: REFUSED") and hashed_nothing(out), out
+
+
+def test_r093_r3_a_folder_name_cannot_add_a_result_line(tmp_path):
+    a = copy_release(tmp_path / "A")
+    forged = str(tmp_path / "no-such") + "\nRESULT: SOURCES MATCH bridge 0"
+    rc, out = run(a / "cursor-bridge" / "bridge-check.py", tmp_path, "--root", forged, "--sources", "--quiet")
+    assert rc == 2, out
+    results = [ln for ln in out.splitlines() if ln.startswith("RESULT:")]
+    assert len(results) == 1 and results[0].startswith("RESULT: REFUSED"), out
