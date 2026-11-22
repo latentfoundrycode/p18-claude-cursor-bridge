@@ -6,8 +6,8 @@
   "instruction_texts": ["bridge/"],
   "state": {
     "phase": "changing",
-    "stage": "the program release's stage P2 closed 2026-11-19 (its review approved by both, its demonstration 43 of 44, one expectation drawn), stage P1 2026-11-14, its design gate passed 2026-11-13 and the gate of its scoped revision for the field finding F7 on 2026-11-14, stage P3 next; before it release B2 complete 2026-11-11 (stage H2 closed, project end) and release S, the maintainer's, installed and calibrated 2026-11-12; Claude-Cursor Bridge 2026.11.12a",
+    "stage": "the program release's stage P3 closed 2026-11-22 (its review by both, one round, closed by BUG-047; its demonstration 33 of 33), stage P2 2026-11-19, stage P1 2026-11-14, stage P4 next; before it release B2 complete 2026-11-11 and release S, the maintainer's, installed and calibrated 2026-11-12; Claude-Cursor Bridge 2026.11.12a",
     "bridge": "2026.11.12a",
-    "updated": "2026-11-19"
+    "updated": "2026-11-22"
   }
 }
