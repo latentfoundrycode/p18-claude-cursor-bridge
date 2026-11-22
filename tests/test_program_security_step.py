@@ -1380,3 +1380,278 @@ def test_r097_pace_report_refuses_an_absent_projects_file_on_stderr(bench):
     assert "projects.json" in err, "the refusal is not on stderr:\nstdout:\n%s\nstderr:\n%s" % (out, err)
     assert "projects.json" not in out, "the refusal went to stdout:\n%s" % out
     assert rc == 2, "exit %r, not 2:\n%s%s" % (rc, out, err)
+
+
+# ================================================================ round 3: the supervisor's rulings (handoff/TASK-077-r3.md)
+
+
+def with_older_failed_jobs(r):
+    """Routes for the older run's (OLD_RUN) jobs: failed, its job's log as routes() gives it."""
+    r["repos/OWNER/REPO/actions/runs/%s/jobs" % OLD_RUN] = "security-jobs-failed-older.json"
+    return r
+
+
+# ---------------------------------------------------------------- Ruling 1: a later success clears the window's own finding
+
+
+@pytest.mark.parametrize("before", [None, 41000000001], ids=["no finding before", "a finding standing from before"])
+def test_r097_a_later_success_clears_the_windows_own_exit_1_finding(bench, before):
+    """The window [a success, an older failure whose log reads exit 1]: a completed run later than the failure ended success,
+    so no finding stands: green, no finding standing line, the ledger's finding_standing null; a finding standing from
+    before is cleared by the same success.
+    enforces: handoff/TASK-077-r3.md Ruling 1; handoff/TASK-077.md R6."""
+    one_project(bench, last_run_read=EARLY, finding=before)
+    rc, out = bench.run(with_older_failed_jobs(routes(runs="security-runs-success-after-failure.json", log="security-log-finding.json")))
+    sec = bench.section("Alpha", out)
+    assert not has(r"finding standing", sec), "a finding stands though a later run of the window ended success:\n%s" % sec
+    assert has(r"\bgreen\b", sec), "the week's last completed run (a success) with no finding standing is not green:\n%s" % sec
+    w = bench.window("Alpha")
+    assert w.get("finding_standing") is None, "the ledger's finding_standing is not null after a later success: %r" % w
+    assert w.get("last_run_read") == NEW_RUN_AT, "last_run_read is not the newest completed run's time: %r" % w
+
+
+# ---------------------------------------------------------------- Ruling 2: the newest exit-1 run stands
+
+
+def test_r097_of_two_exit_1_runs_the_newer_stands(bench):
+    """The window [a failure reading exit 1, an older failure reading exit 1], listed newest first as GitHub lists them: the
+    standing finding is the newer run's id, in the section and in the ledger as an int.
+    enforces: handoff/TASK-077-r3.md Ruling 2; handoff/TASK-077.md R6, R11."""
+    one_project(bench, last_run_read=EARLY)
+    rc, out = bench.run(with_older_failed_jobs(routes(runs="security-runs-two-failures.json", jobs="security-jobs-failed.json",
+                                                      log="security-log-finding.json")))
+    sec = bench.section("Alpha", out)
+    assert standing_line(NEW_RUN, sec), "the newer exit-1 run (%s) does not stand:\n%s" % (NEW_RUN, sec)
+    assert not standing_line(OLD_RUN, sec), "the older exit-1 run (%s) stands instead of the newer:\n%s" % (OLD_RUN, sec)
+    fs = bench.window("Alpha").get("finding_standing")
+    assert isinstance(fs, int) and not isinstance(fs, bool) and fs == int(NEW_RUN), "finding_standing is not the int %s: %r" % (NEW_RUN, fs)
+
+
+# ---------------------------------------------------------------- Ruling 3: a failed alerts read never replaces the scan's remedy
+
+
+ALERTS_FAIL_BESIDE = {
+    "a cancelled run, the open alerts list refused": (
+        dict(runs="security-runs-cancelled.json", alerts="security-forbidden.json"), r"scanner failure", [RERUN], "open alerts list"),
+    "an exit-1 finding, the alerts check refused": (
+        dict(runs="security-runs-failed.json", jobs="security-jobs-failed.json", log="security-log-finding.json",
+             vuln="security-forbidden.json"), r"\bfinding\b", ["DEP-"], "alerts check"),
+    "not configured, the alerts check refused": (
+        dict(workflows="security-workflows-absent.json", vuln="security-forbidden.json"), r"not configured", ["calibration"], "alerts check"),
+    "a disabled workflow, the open alerts list refused": (
+        dict(workflows="security-workflows-disabled.json", alerts="security-forbidden.json"), r"no completed run", [ENABLE, RERUN],
+        "open alerts list"),
+    "no run listed, the alerts check refused": (
+        dict(runs="security-runs-none.json", vuln="security-forbidden.json"), r"no completed run", [RERUN], "alerts check"),
+}
+
+
+@pytest.mark.parametrize("case", sorted(ALERTS_FAIL_BESIDE))
+def test_r097_a_failed_alerts_read_keeps_the_weeks_kind_and_its_remedy(bench, case):
+    """A failed alerts read (the alerts check or the open alerts list refused, 403) beside each kind of the week: the kind
+    and its own remedy kept (the rerun command, the DEP- increment, the calibration item, the enable then the rerun), and
+    the alerts failure's line and its remedy (the login's scope and the Security tab) beside them; the word finding present.
+    enforces: handoff/TASK-077-r3.md Ruling 3; handoff/TASK-077.md R6, R7, R9."""
+    kw, kind, remedies, read = ALERTS_FAIL_BESIDE[case]
+    one_project(bench)
+    rc, out = bench.run(routes(**kw))
+    sec = bench.section("Alpha", out)
+    for remedy in remedies:
+        assert remedy in sec, "%s: the week's own remedy `%s` was replaced:\n%s" % (case, remedy, sec)
+    assert has(kind, sec), "%s: the week's kind (%s) is not in the section:\n%s" % (case, kind, sec)
+    assert failure_line(sec, read, r"\b403\b"), "%s: no line names the %s's failure (403):\n%s" % (case, read, sec)
+    assert has(r"security tab", sec) and has(r"\bscope\b|gh auth refresh -s", sec), \
+        "%s: the alerts failure's remedy (the login's scope, the Security tab) is not in the section:\n%s" % (case, sec)
+    assert has(r"\bfinding\b", sec), "%s: a section holding a failed read lacks the word finding:\n%s" % (case, sec)
+    assert not has(r"\bgreen\b", sec), "%s reported green:\n%s" % (case, sec)
+
+
+# ---------------------------------------------------------------- Ruling 4: a standing finding never replaces the week's kind
+
+
+STANDING_BESIDE = {
+    "no run listed": (dict(runs="security-runs-none.json"), r"no completed run", [RERUN], []),
+    "only a run in progress": (dict(runs="security-runs-in-progress.json"), r"no completed run", [], [RERUN]),
+    "a scanner failure (cancelled)": (dict(runs="security-runs-cancelled.json"), r"scanner failure", [RERUN], []),
+    "a disabled workflow": (dict(workflows="security-workflows-disabled.json"), r"no completed run", [ENABLE, RERUN], []),
+}
+
+
+@pytest.mark.parametrize("case", sorted(STANDING_BESIDE))
+def test_r097_a_standing_finding_stands_beside_the_weeks_kind_with_its_dep_remedy(bench, case):
+    """A finding standing from before (run OLD) and a week of no run, only a run in progress, a cancelled run or a disabled
+    workflow: the week's kind with its own remedy (the rerun command; none for a run in progress; the enable then the
+    rerun), and beside it the finding standing line and its DEP- remedy.
+    enforces: handoff/TASK-077-r3.md Ruling 4; handoff/TASK-077.md R6."""
+    kw, kind, present, absent = STANDING_BESIDE[case]
+    one_project(bench, last_run_read=OLD_RUN_AT, finding=int(OLD_RUN))
+    rc, out = bench.run(routes(**kw))
+    sec = bench.section("Alpha", out)
+    assert has(kind, sec), "%s: the week's kind (%s) was replaced by the standing finding:\n%s" % (case, kind, sec)
+    for remedy in present:
+        assert remedy in sec, "%s: the week's remedy `%s` is not in the section:\n%s" % (case, remedy, sec)
+    for remedy in absent:
+        assert remedy not in sec, "%s: the remedy `%s` is in the section though the next Sunday reads the run:\n%s" % (case, remedy, sec)
+    assert standing_line(OLD_RUN, sec), "%s: the finding standing line (run %s) is not in the section:\n%s" % (case, OLD_RUN, sec)
+    assert "DEP-" in sec, "%s: the standing finding's DEP- remedy is not in the section:\n%s" % (case, sec)
+    assert not has(r"\bgreen\b", sec), "%s reported green:\n%s" % (case, sec)
+
+
+# ---------------------------------------------------------------- Ruling 5: no reply and no seed row ends in a traceback
+
+
+def test_r097_a_run_time_without_an_offset_is_a_failed_runs_read(bench):
+    """A listed run whose created_at holds no UTC offset (2026-11-15T13:54:53): no traceback, a failed read of the runs list
+    (reply could not be parsed), never green, the ledger entry as it stood.
+    enforces: handoff/TASK-077-r3.md Ruling 5; handoff/TASK-077.md R7, R11."""
+    one_project(bench)
+    rc, out = run_caught(bench, routes(runs="security-runs-naive-time.json"))
+    assert "Traceback" not in out, "a run time without an offset ended in a traceback:\n%s" % out
+    sec = bench.section("Alpha", out)
+    assert failure_line(sec, r"runs list", r"pars"), "the runs list is not a failed read (reply could not be parsed):\n%s" % sec
+    assert not has(r"\bgreen\b", sec), "a failed read reported green:\n%s" % sec
+    assert bench.window("Alpha") == {"last_run_read": OLD_RUN_AT, "finding_standing": None}, \
+        "the ledger entry changed after a failed runs read: %r" % bench.window("Alpha")
+
+
+SEED_NAIVE = """# Evaluation of 2026-11-15
+
+## 5. Dependency scan
+
+| Project | Repository | Workflow | Kind | last run read | Remedy |
+|---|---|---|---|---|---|
+| The alpha project | `OWNER/REPO` | `dependency-scan` active | **green** | `last run read: 2026-11-15T13:54:53` | none |
+| The bravo project | `OWNER/OTHER` | `dependency-scan` active | **green** | `last run read: 2026-11-15` | none |
+"""
+
+
+def test_r097_a_seed_row_without_an_offset_seeds_nothing(bench):
+    """--seed-from rows whose last run read is a time without an offset (2026-11-15T13:54:53) or a bare date (2026-11-15):
+    no traceback, exit 0, each row seeds nothing, so each project's window falls back as an unseeded project's (the runs
+    created on a later day than _meta.last_extract, 2026-11-15: none, so no completed run and last_run_read null).
+    enforces: handoff/TASK-077-r3.md Ruling 5; handoff/TASK-077.md R11, R13."""
+    alpha = bench.project("Alpha", "https://github.com/OWNER/REPO.git")
+    bravo = bench.project("Bravo", "https://github.com/OWNER/OTHER.git")
+    bench.write_projects({"Alpha": alpha, "Bravo": bravo})
+    bench.write_ledger(None)
+    sample = bench.tmp / "2026-11-15.md"
+    sample.write_text(SEED_NAIVE, encoding="utf-8")
+    r = routes("OWNER/REPO")
+    r.update(routes("OWNER/OTHER"))
+    rc, out = run_caught(bench, r, "--seed-from", str(sample))
+    assert "Traceback" not in out, "a seed row without an offset ended in a traceback:\n%s" % out
+    assert rc == 0, "exit %r, not 0:\n%s" % (rc, out)
+    for name in ("Alpha", "Bravo"):
+        sec = bench.section(name, out)
+        assert has(r"no completed run", sec), "%s's row seeded a window (it must seed nothing):\n%s" % (name, sec)
+        assert bench.window(name).get("last_run_read") is None, "%s's window is not an unseeded one: %r" % (name, bench.window(name))
+
+
+def test_r097_a_ledger_time_without_an_offset_is_treated_as_null(bench):
+    """The ledger's last_run_read without an offset (2026-11-15T13:54:53): no traceback, treated as null, so every listed
+    run is of the window: green, last_run_read the newest run's time.
+    enforces: handoff/TASK-077-r3.md Ruling 5; handoff/TASK-077.md R11."""
+    one_project(bench, last_run_read="2026-11-15T13:54:53")
+    rc, out = run_caught(bench, routes())
+    assert "Traceback" not in out, "a ledger time without an offset ended in a traceback:\n%s" % out
+    sec = bench.section("Alpha", out)
+    assert has(r"\bgreen\b", sec), "a naive last_run_read was not treated as null (every listed run read):\n%s" % sec
+    assert bench.window("Alpha").get("last_run_read") == NEW_RUN_AT, "the window after a null start: %r" % bench.window("Alpha")
+
+
+BAD_SHAPES = {
+    "an alert whose dependency is a string": (dict(alerts="security-alerts-dependency-string.json"), r"open alerts list", True),
+    "an alert whose security_advisory is a list": (dict(alerts="security-alerts-advisory-list.json"), r"open alerts list", True),
+    "an alert whose package name is a number": (dict(alerts="security-alerts-package-name-int.json"), r"open alerts list", True),
+    "a workflow whose path is a number": (dict(workflows="security-workflows-path-int.json"), r"workflows list", False),
+    "a workflow whose state is a number": (dict(workflows="security-workflows-state-int.json"), r"workflows list", False),
+}
+
+
+@pytest.mark.parametrize("case", sorted(BAD_SHAPES))
+def test_r097_a_field_of_the_wrong_type_is_a_failed_read(bench, case):
+    """An alert whose dependency or security_advisory is not an object or whose package name is not a string; a workflow
+    whose path or state is not a string: no traceback, a failed read of that list (reply could not be parsed), never the
+    no-alert line for an alerts reply, never green.
+    enforces: handoff/TASK-077-r3.md Ruling 5; handoff/TASK-077.md R7."""
+    kw, read, alerts = BAD_SHAPES[case]
+    one_project(bench)
+    rc, out = run_caught(bench, routes(**kw))
+    assert "Traceback" not in out, "%s ended in a traceback:\n%s" % (case, out)
+    sec = bench.section("Alpha", out)
+    assert failure_line(sec, read, r"pars"), "%s is not a failed read of the %s (reply could not be parsed):\n%s" % (case, read, sec)
+    if alerts:
+        assert not says_no_alert_open(sec), "%s was read as no alert open:\n%s" % (case, sec)
+        assert has(r"security tab", sec), "%s: the remedy does not name the Security tab:\n%s" % (case, sec)
+    assert not has(r"\bgreen\b", sec), "%s reported green:\n%s" % (case, sec)
+    assert_clean_file(bench, out)
+
+
+# ---------------------------------------------------------------- Ruling 6: a body without its list
+
+
+NO_LIST = {
+    "a runs body without workflow_runs": (dict(runs="security-runs-no-list.json"), r"runs list"),
+    "a jobs body without jobs": (dict(runs="security-runs-failed.json", jobs="security-jobs-no-list.json"), r"jobs list"),
+}
+
+
+@pytest.mark.parametrize("case", sorted(NO_LIST))
+def test_r097_a_body_without_its_list_is_a_failed_read(bench, case):
+    """A runs body without a workflow_runs list ({"total_count": 0}), or a failed run's jobs body without a jobs list: a
+    failed read of that list (reply could not be parsed), never the no completed run section with only the rerun command.
+    enforces: handoff/TASK-077-r3.md Ruling 6; handoff/TASK-077.md R7."""
+    kw, read = NO_LIST[case]
+    one_project(bench)
+    rc, out = run_caught(bench, routes(**kw))
+    assert "Traceback" not in out, out
+    sec = bench.section("Alpha", out)
+    assert failure_line(sec, read, r"pars"), "%s is not a failed read of the %s (reply could not be parsed):\n%s" % (case, read, sec)
+    assert not has(r"no completed run", sec), "%s was read as no run listed:\n%s" % (case, sec)
+    assert not has(r"\bgreen\b", sec), "%s reported green:\n%s" % (case, sec)
+    assert bench.window("Alpha") == {"last_run_read": OLD_RUN_AT, "finding_standing": None}, \
+        "the ledger entry changed after a failed read: %r" % bench.window("Alpha")
+
+
+# ---------------------------------------------------------------- Ruling 7: the origin read only where Workspace/.git exists
+
+
+def test_r097_a_workspace_without_git_inside_another_repository_is_no_remote(bench):
+    """A project whose Workspace folder holds no .git, inside an enclosing git repository whose origin is OWNER/DECOY: no
+    remote, and no git call and no gh call made for it (the enclosing repository is never read as the project's).
+    enforces: handoff/TASK-077-r3.md Ruling 7; handoff/TASK-077.md R4."""
+    enclosing = bench.tmp / "enclosing"
+    enclosing.mkdir()
+    bench.git(enclosing, "init", "-q")
+    bench.git(enclosing, "remote", "add", "origin", "https://github.com/OWNER/DECOY.git")
+    root = enclosing / "alpha-root"
+    (root / "Workspace").mkdir(parents=True)
+    bench.write_projects({"Alpha": root})
+    bench.write_ledger({"Alpha": {"last_run_read": OLD_RUN_AT, "finding_standing": None}})
+    seen = record_git_calls(bench)
+    r = routes()
+    r.update(routes("OWNER/DECOY"))
+    rc, out = bench.run(r)
+    assert bench.calls() == [], "a gh call was made for a Workspace with no .git: %r" % bench.calls()
+    assert not seen, "a git call was made for a Workspace with no .git: %r" % [argv for argv, _ in seen]
+    sec = bench.section("Alpha", out)
+    assert has(r"no remote", sec), "a Workspace with no .git is not no remote:\n%s" % sec
+    assert "DECOY" not in sec, "the enclosing repository was reported as the project's:\n%s" % sec
+
+
+def test_r097_a_workspace_whose_git_is_a_file_still_reads_its_origin(bench):
+    """A Workspace whose .git is a file (a gitdir file, as a worktree or a separate git dir has): its origin is still read,
+    OWNER/REPO, green.
+    enforces: handoff/TASK-077-r3.md Ruling 7; handoff/TASK-077.md R4."""
+    root = bench.tmp / "projects" / "alpha-root"
+    ws = root / "Workspace"
+    ws.mkdir(parents=True)
+    bench.git(bench.tmp, "init", "-q", "--separate-git-dir", str(bench.tmp / "alpha-gitdir"), str(ws))
+    assert (ws / ".git").is_file(), "test setup: the Workspace's .git is not a file"
+    bench.git(ws, "remote", "add", "origin", "https://github.com/OWNER/REPO.git")
+    bench.write_projects({"Alpha": root})
+    bench.write_ledger({"Alpha": {"last_run_read": OLD_RUN_AT, "finding_standing": None}})
+    rc, out = bench.run(routes())
+    sec = bench.section("Alpha", out)
+    assert not has(r"no remote", sec), "a Workspace whose .git is a file was read as no remote:\n%s" % sec
+    assert "OWNER/REPO" in sec and has(r"\bgreen\b", sec), "the Workspace's origin (OWNER/REPO) was not read:\n%s" % sec
