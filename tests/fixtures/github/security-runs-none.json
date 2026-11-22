@@ -1,0 +1,12 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-22 from the captured security-runs.json (TASK-077): total_count 0 and workflow_runs emptied: no run in the window",
+ "request": "repos/OWNER/REPO/actions/workflows/dependency-scan.yml/runs?created=>=2026-11-08",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "total_count": 0,
+  "workflow_runs": []
+ }
+}

@@ -69,7 +69,7 @@ own manifest and nothing more: a source tree has no settings.json, since the own
 not part of it, and the shim is a matter of the machine a release is installed on. In a
 source tree a file the manifest does not list (EXTRA) fails the check as well.
 Exit:   0 = every manifest file OK; 1 = at least one STALE or MISSING;
-        2 = manifest unreadable.  ASCII-only on purpose (cp1252 consoles).
+        2 = manifest unreadable, or under --sources the program does not stand in the tree it checks, or its folder is not named cursor-bridge, or a folder cannot be resolved.  ASCII-only on purpose (cp1252 consoles).
 ```
 
 ## bridge-install.py
@@ -464,6 +464,14 @@ evaluate-reports: the report cycle's program (restructuring plan, section 12; re
 - `--out`; default: null; required: false
 - `--since`; default: null; required: false; a date; default the ledger's last extract, else the newest evaluation folder
 
+### Subcommand `security`
+
+#### Options
+
+- `-h --help`; default: "==SUPPRESS=="; required: false; show this help message and exit
+- `--date`; default: null; required: false; evaluation date YYYY-MM-DD (default today)
+- `--seed-from`; default: null; required: false; hand-written evaluation file to seed the window
+
 ## in-flight.py
 
 Path: `bridge/cursor-bridge/in-flight.py`
@@ -625,7 +633,7 @@ Weekly pace table per project (read-only).
 
 ### Positionals
 
-- `roots`; default: null; required: false; project roots (default: evaluate-reports project list)
+- `roots`; default: null; required: false; project roots (default: ~/.cursor-bridge/projects.json)
 
 ### Options
 
@@ -972,6 +980,8 @@ profile's three families must be distinct. The result is written to
 docs/ROSTER.resolved.json for the delegate and Review B commands to read, and only when it
 changes (the time of every check goes to the state file as last_resolved), so a check
 before a snapshot leaves the tree clean.
+When the Cursor tool itself is signed out, its own sign-in line (the whole of standard output,
+or any whole line of standard error) ends the run with SIGN-IN, exit 5, and counts no failure.
 The family rule governs Review B only (2026.10.25a): Review B is never of the family of the
 last builder run of the branch under review (none for a branch with no builder run). When
 the chosen profile's Review B is of that family - the change in flight was built under
@@ -1003,7 +1013,7 @@ unavailable marks and failure counts, and says so. Timestamps are UTC. ROSTER_NO
 overrides "now" for tests.
 Exit 0 = resolved; 1 = no usable profile, a family collision, or a command mismatch;
 2 = cannot read or a wrong model argument; 3 = pool/model marked exhausted, re-resolve;
-4 = transient, retry once; 5 = repeated connection failures or time-outs, tell the owner.
+4 = transient, retry once; 5 = repeated connection failures or time-outs, or the Cursor tool signed out (SIGN-IN), tell the owner.
 ASCII-only on purpose.
 ```
 

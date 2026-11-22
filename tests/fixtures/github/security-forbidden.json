@@ -1,0 +1,12 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-22 from the captured security-workflows.json (TASK-077): status, gh_exit, gh_stderr and body replaced as protection-unreadable.json shows: a read the login is refused (HTTP 403), served by the tests for whichever read they refuse",
+ "request": "repos/OWNER/REPO/actions/workflows",
+ "status": 403,
+ "gh_exit": 1,
+ "gh_stderr": "gh: Resource not accessible by integration (HTTP 403)",
+ "body": {
+  "message": "Resource not accessible by integration",
+  "status": "403"
+ }
+}

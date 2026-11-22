@@ -1,0 +1,25 @@
+{
+ "fixture": "captured",
+ "note": "captured 2026-11-22 from this repository by the supervisor (TASK-077; gh 2.97.0, gh api GET); cut to the fields read",
+ "request": "repos/OWNER/REPO/actions/workflows",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": {
+  "total_count": 2,
+  "workflows": [
+   {
+    "id": 405069030,
+    "name": "dependency-scan",
+    "path": ".github/workflows/dependency-scan.yml",
+    "state": "active"
+   },
+   {
+    "id": 374570417,
+    "name": "tests",
+    "path": ".github/workflows/tests.yml",
+    "state": "active"
+   }
+  ]
+ }
+}

@@ -1,0 +1,12 @@
+{
+ "fixture": "built",
+ "note": "built 2026-11-22 from the captured security-alerts-none.json (TASK-077 round 2): the body replaced by the array [1, 2]: an array whose items are not objects",
+ "request": "repos/OWNER/REPO/dependabot/alerts?state=open",
+ "status": 200,
+ "gh_exit": 0,
+ "gh_stderr": "",
+ "body": [
+  1,
+  2
+ ]
+}

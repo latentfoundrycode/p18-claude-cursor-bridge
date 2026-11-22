@@ -2,7 +2,13 @@
 settings and denied by none of its deny rules; the deny rules must catch what they are for.
 Commands are collected from the fenced bash blocks and the inline code of supervisor.md, its phase
 modules (TASK-010), and the merge policy. A placeholder such as <nnn> or <sha> is kept as text: a rule that
-needs the placeholder's position to be a space is a rule that cannot match in practice."""
+needs the placeholder's position to be a space is a rule that cannot match in practice.
+
+The mark `<!-- not run -->` (R-096): an inline command on a line that carries it is not collected. It is for a
+command an instruction quotes as an example and does not instruct, so the text need not reword it to escape the
+check. The mark is a line's, not a command's: a line that instructs any command never carries it, and a marked line
+holding more than one inline command is refused, so a mark never hides an instructed command beside its example.
+The two skip lists below keep what they hold."""
 import json
 import os
 import re
@@ -23,19 +29,35 @@ EXECUTABLES = ("git ", "gh ", "python ~/.claude/", "cursor-agent ", "npx ", "sem
                "pytest ", "cat ~/.claude/", "powershell -NoProfile")
 
 
+NOT_RUN = "<!-- not run -->"
+
+
+def commands_in(text, src):
+    """The commands one text issues: each runnable line of its fenced bash blocks, and each inline command on a line
+    that does not carry NOT_RUN (R-096). An inline command never spans a line, so reading it line by line finds what
+    reading the whole text finds."""
+    found = []
+    for m in re.finditer(r"```(?:bash|sh)\n(.*?)```", text, re.S):
+        for line in m.group(1).splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and line.startswith(EXECUTABLES):
+                found.append((src, line))
+    for text_line in text.split("\n"):
+        cmds = [m.group(1).strip() for m in re.finditer(r"`([^`\n]+)`", text_line)]
+        cmds = [cmd for cmd in cmds if cmd.startswith(EXECUTABLES) and " " in cmd and len(cmd) < 220]
+        if NOT_RUN in text_line:
+            if len(cmds) > 1:
+                raise ValueError("%s: a line carrying %s holds %d commands; the mark is for a line that quotes one "
+                                 "example: %r" % (src, NOT_RUN, len(cmds), cmds))
+            continue
+        found.extend((src, cmd) for cmd in cmds)
+    return found
+
+
 def collect_commands():
     found = []
     for path in DOCS:
-        text = open(path, encoding="utf-8").read()
-        for m in re.finditer(r"```(?:bash|sh)\n(.*?)```", text, re.S):
-            for line in m.group(1).splitlines():
-                line = line.strip()
-                if line and not line.startswith("#") and line.startswith(EXECUTABLES):
-                    found.append((os.path.basename(path), line))
-        for m in re.finditer(r"`([^`\n]+)`", text):
-            cmd = m.group(1).strip()
-            if cmd.startswith(EXECUTABLES) and " " in cmd and len(cmd) < 220:
-                found.append((os.path.basename(path), cmd))
+        found.extend(commands_in(open(path, encoding="utf-8").read(), os.path.basename(path)))
     # the same command text appears many times; test each once
     seen, out = set(), []
     for src, cmd in found:
@@ -113,6 +135,21 @@ def test_no_instructed_command_is_refused_by_the_guard(src, cmd, program, monkey
     reason = guard.check(runnable, None)
     assert reason is None, "%s instructs %r, which the guard refuses: %s" % (src, cmd, reason)
 
+
+def test_r096_an_inline_command_on_a_line_marked_not_run_is_not_collected():
+    """R-096 (TASK-076): the collector keeps an inline command on an unmarked line and skips one on a line that
+    carries the mark, so an instruction can quote a command as an example without the check reading it as issued."""
+    text = ("Before you start, run `git status --short` and read what it prints.\n"
+            "A command never to run, quoted as an example: `git push --force origin main` " + NOT_RUN + "\n")
+    assert [cmd for _src, cmd in commands_in(text, "sample.md")] == ["git status --short"]
+
+
+def test_r096_a_marked_line_holding_two_commands_is_refused():
+    """R-096 (TASK-076, Review A): the mark is a line's, so a marked line holding an instructed command beside its
+    example would hide that command from the check; such a line is refused, never read silently."""
+    text = ("Run `git fetch -q origin main:main`, never `git push --force origin main` " + NOT_RUN + "\n")
+    with pytest.raises(ValueError, match="holds 2 commands"):
+        commands_in(text, "sample.md")
 
 def test_documented_matching_examples():
     assert rule_matches("Bash(git log * main)", "git log --oneline main")

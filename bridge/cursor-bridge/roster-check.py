@@ -29,6 +29,8 @@ profile's three families must be distinct. The result is written to
 docs/ROSTER.resolved.json for the delegate and Review B commands to read, and only when it
 changes (the time of every check goes to the state file as last_resolved), so a check
 before a snapshot leaves the tree clean.
+When the Cursor tool itself is signed out, its own sign-in line (the whole of standard output,
+or any whole line of standard error) ends the run with SIGN-IN, exit 5, and counts no failure.
 The family rule governs Review B only (2026.10.25a): Review B is never of the family of the
 last builder run of the branch under review (none for a branch with no builder run). When
 the chosen profile's Review B is of that family - the change in flight was built under
@@ -60,7 +62,7 @@ unavailable marks and failure counts, and says so. Timestamps are UTC. ROSTER_NO
 overrides "now" for tests.
 Exit 0 = resolved; 1 = no usable profile, a family collision, or a command mismatch;
 2 = cannot read or a wrong model argument; 3 = pool/model marked exhausted, re-resolve;
-4 = transient, retry once; 5 = repeated connection failures or time-outs, tell the owner.
+4 = transient, retry once; 5 = repeated connection failures or time-outs, or the Cursor tool signed out (SIGN-IN), tell the owner.
 ASCII-only on purpose.
 """
 import datetime
@@ -86,6 +88,20 @@ STATE_KEYS = ("other_pool", "exhausted_at", "exhausted_reason", "auto_exhausted_
 NL = chr(10)
 PROBE_PROMPT = "Reply with exactly the single word OK and nothing else."
 PROBE_TIMEOUT = 150
+SIGN_IN_PREFIX = "Error: Authentication required. Please run 'agent login' first"
+SIGN_IN_LINE = "SIGN-IN  the Cursor command-line tool is signed out: run cursor-agent login"
+
+
+class _ProbeSignInSentinel(object):
+    """Distinct falsy value probe returns when the Cursor tool is signed out (not ok, not False)."""
+
+    __slots__ = ()
+
+    def __bool__(self):
+        return False
+
+
+PROBE_SIGN_IN = _ProbeSignInSentinel()  # falsy sentinel; main() tests ``ok is PROBE_SIGN_IN``
 
 FAMILY_PREFIXES = [
     ("claude", "anthropic"), ("anthropic", "anthropic"),
@@ -174,11 +190,51 @@ def cursor_agent_cmd():
     return bridge_env.cursor_agent_launcher()
 
 
+_TRIM_EDGES = " \t\r\n"
+
+
+def _lf_lines(text):
+    if not text:
+        return []
+    return text.split(NL)
+
+
+def _trim_line_edges(line):
+    return line.strip(_TRIM_EDGES)
+
+
+def _line_starts_with_sign_in(line):
+    return _trim_line_edges(line).startswith(SIGN_IN_PREFIX)
+
+
+def tool_sign_in_on_stderr(text):
+    """True when any whole line of standard error is the tool's sign-in line."""
+    for line in _lf_lines(text):
+        if _line_starts_with_sign_in(line):
+            return True
+    return False
+
+
+def tool_sign_in_on_stdout(text):
+    """True when standard output is only the tool's sign-in line (one non-empty trimmed line)."""
+    non_empty = []
+    for line in _lf_lines(text):
+        trimmed = _trim_line_edges(line)
+        if trimmed:
+            non_empty.append(trimmed)
+    return len(non_empty) == 1 and non_empty[0].startswith(SIGN_IN_PREFIX)
+
+
+def _ascii_line(text):
+    return (text or "").encode("ascii", errors="backslashreplace").decode("ascii")
+
+
 def probe(model_id):
     """Return (ok, detail). ok when the model replied 'OK' (case-insensitive) within the timeout, or
     replied something else that is not a usage-limit message: answered off-script, so the model is
     there (2026.10.25a: a sentence instead of the word printed FAIL, which sends the owner to buy
-    usage). A refusal (non-zero exit), an empty reply, a time-out or a usage-limit message is not ok."""
+    usage). A refusal (non-zero exit), an empty reply, a time-out or a usage-limit message is not ok.
+    When the Cursor tool is signed out, ok is PROBE_SIGN_IN (falsy, tested by identity in main())."""
     launcher = cursor_agent_cmd()
     if launcher is None:
         return False, "cursor-agent not found (PATH or %LOCALAPPDATA%/cursor-agent)"
@@ -188,21 +244,23 @@ def probe(model_id):
         return False, str(e)
     try:
         p = subprocess.run(launcher + ["-p", "-f", "--model", model_id, PROBE_PROMPT],
-                           capture_output=True, text=True, timeout=PROBE_TIMEOUT, creationflags=NO_WINDOW,
-                           env=env)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           timeout=PROBE_TIMEOUT, creationflags=NO_WINDOW, env=env)
     except subprocess.TimeoutExpired:
         return False, "timeout after %ds" % PROBE_TIMEOUT
     except FileNotFoundError:
         return False, "cursor-agent launcher not executable: %s" % launcher[0]
+    if tool_sign_in_on_stdout(p.stdout or "") or tool_sign_in_on_stderr(p.stderr or ""):
+        return PROBE_SIGN_IN, ""
     out = (p.stdout or "").strip()
     if p.returncode == 0 and out.strip().strip(".").upper() == "OK":
         return True, "answered"
     if (p.returncode == 0 and out and classify_failure(out + " " + (p.stderr or ""))[0] == "OTHER"
             and not re.search(r"(?i)\b(error|exception|failed|failure|traceback|unavailable|not available|denied|unauthori[sz]ed|forbidden"
                               r"|invalid|not found|unknown model|cannot use|not supported)\b", out)):
-        return True, "answered off-script: %r" % out.replace(NL, " ")[:80]
+        return True, "answered off-script: %a" % out.replace(NL, " ")[:80]
     err =(p.stderr or "").strip().replace("\n", " ")[:200]
-    return False, "exit %d; stdout=%r; stderr=%r" % (p.returncode, out[:80], err)
+    return False, "exit %d; stdout=%a; stderr=%a" % (p.returncode, out[:80], err)
 
 
 def now_utc():
@@ -372,10 +430,14 @@ def expire_unavailable(roster):
     return dropped
 
 
-def record_failure(path, roster, model, text):
+def record_failure(path, roster, model, stderr_text="", stdout_text=""):
     """Mark the model's pool exhausted on a usage-limit message or a second consecutive
     failure within FAILURE_WINDOW_HOURS; a connection error is transient and never counted;
-    otherwise count it. Writes the roster. Returns the exit code (2, 3 or 4)."""
+    otherwise count it. Writes the roster. Returns the exit code (2, 3, 4 or 5)."""
+    if tool_sign_in_on_stderr(stderr_text) or tool_sign_in_on_stdout(stdout_text):
+        print(SIGN_IN_LINE)
+        return 5
+    text = stderr_text + stdout_text
     if model not in roster_models(roster):
         print("CANNOT RECORD: %r is not a model in this roster (%s)" % (model, ", ".join(sorted(roster_models(roster)))))
         print("               the argument after --record-failure must be the model id of the failed call; nothing was changed")
@@ -384,6 +446,7 @@ def record_failure(path, roster, model, text):
     now = now_utc()
     when = stamp(now)
     excerpt = (text or "").strip().replace(NL, " ")[:300]
+    excerpt_out = _ascii_line(excerpt)
     if kind == "CONNECTION":
         conn = roster.setdefault("connection_failures", {})
         prev = conn.get(model)
@@ -397,10 +460,10 @@ def record_failure(path, roster, model, text):
         if count > CONNECTION_RETRIES:
             print("ESCALATE   %s: connection failure or time-out %d times in %d hours (%s)." % (model, count, FAILURE_WINDOW_HOURS, pat))
             print("           Not a model problem, so no switch: stop the step, write it on the Awaiting user on: line, and tell the owner.")
-            print("           excerpt: %s" % excerpt)
+            print("           excerpt: %s" % excerpt_out)
             return 5
         print("TRANSIENT  %s: connection error or time-out (%s), %d of %d - retry the same step once." % (model, pat, count, CONNECTION_RETRIES))
-        print("           excerpt: %s" % excerpt)
+        print("           excerpt: %s" % excerpt_out)
         return 4
     failures = roster.setdefault("failures", {})
     prev = failures.get(model)
@@ -430,7 +493,7 @@ def record_failure(path, roster, model, text):
         code = 3
     else:
         print("TRANSIENT  %s: first failure in %d hours, not a usage-limit message - retry the same step once." % (model, FAILURE_WINDOW_HOURS))
-        print("           excerpt: %s" % excerpt)
+        print("           excerpt: %s" % excerpt_out)
         code = 4
     save_state(path, roster)
     return code
@@ -466,14 +529,19 @@ def main():
         return 0
     if "--record-failure" in argv:
         model = argv[argv.index("--record-failure") + 1]
-        text = ""
-        for flag in ("--stderr-file", "--stdout-file"):
+        stderr_text = ""
+        stdout_text = ""
+        for flag, slot in (("--stderr-file", "stderr"), ("--stdout-file", "stdout")):
             if flag in argv and argv.index(flag) + 1 < len(argv):
                 try:
-                    text += open(argv[argv.index(flag) + 1], encoding="utf-8", errors="replace").read() + "\n"
+                    chunk = open(argv[argv.index(flag) + 1], encoding="utf-8", errors="replace").read() + "\n"
+                    if slot == "stderr":
+                        stderr_text = chunk
+                    else:
+                        stdout_text = chunk
                 except OSError:
                     pass
-        return record_failure(path, roster, model, text)
+        return record_failure(path, roster, model, stderr_text, stdout_text)
 
     if "--record-success" in argv:
         model = argv[argv.index("--record-success") + 1]
@@ -553,6 +621,10 @@ def main():
             usable = True
             for role, mid in (("builder", b_id), ("review_b", r_id)):
                 ok, detail = probe(mid)
+                if ok is PROBE_SIGN_IN:
+                    print("    probe %-8s %s: tool sign-in required" % (role, mid))
+                    print(SIGN_IN_LINE)
+                    return 5
                 print("    probe %-8s %s: %s" % (role, mid, detail))
                 if not ok:
                     usable = False
