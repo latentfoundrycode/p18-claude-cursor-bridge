@@ -500,23 +500,6 @@ def github_repo_from_url(url):
     return None
 
 
-def _git_env():
-    env = os.environ.copy()
-    env["GIT_OPTIONAL_LOCKS"] = "0"
-    env["GIT_NO_LAZY_FETCH"] = "1"
-    for key in (
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_COMMON_DIR",
-        "GIT_NAMESPACE",
-    ):
-        env.pop(key, None)
-    return env
-
-
 def git_origin_repo(project_root):
     ws = os.path.join(project_root, "Workspace")
     git_dir = os.path.join(ws, ".git")
@@ -531,7 +514,7 @@ def git_origin_repo(project_root):
             creationflags=bridge_env.NO_WINDOW,
             timeout=GIT_REMOTE_LIMIT,
             text=True,
-            env=_git_env(),
+            env=bridge_env.git_read_env(),
         )
     except (subprocess.TimeoutExpired, OSError):
         return None

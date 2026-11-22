@@ -100,15 +100,6 @@ import bridge_env
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 GIT_LIMIT = 120
 _IN_FLIGHT_CAP = 8 * 1024 * 1024
-_REVIEWERS = (
-    "review-a",
-    "review-b",
-    "security-auditor",
-    "design-auditor",
-    "plan-critic",
-    "design-critic-b",
-    "supervisor",
-)
 _PASS_RX = re.compile(
     r"^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}Z) PASS ([A-Z][A-Za-z0-9-]*)(?: r([0-9]+))? ([a-z0-9-]+)(?: (.+))?$"
 )
@@ -196,23 +187,6 @@ def _parse_run_time(text):
         return None
 
 
-def _git_env():
-    env = os.environ.copy()
-    env["GIT_OPTIONAL_LOCKS"] = "0"
-    env["GIT_NO_LAZY_FETCH"] = "1"
-    for key in (
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_COMMON_DIR",
-        "GIT_NAMESPACE",
-    ):
-        env.pop(key, None)
-    return env
-
-
 def _git(ws, args, diff_output=False, as_bytes=False):
     cmd = [
         "git",
@@ -240,7 +214,7 @@ def _git(ws, args, diff_output=False, as_bytes=False):
                 capture_output=True,
                 creationflags=NO_WINDOW,
                 timeout=GIT_LIMIT,
-                env=_git_env(),
+                env=bridge_env.git_read_env(),
             )
         else:
             p = subprocess.run(
@@ -251,7 +225,7 @@ def _git(ws, args, diff_output=False, as_bytes=False):
                 errors="replace",
                 creationflags=NO_WINDOW,
                 timeout=GIT_LIMIT,
-                env=_git_env(),
+                env=bridge_env.git_read_env(),
             )
     except subprocess.TimeoutExpired:
         return "timeout", None, None
@@ -614,7 +588,7 @@ def _parse_pass_line(line):
             return None
         if rnd < 1 or rnd > 999:
             return None
-    if m.group(4) not in _REVIEWERS:
+    if m.group(4) not in bridge_env.REVIEWERS:
         return None
     cause = m.group(5)
     if cause is not None and cause not in bridge_env.ROUND_CAUSES:
@@ -736,7 +710,7 @@ def _format_pass_lines(by_week, weeks):
         counts = by_week.get(wk)
         if not counts:
             continue
-        parts = ["%s %d" % (kind, counts[kind]) for kind in _REVIEWERS if counts.get(kind)]
+        parts = ["%s %d" % (kind, counts[kind]) for kind in bridge_env.REVIEWERS if counts.get(kind)]
         if parts:
             lines.append("%d-W%02d %s recorded passes only" % (wk[0], wk[1], ", ".join(parts)))
     return lines

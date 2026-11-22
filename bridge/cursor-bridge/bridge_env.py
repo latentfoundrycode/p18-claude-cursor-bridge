@@ -4425,6 +4425,16 @@ ROUND_CAUSES = (
     "base update",
 )
 
+REVIEWERS = (
+    "review-a",
+    "review-b",
+    "security-auditor",
+    "design-auditor",
+    "plan-critic",
+    "design-critic-b",
+    "supervisor",
+)
+
 _CAUSE_SEPS = "-:(,;" + "\u2013" + "\u2014"
 
 
@@ -4434,6 +4444,23 @@ def round_cause_word(value):
         if value.startswith(cause) and (not rest or rest[0] in _CAUSE_SEPS):
             return cause
     return None
+
+
+def git_read_env():
+    env = os.environ.copy()
+    env["GIT_OPTIONAL_LOCKS"] = "0"
+    env["GIT_NO_LAZY_FETCH"] = "1"
+    for key in (
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_COMMON_DIR",
+        "GIT_NAMESPACE",
+    ):
+        env.pop(key, None)
+    return env
 
 
 def workspace_of(start):
