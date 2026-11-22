@@ -1497,6 +1497,36 @@ def test_r097_a_standing_finding_stands_beside_the_weeks_kind_with_its_dep_remed
     assert not has(r"\bgreen\b", sec), "%s reported green:\n%s" % (case, sec)
 
 
+STANDING_READ_FAILED = {
+    "the workflows list refused (403)": (("repos/OWNER/REPO/actions/workflows", "security-forbidden.json"), r"workflows list", {}),
+    "the runs list refused (403)": (("repos/OWNER/REPO/actions/workflows/dependency-scan.yml/runs", "security-forbidden.json"),
+                                    r"runs list", {}),
+    "the jobs list refused (403)": (("repos/OWNER/REPO/actions/runs/%s/jobs" % NEW_RUN, "security-forbidden.json"), r"jobs list",
+                                    dict(runs="security-runs-failed.json")),
+}
+
+
+@pytest.mark.parametrize("case", sorted(STANDING_READ_FAILED))
+def test_r097_a_standing_finding_keeps_its_dep_remedy_beside_a_failed_scan_read(bench, case):
+    """A finding standing from before (run OLD) and a week whose workflows list, runs list or failed run's jobs list is
+    refused (403): the section names the failed read with the login's scope as its remedy, and beside it the finding
+    standing line and its DEP- remedy ("wherever a finding stands, its DEP-<nnn> remedy is in the section"; Review A round 3
+    B1: the kind a failed read gives is finding, and the DEP- remedy was left out).
+    enforces: handoff/TASK-077-r3.md Ruling 4; handoff/TASK-077-r4.md; handoff/TASK-077.md R6, R7."""
+    route, read, kw = STANDING_READ_FAILED[case]
+    one_project(bench, last_run_read=OLD_RUN_AT, finding=int(OLD_RUN))
+    r = routes(**kw)
+    r[route[0]] = route[1]
+    rc, out = run_caught(bench, r)
+    assert "Traceback" not in out, "%s ended in a traceback:\n%s" % (case, out)
+    sec = bench.section("Alpha", out)
+    assert failure_line(sec, read, r"\b403\b"), "%s: no line names the %s's failure (403):\n%s" % (case, read, sec)
+    assert has(r"\bscope\b|gh auth refresh -s", sec), "%s: the failed read's remedy (the login's scope) is missing:\n%s" % (case, sec)
+    assert standing_line(OLD_RUN, sec), "%s: the finding standing line (run %s) is not in the section:\n%s" % (case, OLD_RUN, sec)
+    assert "DEP-" in sec, "%s: the standing finding's DEP- remedy is not in the section:\n%s" % (case, sec)
+    assert not has(r"\bgreen\b", sec), "%s reported green:\n%s" % (case, sec)
+
+
 # ---------------------------------------------------------------- Ruling 5: no reply and no seed row ends in a traceback
 
 
