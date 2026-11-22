@@ -575,6 +575,50 @@
             }
           ],
           "positionals": []
+        },
+        {
+          "description": null,
+          "name": "security",
+          "options": [
+            {
+              "choices": null,
+              "default": "==SUPPRESS==",
+              "dest": "help",
+              "help": "show this help message and exit",
+              "nargs": 0,
+              "option_strings": [
+                "-h",
+                "--help"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "date",
+              "help": "evaluation date YYYY-MM-DD (default today)",
+              "nargs": null,
+              "option_strings": [
+                "--date"
+              ],
+              "required": false,
+              "type": null
+            },
+            {
+              "choices": null,
+              "default": null,
+              "dest": "seed_from",
+              "help": "hand-written evaluation file to seed the window",
+              "nargs": null,
+              "option_strings": [
+                "--seed-from"
+              ],
+              "required": false,
+              "type": null
+            }
+          ],
+          "positionals": []
         }
       ]
     },
@@ -915,7 +959,7 @@
           "choices": null,
           "default": null,
           "dest": "roots",
-          "help": "project roots (default: evaluate-reports project list)",
+          "help": "project roots (default: ~/.cursor-bridge/projects.json)",
           "nargs": "*",
           "option_strings": [],
           "required": false,

@@ -1,6 +1,6 @@
 {
   "version": "2026.11.12a",
-  "generated": "2026-11-22 06:59",
+  "generated": "2026-11-22 10:57",
   "files": {
     "agents/cursor-configurator.md": "a8aad7838a9bc5b4f00e13fd3749919158cbe37ec7acfa9a40960600398784bc",
     "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
@@ -78,7 +78,7 @@
     "cursor-bridge/design-seeds/x.ai/DESIGN.md": "9c9ef45d8c0c3b9a7622833cdff8bd125ed6bf296a82cc7274215276706e52eb",
     "cursor-bridge/design-seeds/x.ai/README.md": "8560245632010049402a9aaab516e47b1876c660e9fabe2220c7a2be52470e40",
     "cursor-bridge/diagram-check.py": "d8bc790a1196f1f290f410fe8ceb4eee3d812b1c9d903129ba5923cd47b8d015",
-    "cursor-bridge/evaluate-reports.py": "4e4eb6a41b95093a62905fcc8e2fc9d9cafc74ffe41ea17cb46eb6485934e50a",
+    "cursor-bridge/evaluate-reports.py": "7c0222fb2c07f8794e21180a0f07d8cf4be175fdf25d95378cf34a3c13c52c37",
     "cursor-bridge/in-flight.py": "aa5e828996aac2144b901eaf6fc4ed54b5697317bcac3539598a113070fad0d1",
     "cursor-bridge/installer-check.ps1": "a662ab0f1d707234d5b1b58de7584b812099cddcec78274b8f15599a3e026cb5",
     "cursor-bridge/inventory-check.py": "957af30e6805540bf7c6be4695f7c3b33f43834f35dbd5a58e0d93bddf913c76",
@@ -87,7 +87,7 @@
     "cursor-bridge/loop-guard.py": "e6a4b1453f22b4317047995cfbd1ad5deb6478b1a67a3d91d08f0c839f16b9d9",
     "cursor-bridge/minimal-code.snapshot.md": "b822c4d7abd69971dc5fee671b8a63daa58ba62a2711c9cf07849ed82d01a215",
     "cursor-bridge/mutation-run.py": "d587739fb00ba7c6cabf2960c911f61331096bac00949b302e768c4a0586585e",
-    "cursor-bridge/pace-report.py": "b9560dec9cfc99b6dfd3e35509bca368b6d1a662c82c5b270286cd1ec0f57c8f",
+    "cursor-bridge/pace-report.py": "f14c7175c66ca3da6b4f00d55ddd91b516b3f37cbc7d9896f3e775c006c25216",
     "cursor-bridge/permission-guard.py": "6e85731afcca3f8fa4a71c80a3501d9875c7f4f470128ca3f10f8e089db6c31a",
     "cursor-bridge/plan-check.py": "f8167ac2793c34c7cd8ea8c5fe96ab24937dae28f8051709b9b9f6b248139405",
     "cursor-bridge/pr-activity-check.py": "7b6f59a14a52c34d14222939d5af52f677e7494e9008d702e3a5bb0bdb8a8768",

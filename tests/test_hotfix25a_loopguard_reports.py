@@ -7,6 +7,7 @@ UTC in the extract (C8 of 2026-10-18); compaction-baseline.py and the maintainer
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -195,20 +196,25 @@ def test_c1_an_entry_written_after_a_forced_verdict_is_shown_once_as_written(tmp
 
 def test_c1_the_bridge_project_is_listed_and_read_from_its_workspace_key_only(program, tmp_path):
     """2026-10-25 C1 (row 76): the bridge's own project is a report source; the root's key
-    (`E--p18-claude-cursor-bridge`) is the maintainer's own and never one."""
+    (`E--p18-claude-cursor-bridge`) is the maintainer's own and never one. Since TASK-077 (R-097) the projects come from
+    ~/.cursor-bridge/projects.json and the program names no drive path: the rule is pinned on a root of the test's own,
+    by the project's name, a project of any other name read from both keys."""
     er = program("evaluate-reports")
-    assert os.path.normcase(er.PROJECTS["Bridge"]) == os.path.normcase(r"E:\p18-claude-cursor-bridge")
-    assert er.project_keys("Bridge", er.PROJECTS["Bridge"]) == ["E--p18-claude-cursor-bridge-Workspace"]
-    assert er.project_keys("TDP", er.PROJECTS["TDP"]) == ["E--p19-technical-documentation-provider", "E--p19-technical-documentation-provider-Workspace"]
+    bridge = str(tmp_path / "p18-bridge-c1")
+    other = str(tmp_path / "p19-other-c1")
+    bkey, okey = er.project_key(bridge), er.project_key(other)
+    assert bkey == re.sub(r"[:\\/]", "-", bridge), bkey
+    assert er.project_keys("Bridge", bridge) == [bkey + "-Workspace"]
+    assert er.project_keys("TDP", other) == [okey, okey + "-Workspace"]
     for name in ("Claude-Cursor Bridge Issues During Development and Their Solutions.md", "Claude-Cursor Bridge Claude-Cursor Bridge Feedback.md"):
         assert name.endswith(er.ISSUES_SUFFIX) or name.endswith(er.FEEDBACK_SUFFIX), name
     home = tmp_path / "home"
-    for key, note in (("E--p18-claude-cursor-bridge", "maintainer-rule.md"), ("E--p18-claude-cursor-bridge-Workspace", "pause-for-fable.md")):
+    for key, note in ((bkey, "maintainer-rule.md"), (bkey + "-Workspace", "pause-for-fable.md")):
         (home / ".claude" / "projects" / key / "memory").mkdir(parents=True)
         (home / ".claude" / "projects" / key / "memory" / note).write_text("a note\n", encoding="utf-8")
         (home / ".claude" / "projects" / key / "s.jsonl").write_text("", encoding="utf-8")
-    assert [e[0] for e in er.notes_entries(er.PROJECTS["Bridge"], str(home), "Bridge")] == ["note:pause-for-fable.md"]
-    assert [os.path.basename(os.path.dirname(p)) for p in er.session_files(er.PROJECTS["Bridge"], str(home), "Bridge")] == ["E--p18-claude-cursor-bridge-Workspace"]
+    assert [e[0] for e in er.notes_entries(bridge, str(home), "Bridge")] == ["note:pause-for-fable.md"]
+    assert [os.path.basename(os.path.dirname(p)) for p in er.session_files(bridge, str(home), "Bridge")] == [bkey + "-Workspace"]
     root = project(tmp_path)                                       # the hand collect's form: any root, named Bridge
     key = er.project_key(str(root))
     for k, note in ((key, "root-note.md"), (key + "-Workspace", "workspace-note.md")):
