@@ -25,7 +25,7 @@ own manifest and nothing more: a source tree has no settings.json, since the own
 not part of it, and the shim is a matter of the machine a release is installed on. In a
 source tree a file the manifest does not list (EXTRA) fails the check as well.
 Exit:   0 = every manifest file OK; 1 = at least one STALE or MISSING;
-        2 = manifest unreadable, or under --sources the program does not stand in the tree it checks, or a folder cannot be resolved.  ASCII-only on purpose (cp1252 consoles).
+        2 = manifest unreadable, or under --sources the program does not stand in the tree it checks, or its folder is not named cursor-bridge, or a folder cannot be resolved.  ASCII-only on purpose (cp1252 consoles).
 """
 import hashlib
 import json
@@ -34,6 +34,27 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def escape_folder(path):
+    """Print a folder path without control chars or quotes that could break or forge a line."""
+    out = []
+    for ch in path:
+        o = ord(ch)
+        if o < 32:
+            if ch == "\n":
+                out.append("\\n")
+            elif ch == "\r":
+                out.append("\\r")
+            elif ch == "\t":
+                out.append("\\t")
+            else:
+                out.append("\\x%02x" % o)
+        elif ch == '"':
+            out.append('\\"')
+        else:
+            out.append(ch)
+    return "".join(out)
 
 
 def norm_hash(path):
@@ -154,29 +175,37 @@ def main():
         return 2
 
     if sources:
-        here_abs = os.path.abspath(HERE)
-        here_tree_abs = os.path.abspath(os.path.join(HERE, os.pardir))
-        root_abs = root
         resolve_failed = False
         try:
             here_folder = os.path.realpath(HERE)
-            here_tree = os.path.realpath(os.path.join(HERE, os.pardir))
+            here_tree = os.path.dirname(here_folder)
         except (OSError, ValueError):
             resolve_failed = True
-            here_folder = here_abs
-            here_tree = here_tree_abs
+            here_folder = os.path.abspath(HERE)
+            here_tree = os.path.abspath(os.path.join(HERE, os.pardir))
         try:
             check_tree = os.path.realpath(root)
         except (OSError, ValueError):
             resolve_failed = True
-            check_tree = root_abs
+            check_tree = root
         check_cursor_bridge = os.path.join(check_tree, "cursor-bridge")
-        refuse = resolve_failed or os.path.normcase(here_tree) != os.path.normcase(check_tree)
-        if refuse:
-            alt = os.path.join(root_abs, "cursor-bridge", "bridge-check.py")
-            print('RESULT: REFUSED - this program stands in tree "%s" (program: "%s") but was asked to check tree "%s" (tree: "%s"); run "%s" instead.'
-                  % (here_tree, here_folder, check_tree, check_cursor_bridge, alt))
+        if resolve_failed:
+            alt = os.path.join(root, "cursor-bridge", "bridge-check.py")
+            print('RESULT: REFUSED - this program stands in tree "%s" (program: "%s") but was asked to check tree "%s" (cursor-bridge: "%s"); run "%s" instead.'
+                  % (escape_folder(here_tree), escape_folder(here_folder), escape_folder(check_tree),
+                     escape_folder(check_cursor_bridge), escape_folder(alt)))
             return 2
+        if os.path.normcase(os.path.basename(here_folder)) != os.path.normcase("cursor-bridge"):
+            print('RESULT: REFUSED - this program\'s folder is not named cursor-bridge (program: "%s"); run the copy in that tree\'s cursor-bridge folder instead.'
+                  % escape_folder(here_folder))
+            return 2
+        if os.path.normcase(here_tree) != os.path.normcase(check_tree):
+            alt = os.path.join(check_tree, "cursor-bridge", "bridge-check.py")
+            print('RESULT: REFUSED - this program stands in tree "%s" (program: "%s") but was asked to check tree "%s" (cursor-bridge: "%s"); run "%s" instead.'
+                  % (escape_folder(here_tree), escape_folder(here_folder), escape_folder(check_tree),
+                     escape_folder(check_cursor_bridge), escape_folder(alt)))
+            return 2
+        root = check_tree
 
     files = manifest.get("files", {})
     ok = stale = missing = 0
@@ -233,8 +262,9 @@ def main():
                 if rel not in files and not rel.endswith("MANIFEST.json") and "__pycache__" not in rel:
                     extras.append(rel)
 
+    ver_at = escape_folder(root) if sources else root
     print("bridge-check: version %s (%s) at %s" % (
-        manifest.get("version", "?"), manifest.get("generated", "?"), root))
+        manifest.get("version", "?"), manifest.get("generated", "?"), ver_at))
     for kind, rel in problems:
         print("  %-8s %s" % (kind, rel))
     if extras and (sources or not quiet):
@@ -244,13 +274,13 @@ def main():
     if sources and (stale or missing or extras):
         # An unlisted file in a release folder would be installed, never kept as part of a
         # previous release and never removed by a later one.
-        print("RESULT: SOURCES DO NOT MATCH their stamp - run tools/make-manifest.py after the last edit, then re-run. (checked: %s)" % os.path.realpath(HERE))
+        print("RESULT: SOURCES DO NOT MATCH their stamp - run tools/make-manifest.py after the last edit, then re-run. (checked: %s)" % escape_folder(os.path.realpath(HERE)))
         return 1
     if stale or missing:
         print("RESULT: NOT CALIBRATED - run the release's bridge-install.py (it copies the files, merges settings.json and installs the shim), then re-run.")
         return 1
     if sources:
-        print("RESULT: SOURCES MATCH bridge %s %s" % (manifest.get("version", "?"), os.path.realpath(HERE)))
+        print("RESULT: SOURCES MATCH bridge %s %s" % (manifest.get("version", "?"), escape_folder(os.path.realpath(HERE))))
     else:
         print("RESULT: INSTALLED TREE MATCHES bridge %s" % manifest.get("version", "?"))
     return 0
