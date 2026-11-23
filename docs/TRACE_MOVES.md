@@ -90,3 +90,5 @@ The file stays after the merge. A change to it takes the full gate (`review-guar
 - 0f8f6db9335a9ae2d8a59e568d1d218d0efd2224f31092eb4607a97a15302550 48. **The session's model follows the phase, and
 - ff738685c16c1dd29e44c05aab99496c5e8904d6b73c64b3ac04af1dd40ae26f 1. **Intake of the change** (Phase 1, scaled).
 - 40ee76f87d9a99d79c0a107b5768ffffa238abb524688ef48c77a189217a4c05 2. **Design revision** (Phase 2, scaled). Pause before
+- 0b33400ae19eff10c453d9ae02a47ed7db9bfa9d54bd32e5a2074578a4e0490c name: diff-reviewer description: Read-only review of a diff
+- 23488fb25600cb1925eb8790e149d0379795fd70a184317c4054978cbce46d0a name: spec-packager description: Turns one increment of the
