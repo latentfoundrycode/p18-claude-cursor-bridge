@@ -55,11 +55,14 @@ def test_r100_no_other_agent_names_the_documentation_server():
 def test_r100_no_allow_entry_for_the_documentation_server():
     with open(os.path.join(BRIDGE, "cursor-bridge", "settings.bridge.json"), encoding="utf-8") as f:
         settings = json.load(f)
-    assert not [rule for rule in settings.get("permissions", {}).get("allow", []) if "context7" in rule.lower()]
+    allow = settings["permissions"]["allow"]
+    assert len(allow) > 5 and any(rule.startswith("Bash(") for rule in allow), "the allow list is read where it stands"
+    assert not [rule for rule in allow if "context7" in rule.lower()]
 
 
 def test_d004_draws_the_two_subagents_querying_the_documentation_service():
     with open(D004, encoding="utf-8") as f:
         text = f.read()
     assert re.search(r"^ext_docs_service\[", text, re.M)
-    assert re.search(r"p_claude_subagents\s*-->.*ext_docs_service", text)
+    assert re.search(r"^p_claude_subagents\s*-->.*\|\s*ext_docs_service\s*$", text, re.M)
+    assert re.search(r"^ext_docs_service\s*-->\|\"UNTRUSTED:[^\n]*\|\s*p_claude_subagents\s*$", text, re.M)
