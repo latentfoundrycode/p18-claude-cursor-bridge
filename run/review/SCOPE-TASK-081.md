@@ -17,4 +17,9 @@ Stage P4's review by both, one round, approved (tag stage-review/P4-1); one stri
 docs/INVENTORY.md, the documentation-service row (its trigger cell changed here) and the bridge's threat model as a whole. The stamp changes no program.
 
 ## What to read for
-Whether every sentence of the CHANGELOG entry is true of the tree and of 2026.11.12a (what a rollback restores), whether the entry carries every item the plan names, whether tests/test_program_stamp.py holds what it says, and whether the records state their counts truly. This is Review B's round 1.
+Whether every sentence of the CHANGELOG entry is true of the tree and of 2026.11.12a (what a rollback restores), whether the entry carries every item the plan names, whether tests/test_program_stamp.py holds what it says, and whether the records state their counts truly. Review B, round 1: REJECT on one finding (the R-102 item's clause on release S's rows); one Should fix (R-090), two Considers.
+
+## Round 2
+Round cause: records - one sentence of the CHANGELOG entry false of the tree; no program changes.
+
+The commit after "Review files for round TASK-081-r1" (4b95806), whose diff is run/review/REVIEW-TASK-081-r2.diff: the R-102 item now says that where a row above changes one of release S's programs or texts, that row says so, and names them (R-089, R-077 and R-083, R-078 and R-080); the R-090 item names the lists the cache does not serve; the R-087 item says a git before 2.40 refuses the scan (`CANNOT SCAN`); HARDENING records the round; MANIFEST.json regenerated after the last edit; run/review/REVIEW-TASK-081-r1.diff removed. Check each against round 1's findings and that nothing else moved. This is Review B's round 2.
