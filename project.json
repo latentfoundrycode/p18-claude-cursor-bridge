@@ -2,12 +2,12 @@
   "name": "Claude-Cursor Bridge",
   "purpose": "A governance framework under which a Claude supervisor designs, plans, briefs, and reviews software that a headless Cursor builder implements, merged only through a verified cross-family gate.",
   "kind": "private",
-  "version": "2026.11.12a",
+  "version": "2026.11.23a",
   "instruction_texts": ["bridge/"],
   "state": {
     "phase": "changing",
     "stage": "the program release's stage P3 closed 2026-11-22 (its review by both, one round, closed by BUG-047; its demonstration 33 of 33), stage P2 2026-11-19, stage P1 2026-11-14, stage P4 next; before it release B2 complete 2026-11-11 and release S, the maintainer's, installed and calibrated 2026-11-12; Claude-Cursor Bridge 2026.11.12a",
-    "bridge": "2026.11.12a",
+    "bridge": "2026.11.23a",
     "updated": "2026-11-22"
   }
 }
