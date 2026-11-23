@@ -9,13 +9,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 CLAUDE = os.path.join(HERE, os.pardir, "bridge")
 AGENTS = os.path.join(CLAUDE, "agents")
 
-CURRENT = {"claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1", "claude-haiku-4-5"}
-LEGACY = re.compile(r"claude-(?!haiku-4-5)(opus|sonnet|fable|haiku)-(4-[0-9]|5)(?![-.0-9])")  # 4.x and plain 5 ids; Haiku 4.5 is current
+CURRENT = {"claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-2", "claude-haiku-4-5"}
+# 4.x and plain 5 ids, and Fable 5.1, which Fable 5.2 replaced for planning (R-099); Haiku 4.5 is current
+LEGACY = re.compile(r"claude-(?!haiku-4-5)(?:(opus|sonnet|fable|haiku)-(4-[0-9]|5)|fable-5-1)(?![-.0-9])")
 EXPECTED = {
     "diff-reviewer": ("claude-opus-5-5", "high"), "security-auditor": ("claude-opus-5-5", "high"),
     "design-auditor": ("claude-opus-5-5", "high"), "refactor-scout": ("claude-opus-5-5", "high"),
     "spec-packager": ("claude-opus-5-5", None), "diagram-specialist": ("claude-opus-5-5", None),
-    "plan-critic": ("claude-fable-5-1", None),
+    "plan-critic": ("claude-fable-5-2", None),
     "test-runner": ("claude-sonnet-5-5", None), "secret-sentinel": ("claude-sonnet-5-5", None),
     "cursor-configurator": ("claude-sonnet-5-5", None),
 }
@@ -68,6 +69,18 @@ def test_roster_template_matches_review_a():
     prog = open(os.path.join(CLAUDE, "cursor-bridge", "roster-check.py"), encoding="utf-8").read()
     m2 = re.search(r'"review_a":\s*"([^"]+)"', prog)
     assert m2 and m2.group(1) == m.group(1)
+
+
+def test_r099_the_plan_critic_runs_on_fable_5_2_and_a_leftover_5_1_id_reads_legacy():
+    """R-099 (the owner's allocation of 2026-11-13, rule 52): design and planning run on Fable 5.2, so the plan
+    critic's definition carries `model: claude-fable-5-2`, and a leftover `claude-fable-5-1` in any agent
+    definition is a legacy id."""
+    assert frontmatter("plan-critic").get("model") == "claude-fable-5-2"
+    assert LEGACY.search("model: claude-fable-5-1\n")
+    assert not LEGACY.search("model: claude-fable-5-2\n")
+    for name in sorted(EXPECTED):
+        text = open(os.path.join(AGENTS, name + ".md"), encoding="utf-8").read()
+        assert not LEGACY.search(text), "%s names a legacy model id" % name
 
 
 def test_no_legacy_model_id_in_the_tree():

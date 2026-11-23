@@ -206,7 +206,7 @@ Delta: <old> → <new>
   pending:         <item @ phase>
   not applied:     <item — gate already passed>
 Defaults set for you: <e.g. refactoring pass ON for remaining stages — say "off" to change>
-Session model for this phase: <Fable 5.1 | Opus 5.5> — set it in the model menu if the status bar shows another (rule 48)
+Session model for this phase: <Fable 5.2 | Opus 5.5> — set it in the model menu if the status bar shows another (rule 48)
 Project position unchanged: <phase / increment / stage>
 Next action: <the one thing you do next, as the status file's Next: line says>
 ```
