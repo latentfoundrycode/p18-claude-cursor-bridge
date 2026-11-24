@@ -1015,3 +1015,429 @@ def test_task086a_after_the_repair_and_the_rebuild_the_review_guards_first_snaps
     G.snap_ok(ws, "TASK-001")
     data = G.rounds(ws, "TASK-001")["rounds"]
     assert [r["round"] for r in data] == [1] and not data[0].get("seeded"), data
+
+
+# --- round 2: the supervisor's tests of round 1's defects ------------------------------------------------
+# Written after round 1's review, before the round-2 brief; each is red on round 1's code. The in-process tests run
+# the program's `main` with `subprocess.run`, `probe` or `open` wrapped, so no fake git has to be found on PATH (a
+# program started by name without a shell finds an .exe alone on Windows).
+
+RESOLVED_KEYS = {"profile", "builder", "review_a", "review_b", "families", "other_pool", "probed", "resolved_at",
+                 "reset_day", "rebuild", "deviation"}
+
+
+def fail_text(out):
+    """The lines that begin `FAIL`, lower-cased: where a refusal names its cause."""
+    return "\n".join(line for line in out.splitlines() if line.strip().startswith("FAIL")).lower()
+
+
+def _main_in_process(mod, ws, monkeypatch, capsys, *args):
+    for name in list(os.environ):
+        if name.upper().startswith("GIT_"):
+            monkeypatch.delenv(name)
+    monkeypatch.setenv("ROSTER_NOW", NOW)
+    monkeypatch.chdir(ws)
+    monkeypatch.setattr(sys, "argv", ["roster-check.py", "docs/ROSTER.json"] + list(args))
+    capsys.readouterr()
+    rc = mod.main()
+    return rc, capsys.readouterr().out
+
+
+@pytest.mark.parametrize("form", ["new-branch", "repair-record", "checkpoint"])
+def test_task086a_the_rebuild_form_stands_in_the_printed_line_alone(tmp_path, form):
+    """TASK-086a Done when: "the form standing in the printed line alone and the resolved file's `rebuild` entry
+    keeping its two keys": the resolved file holds no key beyond the checkpoint's and `deviation` (round 1 wrote the
+    form into the file as a key of its own)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    if form == "new-branch":
+        write_roster(ws, [NATIVE])
+        commit(ws, "the first run's work")
+        write_record(ws, row(GROK_B), row(COMPOSER, start=c1, clean=True))
+        needle = "new branch"
+    elif form == "repair-record":
+        write_roster(ws, [FULL, dict(NATIVE, review_b_alt=COMPOSER)], other_pool="exhausted")
+        write_record(ws, review_row(), '{"id": "torn", "kind": "builder"')
+        needle = "--repair-record"
+    else:
+        write_roster(ws, [FULL, dict(NATIVE, review_b_alt=COMPOSER)], other_pool="exhausted")
+        commit(ws, "a report with no row", files={REPORT1: "round 1\n"})
+        needle = "checkpoint"
+    rc, out = resolve(ws)
+    assert_rebuild(ws, rc, out)
+    assert needle in rebuild_text(out).lower(), out
+    assert set(resolved(ws)) <= RESOLVED_KEYS, "the form stands in the printed line alone: %s" % sorted(resolved(ws))
+
+
+def test_task086a_the_rebuild_names_the_model_of_review_b_s_family_that_built(tmp_path):
+    """TASK-086a Done when: "REBUILD as on the checkpoint where `review_b`'s family built"; the checkpoint's REBUILD
+    names the model of `review_b`'s family that built the change. A first round by grok and a fix round by composer
+    both count; `review_b` grok is refused for the xai family, so the lines and the `rebuild` entry name the grok
+    model, never the composer model of the last row as if it were of the xai family (round 1)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [NATIVE])
+    c2 = commit(ws, "the first round's work", files={REPORT1: "round 1\n"})
+    write_record(ws, row(GROK_B, start=c1, clean=True), row(COMPOSER, start=c2, clean=True, rnd=2))
+    commit(ws, "the fix round's work", files={REPORT2: "round 2\n"})
+    rc, out = resolve(ws)
+    assert_rebuild(ws, rc, out)
+    assert resolved(ws)["rebuild"]["built_by"] == GROK_B, resolved(ws)
+    lines = [line for line in out.splitlines() if "REBUILD" in line]
+    assert lines and all(GROK_B in line for line in lines), out
+
+
+def test_task086a_an_unavailable_reviewers_alternate_that_does_not_answer_skips_the_profile(program, tmp_path,
+                                                                                          monkeypatch, capsys):
+    """TASK-086a Done when: "the profile skipped as on the checkpoint, never a REBUILD, where a mark or its pool
+    excludes `review_b` and no alternate is independent and usable"; "the alternate is probed where the profile's
+    models are": `review_b` is marked unavailable and the alternate does not answer its probe, so no alternate is
+    usable and the profile is skipped (round 1 resolved a REBUILD with the marked `review_b`)."""
+    ws = scratch_repo(tmp_path)
+    commit(ws, "checkpoint")
+    write_roster(ws, [dict(NATIVE, review_b_alt=GPT)], unavailable=[GROK_R])
+    before = plant_resolved(ws)
+    mod = program("roster-check")
+    monkeypatch.setattr(mod, "probe", lambda model_id, *a, **k: (False, "exit 1") if model_id == GPT else (True, "ok"))
+    rc, out = _main_in_process(mod, ws, monkeypatch, capsys)
+    assert rc == 1 and "skip" in out and "RESOLVED" not in out, out
+    assert "REBUILD" not in out and not deviation_printed(out), out
+    assert resolved_path(ws).read_bytes() == before
+
+
+def _git_answering_otherwise(monkeypatch, match, how):
+    real = subprocess.run
+
+    def fake(args, *a, **k):
+        if isinstance(args, (list, tuple)) and match([str(x) for x in args]):
+            if how == "times-out":
+                raise subprocess.TimeoutExpired(args, 20)
+            return subprocess.CompletedProcess(args, 128, "", "fatal: git is not answering\n")
+        return real(args, *a, **k)
+
+    monkeypatch.setattr(subprocess, "run", fake)
+
+
+@pytest.mark.parametrize("call,how", [("is-ancestor", "fails"), ("is-ancestor", "times-out"),
+                                      ("verify", "fails"), ("verify", "times-out"), ("merge-base", "times-out"),
+                                      ("ls-tree", "fails")])
+def test_task086a_git_answering_neither_yes_nor_no_cannot_be_read(program, tmp_path, monkeypatch, capsys, call, how):
+    """TASK-086a Done when: "git's answer of yes or no being the test and any other failure of git a set that cannot
+    be read"; "git does not answer (it does not start, times out or fails)": an exit other than git's yes or no (128)
+    or a timeout of the ancestor test, of the check that a start commit names a commit, or of the base's merge base
+    ends the resolve with exit 1 and the cause `git`, the resolved file unchanged (round 1 read them as no, as a
+    commit that does not exist, or as no `main`)."""
+    ws = scratch_repo(tmp_path)
+    c0 = git(ws, "rev-parse", "HEAD")
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [NATIVE])
+    if call in ("merge-base", "ls-tree"):
+        commit(ws, "the brief's work", files={REPORT1: "round 1\n"})
+        write_record(ws, row(COMPOSER, start=c1, clean=True))
+        if call == "merge-base":
+            match = lambda a: a[:2] == ["git", "merge-base"] and "--is-ancestor" not in a
+        else:
+            match = lambda a: a[:2] == ["git", "ls-tree"]
+    else:
+        commit(ws, "the first run's work")
+        write_record(ws, row(GROK_B, start=c1, clean=True), row(COMPOSER, start=c0, clean=True))
+        if call == "is-ancestor":
+            match = lambda a: a[:3] == ["git", "merge-base", "--is-ancestor"]
+        else:
+            match = lambda a: a[:3] == ["git", "rev-parse", "--verify"] and any(x.startswith(c1) for x in a[3:])
+    before = plant_resolved(ws)
+    mod = program("roster-check")
+    _git_answering_otherwise(monkeypatch, match, how)
+    rc, out = _main_in_process(mod, ws, monkeypatch, capsys, "--no-probe")
+    assert_cannot_read(ws, rc, out, before, "git")
+
+
+def test_task086a_a_repair_that_fails_part_way_leaves_the_record_whole(program, tmp_path, monkeypatch, capsys):
+    """TASK-086a Done when: "`--repair-record` rewrites the record by a temporary file and a replace, keeping every
+    line that parses in its place and order, appends the others to `run/launcher/runs.damaged.jsonl`"; the brief's
+    security context: "a crash leaves the old record whole". The damaged file cannot be written, so the repair ends
+    with a non-zero exit and no traceback, and the record keeps every line, the moved ones among them (round 1
+    replaced the record first and lost the lines it had not yet appended)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [NATIVE])
+    write_record(ws, review_row(), '{"id": "torn", "kind": "builder"', row(GROK_B, start=c1, clean=True))
+    before = record_path(ws).read_bytes()
+    mod = program("roster-check")
+    real_open = open
+
+    def refusing_open(file, *a, **k):
+        if os.path.basename(str(file)) == "runs.damaged.jsonl":
+            raise OSError("the damaged file cannot be written")
+        return real_open(file, *a, **k)
+
+    monkeypatch.setattr("builtins.open", refusing_open)
+    rc, out = _main_in_process(mod, ws, monkeypatch, capsys, "--repair-record")
+    monkeypatch.setattr("builtins.open", real_open)
+    assert rc != 0, out
+    assert record_path(ws).read_bytes() == before, "the record is left whole"
+
+
+def test_task086a_a_repair_refuses_a_damaged_file_linked_to_another_file(tmp_path):
+    """The brief's security context ("`--repair-record` rewrites the record by a temporary file and a replace in the
+    record's own folder"): the repair writes nothing outside the record's folder, so a `runs.damaged.jsonl` that is a
+    hard link to another file (made without privilege on one volume) is refused, the other file and the record
+    unchanged (round 1 appended to whatever the name reached)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [NATIVE])
+    write_record(ws, review_row(), "not a json line", row(GROK_B, start=c1, clean=True))
+    before = record_path(ws).read_bytes()
+    outside = tmp_path / "outside.txt"
+    outside.write_bytes(b"a file outside the record's folder\n")
+    try:
+        os.link(str(outside), str(ws / "run" / "launcher" / "runs.damaged.jsonl"))
+    except OSError as exc:
+        pytest.skip("no hard link on this file system: %s" % exc)
+    rc, out = resolve(ws, "--repair-record")
+    assert rc != 0 and "Traceback" not in out, out
+    assert outside.read_bytes() == b"a file outside the record's folder\n"
+    assert record_path(ws).read_bytes() == before
+
+
+def test_task086a_a_record_line_split_only_at_its_line_feed(tmp_path):
+    """TASK-086a Done when: "`--repair-record` ... changes nothing where every line parses": a line is what lies
+    between two line feeds, so a builder row whose text holds a line separator (U+2028, valid inside a JSON string)
+    parses whole and the repair changes nothing (round 1 split it there and moved two halves)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [NATIVE])
+    odd = '{"id": "a\u2028b", "kind": "builder", "model": "composer-2.5", "branch": "task-9"}'
+    write_record(ws, review_row(), odd, row(GROK_B, start=c1, clean=True))
+    before = record_path(ws).read_bytes()
+    rc, out = resolve(ws, "--repair-record")
+    assert rc == 0, out
+    assert record_path(ws).read_bytes() == before
+    assert not (ws / "run" / "launcher" / "runs.damaged.jsonl").exists()
+
+
+@pytest.mark.parametrize("line", [b"\xff\xfe not utf-8", b"[" * 100000],
+                         ids=["not-utf-8", "nested-too-deep"])
+def test_task086a_a_hostile_record_line_makes_the_set_unknown_and_the_repair_moves_it(tmp_path, line):
+    """The brief's acceptance criterion "No exception escapes as a traceback on any record" and its security context
+    ("a line that does not parse makes the set unknown"): a line that is not UTF-8, or nested past the parser's depth,
+    is a line that does not parse; the resolve prints the cause on a line of its own and `--repair-record` moves the
+    line, byte for byte, to the damaged file (round 1 raised a traceback on both)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [dict(NATIVE, review_b_alt=GPT)])
+    good = row(GROK_B, start=c1, clean=True).encode("utf-8")
+    record_path(ws).parent.mkdir(parents=True, exist_ok=True)
+    record_path(ws).write_bytes(good + b"\n" + line + b"\n")
+    rc, out = resolve(ws)
+    assert "Traceback" not in out and unknown_cause(out, "runs.jsonl"), out
+    rc, out = resolve(ws, "--repair-record")
+    assert rc == 0 and "Traceback" not in out, out
+    assert record_path(ws).read_bytes() == good + b"\n"
+    assert (ws / "run" / "launcher" / "runs.damaged.jsonl").read_bytes() == line + b"\n"
+
+
+def test_task086a_the_unknown_cause_names_the_record_given_by_run_log(tmp_path):
+    """TASK-086a Done when: "every resolve on an unknown set printing the cause on a line of its own"; the module
+    docstring of these tests: the cause names "the record's file name": under `--run-log` the record is another file,
+    and its name is the one printed (round 1 printed `runs.jsonl` whatever the record was)."""
+    ws = scratch_repo(tmp_path)
+    commit(ws, "checkpoint")
+    write_roster(ws, [dict(NATIVE, review_b_alt=GPT)])
+    other = ws / "run" / "launcher" / "other.jsonl"
+    other.parent.mkdir(parents=True, exist_ok=True)
+    other.write_text(review_row() + "\nnot a json line\n", encoding="utf-8", newline="\n")
+    rc, out = resolve(ws, "--run-log", "run/launcher/other.jsonl")
+    assert unknown_cause(out, "other.jsonl"), out
+
+
+@pytest.mark.parametrize("name", ["handoff/BUG-047-report.md", "handoff/TASK-002-r1-Report.md"],
+                         ids=["no-round-in-the-name", "letter-case"])
+def test_task086a_every_report_file_the_branch_adds_needs_its_row(tmp_path, name):
+    """TASK-086a Done when: "a report file (a file under `handoff/` whose name ends `-report.md` ...)"; "unknown where
+    ... a report file that the branch adds over that base has no builder row of the branch for its brief": a report
+    named without a round (`BUG-047-report.md`, the form four committed reports of this repository use) belongs to
+    brief BUG-047, and the name's ending is compared without regard to letter case (round 1 skipped both, and read the
+    set as known)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [dict(NATIVE, review_b_alt=GPT)])
+    write_record(ws, row(COMPOSER, start=c1, clean=True, brief="TASK-001"))
+    commit(ws, "a report with no row", files={name: "the report\n"})
+    rc, out = resolve(ws)
+    assert unknown_cause(out, os.path.basename(name)), "the cause on a line of its own: " + out
+
+
+def test_task086a_a_family_named_in_the_roster_counts_for_a_builder_row(tmp_path):
+    """The brief's security context ("unknown is never read as nobody having built"); the program's own skip line
+    tells the owner to give a model its family in the roster (`{"model": ..., "family": ...}`): a builder row of that
+    model counts for that family (round 1 counted it for none, so a Review B of the family resolved)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [{"name": "full", "builder": {"model": "mystery-builder-1", "family": "xai"}, "review_b": GPT},
+                      NATIVE], other_pool="exhausted")
+    write_record(ws, row("mystery-builder-1", start=c1, clean=True))
+    commit(ws, "the builder's work")
+    rc, out = resolve(ws)
+    assert "RESOLVED profile 'native'" in out, out
+    assert_rebuild(ws, rc, out)
+
+
+@pytest.mark.parametrize("model", ["mystery-builder-2", 123], ids=["family-unknown", "not-a-string"])
+def test_task086a_a_builder_row_of_no_known_family_makes_the_set_unknown(tmp_path, model):
+    """The brief's security context ("a field of the wrong type is never trusted", "unknown is never read as nobody
+    having built"): a builder row of the branch whose model is not a string, or whose family neither the roster nor
+    the program can name, leaves the set unknown with the cause on a line of its own, so the alternate is never
+    resolved on it; and since that row may be of `review_b`'s family, `review_b` is not "of no builder row of the
+    branch that parses", so the resolve is a REBUILD (round 1 counted the row for no family, read the set as known and
+    resolved `review_b`)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [dict(NATIVE, review_b_alt=GPT)])
+    e = json.loads(row(GROK_B, start=c1, clean=True))
+    e["model"] = model
+    write_record(ws, json.dumps(e))
+    commit(ws, "the builder's work")
+    rc, out = resolve(ws)
+    assert unknown_cause(out, "runs.jsonl"), "the cause on a line of its own: " + out
+    assert_rebuild(ws, rc, out)
+
+
+@pytest.mark.parametrize("ref", ["tag-main", "tag-branch"])
+def test_task086a_main_and_the_branch_are_read_by_their_full_ref_names(tmp_path, ref):
+    """TASK-086a Done when: "the branch's base ... (its merge base with `origin/main`, or with `main` where the
+    repository has no remote)"; "every builder row of the branch counts": the base is the branch `main`, never a tag
+    named `main` (git reads a tag first), and the branch is the checked-out branch, never `heads/<name>` (what git's
+    short name gives where a tag has the same name) (round 1 took the tag for the base, so a report the branch adds
+    read as the base's, and read the branch as `heads/task-1`, so its builder rows counted for nothing)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [dict(NATIVE, review_b_alt=GPT)])
+    if ref == "tag-main":
+        write_record(ws, row(COMPOSER, start=c1, clean=True, brief="TASK-001"))
+        commit(ws, "a report with no row", files={REPORT2.replace("TASK-001", "TASK-002"): "round 1\n"})
+        git(ws, "tag", "main", "HEAD")
+        rc, out = resolve(ws)
+        assert unknown_cause(out, "TASK-002-r2-report.md"), "the cause on a line of its own: " + out
+    else:
+        write_record(ws, row(GROK_B, start=c1, clean=True))
+        commit(ws, "the builder's work")
+        git(ws, "tag", BRANCH, c1)
+        rc, out = resolve(ws)
+        assert_deviation(ws, rc, out, GPT, "family", {"xai"})
+
+
+def test_task086a_a_start_commit_is_a_full_object_name(tmp_path):
+    """The brief's security context ("a `start_commit` from the record is passed to git only after it is checked to
+    be a hexadecimal object name (never ... a revision expression)"): a short object name is one git may read as a
+    branch or tag named like it, so only a full one (40 or 64 hexadecimal digits) places a row; a later row whose
+    start commit is short drops nothing, and the earlier family stays (round 1 dropped it)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [NATIVE])
+    commit(ws, "the first run's work")
+    write_record(ws, row(GROK_B, start=c1, clean=True), row(COMPOSER, start=c1[:12], clean=True))
+    rc, out = resolve(ws)
+    assert_rebuild(ws, rc, out)
+
+
+def test_task086a_a_builder_that_does_not_answer_skips_the_profile_where_an_alternate_would_resolve(
+        program, tmp_path, monkeypatch, capsys):
+    """TASK-086a Done when: "the alternate is probed where the profile's models are"; the checkpoint's rule that a
+    model that does not answer skips the profile: `review_b`'s family built and the alternate answers, but the
+    profile's builder does not, so the profile is skipped, never a REBUILD with a builder that does not answer
+    (round 1 resolved the REBUILD)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [dict(NATIVE, review_b_alt=GPT)])
+    write_record(ws, row(GROK_B, start=c1, clean=True))
+    commit(ws, "the builder's work")
+    before = plant_resolved(ws)
+    mod = program("roster-check")
+    monkeypatch.setattr(mod, "probe",
+                        lambda model_id, *a, **k: (False, "exit 1") if model_id == COMPOSER else (True, "ok"))
+    rc, out = _main_in_process(mod, ws, monkeypatch, capsys)
+    assert rc == 1 and "skip" in out and "RESOLVED" not in out, out
+    assert "REBUILD" not in out and not deviation_printed(out), out
+    assert resolved_path(ws).read_bytes() == before
+
+
+@pytest.mark.parametrize("case,cause", [("no-alternate", "no review_b_alt"), ("alternate-of-review-a", "review a"),
+                                        ("alternate-family-built", "built"), ("alternate-pool-exhausted", "pool"),
+                                        ("alternate-marked", "marked")])
+def test_task086a_review_alt_names_its_cause(tmp_path, case, cause):
+    """TASK-086a Done when: "`--review-alt <reason>` ... ending with exit 1, the cause named"; the design's row "none,
+    or not independent, or not usable ... exit 1, the cause named": the refusal names which (round 1 printed one line
+    for every cause). The words: `no review_b_alt` where none is named, `Review A` for an alternate of its family,
+    `built` for a family that built the branch, `pool` for an exhausted pool, `marked` for a mark."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    if case == "alternate-pool-exhausted":
+        write_roster(ws, [dict(NATIVE, review_b_alt=GPT)], other_pool="exhausted")
+    else:
+        alt = {"no-alternate": None, "alternate-of-review-a": CLAUDE_ALT, "alternate-family-built": COMPOSER,
+               "alternate-marked": COMPOSER}[case]
+        profile = dict(FULL, review_b_alt=alt) if alt else dict(FULL)
+        write_roster(ws, [profile], unavailable=[COMPOSER] if case == "alternate-marked" else ())
+    if case == "alternate-family-built":
+        write_record(ws, row(COMPOSER, start=c1, clean=True))
+    before = plant_resolved(ws)
+    rc, out = resolve(ws, "--review-alt", "safety-refusal")
+    assert rc == 1 and "RESOLVED" not in out, out
+    assert cause in fail_text(out), "the cause named on a FAIL line (%s): %s" % (cause, out)
+    assert resolved_path(ws).read_bytes() == before
+
+
+def test_task086a_review_alt_acts_on_the_profile_in_use_alone(tmp_path):
+    """The design's row "known, on `--review-alt <reason>` | refused by its provider (T103)": the request is about
+    the profile in use, whose `review_b` was refused; where that profile names no alternate the request ends with exit
+    1 and the cause, and never passes to a later profile, which would also change the builder (round 1 resolved the
+    second profile's alternate without a word)."""
+    ws = scratch_repo(tmp_path)
+    commit(ws, "checkpoint")
+    write_roster(ws, [FULL, dict(NATIVE, review_b_alt=COMPOSER)])
+    before = plant_resolved(ws)
+    rc, out = resolve(ws, "--review-alt", "safety-refusal")
+    assert rc == 1 and "RESOLVED" not in out and not deviation_printed(out), out
+    assert "no review_b_alt" in fail_text(out), out
+    assert resolved_path(ws).read_bytes() == before
+
+
+def test_task086a_review_alt_on_a_set_that_cannot_be_read(tmp_path):
+    """TASK-086a Done when: "`--review-alt <reason>` ... ending with exit 1, the cause named and the resolved file
+    unchanged, where it cannot"; the design: the row of a set that cannot be read "is read before the others"."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [dict(FULL, review_b_alt=COMPOSER)])
+    git(ws, "checkout", "-q", "--detach", c1)
+    before = plant_resolved(ws)
+    rc, out = resolve(ws, "--review-alt", "safety-refusal")
+    assert_cannot_read(ws, rc, out, before, "detached")
+
+
+def test_task086a_review_alt_on_a_known_set_records_the_built_families(tmp_path):
+    """The design's row "known, on `--review-alt <reason>` ... the alternate, with `deviation` (the reason given)";
+    the entry's `built` holds the known set (the acceptance test of the request on an empty set never shows it)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [dict(NATIVE, review_b_alt=GPT)])
+    write_record(ws, row(COMPOSER, start=c1, clean=True))
+    commit(ws, "the builder's work")
+    rc, out = resolve(ws, "--review-alt", "safety-refusal")
+    assert_deviation(ws, rc, out, GPT, "safety-refusal", {"cursor"})
+
+
+@pytest.mark.parametrize("reason", ["safety\n", "--no-probe", "-"], ids=["trailing-newline", "an-option", "hyphen"])
+def test_task086a_review_alt_refuses_a_reason_that_is_not_a_word_and_says_so(tmp_path, reason):
+    """TASK-086a Done when: "`--review-alt <reason>`, the reason one word of letters and hyphens": a word begins with
+    a letter and ends at the value's end, so a trailing line feed, an option and a hyphen alone are refused, with a
+    line naming the reason (round 1 took `safety` followed by a line feed and `--no-probe`, the latter also turning
+    the probe off, and refused the rest without a word)."""
+    ws = scratch_repo(tmp_path)
+    commit(ws, "checkpoint")
+    write_roster(ws, [dict(FULL, review_b_alt=COMPOSER)])
+    before = plant_resolved(ws)
+    rc, out = resolve(ws, "--review-alt", reason)
+    assert rc != 0 and "RESOLVED" not in out and not deviation_printed(out), out
+    assert "reason" in out.lower(), "a line naming the reason: " + out
+    assert resolved_path(ws).read_bytes() == before
