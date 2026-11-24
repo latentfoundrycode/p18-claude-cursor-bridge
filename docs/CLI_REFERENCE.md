@@ -970,8 +970,10 @@ docs/ROSTER.json (v2):
 A model entry is an id string or {"model": id, "family": name, "pool": "native"|"other"}.
 Pool is inferred from the id per Cursor's docs: Grok (any effort/host prefix) and Composer are
 the "Cursor Models" pool (native); every third-party model is "Other Models".
-A profile is skipped when other_pool is "exhausted" and any of its models is in the other
-pool. Unless --no-probe, the builder and Review B of a candidate profile are each sent a
+A profile is skipped when other_pool is "exhausted" and the builder is in the other pool, or
+when review_b is excluded by its pool or a mark only where no alternate is independent and
+usable. Unless --no-probe, the profile's builder, Review B and (where the table resolves an
+alternate) review_b_alt are each sent a
 one-word request through `cursor-agent -p -f --model <id>`; a refusal, empty reply,
 usage-limit message or timeout marks the profile unusable (this catches hard failures only,
 never a nearly-empty quota); any other reply counts as answered, off-script. The chosen
@@ -1022,7 +1024,8 @@ unavailable marks and failure counts, and says so. Timestamps are UTC. ROSTER_NO
 overrides "now" for tests.
 Exit 0 = resolved; 1 = no usable profile, a family collision, a command mismatch, a built set
 that cannot be read, or a refused --review-alt;
-2 = cannot read or a wrong model argument; 3 = pool/model marked exhausted, re-resolve;
+2 = cannot read, a malformed --review-alt reason, CANNOT REPAIR, or a wrong model argument;
+3 = pool/model marked exhausted, re-resolve;
 4 = transient, retry once; 5 = repeated connection failures or time-outs, or the Cursor tool signed out (SIGN-IN), tell the owner.
 ASCII-only on purpose.
 ```

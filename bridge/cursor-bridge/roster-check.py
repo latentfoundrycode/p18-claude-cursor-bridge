@@ -21,8 +21,10 @@ docs/ROSTER.json (v2):
 A model entry is an id string or {"model": id, "family": name, "pool": "native"|"other"}.
 Pool is inferred from the id per Cursor's docs: Grok (any effort/host prefix) and Composer are
 the "Cursor Models" pool (native); every third-party model is "Other Models".
-A profile is skipped when other_pool is "exhausted" and any of its models is in the other
-pool. Unless --no-probe, the builder and Review B of a candidate profile are each sent a
+A profile is skipped when other_pool is "exhausted" and the builder is in the other pool, or
+when review_b is excluded by its pool or a mark only where no alternate is independent and
+usable. Unless --no-probe, the profile's builder, Review B and (where the table resolves an
+alternate) review_b_alt are each sent a
 one-word request through `cursor-agent -p -f --model <id>`; a refusal, empty reply,
 usage-limit message or timeout marks the profile unusable (this catches hard failures only,
 never a nearly-empty quota); any other reply counts as answered, off-script. The chosen
@@ -73,7 +75,8 @@ unavailable marks and failure counts, and says so. Timestamps are UTC. ROSTER_NO
 overrides "now" for tests.
 Exit 0 = resolved; 1 = no usable profile, a family collision, a command mismatch, a built set
 that cannot be read, or a refused --review-alt;
-2 = cannot read or a wrong model argument; 3 = pool/model marked exhausted, re-resolve;
+2 = cannot read, a malformed --review-alt reason, CANNOT REPAIR, or a wrong model argument;
+3 = pool/model marked exhausted, re-resolve;
 4 = transient, retry once; 5 = repeated connection failures or time-outs, or the Cursor tool signed out (SIGN-IN), tell the owner.
 ASCII-only on purpose.
 """
@@ -83,6 +86,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -150,16 +154,22 @@ def built_by(run_log, branch=None):
     review is of a text nothing built, and another branch's builder did not build this change
     (2026.10.25a: the fallback to any branch's last run refused the only usable profile)."""
     try:
-        with open(run_log, encoding="utf-8") as f:
-            lines = f.read().splitlines()
+        with open(run_log, "rb") as f:
+            raw = f.read().split(b"\n")
     except OSError:
         return None
     branch = branch or current_branch()
     entries = []
-    for line in lines:
+    for line_b in raw:
+        if not line_b.strip():
+            continue
+        try:
+            line = line_b.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
         try:
             e = json.loads(line)
-        except ValueError:
+        except (ValueError, RecursionError):
             continue
         if isinstance(e, dict) and e.get("kind") == "builder" and e.get("model"):
             if e.get("slot") == "not free":
@@ -172,8 +182,9 @@ def built_by(run_log, branch=None):
 
 
 GIT_TIMEOUT = 20
-REVIEW_ALT_REASON_RX = re.compile(r"^[a-zA-Z-]+$")
-_COMMIT_NAME_RX = re.compile(r"^[0-9a-fA-F]{4,64}$")
+REVIEW_ALT_WORD_RX = re.compile(r"[A-Za-z][A-Za-z-]*")
+_COMMIT_NAME_RX = re.compile(r"^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$")
+_REPORT_BRIEF_RX = re.compile(r"(.+?)(?:-r\d+[a-z]?)?-report\.md", re.IGNORECASE)
 
 
 def _git_run(args, cwd):
@@ -196,78 +207,127 @@ def _in_git_repo(cwd):
 
 
 def _valid_commit_name(name):
-    return isinstance(name, str) and _COMMIT_NAME_RX.match(name)
+    return isinstance(name, str) and bool(_COMMIT_NAME_RX.fullmatch(name))
 
 
-def _commit_exists(sha, cwd):
+def _commit_exists(sha, cwd, cache=None):
+    if cache is None:
+        cache = {}
+    if sha in cache:
+        return cache[sha]
     p = _git_run(["git", "rev-parse", "--verify", "-q", sha + "^{commit}"], cwd)
-    return p is not None and p.returncode == 0
+    if p is None or p.returncode not in (0, 1):
+        cache[sha] = None
+        return None
+    ok = p.returncode == 0
+    cache[sha] = ok
+    return ok
 
 
 def _git_is_ancestor(ancestor, descendant, cwd):
     p = _git_run(["git", "merge-base", "--is-ancestor", ancestor, descendant], cwd)
-    if p is None:
+    if p is None or p.returncode not in (0, 1):
         return None
     return p.returncode == 0
 
 
+def _repo_toplevel(cwd):
+    p = _git_run(["git", "rev-parse", "--show-toplevel"], cwd)
+    if p is None or p.returncode != 0:
+        return None
+    return (p.stdout or "").strip()
+
+
 def _brief_from_report(rel_path):
     base = os.path.basename(rel_path.replace("\\", "/"))
-    m = re.match(r"^(.+)-r\d+-report\.md$", base)
+    m = _REPORT_BRIEF_RX.fullmatch(base)
     return m.group(1) if m else None
 
 
-def _handoff_reports_on_tree(cwd):
-    handoff = os.path.join(cwd, "handoff")
-    found = []
-    if not os.path.isdir(handoff):
-        return found
-    for name in os.listdir(handoff):
-        if name.endswith("-report.md"):
-            found.append(("handoff/" + name).replace("\\", "/"))
-    return found
-
-
 def _reports_at_commit(commit, cwd):
-    p = _git_run(["git", "ls-tree", "-r", "--name-only", commit, "handoff"], cwd)
+    p = _git_run(["git", "ls-tree", "-r", "-z", "--name-only", "--full-tree", commit, "--", "handoff/"], cwd)
     if p is None or p.returncode != 0:
-        return set()
+        return None
     out = set()
-    for line in (p.stdout or "").splitlines():
-        line = line.strip().replace("\\", "/")
-        if line.endswith("-report.md"):
-            out.add(line)
+    for part in (p.stdout or "").split("\0"):
+        part = part.strip().replace("\\", "/")
+        if part and part.lower().endswith("-report.md"):
+            out.add(part)
     return out
 
 
+def _handoff_reports_working_tree(toplevel):
+    handoff = os.path.join(toplevel, "handoff")
+    found = set()
+    if os.path.isdir(handoff):
+        for name in os.listdir(handoff):
+            if name.lower().endswith("-report.md"):
+                found.add(("handoff/" + name).replace("\\", "/"))
+    return found
+
+
+def _tree_report_names(cwd):
+    top = _repo_toplevel(cwd)
+    if top is None:
+        return None, "git"
+    wt = _handoff_reports_working_tree(top)
+    head_p = _git_run(["git", "rev-parse", "HEAD"], cwd)
+    if head_p is None or head_p.returncode != 0:
+        return None, "git"
+    head = (head_p.stdout or "").strip()
+    at_head = _reports_at_commit(head, cwd)
+    if at_head is None:
+        return None, "git"
+    return wt | at_head, None
+
+
+def _branch_from_head(cwd):
+    p = _git_run(["git", "symbolic-ref", "-q", "HEAD"], cwd)
+    if p is None or p.returncode not in (0, 1):
+        return None, "git"
+    if p.returncode == 1:
+        return None, "detached"
+    ref = (p.stdout or "").strip()
+    if ref.startswith("refs/heads/"):
+        return ref[len("refs/heads/"):], None
+    return None, "detached"
+
+
 def _merge_base_with_main(branch, cwd):
-    for ref in ("origin/main", "main"):
-        p = _git_run(["git", "rev-parse", "--verify", "-q", ref + "^{commit}"], cwd)
-        if p is None or p.returncode != 0:
+    branch_ref = branch if branch.startswith("refs/") else "refs/heads/" + branch
+    for main_ref in ("refs/remotes/origin/main", "refs/heads/main"):
+        p = _git_run(["git", "rev-parse", "--verify", "-q", main_ref + "^{commit}"], cwd)
+        if p is None or p.returncode not in (0, 1):
+            return None, "git"
+        if p.returncode == 1:
             continue
-        main_sha = (p.stdout or "").strip()
-        mb = _git_run(["git", "merge-base", branch, main_sha], cwd)
-        if mb is None:
-            return None, None
-        if mb.returncode != 0:
-            continue
+        mb = _git_run(["git", "merge-base", branch_ref, main_ref], cwd)
+        if mb is None or mb.returncode not in (0, 1):
+            return None, "git"
+        if mb.returncode == 1:
+            return None, "main"
         base = (mb.stdout or "").strip()
         if base:
             return base, None
     return None, "main"
 
 
-def _row_valid_start(row, cwd):
+def _row_valid_start(row, cwd, commit_cache):
     sc = row.get("start_commit")
     if not _valid_commit_name(sc):
         return None
-    if not _commit_exists(sc, cwd):
+    exists = _commit_exists(sc, cwd, commit_cache)
+    if exists is None:
+        return False
+    if not exists:
         return None
     return sc
 
 
-def _apply_drop_rule(rows, cwd):
+def _apply_drop_rule(rows, cwd, commit_cache=None):
     """Return rows that survive the clean-rebuild drop rule, in file order, or None if git does not answer."""
+    if commit_cache is None:
+        commit_cache = {}
     if not rows:
         return []
     kept = []
@@ -276,8 +336,10 @@ def _apply_drop_rule(rows, cwd):
         for later in rows[i + 1:]:
             if later.get("clean") is not True:
                 continue
-            ls = _row_valid_start(later, cwd)
-            es = _row_valid_start(row, cwd)
+            ls = _row_valid_start(later, cwd, commit_cache)
+            es = _row_valid_start(row, cwd, commit_cache)
+            if ls is False or es is False:
+                return None
             if ls is None or es is None:
                 continue
             if ls == es:
@@ -301,7 +363,7 @@ def _roster_builder_families(roster, profiles):
         fam = family_of(b_id, b_fam_o)
         if fam:
             fams.add(fam)
-    for role in ("builder",):
+    for role in ("builder", "review_b"):
         mid, fam_o, _ = norm_entry(roster.get(role))
         if mid:
             fam = family_of(mid, fam_o)
@@ -310,31 +372,65 @@ def _roster_builder_families(roster, profiles):
     return fams
 
 
+def _roster_model_family(roster, profiles, model_id):
+    if not isinstance(model_id, str) or not model_id:
+        return None
+    for prof in profiles or []:
+        for role in ("builder", "review_b", "review_b_alt"):
+            mid, fam_o, _ = norm_entry(prof.get(role))
+            if mid == model_id and fam_o:
+                return family_of(mid, fam_o)
+    for role in ("builder", "review_b", "review_a"):
+        mid, fam_o, _ = norm_entry(roster.get(role))
+        if mid == model_id and fam_o:
+            return family_of(mid, fam_o)
+    return family_of(model_id)
+
+
+def _parse_run_line(line_b):
+    if not line_b.strip():
+        return None
+    try:
+        text = line_b.decode("utf-8", "strict")
+    except UnicodeDecodeError:
+        return False
+    if not text.strip():
+        return None
+    try:
+        e = json.loads(text)
+    except (ValueError, RecursionError):
+        return False
+    if not isinstance(e, dict):
+        return False
+    return e
+
+
 def _parse_run_log_raw(run_log):
+    run_log_base = os.path.basename(run_log)
     try:
         if os.path.isdir(run_log):
-            return None, "runs.jsonl", [], [0]
-        with open(run_log, encoding="utf-8") as f:
-            raw_lines = f.read().splitlines()
+            return None, run_log_base, [], [], []
+        with open(run_log, "rb") as f:
+            raw_lines = f.read().split(b"\n")
     except OSError:
         if os.path.exists(run_log):
-            return None, "runs.jsonl", [], [0]
-        return [], None, [], []
+            return None, run_log_base, [], [], []
+        return [], None, [], [], []
     bad = []
     objs = []
-    for line in raw_lines:
-        if not line.strip():
+    good_bytes = []
+    for line_b in raw_lines:
+        if not line_b.strip():
             continue
-        try:
-            e = json.loads(line)
-        except ValueError:
-            bad.append(line)
+        parsed = _parse_run_line(line_b)
+        if parsed is None:
             continue
-        if not isinstance(e, dict):
-            bad.append(line)
+        if parsed is False:
+            bad.append(line_b)
             continue
-        objs.append(e)
-    return objs, None, bad, raw_lines
+        objs.append(parsed)
+        good_bytes.append(line_b)
+    return objs, None, bad, raw_lines, good_bytes
 
 
 def _branch_builder_rows(entries, branch):
@@ -349,7 +445,7 @@ def _branch_builder_rows(entries, branch):
     return rows
 
 
-def built_families(run_log, branch=None, cwd=None):
+def built_families(run_log, branch=None, cwd=None, roster=None, profiles=None):
     """Families that built the branch, or empty / unknown / unreadable.
 
     Signature for TASK-086b: built_families(run_log, branch=None, cwd=None) -> dict with
@@ -358,25 +454,31 @@ def built_families(run_log, branch=None, cwd=None):
     """
     cwd = cwd or os.getcwd()
     branch_arg = branch
+    roster = roster or {}
+    profiles = profiles or roster.get("profiles") or []
     result = {"branch": branch or "", "status": "known", "families": set(), "unknown_causes": [],
               "unreadable_cause": None, "parsing_rows": [], "counted_rows": [],
               "rebuild_end": None, "run_log_base": os.path.basename(run_log)}
     if not _in_git_repo(cwd):
         result["status"] = "empty"
         return result
-    head_ref = _git_run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd)
-    if head_ref is None or head_ref.returncode != 0:
+    branch_name, head_fail = _branch_from_head(cwd)
+    if head_fail == "git":
         result["status"] = "unreadable"
         result["unreadable_cause"] = "git"
         return result
-    ref = (head_ref.stdout or "").strip()
-    if ref == "HEAD":
+    if head_fail == "detached":
         result["status"] = "unreadable"
         result["unreadable_cause"] = "detached"
         return result
-    branch = branch_arg or ref
+    branch = branch_arg or branch_name
     result["branch"] = branch
-    tree_reports = _handoff_reports_on_tree(cwd)
+    tree_reports, rep_fail = _tree_report_names(cwd)
+    if rep_fail:
+        result["status"] = "unreadable"
+        result["unreadable_cause"] = rep_fail
+        return result
+    added_reports = []
     if tree_reports:
         base, fail = _merge_base_with_main(branch, cwd)
         if fail:
@@ -388,40 +490,46 @@ def built_families(run_log, branch=None, cwd=None):
             result["unreadable_cause"] = "main"
             return result
         base_reports = _reports_at_commit(base, cwd)
-        added_reports = [r for r in tree_reports if r not in base_reports]
-    else:
-        added_reports = []
-    entries, open_fail, bad_lines, _raw = _parse_run_log_raw(run_log)
+        if base_reports is None:
+            result["status"] = "unreadable"
+            result["unreadable_cause"] = "git"
+            return result
+        base_cf = {p.casefold() for p in base_reports}
+        added_reports = [r for r in tree_reports if r.casefold() not in base_cf]
+    entries, open_fail, bad_lines, _raw, _good = _parse_run_log_raw(run_log)
     if open_fail:
         result["status"] = "unreadable"
         result["unreadable_cause"] = open_fail
         return result
-    if entries is None:
-        result["status"] = "unreadable"
-        result["unreadable_cause"] = "runs.jsonl"
-        return result
     parsing_rows = _branch_builder_rows(entries, branch)
     result["parsing_rows"] = list(parsing_rows)
-    counted = _apply_drop_rule(parsing_rows, cwd)
+    commit_cache = {}
+    counted = _apply_drop_rule(parsing_rows, cwd, commit_cache)
     if counted is None:
         result["status"] = "unreadable"
         result["unreadable_cause"] = "git"
         return result
     result["counted_rows"] = counted
-    for row in counted:
-        fam = family_of(str(row.get("model")))
-        if fam:
-            result["families"].add(fam)
     unknown = []
     if bad_lines:
-        unknown.append(("runs.jsonl", "runs.jsonl"))
+        unknown.append(("runs.jsonl", result["run_log_base"]))
         result["rebuild_end"] = "--repair-record"
+    for row in counted:
+        mid = row.get("model")
+        fam = _roster_model_family(roster, profiles, mid)
+        if not isinstance(mid, str) or not mid or fam is None:
+            row_id = row.get("id", "?")
+            label = "%s: builder row %s of model %r, whose family cannot be named; give the model its family in the roster" % (
+                result["run_log_base"], row_id, mid)
+            unknown.append((label, label))
+            if result["rebuild_end"] is None:
+                result["rebuild_end"] = "checkpoint"
+            continue
+        result["families"].add(fam)
     for rep in added_reports:
         brief = _brief_from_report(rep)
-        if not brief:
-            continue
-        if not any(r.get("brief") == brief for r in parsing_rows):
-            unknown.append((rep, rep))
+        if brief is None or not any(r.get("brief") == brief for r in parsing_rows):
+            unknown.append((rep, os.path.basename(rep.replace("\\", "/"))))
             if result["rebuild_end"] is None:
                 result["rebuild_end"] = "checkpoint"
     if unknown:
@@ -438,67 +546,119 @@ def built_families(run_log, branch=None, cwd=None):
 def _rebuild_needs_new_branch(counted, branch, cwd):
     if not counted:
         return False
+    commit_cache = {}
     start = None
     for row in counted:
-        sc = _row_valid_start(row, cwd)
+        sc = _row_valid_start(row, cwd, commit_cache)
+        if sc is False:
+            return None
         if sc:
             start = sc
             break
     if start is None:
         return True
     hypo = {"kind": "builder", "branch": branch, "model": "x", "start_commit": start, "clean": True}
-    survived = _apply_drop_rule(counted + [hypo], cwd)
+    survived = _apply_drop_rule(counted + [hypo], cwd, commit_cache)
+    if survived is None:
+        return None
     return len(survived) > 1
+
+
+def _rebuild_built_by_model(rows, r_fam, roster, profiles, fallback):
+    for row in reversed(rows):
+        mid = row.get("model")
+        fam = _roster_model_family(roster, profiles, mid)
+        if fam == r_fam and isinstance(mid, str) and mid:
+            return mid
+    return fallback
+
+
+def _parsing_row_families(rows, roster, profiles):
+    fams = set()
+    for row in rows:
+        fam = _roster_model_family(roster, profiles, row.get("model"))
+        if fam:
+            fams.add(fam)
+    return fams
 
 
 def _alt_independent(alt_fam, built_fams, ra_fam):
     return alt_fam and alt_fam != ra_fam and alt_fam not in built_fams
 
 
-def _parsing_row_families(rows):
-    fams = set()
-    for row in rows:
-        fam = family_of(str(row.get("model")))
-        if fam:
-            fams.add(fam)
-    return fams
+def _damaged_path_unsafe(path):
+    if not os.path.exists(path):
+        return False
+    if not os.path.isfile(path):
+        return True
+    if os.path.islink(path):
+        return True
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return True
+    if getattr(st, "st_reparse_tag", 0):
+        return True
+    if st.st_nlink > 1:
+        return True
+    return False
 
 
 def repair_record(run_log):
-    entries, open_fail, bad_lines, raw_lines = _parse_run_log_raw(run_log)
-    if open_fail or entries is None:
+    _entries, open_fail, _bad, raw_lines, _good = _parse_run_log_raw(run_log)
+    if open_fail is not None:
         print("CANNOT REPAIR: cannot read %s" % run_log)
         return 2
-    good_objs = []
-    bad_lines_ordered = []
-    for line in raw_lines:
-        if not line.strip():
+    kept_bytes = []
+    moved_bytes = []
+    for line_b in raw_lines:
+        if not line_b.strip():
             continue
-        try:
-            e = json.loads(line)
-            if not isinstance(e, dict):
-                bad_lines_ordered.append(line)
-                continue
-        except ValueError:
-            bad_lines_ordered.append(line)
-            continue
-        good_objs.append(line)
-    if not bad_lines_ordered:
-        print("repair-record  kept %d  moved 0" % len(good_objs))
+        parsed = _parse_run_line(line_b)
+        if parsed is False:
+            moved_bytes.append(line_b)
+        elif parsed is not None:
+            kept_bytes.append(line_b)
+    if not moved_bytes:
+        print("repair-record  kept %d  moved 0" % len(kept_bytes))
         return 0
     log_dir = os.path.dirname(os.path.abspath(run_log)) or "."
     base = os.path.basename(run_log)
-    tmp = os.path.join(log_dir, base + ".tmp")
-    os.makedirs(log_dir, exist_ok=True)
-    with open(tmp, "w", encoding="utf-8", newline=NL) as f:
-        for line in good_objs:
-            f.write(line + NL)
-    os.replace(tmp, run_log)
     damaged = os.path.join(log_dir, "runs.damaged.jsonl")
-    with open(damaged, "a", encoding="utf-8", newline=NL) as f:
-        for line in bad_lines_ordered:
-            f.write(line + NL)
-    print("repair-record  kept %d  moved %d" % (len(good_objs), len(bad_lines_ordered)))
+    if _damaged_path_unsafe(damaged):
+        print("CANNOT REPAIR: refuse %s" % damaged)
+        return 2
+    tmp_fd = tmp_path = None
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+        with open(damaged, "ab") as f:
+            for line_b in moved_bytes:
+                f.write(line_b + b"\n")
+            f.flush()
+            os.fsync(f.fileno())
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=log_dir, prefix=base + ".")
+        with os.fdopen(tmp_fd, "wb") as f:
+            tmp_fd = None
+            for line_b in kept_bytes:
+                f.write(line_b + b"\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, run_log)
+        tmp_path = None
+    except OSError as e:
+        if tmp_fd is not None:
+            try:
+                os.close(tmp_fd)
+            except OSError:
+                pass
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+        print("CANNOT REPAIR: %s" % e)
+        return 2
+    print("repair-record  kept %d  moved %d" % (len(kept_bytes), len(moved_bytes)))
     return 0
 
 
@@ -845,7 +1005,7 @@ def record_failure(path, roster, model, stderr_text="", stdout_text=""):
 def main():
     argv = sys.argv[1:]
     if not argv or argv[0].startswith("--"):
-        print("usage: roster-check.py docs/ROSTER.json [--command ...] [--no-probe] [--out <path>] | --record-failure <model> --stderr-file <path>")
+        print("usage: roster-check.py docs/ROSTER.json [--command ...] [--no-probe] [--out <path>] [--repair-record] [--review-alt <reason>] | --record-failure <model> --stderr-file <path>")
         return 2
     path = argv[0]
     command = argv[argv.index("--command") + 1] if "--command" in argv and argv.index("--command") + 1 < len(argv) else None
@@ -916,9 +1076,12 @@ def main():
     review_alt_reason = None
     if "--review-alt" in argv:
         i = argv.index("--review-alt") + 1
-        if i >= len(argv) or not REVIEW_ALT_REASON_RX.match(argv[i] or ""):
+        alt_val = argv[i] if i < len(argv) else None
+        if alt_val is None or not REVIEW_ALT_WORD_RX.fullmatch(alt_val):
+            got = repr(alt_val) if alt_val is not None else "nothing"
+            print("FAIL  --review-alt: the reason must be one word of letters and hyphens, beginning with a letter (got %s)" % got)
             return 2
-        review_alt_reason = argv[i]
+        review_alt_reason = alt_val
 
     maybe_auto_reset(path, roster)
     dropped = expire_unavailable(roster)
@@ -940,11 +1103,15 @@ def main():
         return 1
 
     cwd = os.getcwd()
-    bset = built_families(run_log, cwd=cwd)
+    bset = built_families(run_log, cwd=cwd, roster=roster, profiles=profiles)
     built_model = built_by(run_log, bset["branch"])
     built_fam_one = family_of(built_model) if built_model else None
     roster_b_fams = _roster_builder_families(roster, profiles)
-    parse_b_fams = _parsing_row_families(bset["parsing_rows"])
+    parse_b_fams = _parsing_row_families(bset["parsing_rows"], roster, profiles)
+    parsing_unknown_family = any(
+        not isinstance(row.get("model"), str) or not row.get("model")
+        or _roster_model_family(roster, profiles, row.get("model")) is None
+        for row in bset["parsing_rows"])
     rebuild_end = bset.get("rebuild_end")
     set_status = bset["status"]
     built_fam_set = set(bset["families"]) if set_status in ("known", "empty") else set()
@@ -959,6 +1126,18 @@ def main():
             print("unknown  the built set is not known (%s)" % label)
         print("FAIL  --review-alt refused: the built set is not known")
         return 1
+
+    def _rebuild_line_open(r_id, r_fam, rb_model, builder_id):
+        rows_for_rb = bset["counted_rows"] if set_status != "unknown" else bset["parsing_rows"]
+        rb = _rebuild_built_by_model(rows_for_rb, r_fam, roster, profiles, built_model)
+        if rb and _roster_model_family(roster, profiles, rb) == r_fam:
+            return ("    REBUILD  review_b %s is of the %s family, which built the change in flight (%s): this profile's builder %s rebuilds it before Review B (step 3b); the reviewer of a change is never of the family that built it (release A4)" % (
+                r_id, r_fam, rb, builder_id)), rb
+        if r_fam in roster_b_fams:
+            return ("    REBUILD  review_b %s is of the %s family, which is a builder's family in the roster file: this profile's builder %s rebuilds it before Review B (step 3b); the reviewer of a change is never of the family that built it (release A4)" % (
+                r_id, r_fam, builder_id)), rb
+        return ("    REBUILD  review_b %s is of the %s family, and a builder row of the branch names a model whose family cannot be named: this profile's builder %s rebuilds it before Review B (step 3b); the reviewer of a change is never of the family that built it (release A4)" % (
+            r_id, r_fam, builder_id)), rb
 
     print("roster-check: other_pool=%s  review_a=%s (%s)" % (other_pool, ra_id, ra_fam))
     if built_model:
@@ -988,129 +1167,204 @@ def main():
     def _r_excluded(r_id, r_pool):
         return r_id in unavailable or (other_pool == "exhausted" and r_pool == "other")
 
-    def _r_usable_plain(r_id, r_pool):
-        return r_id not in unavailable and not (other_pool == "exhausted" and r_pool == "other")
-
-    chosen = None
-    global_rebuild_end = rebuild_end
-    for prof in profiles:
+    def _profile_in_use(prof):
         name = prof.get("name", "?")
         b_id, b_fam_o, b_pool_o = norm_entry(prof.get("builder"))
         r_id, r_fam_o, r_pool_o = norm_entry(prof.get("review_b"))
-        a_id, a_fam_o, a_pool_o = norm_entry(prof.get("review_b_alt"))
         b_fam, r_fam = family_of(b_id, b_fam_o), family_of(r_id, r_fam_o)
-        a_fam = family_of(a_id, a_fam_o) if a_id else None
-        b_pool, r_pool = pool_of(b_id, b_pool_o), pool_of(r_id, r_pool_o)
-        a_pool = pool_of(a_id, a_pool_o) if a_id else None
-        print("  profile %-8s builder=%s (%s, %s)  review_b=%s (%s, %s)" % (name, b_id, b_fam, b_pool, r_id, r_fam, r_pool))
+        b_pool = pool_of(b_id, b_pool_o)
         if b_fam is None or r_fam is None:
-            print("    skip: family unknown - add {\"model\": ..., \"family\": ...}"); continue
+            return None
         if other_pool == "exhausted" and b_pool == "other":
-            how = (" automatically at " + roster["auto_exhausted_at"]) if roster.get("auto_exhausted_at") else " by the owner"
-            print("    skip: uses the other-models pool, marked exhausted%s" % how); continue
+            return None
         if b_id in unavailable:
-            print("    skip: a model was marked unavailable after repeated failures (%s)" % b_id); continue
+            return None
         fams = {"builder": b_fam, "review_a": ra_fam, "review_b": r_fam}
         if len(set(fams.values())) < 3:
-            print("    skip: family collision %s" % fams); continue
-
-        if review_alt_reason is not None:
-            if not a_id:
-                continue
-            if not _alt_independent(a_fam, built_fam_set if set_status == "known" else set(), ra_fam):
-                continue
-            if not _alt_pool_ok(a_id, a_pool):
-                continue
-            probe_list = [("builder", b_id), ("review_b_alt", a_id)]
-            if do_probe:
-                ok, sign_in = _probe_roles(probe_list)
-                if sign_in:
-                    return 5
-                if not ok:
-                    continue
-            branch_name = bset["branch"]
-            known_built = sorted(built_fam_set) if set_status == "known" else []
-            chosen = {"profile": name, "builder": b_id, "review_a": ra_id, "review_b": a_id, "families": dict(fams, review_b=a_fam),
-                      "other_pool": other_pool, "probed": do_probe,
-                      "resolved_at": stamp(now_utc()), "reset_day": roster.get("reset_day"),
-                      "deviation": {"review_b_alt": a_id, "reason": review_alt_reason, "branch": branch_name, "built": known_built}}
-            print("DEVIATION  review_b is %s on request (%s)" % (a_id, review_alt_reason))
-            break
-
-        r_excl = _r_excluded(r_id, r_pool)
-        use_r_id, use_r_fam = r_id, r_fam
-        rebuild = None
-        deviation = None
-        profile_rebuild_end = global_rebuild_end
-
-        if set_status == "unknown":
-            if r_excl:
-                print("    skip: review_b is excluded and no alternate may be resolved on an unknown built set"); continue
-            if not _r_usable_plain(r_id, r_pool):
-                print("    skip: a model was marked unavailable after repeated failures (%s)" % r_id); continue
-            if r_fam in roster_b_fams or r_fam in parse_b_fams:
-                rebuild = {"built_by": built_model, "rebuild_with": b_id}
-                print("    REBUILD  review_b %s is of the %s family, which built the change in flight (%s): this profile's builder %s rebuilds it before Review B (step 3b); the reviewer of a change is never of the family that built it (release A4)" % (r_id, r_fam, built_model or "?", b_id))
-            else:
-                pass
-        elif set_status in ("known", "empty"):
-            if not r_excl and not _r_usable_plain(r_id, r_pool):
-                print("    skip: a model was marked unavailable after repeated failures (%s)" % r_id); continue
-            if not r_excl and r_fam not in built_fam_set:
-                pass
-            elif not r_excl and r_fam in built_fam_set:
-                if a_id and _alt_independent(a_fam, built_fam_set, ra_fam) and _alt_pool_ok(a_id, a_pool):
-                    use_r_id, use_r_fam = a_id, a_fam
-                    known_built = sorted(built_fam_set)
-                    deviation = {"review_b_alt": a_id, "reason": "family", "branch": bset["branch"], "built": known_built}
-                else:
-                    rebuild = {"built_by": built_model, "rebuild_with": b_id}
-                    if _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd):
-                        profile_rebuild_end = "new branch"
-                    print("    REBUILD  review_b %s is of the %s family, which built the change in flight (%s): this profile's builder %s rebuilds it before Review B (step 3b); the reviewer of a change is never of the family that built it (release A4)" % (r_id, r_fam, built_model or "?", b_id))
-            elif r_excl:
-                if a_id and _alt_independent(a_fam, built_fam_set, ra_fam) and _alt_pool_ok(a_id, a_pool):
-                    use_r_id, use_r_fam = a_id, a_fam
-                    known_built = sorted(built_fam_set)
-                    deviation = {"review_b_alt": a_id, "reason": "unavailable", "branch": bset["branch"], "built": known_built}
-                else:
-                    print("    skip: review_b is excluded and no independent usable alternate"); continue
-
-        probe_list = [("builder", b_id)]
-        if deviation and a_id:
-            probe_list.append(("review_b_alt", a_id))
-        elif not deviation:
-            probe_list.append(("review_b", r_id))
+            return None
         if do_probe:
-            ok, sign_in = _probe_roles(probe_list)
-            if sign_in:
-                return 5
+            ok, detail = probe(b_id)
+            if ok is PROBE_SIGN_IN:
+                print("    probe %-8s %s: tool sign-in required" % ("builder", b_id))
+                print(SIGN_IN_LINE)
+                return "sign-in"
+            print("    probe %-8s %s: %s" % ("builder", b_id, detail))
             if not ok:
-                if deviation and rebuild is None and set_status != "unknown":
-                    rebuild = {"built_by": built_model, "rebuild_with": b_id}
-                    if _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd):
-                        profile_rebuild_end = "new branch"
-                    deviation = None
-                    use_r_id, use_r_fam = r_id, r_fam
-                    print("    REBUILD  review_b %s is of the %s family, which built the change in flight (%s): this profile's builder %s rebuilds it before Review B (step 3b); the reviewer of a change is never of the family that built it (release A4)" % (r_id, r_fam, built_model or "?", b_id))
-                else:
+                return None
+        return prof
+
+    if review_alt_reason is not None:
+        in_use = None
+        for prof in profiles:
+            u = _profile_in_use(prof)
+            if u == "sign-in":
+                return 5
+            if u is not None:
+                in_use = u
+                break
+        if in_use is None:
+            print("FAIL  --review-alt refused: no profile is in use (every profile is skipped)")
+            return 1
+        name = in_use.get("name", "?")
+        a_id, a_fam_o, a_pool_o = norm_entry(in_use.get("review_b_alt"))
+        if not a_id:
+            print("FAIL  --review-alt refused: no review_b_alt named in profile '%s'" % name)
+            return 1
+        a_fam = family_of(a_id, a_fam_o)
+        a_pool = pool_of(a_id, a_pool_o)
+        check_built = built_fam_set if set_status == "known" else set()
+        if a_fam == ra_fam:
+            print("FAIL  --review-alt refused: review_b_alt %s is of Review A's family (%s)" % (a_id, ra_fam))
+            return 1
+        if a_fam and a_fam in check_built:
+            print("FAIL  --review-alt refused: review_b_alt %s is of the %s family, which built the branch" % (a_id, a_fam))
+            return 1
+        if a_id in unavailable:
+            print("FAIL  --review-alt refused: review_b_alt %s is marked unavailable" % a_id)
+            return 1
+        if other_pool == "exhausted" and a_pool == "other":
+            print("FAIL  --review-alt refused: review_b_alt %s: its pool is exhausted" % a_id)
+            return 1
+        b_id, b_fam_o, _ = norm_entry(in_use.get("builder"))
+        b_fam = family_of(b_id, b_fam_o)
+        if do_probe:
+            ok, detail = probe(a_id)
+            if ok is PROBE_SIGN_IN:
+                print("    probe %-8s %s: tool sign-in required" % ("review_b_alt", a_id))
+                print(SIGN_IN_LINE)
+                return 5
+            print("    probe %-8s %s: %s" % ("review_b_alt", a_id, detail))
+            if not ok:
+                print("FAIL  --review-alt refused: review_b_alt %s did not answer its probe" % a_id)
+                return 1
+        fams = {"builder": b_fam, "review_a": ra_fam, "review_b": a_fam}
+        known_built = sorted(built_fam_set) if set_status == "known" else []
+        chosen = {"profile": name, "builder": b_id, "review_a": ra_id, "review_b": a_id,
+                  "families": fams, "other_pool": other_pool, "probed": do_probe,
+                  "resolved_at": stamp(now_utc()), "reset_day": roster.get("reset_day"),
+                  "deviation": {"review_b_alt": a_id, "reason": review_alt_reason, "branch": bset["branch"],
+                                "built": known_built}}
+        print("DEVIATION  review_b is %s on request (%s)" % (a_id, review_alt_reason))
+        chosen_rebuild_end = None
+    else:
+        chosen = None
+        chosen_rebuild_end = None
+
+    global_rebuild_end = rebuild_end
+    if review_alt_reason is None:
+        for prof in profiles:
+            name = prof.get("name", "?")
+            b_id, b_fam_o, b_pool_o = norm_entry(prof.get("builder"))
+            r_id, r_fam_o, r_pool_o = norm_entry(prof.get("review_b"))
+            a_id, a_fam_o, a_pool_o = norm_entry(prof.get("review_b_alt"))
+            b_fam, r_fam = family_of(b_id, b_fam_o), family_of(r_id, r_fam_o)
+            a_fam = family_of(a_id, a_fam_o) if a_id else None
+            b_pool, r_pool = pool_of(b_id, b_pool_o), pool_of(r_id, r_pool_o)
+            a_pool = pool_of(a_id, a_pool_o) if a_id else None
+            print("  profile %-8s builder=%s (%s, %s)  review_b=%s (%s, %s)" % (name, b_id, b_fam, b_pool, r_id, r_fam, r_pool))
+            if b_fam is None or r_fam is None:
+                print("    skip: family unknown - add {\"model\": ..., \"family\": ...}"); continue
+            if other_pool == "exhausted" and b_pool == "other":
+                how = (" automatically at " + roster["auto_exhausted_at"]) if roster.get("auto_exhausted_at") else " by the owner"
+                print("    skip: uses the other-models pool, marked exhausted%s" % how); continue
+            if b_id in unavailable:
+                print("    skip: a model was marked unavailable after repeated failures (%s)" % b_id); continue
+            fams = {"builder": b_fam, "review_a": ra_fam, "review_b": r_fam}
+            if len(set(fams.values())) < 3:
+                print("    skip: family collision %s" % fams); continue
+
+            r_excl = _r_excluded(r_id, r_pool)
+            use_r_id, use_r_fam = r_id, r_fam
+            rebuild = None
+            deviation = None
+            profile_rebuild_end = global_rebuild_end
+            family_deviation = False
+
+            if set_status == "unknown":
+                if r_excl:
+                    print("    skip: review_b is excluded and no alternate may be resolved on an unknown built set"); continue
+                if r_fam in roster_b_fams or r_fam in parse_b_fams or parsing_unknown_family:
+                    rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
+                    rebuild = {"built_by": rb_model, "rebuild_with": b_id}
+                    print(rb_line)
+            elif set_status in ("known", "empty"):
+                if not r_excl and r_id in unavailable:
+                    print("    skip: a model was marked unavailable after repeated failures (%s)" % r_id); continue
+                if not r_excl and r_fam not in built_fam_set:
+                    pass
+                elif not r_excl and r_fam in built_fam_set:
+                    family_deviation = True
+                    if a_id and _alt_independent(a_fam, built_fam_set, ra_fam) and _alt_pool_ok(a_id, a_pool):
+                        use_r_id, use_r_fam = a_id, a_fam
+                        known_built = sorted(built_fam_set)
+                        deviation = {"review_b_alt": a_id, "reason": "family", "branch": bset["branch"], "built": known_built}
+                    else:
+                        rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
+                        rebuild = {"built_by": rb_model, "rebuild_with": b_id}
+                        nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
+                        if nb is None:
+                            print("FAIL  cannot read the families that built this branch (git)")
+                            return 1
+                        if nb:
+                            profile_rebuild_end = "new branch"
+                        print(rb_line)
+                elif r_excl:
+                    if a_id and _alt_independent(a_fam, built_fam_set, ra_fam) and _alt_pool_ok(a_id, a_pool):
+                        use_r_id, use_r_fam = a_id, a_fam
+                        known_built = sorted(built_fam_set)
+                        deviation = {"review_b_alt": a_id, "reason": "unavailable", "branch": bset["branch"], "built": known_built}
+                    else:
+                        print("    skip: review_b is excluded and no independent usable alternate"); continue
+
+            if do_probe:
+                ok_b, sign_in_b = _probe_roles([("builder", b_id)])
+                if sign_in_b:
+                    return 5
+                if not ok_b:
                     print("    skip: a model did not answer"); continue
+                rest = []
+                if deviation and a_id:
+                    rest.append(("review_b_alt", a_id))
+                elif rebuild is not None or not deviation:
+                    rest.append(("review_b", r_id))
+                if rest:
+                    ok, sign_in = _probe_roles(rest)
+                    if sign_in:
+                        return 5
+                    if not ok:
+                        if deviation and deviation.get("reason") == "unavailable":
+                            print("    skip: a model did not answer"); continue
+                        if deviation and family_deviation and rebuild is None:
+                            rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
+                            rebuild = {"built_by": rb_model, "rebuild_with": b_id}
+                            nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
+                            if nb is None:
+                                print("FAIL  cannot read the families that built this branch (git)")
+                                return 1
+                            if nb:
+                                profile_rebuild_end = "new branch"
+                            deviation = None
+                            use_r_id, use_r_fam = r_id, r_fam
+                            print(rb_line)
+                            ok2, sign_in2 = _probe_roles([("review_b", r_id)])
+                            if sign_in2:
+                                return 5
+                            if not ok2:
+                                print("    skip: a model did not answer"); continue
+                        else:
+                            print("    skip: a model did not answer"); continue
 
-        fams_out = {"builder": b_fam, "review_a": ra_fam, "review_b": use_r_fam}
-        chosen = {"profile": name, "builder": b_id, "review_a": ra_id, "review_b": use_r_id, "families": fams_out,
-                  "other_pool": other_pool, "probed": do_probe,
-                  "resolved_at": stamp(now_utc()), "reset_day": roster.get("reset_day")}
-        if deviation:
-            chosen["deviation"] = deviation
-            print("DEVIATION  review_b is %s instead of %s (%s)" % (a_id, r_id, deviation["reason"]))
-        if rebuild:
-            chosen["rebuild"] = rebuild
-            chosen["_rebuild_end"] = profile_rebuild_end
-        break
-
-    if review_alt_reason is not None and chosen is None:
-        print("FAIL  --review-alt refused: no profile has an independent usable alternate")
-        return 1
+            fams_out = {"builder": b_fam, "review_a": ra_fam, "review_b": use_r_fam}
+            chosen = {"profile": name, "builder": b_id, "review_a": ra_id, "review_b": use_r_id, "families": fams_out,
+                      "other_pool": other_pool, "probed": do_probe,
+                      "resolved_at": stamp(now_utc()), "reset_day": roster.get("reset_day")}
+            if deviation:
+                chosen["deviation"] = deviation
+                print("DEVIATION  review_b is %s instead of %s (%s)" % (a_id, r_id, deviation["reason"]))
+            if rebuild:
+                chosen["rebuild"] = rebuild
+                chosen_rebuild_end = profile_rebuild_end
+            break
     if chosen is None:
         print("FAIL  no usable profile - the owner must buy usage, flip other_pool, or add a native profile")
         return 1
@@ -1141,7 +1395,7 @@ def main():
         chosen["profile"], chosen["builder"], chosen["review_a"], chosen["review_b"], out_path,
         "" if not same else " (unchanged since %s, not rewritten)" % before.get("resolved_at")))
     if chosen.get("rebuild"):
-        end = chosen.pop("_rebuild_end", None)
+        end = chosen_rebuild_end
         base = "REBUILD  the change in flight was built by %s; rebuild it with %s (the brief re-delegated) before Review B %s; the launcher refuses Review B until then" % (
             chosen["rebuild"]["built_by"], chosen["builder"], chosen["review_b"])
         if end == "checkpoint":
