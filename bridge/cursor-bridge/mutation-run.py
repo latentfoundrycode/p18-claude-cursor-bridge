@@ -12,6 +12,7 @@ unmutated code before any mutant runs. A mutant whose tests list times out on th
 is an error and is not run. ASCII-only on purpose (cp1252 consoles).
 """
 import argparse
+import ast
 import hashlib
 import importlib.machinery
 import json
@@ -175,10 +176,6 @@ def import_root_is_absolute(rel):
     s = rel.replace("\\", "/")
     if s.startswith("/"):
         return True
-    if s.startswith("//") or s.startswith("\\\\"):
-        return True
-    if s.startswith("///") or s.startswith("\\\\?\\") or s.startswith("\\\\.\\"):
-        return True
     if len(s) >= 2 and s[1] == ":":
         return True
     return os.path.isabs(rel)
@@ -202,11 +199,18 @@ def validate_import_roots(data, workspace, checkpoint, commit):
                 raise Refuse(
                     "mutation-run: import_roots entry %r leaves the Workspace" % entry)
             raise Refuse("mutation-run: import_roots entry %r is not a valid path" % entry)
-        full = os.path.join(workspace, rel.replace("/", os.sep))
-        if os.path.lexists(full):
-            if link_on_path(full, stop=os.path.abspath(workspace)):
+        parts = [p for p in rel.split("/") if p]
+        cur = os.path.abspath(workspace)
+        for part in parts:
+            cur = os.path.join(cur, part)
+            try:
+                if not os.path.lexists(cur):
+                    break
+                if bridge_env.is_link(cur):
+                    raise Refuse("mutation-run: import_roots entry %r passes through a link" % entry)
+            except OSError:
                 raise Refuse("mutation-run: import_roots entry %r passes through a link" % entry)
-        refuse_links_under(workspace, rel)
+        full = os.path.join(workspace, rel.replace("/", os.sep))
         if not checkpoint:
             if not os.path.isdir(full):
                 if os.path.lexists(full):
@@ -215,18 +219,6 @@ def validate_import_roots(data, workspace, checkpoint, commit):
                 raise Refuse("mutation-run: import_roots entry %r is not in the working tree" % entry)
         out.append(rel)
     return out
-
-
-def tree_path_at_commit(workspace, commit, rel):
-    rel = normalize_rel(rel)
-    if git_try("ls-tree", "-z", commit, "--", rel, cwd=workspace) is not None:
-        return True
-    if git_try("cat-file", "-e", "%s:%s" % (commit, rel), cwd=workspace) is not None:
-        return True
-    pkg_init = rel + "/__init__.py"
-    if git_try("cat-file", "-e", "%s:%s" % (commit, pkg_init), cwd=workspace) is not None:
-        return True
-    return False
 
 
 def module_dotted_prefixes(import_roots_norm, mapped_roots_norm):
@@ -244,12 +236,9 @@ def module_dotted_prefixes(import_roots_norm, mapped_roots_norm):
     return prefixes
 
 
-def active_import_roots(tree_root, import_roots_norm, checkpoint, workspace, commit):
+def active_import_roots(tree_root, import_roots_norm):
     active = []
     for rel in import_roots_norm:
-        if checkpoint:
-            if not tree_path_at_commit(workspace, commit, rel):
-                continue
         p = os.path.join(tree_root, rel.replace("/", os.sep))
         if not os.path.isdir(p):
             continue
@@ -270,24 +259,28 @@ def active_mapped_roots(tree_root, mapped_roots_norm):
 
 def map_probe_entries(probe_paths, workspace, copy_root):
     mapped = []
-    ws_abs = os.path.abspath(workspace)
     try:
-        wn = os.path.normcase(os.path.realpath(ws_abs))
+        wr = os.path.realpath(os.path.abspath(workspace))
     except OSError:
         return mapped
+    nwr = os.path.normcase(wr)
     for raw in probe_paths:
         if not isinstance(raw, str) or not raw:
             continue
         try:
-            ap = os.path.normcase(os.path.realpath(os.path.abspath(raw)))
+            ar = os.path.realpath(os.path.abspath(raw))
         except (OSError, TypeError):
             continue
-        if ap != wn and not ap.startswith(wn + os.sep):
+        nar = os.path.normcase(ar)
+        if nar != nwr and not nar.startswith(nwr + os.sep):
             continue
-        if ap == wn:
+        if nar == nwr:
             wrel = "."
         else:
-            wrel = os.path.relpath(ap, ws_abs).replace("\\", "/")
+            try:
+                wrel = os.path.relpath(ar, wr).replace("\\", "/")
+            except ValueError:
+                continue
         if wrel == ".":
             cp = copy_root
         else:
@@ -301,7 +294,7 @@ def map_probe_entries(probe_paths, workspace, copy_root):
 
 def run_interpreter_path_probe(plugin_dir, tree_root, env, timeout_sec):
     probe_env = pytest_env(plugin_dir, tree_root, env)
-    cmd = [sys.executable, "-c", "import json,sys;print(json.dumps(sys.path))"]
+    cmd = [sys.executable, "-c", "import sys; print(repr(sys.path))"]
     rc, out, err, timed = run_process(cmd, probe_env, tree_root, timeout_sec)
     if timed or rc != 0:
         return []
@@ -310,8 +303,8 @@ def run_interpreter_path_probe(plugin_dir, tree_root, env, timeout_sec):
             text = out.decode("utf-8", "replace")
         else:
             text = out or ""
-        paths = json.loads(text.strip())
-    except (json.JSONDecodeError, TypeError, AttributeError):
+        paths = ast.literal_eval(text.strip())
+    except (ValueError, SyntaxError, MemoryError, RecursionError, TypeError):
         return []
     if not isinstance(paths, list):
         return []
@@ -1251,6 +1244,10 @@ def checkpoint_records_for_item(item, tests_run):
 
 def write_resolution_plugin(plugin_dir, copy_root, mutated_files, workspace_tracked, workspace_abs, dotted_prefixes):
     out_json = os.path.join(plugin_dir, "_resolution_out.json")
+    try:
+        workspace_real = os.path.realpath(os.path.abspath(workspace_abs))
+    except OSError:
+        workspace_real = os.path.abspath(workspace_abs)
     code = '''import json
 import os
 import sys
@@ -1261,6 +1258,7 @@ DOTTED_PREFIXES = %s
 OUT = %r
 ROOT = os.getcwd()
 WORKSPACE = %r
+WORKSPACE_REAL = %r
 
 def _dotted(rel):
     rel = rel.replace("\\\\", "/")
@@ -1307,12 +1305,25 @@ def pytest_configure(config):
 def _norm(p):
     return os.path.normcase(os.path.abspath(p))
 
+def _in_workspace(ap, nw, nwr):
+    return ap == nw or ap.startswith(nw + os.sep) or ap == nwr or ap.startswith(nwr + os.sep)
+
+def _in_copy(ap, nc, ncr):
+    return ap == nc or ap.startswith(nc + os.sep) or ap == ncr or ap.startswith(ncr + os.sep)
+
 def pytest_sessionfinish(session, exitstatus):
     import sys as _sys
     wroot = os.path.abspath(WORKSPACE)
+    wroot_real = os.path.abspath(WORKSPACE_REAL)
     croot = os.path.abspath(ROOT)
+    try:
+        croot_real = os.path.realpath(croot)
+    except OSError:
+        croot_real = croot
     nw = _norm(wroot)
+    nwr = _norm(wroot_real)
     nc = _norm(croot)
+    ncr = _norm(croot_real)
     raw_path = []
     norm_path = []
     for p in _sys.path:
@@ -1328,27 +1339,28 @@ def pytest_sessionfinish(session, exitstatus):
     for i, ap in enumerate(norm_path):
         if ap is None:
             continue
-        if ap == nc or ap.startswith(nc + os.sep):
+        if _in_copy(ap, nc, ncr):
             copy_indices.append(i)
     min_copy = min(copy_indices) if copy_indices else None
     for i, ap in enumerate(norm_path):
         if ap is None:
             continue
-        if ap == nw or ap.startswith(nw + os.sep):
-            if min_copy is not None and i < min_copy:
+        if _in_workspace(ap, nw, nwr):
+            if min_copy is None or i < min_copy:
                 path_ahead.append(raw_path[i])
     for name, mod in list(_sys.modules.items()):
         f = getattr(mod, "__file__", None)
         if not f:
             continue
         af = _norm(f)
-        if not af.startswith(nw + os.sep) and af != nw:
+        if not _in_workspace(af, nw, nwr):
             continue
-        if af.startswith(nc + os.sep) or af == nc:
+        if _in_copy(af, nc, ncr):
             continue
         for t in TRACKED:
             wp = _norm(os.path.join(wroot, t.replace("/", os.sep)))
-            if af == wp:
+            wpr = _norm(os.path.join(wroot_real, t.replace("/", os.sep)))
+            if af == wp or af == wpr:
                 loaded_ws.append({"module": name, "path": t})
                 break
     with open(OUT, "w", encoding="utf-8") as f:
@@ -1357,7 +1369,8 @@ def pytest_sessionfinish(session, exitstatus):
        json.dumps(sorted(workspace_tracked)),
        json.dumps(list(dotted_prefixes)),
        out_json.replace("\\", "/"),
-       os.path.abspath(workspace_abs))
+       os.path.abspath(workspace_abs),
+       workspace_real)
     path = os.path.join(plugin_dir, PLUGIN_NAME)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(code)
@@ -1393,6 +1406,7 @@ def pytest_env(plugin_dir, tree_root, env, results_path=None, import_roots_rel=(
     run_env = dict(env)
     run_env["PYTHONPATH"] = os.pathsep.join(parts)
     run_env["PYTHONDONTWRITEBYTECODE"] = "1"
+    run_env["PYTHONSAFEPATH"] = "1"
     if results_path:
         run_env["MUTATION_PYTEST_RESULTS"] = results_path
     return run_env
@@ -1564,10 +1578,12 @@ def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_t
         if isinstance(item, dict):
             mod = item.get("module", "")
             place = item.get("path", "")
-            raise Refuse(
-                "mutation-run: module %s from Workspace path %s was loaded (editable install is the usual "
-                "cause; use import_roots for a finder-style install)" % (mod, place))
-        raise Refuse("mutation-run: module from Workspace path %s was loaded" % item)
+        else:
+            mod = ""
+            place = item
+        raise Refuse(
+            "mutation-run: module from Workspace path %s was loaded (module %s; an editable install of the "
+            "project is the usual cause; use import_roots for a finder-style install)" % (place, mod))
     _remove_resolution_plugin(plugin_dir)
     return None
 
@@ -1758,8 +1774,7 @@ def main(argv=None):
             probe_paths = run_interpreter_path_probe(plugin_dir, copy_root, env, timeout_sec)
             mapped_all = map_probe_entries(probe_paths, workspace, copy_root)
             mapped_active = active_mapped_roots(copy_root, mapped_all)
-            ir_active = active_import_roots(
-                copy_root, import_roots, True, workspace, args.checkpoint)
+            ir_active = active_import_roots(copy_root, import_roots)
             dotted_ps = module_dotted_prefixes(ir_active, mapped_active)
             path_kw = dict(
                 import_roots_rel=ir_active, mapped_roots_rel=mapped_active, dotted_prefixes=dotted_ps)
@@ -1858,7 +1873,7 @@ def main(argv=None):
         probe_paths = run_interpreter_path_probe(plugin_dir, copy_root, env, timeout_sec)
         mapped_all = map_probe_entries(probe_paths, workspace, copy_root)
         mapped_active = active_mapped_roots(copy_root, mapped_all)
-        ir_active = active_import_roots(copy_root, import_roots, False, workspace, None)
+        ir_active = active_import_roots(copy_root, import_roots)
         dotted_ps = module_dotted_prefixes(ir_active, mapped_active)
         path_kw = dict(
             import_roots_rel=ir_active, mapped_roots_rel=mapped_active, dotted_prefixes=dotted_ps)

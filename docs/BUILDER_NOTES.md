@@ -114,3 +114,5 @@
 2026-11-21 TASK-070-r3: a foreground pytest of the three mutation files was killed (exit 143, Terminated) after about five minutes even though the wait was longer, so that command was started again and left running until it finished. The partial dot line from the killed run is not a result.
 
 2026-11-21 TASK-073-r2: `git checkout -- bridge-install.py` during mutation checks reverts the whole file; keep a sidecar copy and re-run `make-manifest.py` if a scratch file was hashed before deletion.
+
+2026-11-24 TASK-085-r2: Pytest 3.11+ prepends the copy root ahead of `PYTHONPATH` unless child runs set `PYTHONSAFEPATH=1` (see `pytest_env`); without it a stale top-level package under the copy root shadowed a mapped editable root (`test_task085_mapped_roots_stand_ahead_of_the_copy_root`).

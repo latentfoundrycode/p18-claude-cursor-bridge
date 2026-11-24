@@ -270,6 +270,8 @@ def test_task085_import_roots_entry_naming_no_folder_refused_in_the_ordinary_mod
     assert "import_roots" in out and entry in out, out
 
 
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="the interpreter's -m puts its folder first, and only Python "
+                    "3.11 and later can be told not to (-P)")
 def test_task085_mapped_roots_stand_ahead_of_the_copy_root(tmp_path):
     """TASK-085 Done when: every mapped entry "stands on the run's `PYTHONPATH` ahead of the copy's root" (the
     design: "those folders stand first on the run's PYTHONPATH, ahead of the copy's root"): where the copy's root
@@ -375,6 +377,62 @@ def test_task085_workspace_reached_through_a_link_still_maps_its_entries(tmp_pat
     _link_folder(via, ws)
     mf = mutants(ws, "lk", body())
     rc, out = run_mr(via, via / "run" / "supervisor" / mf.name, python)
+    assert rc == 0, out
+    assert "m1: killed" in out, out
+
+
+# --- written after the builder's round 2 ----------------------------------------------------------------------------
+
+def test_task085_workspace_entry_with_no_copy_entry_on_the_path_refused(tmp_path):
+    """TASK-085, the brief's R8 and round 2's correction 6: an entry of the import path inside the Workspace is
+    refused where it stands ahead of every entry of the copy, and also where no entry of the copy stands on the path at
+    all: a test module that, after its imports, takes every entry of the copy off the import path and appends the
+    Workspace's folder is refused with exit 2 by the line that says the entry stands ahead of the copy (round 2's
+    self-check: with that case removed, nothing failed)."""
+    ws = nested_project(tmp_path)
+    tail = ("\n\nimport os as _os\nimport sys as _sys\n\n"
+            "_COPY = _os.path.normcase(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))\n\n\n"
+            "def _in_copy(p):\n"
+            "    n = _os.path.normcase(_os.path.abspath(p))\n"
+            "    return n == _COPY or n.startswith(_COPY + _os.sep)\n\n\n"
+            "_sys.path[:] = [p for p in _sys.path if not (p and _in_copy(p))]\n"
+            "_sys.path.append(%r)\n" % str(ws))
+    write(ws, "tests/test_pkg.py", TEST + tail)
+    git(ws, "add", "tests/test_pkg.py")
+    git(ws, "commit", "-q", "-m", "the copy off the path, the Workspace on it")
+    rc, out = run_mr(ws, mutants(ws, "nc", body(import_roots=["sdk/src"])), sys.executable)
+    assert rc == 2, out
+    assert "ahead of the copy" in out, out
+
+
+TOOL_TEST = '''import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def test_tool():
+    p = subprocess.run([sys.executable, os.path.join(HERE, os.pardir, "tools", "show.py")], capture_output=True,
+                       text=True, timeout=60, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    assert p.stdout.strip() == "7", p.stderr
+'''
+
+
+def test_task085_a_script_started_by_a_test_still_imports_its_neighbour(tmp_path):
+    """TASK-085, round 1's R12 (no environment variable, no other behaviour change): the run's path order is set for
+    the run's own pytest processes, never through the environment that every process a project's test starts
+    inherits; so a test that starts a script of the project, which imports a module from its own folder, passes in the
+    baseline as it passes outside the run, and the mutant is killed (round 2 set PYTHONSAFEPATH=1 in that
+    environment, where a script started by a test no longer finds its neighbour)."""
+    ws = nested_project(tmp_path)
+    write(ws, "tools/helper.py", "VALUE = 7\n")
+    write(ws, "tools/show.py", "import helper\n\nprint(helper.VALUE)\n")
+    write(ws, "tests/test_tool.py", TOOL_TEST)
+    git(ws, "add", "-A")
+    git(ws, "commit", "-q", "-m", "a tool and its test")
+    mutant = dict(MUTANT, tests=["tests/test_pkg.py", "tests/test_tool.py"])
+    rc, out = run_mr(ws, mutants(ws, "sp", {"mutants": [mutant], "import_roots": ["sdk/src"]}), sys.executable)
     assert rc == 0, out
     assert "m1: killed" in out, out
 
