@@ -1583,3 +1583,72 @@ def test_task086a_a_report_name_holding_a_line_feed_prints_no_line_of_its_own(tm
     assert not any(line.startswith("RESOLVED profile 'planted'") for line in out.splitlines()), out
     assert unknown_cause(out, "-r1-report.md"), "the cause on a line of its own: " + out
 
+
+# Round 4 (the supervisor's): each model's probe answer is judged apart. Under the family deviation the alternate is
+# the reviewer, so review_b's answer does not decide; where the alternate does not answer, the REBUILD judges review_b
+# on its first answer, never a second probe. Every model is still probed once (the sign-in rule).
+
+def _probe_answers(mod, monkeypatch, failing):
+    probed = []
+
+    def fake_probe(model_id, *args, **kwargs):
+        probed.append(model_id)
+        return (False, "exit 1; stdout=''; stderr='refused'") if model_id in failing else (True, "answered")
+
+    monkeypatch.setattr(mod, "probe", fake_probe)
+    return probed
+
+
+def _family_deviation_repo(tmp_path):
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [dict(NATIVE, review_b_alt=GPT)])
+    write_record(ws, row(GROK_B, start=c1, clean=True))
+    commit(ws, "the builder's work")
+    return ws
+
+
+def test_task086a_review_b_silent_under_the_family_deviation_leaves_the_alternate_resolved(program, tmp_path,
+                                                                                          monkeypatch, capsys):
+    """C39 table row 2 ("the alternate, with deviation (reason family)"): review_b's family built the branch and the
+    alternate answers its probe, so the alternate resolves with the deviation whatever review_b answered; review_b is
+    still probed once (round 3 read review_b's silence as the alternate's, printed a REBUILD, probed review_b again
+    and ended with no usable profile)."""
+    ws = _family_deviation_repo(tmp_path)
+    mod = program("roster-check")
+    probed = _probe_answers(mod, monkeypatch, {GROK_R})
+    rc, out = _main_in_process(mod, ws, monkeypatch, capsys)
+    assert rc == 0 and deviation_printed(out) and "REBUILD" not in out, out
+    data = resolved(ws)
+    assert data.get("review_b") == GPT and "rebuild" not in data, data
+    assert (data.get("deviation") or {}).get("reason") == "family", data
+    assert probed.count(GROK_R) == 1 and probed.count(GPT) == 1 and COMPOSER in probed, probed
+
+
+def test_task086a_an_alternate_silent_under_the_family_deviation_judges_review_b_on_its_first_answer(
+        program, tmp_path, monkeypatch, capsys):
+    """Round 2's correction 2: an alternate that does not answer leaves the REBUILD with review_b, and review_b is
+    judged on the answer it gave when the profile's models were probed, never probed a second time."""
+    ws = _family_deviation_repo(tmp_path)
+    mod = program("roster-check")
+    probed = _probe_answers(mod, monkeypatch, {GPT})
+    rc, out = _main_in_process(mod, ws, monkeypatch, capsys)
+    assert rc == 0 and "REBUILD" in out and not deviation_printed(out), out
+    data = resolved(ws)
+    assert data.get("review_b") == GROK_R and "rebuild" in data and "deviation" not in data, data
+    assert probed.count(GROK_R) == 1 and probed.count(GPT) == 1, probed
+
+
+def test_task086a_both_reviewers_silent_under_the_family_deviation_skip_the_profile(program, tmp_path, monkeypatch,
+                                                                                   capsys):
+    """Neither the alternate nor review_b answers: no reviewer is usable, so the profile is skipped as on the
+    checkpoint (exit 1, nothing resolved, the resolved file unchanged), each model probed once."""
+    ws = _family_deviation_repo(tmp_path)
+    before = plant_resolved(ws)
+    mod = program("roster-check")
+    probed = _probe_answers(mod, monkeypatch, {GPT, GROK_R})
+    rc, out = _main_in_process(mod, ws, monkeypatch, capsys)
+    assert rc == 1 and "skip" in out and "RESOLVED" not in out and not deviation_printed(out), out
+    assert resolved_path(ws).read_bytes() == before
+    assert probed.count(GROK_R) == 1 and probed.count(GPT) == 1, probed
+
