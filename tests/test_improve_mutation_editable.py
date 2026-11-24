@@ -229,7 +229,7 @@ def test_task085_import_roots_entry_through_a_link_refused(tmp_path):
     assert "import_roots" in out and "link" in out.lower(), out
 
 
-@pytest.mark.parametrize("value", ["sdk/src", [5], [["sdk/src"]], {"sdk": "src"}])
+@pytest.mark.parametrize("value", ["sdk/src", [5], [["sdk/src"]], {"sdk": "src"}, None])
 def test_task085_import_roots_must_be_a_list_of_strings(tmp_path, value):
     """TASK-085 Done when: "`import_roots` is a list of strings": a bare string, a number, a nested list or an object
     is refused with exit 2, the line naming the key and what it must be."""
@@ -254,6 +254,129 @@ def test_task085_import_roots_is_part_of_the_cache_key(tmp_path):
     rc, out = run_mr(ws, changed, python)
     assert rc == 0 and "m1: killed" in out, out
     assert "m1: killed (cached" not in out, out
+
+
+# --- written after the builder's round 1, where its own mutation check found two survivors (M2, M8) and the brief's
+# --- R8 kept a check no case held ---------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("entry", ["sdk/missing", "sdk/src/pkg/calc.py"])
+def test_task085_import_roots_entry_naming_no_folder_refused_in_the_ordinary_mode(tmp_path, entry):
+    """The brief's R4 (handoff/TASK-085.md): in the ordinary mode an `import_roots` entry naming a folder the working
+    tree does not hold, or naming a file, is refused with exit 2 by a line naming the key and the entry, so that a
+    mistyped root is told and never silently ignored."""
+    ws = nested_project(tmp_path)
+    rc, out = run_mr(ws, mutants(ws, "nf", body(import_roots=[entry])), sys.executable)
+    assert rc == 2, out
+    assert "import_roots" in out and entry in out, out
+
+
+def test_task085_mapped_roots_stand_ahead_of_the_copy_root(tmp_path):
+    """TASK-085 Done when: every mapped entry "stands on the run's `PYTHONPATH` ahead of the copy's root" (the
+    design: "those folders stand first on the run's PYTHONPATH, ahead of the copy's root"): where the copy's root
+    also holds a stale `pkg/` of its own, the path entry's folder answers first, so the mutant of sdk/src/pkg/calc.py
+    is killed; with the root first the stale package would answer and the mutant survive (exit 1)."""
+    ws = nested_project(tmp_path)
+    write(ws, "pkg/__init__.py", "")
+    write(ws, "pkg/calc.py", CALC)
+    git(ws, "add", "-A")
+    git(ws, "commit", "-q", "-m", "a stale copy at the root")
+    python = path_entry_venv(tmp_path, ws, tag="po")
+    rc, out = run_mr(ws, mutants(ws, "po", body()), python)
+    assert rc == 0, out
+    assert "m1: killed" in out, out
+
+
+def test_task085_dotted_name_under_import_roots_refuses_a_module_resolving_outside(tmp_path):
+    """TASK-085 Done when: "the same roots, with `import_roots` where the file names them, serve
+    `dotted_module_paths` and the generated plugin, so that a module under `sdk/src/pkg/` is checked as
+    `pkg.<module>`": where `pkg.calc` resolves outside the copy (a conftest.py puts an outside folder holding `pkg`
+    first), the resolution check refuses it by that name with exit 2, as it refuses any mutated module resolving
+    outside; read as `sdk.src.pkg.calc` alone it would pass and the mutant survive (exit 1)."""
+    ws = nested_project(tmp_path)
+    outside = tmp_path / "outside_pkg"
+    (outside / "pkg").mkdir(parents=True)
+    (outside / "pkg" / "__init__.py").write_text("", encoding="utf-8")
+    (outside / "pkg" / "calc.py").write_text(CALC, encoding="utf-8")
+    write(ws, "tests/conftest.py", "import sys\nsys.path.insert(0, %r)\n" % str(outside))
+    git(ws, "add", "tests/conftest.py")
+    git(ws, "commit", "-q", "-m", "an outside package first")
+    rc, out = run_mr(ws, mutants(ws, "dn", body(import_roots=["sdk/src"])), sys.executable)
+    assert rc == 2, out
+    assert "pkg.calc" in out and "resolves outside the copy" in out, out
+
+
+def test_task085_workspace_entry_ahead_of_the_copy_refused_by_its_own_line(tmp_path):
+    """TASK-085, the brief's R8 (the check that raised `module from Workspace path sys.path was loaded` kept under a
+    line of its own): a test module that puts the Workspace's own folder first on the import path when it is
+    collected, ahead of every entry of the copy, is refused with exit 2 by a line that says the entry stands ahead of
+    the copy, and never by the old line. The insert stands in the test module, which pytest collects after its
+    configure hook, so no mutated module is resolved through it (Review A, round 1: from an initial conftest.py the
+    insert came first and the check of a module resolving outside the copy answered instead)."""
+    ws = nested_project(tmp_path)
+    write(ws, "tests/test_pkg.py", "import sys\nsys.path.insert(0, %r)\n\n%s" % (str(ws), TEST))
+    git(ws, "add", "tests/test_pkg.py")
+    git(ws, "commit", "-q", "-m", "the Workspace first")
+    rc, out = run_mr(ws, mutants(ws, "wa", body(import_roots=["sdk/src"])), sys.executable)
+    assert rc == 2, out
+    assert "ahead of the copy" in out, out
+    assert "Workspace path sys.path" not in out, out
+
+
+# --- written after Review A's round 1 -------------------------------------------------------------------------------
+
+def test_task085_mapped_folder_keeps_its_letter_case_for_the_dotted_name(tmp_path):
+    """TASK-085 Done when: every entry inside the Workspace "is mapped to the same folder of the copy" and the same
+    roots serve the dotted name, so that a module under the mapped folder is checked as `pkg.<module>`; on Windows the
+    entry is compared without regard to letter case but the folder keeps the case it has, so a path entry into
+    `SDK/Src` still forms `pkg.calc` for SDK/Src/pkg/calc.py, and where `pkg.calc` resolves outside the copy (an
+    outside folder holding `pkg` put first by a conftest.py) the run is refused by that name (Review A, round 1: a
+    lower-cased folder lost the name, and the mutant survived)."""
+    ws = tmp_path / "proj" / "Workspace"
+    (ws / "run" / "supervisor" / "mutation-cache").mkdir(parents=True)
+    write(ws, "SDK/Src/pkg/__init__.py", "")
+    write(ws, "SDK/Src/pkg/calc.py", CALC)
+    write(ws, "tests/test_pkg.py", TEST)
+    outside = tmp_path / "outside_pkg"
+    (outside / "pkg").mkdir(parents=True)
+    (outside / "pkg" / "__init__.py").write_text("", encoding="utf-8")
+    (outside / "pkg" / "calc.py").write_text(CALC, encoding="utf-8")
+    write(ws, "tests/conftest.py", "import sys\nsys.path.insert(0, %r)\n" % str(outside))
+    git(ws, "init", "-q", "-b", "main")
+    git(ws, "add", "-A")
+    git(ws, "commit", "-q", "-m", "init")
+    python = path_entry_venv(tmp_path, ws, tag="lc", entry=str(ws / "SDK" / "Src"))
+    mutant = dict(MUTANT, file="SDK/Src/pkg/calc.py")
+    rc, out = run_mr(ws, mutants(ws, "lc", {"mutants": [mutant]}), python)
+    assert rc == 2, out
+    assert "pkg.calc" in out and "resolves outside the copy" in out, out
+
+
+def _link_folder(link, target):
+    """A symbolic link to a folder or, on Windows where none can be made, a junction; skips where neither can."""
+    try:
+        os.symlink(str(target), str(link), target_is_directory=True)
+        return
+    except (OSError, NotImplementedError) as e:
+        if sys.platform != "win32":
+            pytest.skip("this account cannot create a symbolic link here (%s)" % e)
+    j = subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], **_kw(timeout=30))
+    if j.returncode != 0:
+        pytest.skip("neither a symbolic link nor a junction could be made here (%s)" % j.stderr)
+
+
+def test_task085_workspace_reached_through_a_link_still_maps_its_entries(tmp_path):
+    """TASK-085 Done when: "every entry that resolves inside the Workspace ... is mapped to the same folder of the
+    copy": where the program is started in the Workspace through a link (a junction, a symbolic link), an entry that
+    names the Workspace's real folder still resolves inside it and is mapped, so the mutant is killed (Review A,
+    round 1: the folder was taken relative to the unresolved Workspace path and the entry was dropped)."""
+    ws = nested_project(tmp_path)
+    python = path_entry_venv(tmp_path, ws, tag="lk")
+    via = tmp_path / "via"
+    _link_folder(via, ws)
+    mf = mutants(ws, "lk", body())
+    rc, out = run_mr(via, via / "run" / "supervisor" / mf.name, python)
+    assert rc == 0, out
+    assert "m1: killed" in out, out
 
 
 # --- the checkpoint mode --------------------------------------------------------------------------------------------
