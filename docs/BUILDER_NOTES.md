@@ -120,3 +120,5 @@
 2026-11-24 TASK-086a-r2: Step 7 of Done listed three failures in `tests/test_program_roster_sign_in.py` unrelated to `roster-check.py`; brief marks that file out of scope for fixes.
 
 2026-11-24 TASK-086a-r3: The r2 BUILDER_NOTES line about those three sign-in failures was wrong: round 2's probe-order change caused them; round 3 probes every model of a profile before judging it, which fixes them.
+
+2026-11-24 TASK-086a-r4: Round 3 judged review_b and the alternate on one probe answer; round 4 keeps each model's answer separately and judges them apart (family deviation: alternate answers resolves regardless of review_b; alternate silent falls back to REBUILD judged on review_b's single probe).

@@ -28,8 +28,11 @@ alternate) review_b_alt are each sent a one-word request through `cursor-agent -
 a refusal, empty reply, usage-limit message or timeout marks that model as not answering (this
 catches hard failures only, never a nearly-empty quota); any other reply counts as answered,
 off-script. After every probe planned for the profile, a builder that did not answer skips it;
-an alternate that did not answer under the reason family leaves a REBUILD with review_b, which
-is probed too and skips the profile if it does not answer. The chosen
+under the reason unavailable an alternate that did not answer skips it (review_b is excluded and
+not probed). Under the reason family an alternate that answered resolves with the deviation,
+whatever review_b answered; an alternate that did not answer leaves a REBUILD with review_b, judged
+on the answer review_b gave in its one probe (never probed twice), and skips the profile if review_b
+did not answer. With no deviation, review_b that did not answer skips the profile. The chosen
 profile's three families must be distinct. The result is written to
 docs/ROSTER.resolved.json for the delegate and Review B commands to read, and only when it
 changes (the time of every check goes to the state file as last_resolved), so a check
@@ -1385,23 +1388,23 @@ def main():
                 ok_b, sign_in_b = _probe_roles([("builder", b_id)])
                 if sign_in_b:
                     return 5
-                rest = []
+                ok_rb = True
+                ok_alt = True
                 if not _r_excluded(r_id, r_pool):
-                    rest.append(("review_b", r_id))
+                    ok_rb, sign_in_rb = _probe_roles([("review_b", r_id)])
+                    if sign_in_rb:
+                        return 5
                 if deviation and a_id and _alt_pool_ok(a_id, a_pool):
-                    rest.append(("review_b_alt", a_id))
-                ok_rest = True
-                sign_in_rest = False
-                if rest:
-                    ok_rest, sign_in_rest = _probe_roles(rest)
-                if sign_in_rest:
-                    return 5
+                    ok_alt, sign_in_alt = _probe_roles([("review_b_alt", a_id)])
+                    if sign_in_alt:
+                        return 5
                 if not ok_b:
                     print("    skip: a model did not answer"); continue
-                if not ok_rest:
-                    if deviation and deviation.get("reason") == "unavailable":
+                if deviation and deviation.get("reason") == "unavailable":
+                    if not ok_alt:
                         print("    skip: a model did not answer"); continue
-                    if deviation and family_deviation and rebuild is None:
+                elif deviation and family_deviation and rebuild is None:
+                    if not ok_alt:
                         rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
                         rebuild = {"built_by": rb_model, "rebuild_with": b_id}
                         nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
@@ -1413,13 +1416,10 @@ def main():
                         deviation = None
                         use_r_id, use_r_fam = r_id, r_fam
                         print(rb_line)
-                        ok2, sign_in2 = _probe_roles([("review_b", r_id)])
-                        if sign_in2:
-                            return 5
-                        if not ok2:
+                        if not ok_rb:
                             print("    skip: a model did not answer"); continue
-                    else:
-                        print("    skip: a model did not answer"); continue
+                elif not deviation and not _r_excluded(r_id, r_pool) and not ok_rb:
+                    print("    skip: a model did not answer"); continue
 
             fams_out = {"builder": b_fam, "review_a": ra_fam, "review_b": use_r_fam}
             chosen = {"profile": name, "builder": b_id, "review_a": ra_id, "review_b": use_r_id, "families": fams_out,

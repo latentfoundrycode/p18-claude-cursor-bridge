@@ -977,8 +977,11 @@ alternate) review_b_alt are each sent a one-word request through `cursor-agent -
 a refusal, empty reply, usage-limit message or timeout marks that model as not answering (this
 catches hard failures only, never a nearly-empty quota); any other reply counts as answered,
 off-script. After every probe planned for the profile, a builder that did not answer skips it;
-an alternate that did not answer under the reason family leaves a REBUILD with review_b, which
-is probed too and skips the profile if it does not answer. The chosen
+under the reason unavailable an alternate that did not answer skips it (review_b is excluded and
+not probed). Under the reason family an alternate that answered resolves with the deviation,
+whatever review_b answered; an alternate that did not answer leaves a REBUILD with review_b, judged
+on the answer review_b gave in its one probe (never probed twice), and skips the profile if review_b
+did not answer. With no deviation, review_b that did not answer skips the profile. The chosen
 profile's three families must be distinct. The result is written to
 docs/ROSTER.resolved.json for the delegate and Review B commands to read, and only when it
 changes (the time of every check goes to the state file as last_resolved), so a check
