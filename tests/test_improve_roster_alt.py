@@ -1283,6 +1283,24 @@ def test_task086a_a_family_named_in_the_roster_counts_for_a_builder_row(tmp_path
     assert_rebuild(ws, rc, out)
 
 
+def test_task086a_a_family_named_in_the_roster_is_the_rows_family_not_an_unknown_one(tmp_path):
+    """The supervisor's, after the mutation run (its mutant n15, the roster's family entry not read, survived the case
+    above, where an unknown family takes the same REBUILD): a builder row whose model the roster names with a family
+    that is not `review_b`'s makes a known set of that family, so `review_b` resolves plainly, no REBUILD and no
+    deviation; read without the roster, the row would be of no known family and the set unknown."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [{"name": "full", "builder": {"model": "mystery-builder-1", "family": "openai"}, "review_b": GPT},
+                      NATIVE], other_pool="exhausted")
+    write_record(ws, row("mystery-builder-1", start=c1, clean=True))
+    commit(ws, "the builder's work")
+    rc, out = resolve(ws)
+    assert rc == 0 and "RESOLVED profile 'native'" in out, out
+    assert "REBUILD" not in out and not deviation_printed(out), out
+    data = resolved(ws)
+    assert data.get("review_b") == GROK_R and "rebuild" not in data and "deviation" not in data, data
+
+
 @pytest.mark.parametrize("model", ["mystery-builder-2", 123], ids=["family-unknown", "not-a-string"])
 def test_task086a_a_builder_row_of_no_known_family_makes_the_set_unknown(tmp_path, model):
     """The brief's security context ("a field of the wrong type is never trusted", "unknown is never read as nobody
