@@ -20,6 +20,7 @@ import os
 import re
 import shutil
 import signal
+import stat
 import struct
 import subprocess
 import sys
@@ -45,6 +46,12 @@ except Exception as e:
     bridge_env = None
 
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
+
+def interpreter_argv():
+    if sys.version_info >= (3, 11):
+        return [sys.executable, "-P"]
+    return [sys.executable]
 MUTANT_ID_RX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 PLUGIN_NAME = "_mutation_resolution_check.py"
 PLUGIN_MOD = "_mutation_resolution_check"
@@ -204,11 +211,14 @@ def validate_import_roots(data, workspace, checkpoint, commit):
         for part in parts:
             cur = os.path.join(cur, part)
             try:
-                if not os.path.lexists(cur):
-                    break
-                if bridge_env.is_link(cur):
-                    raise Refuse("mutation-run: import_roots entry %r passes through a link" % entry)
-            except OSError:
+                st = os.lstat(cur)
+            except FileNotFoundError:
+                break
+            except NotADirectoryError:
+                break
+            except (OSError, ValueError):
+                raise Refuse("mutation-run: import_roots entry %r passes through a link" % entry)
+            if stat.S_ISLNK(st.st_mode) or getattr(st, "st_reparse_tag", 0):
                 raise Refuse("mutation-run: import_roots entry %r passes through a link" % entry)
         full = os.path.join(workspace, rel.replace("/", os.sep))
         if not checkpoint:
@@ -269,7 +279,7 @@ def map_probe_entries(probe_paths, workspace, copy_root):
             continue
         try:
             ar = os.path.realpath(os.path.abspath(raw))
-        except (OSError, TypeError):
+        except (OSError, TypeError, ValueError):
             continue
         nar = os.path.normcase(ar)
         if nar != nwr and not nar.startswith(nwr + os.sep):
@@ -294,8 +304,11 @@ def map_probe_entries(probe_paths, workspace, copy_root):
 
 def run_interpreter_path_probe(plugin_dir, tree_root, env, timeout_sec):
     probe_env = pytest_env(plugin_dir, tree_root, env)
-    cmd = [sys.executable, "-c", "import sys; print(repr(sys.path))"]
-    rc, out, err, timed = run_process(cmd, probe_env, tree_root, timeout_sec)
+    cmd = interpreter_argv() + ["-c", "import sys; print(repr(sys.path))"]
+    try:
+        rc, out, err, timed = run_process(cmd, probe_env, tree_root, timeout_sec)
+    except OSError:
+        return []
     if timed or rc != 0:
         return []
     try:
@@ -1406,7 +1419,6 @@ def pytest_env(plugin_dir, tree_root, env, results_path=None, import_roots_rel=(
     run_env = dict(env)
     run_env["PYTHONPATH"] = os.pathsep.join(parts)
     run_env["PYTHONDONTWRITEBYTECODE"] = "1"
-    run_env["PYTHONSAFEPATH"] = "1"
     if results_path:
         run_env["MUTATION_PYTEST_RESULTS"] = results_path
     return run_env
@@ -1535,8 +1547,8 @@ def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_t
     run_env["PY_COLORS"] = "0"
     run_env.pop("FORCE_COLOR", None)
     cfg = pytest_config_argv(plugin_dir, copy_root)
-    argv = [sys.executable, "-m", "pytest", "--collect-only", "-q",
-            "-p", PLUGIN_MOD, "-p", "no:cacheprovider"] + cfg + test_files
+    argv = interpreter_argv() + ["-m", "pytest", "--collect-only", "-q",
+                                 "-p", PLUGIN_MOD, "-p", "no:cacheprovider"] + cfg + test_files
     rc, out, err, timed = run_process(argv, run_env, copy_root, timeout_sec)
     if timed:
         raise ResolutionTimeout(timeout_sec)
@@ -1580,7 +1592,7 @@ def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_t
             place = item.get("path", "")
         else:
             mod = ""
-            place = item
+            place = repr(item)
         raise Refuse(
             "mutation-run: module from Workspace path %s was loaded (module %s; an editable install of the "
             "project is the usual cause; use import_roots for a finder-style install)" % (place, mod))
@@ -1667,7 +1679,7 @@ def run_mutant_tests(plugin_dir, copy_root, tests, env, timeout_sec, results_pat
         plugin_dir, copy_root, env, results_path,
         import_roots_rel=import_roots_rel, mapped_roots_rel=mapped_roots_rel)
     cfg = pytest_config_argv(plugin_dir, copy_root)
-    argv = [sys.executable, "-m", "pytest", "-p", OUTCOMES_PLUGIN_MOD, "-p", "no:cacheprovider"] + cfg + tests
+    argv = interpreter_argv() + ["-m", "pytest", "-p", OUTCOMES_PLUGIN_MOD, "-p", "no:cacheprovider"] + cfg + tests
     rc, out, err, timed = run_process(argv, run_env, copy_root, timeout_sec)
     data = read_pytest_results(results_path)
     return rc, out, err, timed, run_process_still_alive_after_timeout(), data
@@ -1831,7 +1843,7 @@ def main(argv=None):
                     import_roots_rel=ir_active, mapped_roots_rel=mapped_active)
                 cfg = pytest_config_argv(plugin_dir, copy_root)
                 rc, out, err, timed = run_process(
-                    [sys.executable, "-m", "pytest", "-p", OUTCOMES_PLUGIN_MOD, "-p", "no:cacheprovider"]
+                    interpreter_argv() + ["-m", "pytest", "-p", OUTCOMES_PLUGIN_MOD, "-p", "no:cacheprovider"]
                     + cfg + [item],
                     run_env, copy_root, timeout_sec)
                 data = read_pytest_results(chk_results)

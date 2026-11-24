@@ -115,4 +115,4 @@
 
 2026-11-21 TASK-073-r2: `git checkout -- bridge-install.py` during mutation checks reverts the whole file; keep a sidecar copy and re-run `make-manifest.py` if a scratch file was hashed before deletion.
 
-2026-11-24 TASK-085-r2: Pytest 3.11+ prepends the copy root ahead of `PYTHONPATH` unless child runs set `PYTHONSAFEPATH=1` (see `pytest_env`); without it a stale top-level package under the copy root shadowed a mapped editable root (`test_task085_mapped_roots_stand_ahead_of_the_copy_root`).
+2026-11-24 TASK-085-r2: The interpreter's `-m` puts the folder it runs in first on the import path on every Python version; Python 3.11 and later can be told not to, by `-P` on the command line (or `PYTHONSAFEPATH`, which every child process inherits and so is not used).
