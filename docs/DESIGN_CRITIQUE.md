@@ -838,3 +838,15 @@ What is criticised: the two stages change-cycle.md's item 4 appends to docs/BUIL
 **Resolution:** none due. Round 1's two Blocking findings, one of each critic, were fixed after it, no later round held one, and no round a non-convergent one (the plan critic said in rounds 2 to 5 that no fix reversed an earlier one), so no resolution round runs and the subject goes to its gate. What the confirming read found is fixed in the text and recorded as fixed, unverified: no critic has read those last two changes.
 
 **Gate**: passed 2026-11-14, the owner's five approvals asked in the question form on the records at 9e0da35 (the behaviour the design fixes, the one launched form now refused among it; the register's row R-105 with R-102's sentence and the clause R-059 gains; D-001 as revised; the critique's record, its last two fixes named as unread by a critic; the plan revision, TASK-084 new and TASK-082, TASK-081 and TASK-065 revised), the traits told as unchanged; the five round files removed with `git rm` in the commit that passes the gate.
+
+## Subject: improvements (the improvements release's design revision and its plan addendum as one subject: the two evaluations' program and text items, the owner's two rules held by the hooks, the pitfalls; 2026-11-24)
+
+**What is criticised:** the change cycle's design revision (change-cycle.md, item 2) with its plan addendum (item 4), one subject since the addendum's increments stand in the round-1 file: docs/DESIGN.md's section "Change: the improvements release", the register's rows R-106 to R-136 with R-031 and R-037 as closed, the inventory's seven new Decisions rows, the diagram index with D-001 to D-004 as revised, and docs/BUILD_PLAN.md's section "The improvements release — the plan addendum" (stages I1 to I5, TASK-085 to TASK-118). The critics read `run/review/DESIGN-improvements-<round>.md`, built from the committed records by run/supervisor/improve_design_file.py, with plan-critic's design-document and build-plan lenses and the lenses the type and the two traits add. The owner's scope (INVENTORY, Decisions: the order's row and the intake's decisions of 2026-11-24, the two rules of 2026-11-15, the standing word on an exhausted pool) is the subject's fixed input: nothing of it is relitigated; the one-time install of the duplicate detector and the release's name are the owner's open decisions at the gate and are criticised only as the design states them.
+
+**Accepted** (finding, critic, round, the reason):
+- (none yet)
+
+**Rounds** (round, kind, the commit its file was built from, critic, Blocking / Should fix / Consider, what was fixed):
+- (none yet)
+
+**Resolution:** (none yet)
