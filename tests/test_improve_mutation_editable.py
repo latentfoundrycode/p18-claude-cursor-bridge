@@ -370,13 +370,17 @@ def test_task085_workspace_reached_through_a_link_still_maps_its_entries(tmp_pat
     """TASK-085 Done when: "every entry that resolves inside the Workspace ... is mapped to the same folder of the
     copy": where the program is started in the Workspace through a link (a junction, a symbolic link), an entry that
     names the Workspace's real folder still resolves inside it and is mapped, so the mutant is killed (Review A,
-    round 1: the folder was taken relative to the unresolved Workspace path and the entry was dropped)."""
+    round 1: the folder was taken relative to the unresolved Workspace path and the entry was dropped). The mutants
+    file is named relative to the folder the program starts in: on POSIX the working folder is the link's real folder
+    (getcwd resolves a symbolic link), so a path through the link would be refused as outside run/supervisor/ by the
+    file's own check, which this increment does not change (CI, PR #205); there the case runs from the real folder,
+    and on Windows, where the working folder keeps the junction, it runs through the link."""
     ws = nested_project(tmp_path)
     python = path_entry_venv(tmp_path, ws, tag="lk")
     via = tmp_path / "via"
     _link_folder(via, ws)
     mf = mutants(ws, "lk", body())
-    rc, out = run_mr(via, via / "run" / "supervisor" / mf.name, python)
+    rc, out = run_mr(via, os.path.join("run", "supervisor", mf.name), python)
     assert rc == 0, out
     assert "m1: killed" in out, out
 
