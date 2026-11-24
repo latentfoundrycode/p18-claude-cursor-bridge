@@ -118,3 +118,5 @@
 2026-11-24 TASK-085-r2: The interpreter's `-m` puts the folder it runs in first on the import path on every Python version; Python 3.11 and later can be told not to, by `-P` on the command line (or `PYTHONSAFEPATH`, which every child process inherits and so is not used).
 
 2026-11-24 TASK-086a-r2: Step 7 of Done listed three failures in `tests/test_program_roster_sign_in.py` unrelated to `roster-check.py`; brief marks that file out of scope for fixes.
+
+2026-11-24 TASK-086a-r3: The r2 BUILDER_NOTES line about those three sign-in failures was wrong: round 2's probe-order change caused them; round 3 probes every model of a profile before judging it, which fixes them.

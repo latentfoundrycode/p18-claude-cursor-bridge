@@ -2,7 +2,7 @@
 """roster-check: resolve which models fill the builder / Review A / Review B roles today,
 prove three distinct families, and (optionally) prove each model answers.
 
-  python roster-check.py docs/ROSTER.json [--command "<delegate command>"] [--no-probe] [--out docs/ROSTER.resolved.json] [--run-log run/launcher/runs.jsonl]
+  python roster-check.py docs/ROSTER.json [--command "<delegate command>"] [--no-probe] [--out docs/ROSTER.resolved.json] [--run-log run/launcher/runs.jsonl] [--repair-record] [--review-alt <reason>]
 
 docs/ROSTER.json (v2):
 {
@@ -24,10 +24,12 @@ the "Cursor Models" pool (native); every third-party model is "Other Models".
 A profile is skipped when other_pool is "exhausted" and the builder is in the other pool, or
 when review_b is excluded by its pool or a mark only where no alternate is independent and
 usable. Unless --no-probe, the profile's builder, Review B and (where the table resolves an
-alternate) review_b_alt are each sent a
-one-word request through `cursor-agent -p -f --model <id>`; a refusal, empty reply,
-usage-limit message or timeout marks the profile unusable (this catches hard failures only,
-never a nearly-empty quota); any other reply counts as answered, off-script. The chosen
+alternate) review_b_alt are each sent a one-word request through `cursor-agent -p -f --model <id>`;
+a refusal, empty reply, usage-limit message or timeout marks that model as not answering (this
+catches hard failures only, never a nearly-empty quota); any other reply counts as answered,
+off-script. After every probe planned for the profile, a builder that did not answer skips it;
+an alternate that did not answer under the reason family leaves a REBUILD with review_b, which
+is probed too and skips the profile if it does not answer. The chosen
 profile's three families must be distinct. The result is written to
 docs/ROSTER.resolved.json for the delegate and Review B commands to read, and only when it
 changes (the time of every check goes to the state file as last_resolved), so a check
@@ -84,6 +86,7 @@ import datetime
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -141,11 +144,10 @@ def norm_entry(entry):
 
 
 def current_branch():
-    try:
-        p = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, creationflags=NO_WINDOW)
-        return p.stdout.strip() if p.returncode == 0 else ""
-    except OSError:
+    p = _git_run(["git", "rev-parse", "--abbrev-ref", "HEAD"], os.getcwd())
+    if p is None or p.returncode != 0:
         return ""
+    return (p.stdout or "").strip()
 
 
 def built_by(run_log, branch=None):
@@ -187,12 +189,27 @@ _COMMIT_NAME_RX = re.compile(r"^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$")
 _REPORT_BRIEF_RX = re.compile(r"(.+?)(?:-r\d+[a-z]?)?-report\.md", re.IGNORECASE)
 
 
+def _git_decode_stdout(raw):
+    if raw is None:
+        return ""
+    if isinstance(raw, str):
+        return raw
+    try:
+        return raw.decode("utf-8", errors="surrogateescape")
+    except ValueError:
+        return None
+
+
 def _git_run(args, cwd):
     try:
-        return subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=GIT_TIMEOUT,
-                              creationflags=NO_WINDOW)
-    except (OSError, subprocess.TimeoutExpired):
+        p = subprocess.run(args, cwd=cwd, capture_output=True, text=False, timeout=GIT_TIMEOUT,
+                           creationflags=NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired, ValueError):
         return None
+    stdout = _git_decode_stdout(p.stdout)
+    if stdout is None:
+        return None
+    return subprocess.CompletedProcess(args, p.returncode, stdout, p.stderr)
 
 
 def _in_git_repo(cwd):
@@ -436,7 +453,7 @@ def _parse_run_log_raw(run_log):
 def _branch_builder_rows(entries, branch):
     rows = []
     for e in entries:
-        if e.get("kind") != "builder" or not e.get("model"):
+        if e.get("kind") != "builder":
             continue
         if e.get("slot") == "not free":
             continue
@@ -450,7 +467,9 @@ def built_families(run_log, branch=None, cwd=None, roster=None, profiles=None):
 
     Signature for TASK-086b: built_families(run_log, branch=None, cwd=None) -> dict with
     status, families, unknown_causes, unreadable_cause, parsing_rows, counted_rows, rebuild_end.
-    cwd is the folder the branch is read in (default: process cwd).
+    cwd is the folder the branch is read in (default: process cwd). TASK-086b's launcher must pass
+    the roster and its profiles for the same set the resolve reads; without them a row whose family
+    only the roster names reads as unknown.
     """
     cwd = cwd or os.getcwd()
     branch_arg = branch
@@ -527,9 +546,13 @@ def built_families(run_log, branch=None, cwd=None, roster=None, profiles=None):
             continue
         result["families"].add(fam)
     for rep in added_reports:
-        brief = _brief_from_report(rep)
+        rep_base = os.path.basename(rep.replace("\\", "/"))
+        if any(0xD800 <= ord(ch) <= 0xDFFF for ch in rep_base):
+            brief = None
+        else:
+            brief = _brief_from_report(rep)
         if brief is None or not any(r.get("brief") == brief for r in parsing_rows):
-            unknown.append((rep, os.path.basename(rep.replace("\\", "/"))))
+            unknown.append((rep, ascii(rep_base)))
             if result["rebuild_end"] is None:
                 result["rebuild_end"] = "checkpoint"
     if unknown:
@@ -586,18 +609,38 @@ def _alt_independent(alt_fam, built_fams, ra_fam):
     return alt_fam and alt_fam != ra_fam and alt_fam not in built_fams
 
 
-def _damaged_path_unsafe(path):
-    if not os.path.exists(path):
-        return False
-    if not os.path.isfile(path):
+def _is_symlink_or_junction(st):
+    if stat.S_ISLNK(st.st_mode):
         return True
-    if os.path.islink(path):
+    if getattr(st, "st_reparse_tag", 0):
         return True
+    return False
+
+
+def _nofollow_opener(path, flags):
+    return os.open(path, flags | getattr(os, "O_NOFOLLOW", 0), 0o644)
+
+
+def _record_path_unsafe(path):
     try:
         st = os.lstat(path)
     except OSError:
+        return False
+    if _is_symlink_or_junction(st):
         return True
-    if getattr(st, "st_reparse_tag", 0):
+    if not stat.S_ISREG(st.st_mode):
+        return True
+    return False
+
+
+def _damaged_path_unsafe(path):
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return False
+    if _is_symlink_or_junction(st):
+        return True
+    if not stat.S_ISREG(st.st_mode):
         return True
     if st.st_nlink > 1:
         return True
@@ -605,6 +648,9 @@ def _damaged_path_unsafe(path):
 
 
 def repair_record(run_log):
+    if _record_path_unsafe(run_log):
+        print("CANNOT REPAIR: refuse %s" % run_log)
+        return 2
     _entries, open_fail, _bad, raw_lines, _good = _parse_run_log_raw(run_log)
     if open_fail is not None:
         print("CANNOT REPAIR: cannot read %s" % run_log)
@@ -631,7 +677,11 @@ def repair_record(run_log):
     tmp_fd = tmp_path = None
     try:
         os.makedirs(log_dir, exist_ok=True)
-        with open(damaged, "ab") as f:
+        with open(damaged, "ab", opener=_nofollow_opener) as f:
+            fst = os.fstat(f.fileno())
+            if _is_symlink_or_junction(fst) or not stat.S_ISREG(fst.st_mode) or fst.st_nlink != 1:
+                print("CANNOT REPAIR: refuse %s" % damaged)
+                return 2
             for line_b in moved_bytes:
                 f.write(line_b + b"\n")
             f.flush()
@@ -802,9 +852,10 @@ def state_path(roster_path):
     roster_dir = os.path.dirname(os.path.abspath(roster_path)) or "."
     try:
         g = subprocess.run(["git", "rev-parse", "--git-common-dir"], cwd=roster_dir, capture_output=True,
-                           text=True, timeout=20, creationflags=NO_WINDOW)
-        if g.returncode == 0 and g.stdout.strip():
-            common = g.stdout.strip()
+                           text=False, timeout=20, creationflags=NO_WINDOW)
+        common_out = _git_decode_stdout(g.stdout) if g.returncode == 0 else None
+        if common_out is not None and common_out.strip():
+            common = common_out.strip()
             if not os.path.isabs(common):
                 common = os.path.join(roster_dir, common)
             return os.path.join(os.path.abspath(common), "bridge", "roster-state.json")
@@ -1213,6 +1264,9 @@ def main():
         a_fam = family_of(a_id, a_fam_o)
         a_pool = pool_of(a_id, a_pool_o)
         check_built = built_fam_set if set_status == "known" else set()
+        if not a_fam:
+            print("FAIL  --review-alt refused: review_b_alt %s: its family is unknown" % a_id)
+            return 1
         if a_fam == ra_fam:
             print("FAIL  --review-alt refused: review_b_alt %s is of Review A's family (%s)" % (a_id, ra_fam))
             return 1
@@ -1280,12 +1334,23 @@ def main():
             profile_rebuild_end = global_rebuild_end
             family_deviation = False
 
+            family_only_unknown = (
+                parsing_unknown_family
+                and all("whose family cannot be named" in label for _n, label in bset["unknown_causes"]))
+
             if set_status == "unknown":
                 if r_excl:
                     print("    skip: review_b is excluded and no alternate may be resolved on an unknown built set"); continue
                 if r_fam in roster_b_fams or r_fam in parse_b_fams or parsing_unknown_family:
                     rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
                     rebuild = {"built_by": rb_model, "rebuild_with": b_id}
+                    if family_only_unknown:
+                        nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
+                        if nb is None:
+                            print("FAIL  cannot read the families that built this branch (git)")
+                            return 1
+                        if nb:
+                            profile_rebuild_end = "new branch"
                     print(rb_line)
             elif set_status in ("known", "empty"):
                 if not r_excl and r_id in unavailable:
@@ -1320,39 +1385,41 @@ def main():
                 ok_b, sign_in_b = _probe_roles([("builder", b_id)])
                 if sign_in_b:
                     return 5
+                rest = []
+                if not _r_excluded(r_id, r_pool):
+                    rest.append(("review_b", r_id))
+                if deviation and a_id and _alt_pool_ok(a_id, a_pool):
+                    rest.append(("review_b_alt", a_id))
+                ok_rest = True
+                sign_in_rest = False
+                if rest:
+                    ok_rest, sign_in_rest = _probe_roles(rest)
+                if sign_in_rest:
+                    return 5
                 if not ok_b:
                     print("    skip: a model did not answer"); continue
-                rest = []
-                if deviation and a_id:
-                    rest.append(("review_b_alt", a_id))
-                elif rebuild is not None or not deviation:
-                    rest.append(("review_b", r_id))
-                if rest:
-                    ok, sign_in = _probe_roles(rest)
-                    if sign_in:
-                        return 5
-                    if not ok:
-                        if deviation and deviation.get("reason") == "unavailable":
+                if not ok_rest:
+                    if deviation and deviation.get("reason") == "unavailable":
+                        print("    skip: a model did not answer"); continue
+                    if deviation and family_deviation and rebuild is None:
+                        rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
+                        rebuild = {"built_by": rb_model, "rebuild_with": b_id}
+                        nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
+                        if nb is None:
+                            print("FAIL  cannot read the families that built this branch (git)")
+                            return 1
+                        if nb:
+                            profile_rebuild_end = "new branch"
+                        deviation = None
+                        use_r_id, use_r_fam = r_id, r_fam
+                        print(rb_line)
+                        ok2, sign_in2 = _probe_roles([("review_b", r_id)])
+                        if sign_in2:
+                            return 5
+                        if not ok2:
                             print("    skip: a model did not answer"); continue
-                        if deviation and family_deviation and rebuild is None:
-                            rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
-                            rebuild = {"built_by": rb_model, "rebuild_with": b_id}
-                            nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
-                            if nb is None:
-                                print("FAIL  cannot read the families that built this branch (git)")
-                                return 1
-                            if nb:
-                                profile_rebuild_end = "new branch"
-                            deviation = None
-                            use_r_id, use_r_fam = r_id, r_fam
-                            print(rb_line)
-                            ok2, sign_in2 = _probe_roles([("review_b", r_id)])
-                            if sign_in2:
-                                return 5
-                            if not ok2:
-                                print("    skip: a model did not answer"); continue
-                        else:
-                            print("    skip: a model did not answer"); continue
+                    else:
+                        print("    skip: a model did not answer"); continue
 
             fams_out = {"builder": b_fam, "review_a": ra_fam, "review_b": use_r_fam}
             chosen = {"profile": name, "builder": b_id, "review_a": ra_id, "review_b": use_r_id, "families": fams_out,

@@ -951,7 +951,7 @@ Path: `bridge/cursor-bridge/roster-check.py`
 roster-check: resolve which models fill the builder / Review A / Review B roles today,
 prove three distinct families, and (optionally) prove each model answers.
 
-  python roster-check.py docs/ROSTER.json [--command "<delegate command>"] [--no-probe] [--out docs/ROSTER.resolved.json] [--run-log run/launcher/runs.jsonl]
+  python roster-check.py docs/ROSTER.json [--command "<delegate command>"] [--no-probe] [--out docs/ROSTER.resolved.json] [--run-log run/launcher/runs.jsonl] [--repair-record] [--review-alt <reason>]
 
 docs/ROSTER.json (v2):
 {
@@ -973,10 +973,12 @@ the "Cursor Models" pool (native); every third-party model is "Other Models".
 A profile is skipped when other_pool is "exhausted" and the builder is in the other pool, or
 when review_b is excluded by its pool or a mark only where no alternate is independent and
 usable. Unless --no-probe, the profile's builder, Review B and (where the table resolves an
-alternate) review_b_alt are each sent a
-one-word request through `cursor-agent -p -f --model <id>`; a refusal, empty reply,
-usage-limit message or timeout marks the profile unusable (this catches hard failures only,
-never a nearly-empty quota); any other reply counts as answered, off-script. The chosen
+alternate) review_b_alt are each sent a one-word request through `cursor-agent -p -f --model <id>`;
+a refusal, empty reply, usage-limit message or timeout marks that model as not answering (this
+catches hard failures only, never a nearly-empty quota); any other reply counts as answered,
+off-script. After every probe planned for the profile, a builder that did not answer skips it;
+an alternate that did not answer under the reason family leaves a REBUILD with review_b, which
+is probed too and skips the profile if it does not answer. The chosen
 profile's three families must be distinct. The result is written to
 docs/ROSTER.resolved.json for the delegate and Review B commands to read, and only when it
 changes (the time of every check goes to the state file as last_resolved), so a check
