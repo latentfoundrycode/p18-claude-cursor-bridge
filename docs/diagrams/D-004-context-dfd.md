@@ -39,7 +39,7 @@ Notes:
 | p_dependency_scan | .github/workflows/dependency-scan.yml |
 | ds_checkout | the Workspace and Worktrees/ checkouts |
 | ds_project_checkouts | each project's Workspace/ under a root ~/.cursor-bridge/projects.json lists: its .git (config, refs/heads/main, bridge/ rounds files), run/, handoff/, docs/HARDENING.md |
-| ds_run_outputs | run/agent/\*.err, run/agent/\*.out, run/review/REVIEW-nnn.err, run/review/REVIEW-nnn.out (designed; TASK-092) |
+| ds_run_outputs | run/agent/\*.err, run/agent/\*.out, run/review/REVIEW-nnn.err |
 | ds_runs_log | run/launcher/runs.jsonl |
 | ds_guard_records | git common dir bridge/ |
 | ds_review_hashes | ~/.cursor-bridge/review-hashes/ |
@@ -169,12 +169,11 @@ ds_runs_log -->|"UNTRUSTED: learned limits; the built set, every builder run of 
 ds_checkout -->|"UNTRUSTED: the report files the branch adds under handoff/, each needing its brief's builder row, and docs/ROSTER.json's builder families, for the built set (R-107)"| p_bridge_run
 ds_checkout -->|"UNTRUSTED: docs/ROSTER.resolved.json with its deviation entry (the model, the reason family or unavailable, the branch, the built families), honoured only where the built set is known, the model's family is not in it and the entry's families equal the set read at the launch; otherwise refused, resolve again (R-107)"| p_bridge_run
 ds_checkout -->|"project.json's interpreters as the merge base of the branch with origin/main holds it: gated content read from the repository's objects, never from the working tree or the branch's own commits; none where there is no origin/main; a named one admitted where it lies inside the launch roots through no link (R-117)"| p_bridge_run
-p_bridge_run -->|"a declared interpreter, admitted, for the driver or test kind in a stripped run alone: a builder that replaces the file at a listed path gains the stripped environment a test file already has, nothing else (R-117)"| p_test_suite
 ds_guard_records -->|"rounds for the ceiling"| p_bridge_run
 p_bridge_run <-->|"heavy slot, holder"| ds_heavy_lock
 p_bridge_run -->|"listing before and after"| ext_beside_workspace
 ext_key_file -->|"SECRET: NAME=value to the child only, not to cursor-agent or a driver"| p_bridge_run
-p_bridge_run -->|"SECRET: stripped environment (--strip, R-052) on every suite and increment's own test files the loop launches and on every driver but one under a recorded Decision, a suite's or own-file run's named key values by --key-file, handed to that code, a driver's from the project's .env in its scratch copy, its scratch folder named by --scratch under the owner's profile, outside the agent home"| p_test_suite
+p_bridge_run -->|"SECRET: stripped environment (--strip, R-052) on every suite and increment's own test files the loop launches and on every driver but one under a recorded Decision, a suite's or own-file run's named key values by --key-file, handed to that code, a driver's from the project's .env in its scratch copy, its scratch folder named by --scratch under the owner's profile, outside the agent home; a declared interpreter, admitted, for the driver or test kind in a stripped run alone: a builder that replaces the file at a listed path gains the stripped environment a test file already has, nothing else (R-117)"| p_test_suite
 ds_checkout -->|"UNTRUSTED: code and tests the builder wrote; SECRET: the .env service passwords a driver copies into its scratch copy"| p_test_suite
 ds_checkout -->|"UNTRUSTED: code and tests the builder wrote, run in the session's own environment: stated limits (BUG-043)"| p_supervisor
 p_test_suite -.->|"UNTRUSTED: a deliberate write, .git config, hooks, which a later git command of the session runs (BUG-043)"| ds_checkout
