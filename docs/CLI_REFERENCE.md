@@ -962,7 +962,8 @@ docs/ROSTER.json (v2):
                                                     A probe cannot see 1% remaining.
   "review_a": "claude-opus-5-5",                  <- Review A runs in Claude Code, not Cursor.
   "profiles": [                                   <- tried in order; the first usable one wins
-    {"name": "full",   "builder": "grok-4.7-high", "review_b": "gpt-5.6-sol-high"},
+    {"name": "full",   "builder": "grok-4.7-high", "review_b": "gpt-5.6-sol-high",
+                        "review_b_alt": "composer-2.5"},
     {"name": "native", "builder": "composer-2.5",  "review_b": "grok-4.7-high"}
   ]
 }
@@ -980,12 +981,22 @@ changes (the time of every check goes to the state file as last_resolved), so a 
 before a snapshot leaves the tree clean.
 When the Cursor tool itself is signed out, its own sign-in line (the whole of standard output,
 or any whole line of standard error) ends the run with SIGN-IN, exit 5, and counts no failure.
-The family rule governs Review B only (2026.10.25a): Review B is never of the family of the
-last builder run of the branch under review (none for a branch with no builder run). When
-the chosen profile's Review B is of that family - the change in flight was built under
-another profile, before a switch - the profile still resolves, with a REBUILD line and a
-"rebuild" entry in the resolved file: its builder rebuilds the change first (step 3b), and
-bridge-run.py refuses that Review B until the branch's last builder run is of another family.
+A profile may name a second reviewer in review_b_alt. The families that built the branch are
+read from run/launcher/runs.jsonl: every builder row of the branch counts (rows marked slot
+not free never count). The set is known (a list of families after the clean-rebuild drop rule),
+unknown (a line of the record does not parse, or a report file the branch adds has no matching
+builder row), empty (no row applies, or the checkout lies in no repository), or cannot be read
+(detached head, the record cannot be opened, git does not answer, or a report is present and
+the branch's base against main cannot be found): cannot read exits 1 with no REBUILD. Review B is
+never of a family in the known built set. When review_b's family built and review_b_alt is
+independent and usable, the alternate resolves with a DEVIATION line and a deviation entry (reason
+family, unavailable, or the reason given with --review-alt) instead of a rebuild entry. Otherwise
+the profile still resolves with a REBUILD line and a rebuild entry when the table says so.
+--repair-record  rewrites the run record keeping every line that parses, appends the others to
+run/launcher/runs.damaged.jsonl, prints both counts, resolves nothing.
+--review-alt <reason>  resolve the alternate on request; reason is one word of ASCII letters and
+hyphens; exit 1 when the alternate cannot be resolved (the built set unknown or not readable
+among the causes).
 --record-failure <model> --stderr-file <path> [--stdout-file <path>]
   Classify a failed cursor-agent call. <model> must be a model id of this roster (a wrong
   argument exits 2 and changes nothing). USAGE-LIMIT (a usage/quota/limit message) or a
@@ -1009,7 +1020,8 @@ exhausted and the current UTC time is at or past 00:00 UTC of the first reset_da
 after exhausted_at, the check restores other_pool to "available" by itself, clears the
 unavailable marks and failure counts, and says so. Timestamps are UTC. ROSTER_NOW=<ISO UTC>
 overrides "now" for tests.
-Exit 0 = resolved; 1 = no usable profile, a family collision, or a command mismatch;
+Exit 0 = resolved; 1 = no usable profile, a family collision, a command mismatch, a built set
+that cannot be read, or a refused --review-alt;
 2 = cannot read or a wrong model argument; 3 = pool/model marked exhausted, re-resolve;
 4 = transient, retry once; 5 = repeated connection failures or time-outs, or the Cursor tool signed out (SIGN-IN), tell the owner.
 ASCII-only on purpose.
