@@ -5,9 +5,9 @@
   "version": "2026.11.23a",
   "instruction_texts": ["bridge/"],
   "state": {
-    "phase": "changing",
-    "stage": "the program release's stage P3 closed 2026-11-22 (its review by both, one round, closed by BUG-047; its demonstration 33 of 33), stage P2 2026-11-19, stage P1 2026-11-14, stage P4 next; before it release B2 complete 2026-11-11 and release S, the maintainer's, installed and calibrated 2026-11-12; Claude-Cursor Bridge 2026.11.12a",
+    "phase": "done",
+    "stage": "the program release complete 2026-11-24: stage P4 closed 2026-11-24 (its review by both before the stamp, one round; the owner's install that day), stage P3 2026-11-22, stage P2 2026-11-19, stage P1 2026-11-14; before it release B2 complete 2026-11-11; Claude-Cursor Bridge 2026.11.23a",
     "bridge": "2026.11.23a",
-    "updated": "2026-11-22"
+    "updated": "2026-11-24"
   }
 }
