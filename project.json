@@ -6,7 +6,7 @@
   "instruction_texts": ["bridge/"],
   "state": {
     "phase": "changing",
-    "stage": "the improvements release begun 2026-11-24 (design revision and plan addendum); before it the program release complete 2026-11-24: stage P4 closed 2026-11-24 (its review by both before the stamp, one round; the owner's install that day), stage P3 2026-11-22, stage P2 2026-11-19, stage P1 2026-11-14; before it release B2 complete 2026-11-11; Claude-Cursor Bridge 2026.11.23a",
+    "stage": "the improvements release: its design and plan approved by the owner 2026-11-24, stages I1 to I5 from TASK-085; before it the program release complete 2026-11-24: stage P4 closed 2026-11-24 (its review by both before the stamp, one round; the owner's install that day), stage P3 2026-11-22, stage P2 2026-11-19, stage P1 2026-11-14; before it release B2 complete 2026-11-11; Claude-Cursor Bridge 2026.11.23a",
     "bridge": "2026.11.23a",
     "updated": "2026-11-24"
   }
