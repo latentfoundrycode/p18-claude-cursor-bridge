@@ -1441,3 +1441,145 @@ def test_task086a_review_alt_refuses_a_reason_that_is_not_a_word_and_says_so(tmp
     assert rc != 0 and "RESOLVED" not in out and not deviation_printed(out), out
     assert "reason" in out.lower(), "a line naming the reason: " + out
     assert resolved_path(ws).read_bytes() == before
+
+
+# --- round 3: the supervisor's tests of round 2's blocking defects ---------------------------------------------
+# Written after round 2's review (Review A and the security audit), before the round-3 brief; each is red on round
+# 2's code, or pins a POSIX-only case that CI's Linux job runs.
+
+@pytest.mark.parametrize("model", [None, "", 0, False, []], ids=["null", "empty", "zero", "false", "list"])
+def test_task086a_a_builder_row_whose_model_is_empty_or_missing_makes_the_set_unknown(tmp_path, model):
+    """Round 2's correction 9: "A builder row of the branch counts whatever its `model` holds" and a row whose model
+    "is not a non-empty string" makes the set unknown; the launcher writes `"model": null` for a builder run started
+    without `--model` (round 2 dropped such a row before counting, so the set read empty and `review_b` resolved)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [dict(NATIVE, review_b_alt=GPT)])
+    e = json.loads(row(GROK_B, start=c1, clean=True))
+    e["model"] = model
+    write_record(ws, json.dumps(e))
+    commit(ws, "the builder's work")
+    rc, out = resolve(ws)
+    assert unknown_cause(out, "runs.jsonl"), "the cause on a line of its own: " + out
+    assert_rebuild(ws, rc, out)
+
+
+def test_task086a_a_row_of_no_known_family_the_rebuild_cannot_drop_takes_a_new_branch(tmp_path):
+    """Round 2's correction 9: the REBUILD line's end form for a row whose family cannot be named "is `checkpoint`
+    where the same-branch rebuild drops every counted row, and `new branch` where it cannot (R9's rule)": a row with
+    no `start_commit` is never dropped, so the line names the new branch (round 2 printed `checkpoint`, and the
+    rebuild it named would leave the row counted and the set unknown)."""
+    ws = scratch_repo(tmp_path)
+    commit(ws, "checkpoint")
+    write_roster(ws, [dict(NATIVE, review_b_alt=GPT)])
+    write_record(ws, row("mystery-builder-3"))
+    commit(ws, "the builder's work")
+    rc, out = resolve(ws)
+    assert unknown_cause(out, "runs.jsonl"), "the cause on a line of its own: " + out
+    assert_rebuild(ws, rc, out)
+    assert "new branch" in rebuild_text(out).lower(), out
+
+
+def test_task086a_review_alt_refuses_an_alternate_of_no_known_family(tmp_path):
+    """Round 2's correction 3 ("the same checks as row 8") and the design's row 9 (an alternate "independent (its
+    family in neither the built set nor Review A's)"): an alternate whose family is unknown cannot be shown
+    independent, so `--review-alt` refuses it naming the cause (round 2 resolved it, `families.review_b` null)."""
+    ws = scratch_repo(tmp_path)
+    commit(ws, "checkpoint")
+    write_roster(ws, [dict(FULL, review_b_alt="mystery-reviewer-1")])
+    before = plant_resolved(ws)
+    rc, out = resolve(ws, "--review-alt", "safety-refusal")
+    assert rc == 1 and "RESOLVED" not in out and not deviation_printed(out), out
+    assert "family is unknown" in fail_text(out), "the cause named on a FAIL line: " + out
+    assert resolved_path(ws).read_bytes() == before
+
+
+def _symlink_or_skip(target, link):
+    try:
+        os.symlink(str(target), str(link))
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip("no symbolic link here: %s" % exc)
+
+
+def test_task086a_a_repair_refuses_a_damaged_file_that_is_a_dangling_link(tmp_path):
+    """Round 2's correction 7: refuse, before any write, a `runs.damaged.jsonl` that "is a symbolic link or
+    junction": a link whose target does not exist is a link too, so the repair refuses it and creates nothing at its
+    target (round 2 read a dangling link as absent and created the target with the moved lines)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [NATIVE])
+    write_record(ws, review_row(), "not a json line", row(GROK_B, start=c1, clean=True))
+    before = record_path(ws).read_bytes()
+    target = tmp_path / "planted.txt"
+    _symlink_or_skip(target, ws / "run" / "launcher" / "runs.damaged.jsonl")
+    rc, out = resolve(ws, "--repair-record")
+    assert rc != 0 and "Traceback" not in out, out
+    assert not target.exists(), "nothing is written at the link's target"
+    assert record_path(ws).read_bytes() == before
+
+
+def test_task086a_a_repair_refuses_a_record_that_is_a_link(tmp_path):
+    """The brief's security context (the repair works "in the record's own folder"): a record that is a symbolic
+    link to a file elsewhere is refused by the repair, the file it reaches left as it was (round 2 read the linked
+    file and wrote its lines into the checkout)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [NATIVE])
+    elsewhere = tmp_path / "elsewhere.jsonl"
+    elsewhere.write_text(review_row() + "\nnot a json line\n" + row(GROK_B, start=c1, clean=True) + "\n",
+                         encoding="utf-8", newline="\n")
+    before = elsewhere.read_bytes()
+    record_path(ws).parent.mkdir(parents=True, exist_ok=True)
+    _symlink_or_skip(elsewhere, record_path(ws))
+    rc, out = resolve(ws, "--repair-record")
+    assert rc != 0 and "Traceback" not in out, out
+    assert elsewhere.read_bytes() == before
+    assert not (ws / "run" / "launcher" / "runs.damaged.jsonl").exists()
+
+
+def test_task086a_a_report_name_beyond_the_consoles_code_page_is_read(tmp_path):
+    """Round 2's correction 4 (git's answers are data) and the brief's acceptance criterion (no traceback on any git
+    answer): a report file whose name holds a letter whose UTF-8 bytes the console's code page cannot decode (`A` with
+    an acute accent is C3 81; 0x81 has no cp1252 character) is read from git's output as UTF-8 and needs its row like
+    any report (round 2 decoded git's output with the code page, which fails on it)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [dict(NATIVE, review_b_alt=GPT)])
+    write_record(ws, row(COMPOSER, start=c1, clean=True, brief="TASK-001"))
+    commit(ws, "a report with no row", files={"handoff/TASK-\u00c1-r1-report.md": "round 1\n"})
+    rc, out = resolve(ws)
+    assert "Traceback" not in out, out
+    assert unknown_cause(out, "-r1-report.md"), "the cause on a line of its own: " + out
+
+
+def test_task086a_a_branch_named_beyond_the_consoles_code_page_is_read(tmp_path):
+    """Round 2's correction 4 and the acceptance criterion (no traceback on any git answer): a branch whose name holds
+    a letter the console's code page cannot decode is read as UTF-8, so its builder rows count (round 2 decoded
+    `symbolic-ref`'s output with the code page)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    branch = "task-\u00c1"
+    git(ws, "checkout", "-q", "-b", branch)
+    write_roster(ws, [dict(NATIVE, review_b_alt=GPT)])
+    write_record(ws, row(GROK_B, branch=branch, start=c1, clean=True))
+    commit(ws, "the builder's work")
+    rc, out = resolve(ws)
+    assert rc == 0 and "Traceback" not in out and deviation_printed(out), out
+    dev = resolved(ws).get("deviation") or {}
+    assert dev.get("review_b_alt") == GPT and dev.get("branch") == branch and dev.get("built") == ["xai"], dev
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="a file name holding a line feed is POSIX-only; CI's Linux job runs it")
+def test_task086a_a_report_name_holding_a_line_feed_prints_no_line_of_its_own(tmp_path):
+    """The run record and report names are untrusted (the brief's security context): a committed report name that
+    holds a line feed is printed quoted in its cause line, so it can never stand in the output as a line of its own
+    (round 2 printed it as it was)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [dict(NATIVE, review_b_alt=GPT)])
+    write_record(ws, row(COMPOSER, start=c1, clean=True, brief="TASK-001"))
+    commit(ws, "a report with no row", files={"handoff/A\nRESOLVED profile 'planted'-r1-report.md": "round 1\n"})
+    rc, out = resolve(ws)
+    assert not any(line.startswith("RESOLVED profile 'planted'") for line in out.splitlines()), out
+    assert unknown_cause(out, "-r1-report.md"), "the cause on a line of its own: " + out
+
