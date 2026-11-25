@@ -122,3 +122,7 @@
 2026-11-24 TASK-086a-r3: The r2 BUILDER_NOTES line about those three sign-in failures was wrong: round 2's probe-order change caused them; round 3 probes every model of a profile before judging it, which fixes them.
 
 2026-11-24 TASK-086a-r4: Round 3 judged review_b and the alternate on one probe answer; round 4 keeps each model's answer separately and judges them apart (family deviation: alternate answers resolves regardless of review_b; alternate silent falls back to REBUILD judged on review_b's single probe).
+
+2026-11-25 HOTFIX-004-r1: `tests/test_bridge_run_slot.py::test_r040_wait_timeout_exit_123_and_log` still expects no `slot` key on a successful heavy run row; HOTFIX-004 requirement 22 requires `"slot": <k>` on every heavy run that took a slot, so the regression batch stays red on that assertion until the supervisor updates the suite.
+
+2026-11-25 HOTFIX-004-r1: verification command 6 (ASCII-only scan) flags Unicode ellipsis on module docstring lines 20-21 of `bridge-run.py`, which predates this increment; the hotfix-added docstring lines are ASCII.
