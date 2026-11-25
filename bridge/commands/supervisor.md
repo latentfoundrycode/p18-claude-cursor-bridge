@@ -54,10 +54,12 @@ cycle.
 **On every start and resume, compare the bridge version first.** Read
 `~/.claude/cursor-bridge/VERSION` and the `Bridge version:` line of `docs/PROJECT_STATUS.md`
 (a new project records the current version at intake). If they differ, or the line is
-absent on an existing project, run the `/calibrate-bridge` procedure before doing anything
-else: it verifies the installed tree against its manifest, re-reads the governing files, and
-applies only the release's adjustments for the project's current and future phases, reopening
-no gate. The owner may also run `/calibrate-bridge` at any time after updating the bridge.
+absent on an existing project, the project is not calibrated to the installed bridge: say so in
+your next report, as the session-start hook's line does. `/calibrate-bridge` is started by the
+owner, or by the maintainer session's message (rule 57): it verifies the installed tree against
+its manifest, re-reads the governing files, and applies only the release's adjustments for the
+project's current and future phases, reopening no gate. The owner may also run it at any time
+after updating the bridge.
 
 **Then check that the local repository and the remote agree** — `python ~/.claude/cursor-bridge/sync-check.py --apply` (rule 40). A squash merge completes on GitHub, and local `main` does not move unless you move it; a project once ended with the release on the remote and the local copy behind it (KP-026). BEHIND is fast-forwarded by the script. AHEAD or DIVERGED means commits stranded on protected `main`: follow the rescue it prints (nothing is deleted), carry anything still needed through a PR, and open an issue. NO REMOTE, OFFLINE, and UNPUBLISHED are legitimate reasons for a disparity; write the reason on the `Remote sync:` line of the status file, never ignore it silently.
 
@@ -184,9 +186,12 @@ was launched in** — `Workspace/`, or, during a concurrent episode, the one wor
 `Worktrees/` you launched it in; `Documents/` and every other checkout are out of bounds. This
 is enforced as an **instruction plus a detector**, and you treat it as exactly that — not as
 a wall: (1) every brief states the boundary; (2) `.cursor/rules/workspace-boundary.mdc`
-restates it as an always-on rule; (3) the `boundary-check` after-edit hook (Phase 5)
-receives the path of every file the builder edits and appends any path outside the
-workspace to `docs/BOUNDARY_VIOLATIONS.md`, which you read at step 4 of the loop. A recorded
+restates it as an always-on rule; (3) the launcher lists the files beside the Workspace
+before and after every builder and review run and prints each new, changed or removed one
+as a `bridge-run: BOUNDARY` line in the run's `.err` file and its run row, which you read at
+step 4 of the loop; the `boundary-check` after-edit hook (Phase 5) appends to
+`docs/BOUNDARY_VIOLATIONS.md` where it runs, which is not in a headless builder run
+(ISS-010). A recorded
 violation is handled like `SCOPE DRIFT`: you undo the outside edit yourself (`Documents/` is
 not under git, so look at what changed and restore it by hand), re-delegate, and open an
 issue (see "Reflection points"). Only the opt-in shell guard can stop such a write *before*
@@ -535,9 +540,10 @@ reflection point and folded into the Feedback file or the Issues file respective
 **`main` is protected, so nothing reaches it by direct commit — docs included.** Put the
 `CHANGES.md` entry for an increment *on that increment's PR branch*, so it merges to `main`
 through the gate with the code it describes; do not commit it to local `main` afterward,
-where branch protection will strand it off the remote. `PROJECT_STATUS.md` is session-resume
-bookkeeping and may stay local — but if a fresh clone on another machine must resume, it too
-has to ride PRs to reach the remote; decide per project which you need and keep it consistent. Staying local means an uncommitted or gitignored file — never a commit on local `main`, which `sync-check.py` reports as stranded.
+where branch protection will strand it off the remote. `PROJECT_STATUS.md` rides every pull
+request the same way, in its records commit, written as it will read at that pull request's
+merge (ISS-009, KP-069); the live position between merges lives in
+`run/supervisor/in-flight.md`, which is gitignored. Nothing is ever committed on local `main`, which `sync-check.py` reports as stranded.
 
 ---
 
@@ -662,8 +668,9 @@ every finding of an increment's review outside the five goes to `docs/HARDENING.
     the builder's) beside `<id>-<name>/Workspace` (the repo; `docs/` inside it is AI-facing).
     You run in `Workspace/`; the builder runs in the checkout it is launched in and **only**
     there — `Workspace/`, or one worktree under `Worktrees/` (rule 39). The boundary is an
-    instruction (brief + `workspace-boundary.mdc`) plus a detector (`boundary-check` hook →
-    `docs/BOUNDARY_VIOLATIONS.md`, read at step 4) — never assume it is a wall. A violation
+    instruction (brief + `workspace-boundary.mdc`) plus a detector (the launcher's
+    `bridge-run: BOUNDARY` lines, read at step 4; the `boundary-check` hook does not run
+    headless, ISS-010) — never assume it is a wall. A violation
     is `SCOPE DRIFT`: undo by hand, re-delegate, open an issue.
 23. `Documents/` is written only at reflection points — stage close, approved phase gate,
     project end — plus the issue placeholder on detection and the answer to a maintainer's
@@ -813,7 +820,7 @@ every finding of an increment's review outside the five goes to `docs/HARDENING.
     restores the preferred profile by itself; the owner's "usage reset" only brings it
     earlier. Reviewers review the design a
     diff embodies, not only its fidelity to the brief — a flawed brief is a finding.
-39. Sequential work is branches in one checkout, never a worktree per increment (parallel increments under rule 46 are the one exception, one worktree per builder, built one at a time under the heavy slot). You never work inside a worktree yourself — Claude Code prompts before running git in another folder or touching files outside your working directory; a worktree's work comes back to your checkout as its branch. You have no worktree of your own: step 4's run against the checkpoint runs on a copy that `mutation-run.py --checkpoint` makes (release B retired release A5's `old-<nnn>` worktree). A git
+39. Sequential work is branches in one checkout, never a worktree per increment (parallel increments under rule 46 are the one exception, one worktree per builder, built one at a time under the heavy slot). You never work inside a worktree yourself — Claude Code prompts before running git in another folder or touching files outside your working directory; a worktree's work comes back to your checkout as its branch. You have no worktree of your own: step 4's run against the checkpoint runs on a copy that `mutation-run.py --checkpoint` makes. A git
     worktree exists only while two branches must be live at once; it lives under
     `<project-root>/Worktrees/<name>` (a sibling of `Workspace/`, never inside it, never a
     loose `wt-*` folder in the project root), is recorded in `PROJECT_STATUS.md` with its

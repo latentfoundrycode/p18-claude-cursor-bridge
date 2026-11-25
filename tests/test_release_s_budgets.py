@@ -20,8 +20,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 BRIDGE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
 PHASES = os.path.join(BRIDGE, "cursor-bridge", "workflow", "phases")
 
-RULEBOOK_WORDS = 150000        # the rulebook stood at 149,668 words when release S began (2026-11-11)
-STEP_FILE_WORDS = 8000         # the largest file of a step: the delegation loop's module, 7,550 words then
+RULEBOOK_WORDS = 158000        # 150,000 from release S (149,668 words, 2026-11-11); raised once for the improvements release on the owner's words of 2026-11-24 (TASK-087a), lowered at its stamp
+STEP_FILE_WORDS = 8500         # 8,000 from release S (the loop's module, 7,550 words then); raised with the rulebook's (TASK-087a), lowered at the stamp
 
 
 def words(path):

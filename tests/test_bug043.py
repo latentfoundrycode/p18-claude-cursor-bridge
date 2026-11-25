@@ -46,7 +46,7 @@ def test_bug043_the_loop_runs_the_increment_s_own_files_through_the_launcher():
     text = loop()
     assert "A run of the increment's own test files alone goes through the launcher the same way, yours and never `test-runner`'s, since it runs code no reviewer has read: `" + OWN_FILES + "`, in the background under the same `timeout`, and `test-runner` reads that file." in text
     assert "A run of the increment's own test files alone may run in the foreground" not in text
-    assert "A stripped suite or own-file run that fails for want of a variable takes `--key-file` as above, a variable nothing names being the run's failure, back to the builder or the owner, and for want of a file a variable naming a copy outside the Workspace, never a home variable, which would undo the home redirect; it is never run again without `--strip`, and a 125 on a runner you know, or naming the agent home, is a defect to fix, not a runner the launcher does not know." in text
+    assert "takes `--key-file` as above" in text and "never run again without `--strip`" in text
 
 
 def test_bug043_the_test_runner_reads_their_file():

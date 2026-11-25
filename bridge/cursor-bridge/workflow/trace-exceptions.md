@@ -200,4 +200,6 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - new HOTFIX-003 bridge/cursor-bridge/workflow/phases/interface/mockups.md The procedure
 - reword HOTFIX-003 bridge/commands/supervisor.md Escalate to the user when
 - reword HOTFIX-003 bridge/commands/supervisor.md Reporting to the user
+- reword TASK-087 bridge/commands/supervisor.md 1. Checkpoint
+- new TASK-087 bridge/cursor-bridge/workflow/phases/reflection.md Issues — what counts, and where it is written
 - reword TASK-087 bridge/commands/supervisor.md Role: Supervising Architect
