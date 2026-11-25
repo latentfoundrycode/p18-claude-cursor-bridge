@@ -1048,7 +1048,19 @@ def write_log(folder, entry):
         return
     try:
         os.makedirs(os.path.dirname(os.path.join(folder, LOG)), exist_ok=True)
-        with open(os.path.join(folder, LOG), "a", encoding="utf-8") as f:
+        path = os.path.join(folder, LOG)
+        with open(path, "a", encoding="utf-8", newline="\n") as f:
+            need_nl = False
+            if os.path.isfile(path) and os.path.getsize(path) > 0:
+                try:
+                    with open(path, "rb") as tail:
+                        tail.seek(-1, os.SEEK_END)
+                        if tail.read(1) != b"\n":
+                            need_nl = True
+                except OSError:
+                    need_nl = False
+            if need_nl:
+                f.write("\n")
             f.write(json.dumps(entry) + "\n")
     except OSError as e:
         sys.stderr.write("bridge-run: run log not written (%s)\n" % e)
@@ -1197,6 +1209,178 @@ def roster_builder_model(folder):
     return None
 
 
+def _read_roster_json(ws):
+    try:
+        with open(os.path.join(ws, "docs", "ROSTER.json"), encoding="utf-8", errors="replace") as f:
+            data = json.load(f)
+    except (OSError, ValueError, RecursionError):
+        return None, None
+    if not isinstance(data, dict):
+        return None, None
+    profiles = data.get("profiles")
+    if profiles is None:
+        profiles = []
+    elif not isinstance(profiles, list):
+        return None, None
+    elif any(not isinstance(p, dict) for p in profiles):
+        return None, None
+    return data, profiles
+
+
+def _roster_for_review():
+    try:
+        roster = roster_program()
+    except Exception as e:
+        return None, "the roster program could not be loaded (%s); run bridge-check.py on the installed tree" % e
+    for name in ("built_families", "family_of"):
+        if not callable(getattr(roster, name, None)):
+            return None, "the roster program lacks %s; run bridge-check.py on the installed tree" % name
+    return roster, None
+
+
+def _git_launch_state(ws):
+    """The commit and clean-tree reading for a builder row, before the child starts."""
+    base = ws or "."
+    start_commit = None
+    try:
+        p = subprocess.run(
+            ["git", "-C", base, "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=NO_WINDOW,
+            timeout=bridge_env.GIT_TIMEOUT,
+        )
+        if p.returncode == 0:
+            cand = p.stdout.strip()
+            if len(cand) in (40, 64) and all(ch in "0123456789abcdef" for ch in cand.lower()):
+                start_commit = cand
+    except (OSError, subprocess.TimeoutExpired):
+        return None, False
+    if start_commit is None:
+        return None, False
+    try:
+        p = subprocess.run(
+            ["git", "-C", base, "status", "--porcelain", "-z", "--untracked-files=normal", "--ignore-submodules=none"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=NO_WINDOW,
+            timeout=bridge_env.GIT_TIMEOUT,
+        )
+        if p.returncode != 0:
+            return None, False
+        allowed = "docs/ROSTER.resolved.json"
+        parts = p.stdout.split("\0")
+        i = 0
+        while i < len(parts):
+            chunk = parts[i]
+            if not chunk:
+                i += 1
+                continue
+            if len(chunk) < 2:
+                i += 1
+                continue
+            xy = chunk[:2]
+            rest = chunk[2:]
+            if rest.startswith(" "):
+                rest = rest[1:]
+            paths = [rest.replace("\\", "/")]
+            if "R" in xy or "C" in xy:
+                i += 1
+                if i < len(parts) and parts[i]:
+                    paths.append(parts[i].replace("\\", "/"))
+            for path in paths:
+                if path != allowed:
+                    return start_commit, False
+            i += 1
+        return start_commit, True
+    except (OSError, subprocess.TimeoutExpired):
+        return None, False
+
+
+def _load_deviation(folder):
+    try:
+        with open(os.path.join(folder, "docs", "ROSTER.resolved.json"), encoding="utf-8", errors="replace") as f:
+            data = json.load(f)
+    except (OSError, ValueError, RecursionError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    deviation = data.get("deviation")
+    return deviation if isinstance(deviation, dict) else None
+
+
+_LAUNCH_BUILT_SET = None
+
+
+def _built_set_at_launch(roster, folder, ws, branch):
+    global _LAUNCH_BUILT_SET
+    log_path = os.path.join(folder, LOG)
+    try:
+        log_stamp = os.path.getmtime(log_path) if os.path.isfile(log_path) else None
+    except OSError:
+        log_stamp = None
+    cache_key = (folder, ws, branch, log_stamp)
+    if _LAUNCH_BUILT_SET is not None and _LAUNCH_BUILT_SET[0] == cache_key:
+        return _LAUNCH_BUILT_SET[1]
+    roster_data, profiles = _read_roster_json(ws)
+    try:
+        bset = roster.built_families(
+            log_path,
+            branch=branch,
+            cwd=ws,
+            roster=roster_data or {},
+            profiles=profiles or [],
+        )
+    except Exception as e:
+        bset = {"status": "bset_error", "error": e}
+    _LAUNCH_BUILT_SET = (cache_key, (bset, roster_data, profiles))
+    return _LAUNCH_BUILT_SET[1]
+
+
+def _unknown_cause_text(bset):
+    causes = bset.get("unknown_causes") or []
+    if not causes:
+        return bset.get("run_log_base") or "runs.jsonl"
+    labels = [label for _needle, label in causes]
+    return ", ".join(labels)
+
+
+def _deviation_allows_builder_review(argv, folder, model, roster):
+    deviation = _load_deviation(folder)
+    if deviation is None:
+        return False
+    if deviation.get("review_b_alt") != model:
+        return False
+    ws = workspace_of(argv, folder)
+    branch = branch_of(ws)
+    if not isinstance(deviation.get("branch"), str) or deviation.get("branch") != branch:
+        return False
+    built = deviation.get("built")
+    if not isinstance(built, list) or not all(isinstance(x, str) for x in built):
+        return False
+    bset, _, _ = _built_set_at_launch(roster, folder, ws, branch)
+    status = bset.get("status")
+    if status in ("unknown", "unreadable"):
+        return False
+    review_fam = roster.family_of(model)
+    if not review_fam:
+        return False
+    known = bset.get("families") or set()
+    if status == "empty":
+        if built:
+            return False
+        return review_fam not in known
+    if status != "known":
+        return False
+    if review_fam in known:
+        return False
+    return set(built) == set(known)
+
+
 def prior_brief_run(folder, brief_name):
     for row in read_log(folder):
         if row.get("brief_name") == brief_name:
@@ -1248,7 +1432,14 @@ def review_launch_refusal(argv, folder):
     builder = roster_builder_model(folder)
     model = model_of(argv)
     if builder and model == builder:
-        return "review launch on the roster builder model (%s) is refused; Review B uses a reviewer model" % builder
+        roster, roster_err = _roster_for_review()
+        if roster_err:
+            return roster_err
+        if not _deviation_allows_builder_review(argv, folder, model, roster):
+            if _load_deviation(folder) is None:
+                return ("review launch on the roster builder model (%s) is refused; Review B uses a reviewer model; "
+                        "resolve the roster again" % builder)
+            return "review launch on the roster builder model (%s) is refused; resolve the roster again" % builder
     for token in bridge_env.handoff_brief_tokens(argv):
         if bridge_env.parse_review_name(token):
             return "a review launch must not name a brief (%s); only the launcher counts builder briefs" % token
@@ -2392,12 +2583,13 @@ def branch_of(folder):
         p = subprocess.run(
             ["git", "-C", folder or ".", "rev-parse", "--abbrev-ref", "HEAD"],
             capture_output=True,
-            text=True,
             creationflags=NO_WINDOW,
             timeout=bridge_env.GIT_TIMEOUT,
         )
-        return p.stdout.strip() if p.returncode == 0 else None
-    except (OSError, subprocess.TimeoutExpired):
+        if p.returncode != 0:
+            return None
+        return p.stdout.decode("utf-8", errors="replace").strip()
+    except Exception:
         return None
 
 
@@ -2441,19 +2633,61 @@ def review_family_refusal(argv, folder):
     model = model_of(argv)
     if not is_agent_argv(argv) or not model:
         return None
-    try:
-        roster = roster_program()
-        built = roster.built_by(os.path.join(folder, LOG), branch_of(workspace_of(argv, folder)))
-        if not built:
-            return None
-        built_fam, review_fam = roster.family_of(built), roster.family_of(model)
-    except Exception as e:                               # the check never stops a run on its own failure, but says so
-        NOTES.append("the review-family check could not run (%s); check the family by hand" % e)
+    roster, roster_err = _roster_for_review()
+    if roster_err:
+        return roster_err
+    ws = workspace_of(argv, folder)
+    branch = branch_of(ws)
+    bset, roster_data, profiles = _built_set_at_launch(roster, folder, ws, branch)
+    status = bset.get("status")
+    review_fam = roster.family_of(model)
+    if status == "bset_error":
+        exc = bset.get("error")
+        return ("Review B %s cannot run: the built set could not be read (%s); run bridge-check.py on the installed tree"
+                % (model, exc))
+    if status == "unreadable":
+        cause = bset.get("unreadable_cause") or "runs.jsonl"
+        return ("Review B %s cannot run: the branch's built set cannot be read (%s); resolve the roster again"
+                % (model, cause))
+    if status == "empty":
         return None
-    if built_fam and built_fam == review_fam:
-        return ("Review B %s is of the %s family, which built this change (%s, the branch's last builder run): rebuild it "
-                "with the builder in docs/ROSTER.resolved.json first (step 3b; roster-check prints REBUILD)" % (model, review_fam, built))
-    return None
+    if status == "known":
+        fams = bset.get("families") or set()
+        if not review_fam or review_fam not in fams:
+            return None
+        built_desc = ", ".join(sorted(fams))
+        return ("Review B %s is of the %s family, which built this change (the branch's built set includes %s): "
+                "rebuild it with the builder in docs/ROSTER.resolved.json first (step 3b; roster-check prints REBUILD)"
+                % (model, review_fam, built_desc))
+    if status != "unknown":
+        return None
+    cause = _unknown_cause_text(bset)
+    cannot = "Review B %s cannot run: the built set is unknown (%s); resolve the roster again" % (model, cause)
+    try:
+        parsing_fams = roster._parsing_row_families(
+            bset.get("parsing_rows") or [], roster_data or {}, profiles or [])
+    except Exception:
+        return cannot
+    roster_fams = set()
+    if roster_data is not None:
+        try:
+            roster_fams = roster._roster_builder_families(roster_data, profiles or [])
+        except Exception:
+            return cannot
+    if not roster_fams:
+        resolved_builder = roster_builder_model(ws)
+        if resolved_builder is None:
+            return cannot
+        built_fam = roster.family_of(resolved_builder)
+        if not built_fam:
+            return cannot
+        roster_fams = {built_fam}
+    refused_fams = roster_fams | parsing_fams
+    if not review_fam or review_fam not in refused_fams:
+        return None
+    return ("Review B %s is of the %s family, which built this change (the built set is unknown, %s): "
+            "rebuild it with the builder in docs/ROSTER.resolved.json first (step 3b; roster-check prints REBUILD); "
+            "resolve the roster again" % (model, review_fam, cause))
 
 
 WATCH_POLL = 15                                          # seconds between polls of the wait before a CI watch (R-085)
@@ -3252,7 +3486,7 @@ def main():
     if kind == "review":
         reason = review_family_refusal(cmd, folder)
         if reason:
-            sys.stderr.write("bridge-run: refused - %s\n" % reason)
+            sys.stderr.write("bridge-run: refused - %s\n" % _ascii_refusal(reason))
             return 125
     raw = flags[flags.index("--limit") + 1] if flags.index("--limit") + 1 < len(flags) else ""
     if raw != "auto":
@@ -3370,6 +3604,11 @@ def main():
         sys.stderr.write("bridge-run: key file read (%d name(s): %s)\n" % (len(keys), ", ".join(sorted(keys)) or "none"))
     log_branch = brief_meta.get("branch") if brief_meta else branch_of(workspace_of(cmd, folder))
     entry = {"id": run_id, "kind": kind, "head": head, "model": model_of(cmd), "branch": log_branch, "limit": int(limit), "seconds": None, "exit": None, "healthy": None}
+    if kind == "builder":
+        ws_build = workspace_of(cmd_before_resolve, folder)
+        start_commit, clean = _git_launch_state(ws_build)
+        entry["start_commit"] = start_commit
+        entry["clean"] = clean
     if brief_meta:
         entry.update(
             brief=brief_meta["brief"],
