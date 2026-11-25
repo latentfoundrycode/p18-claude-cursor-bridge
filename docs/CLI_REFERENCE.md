@@ -173,8 +173,8 @@ kills any orphan the command left behind. On other platforms the command runs in
 process group, killed as a whole.
 
 What it accepts (release 0a review, F6; release A2): only the commands the loop runs through
-it, each by name: `cursor-agent …` (a builder, or Review B with `--kind review`), `gh pr
-checks …` (the CI watch) and the test suites the supervisor awaits (`pytest`, `python -m
+it, each by name: `cursor-agent ...` (a builder, or Review B with `--kind review`), `gh pr
+checks ...` (the CI watch) and the test suites the supervisor awaits (`pytest`, `python -m
 pytest`, `python -m unittest`, `uv run pytest`, `npm test`, `npm run test*`, `pnpm test`,
 `yarn test`, `npx vitest`, `npx jest`, `npx playwright test`, `node --test`, `go test`,
 `cargo test`, `dotnet test`); an option that would run another program or delete a folder

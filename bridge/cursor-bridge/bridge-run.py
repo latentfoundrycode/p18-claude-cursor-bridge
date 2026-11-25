@@ -17,8 +17,8 @@ kills any orphan the command left behind. On other platforms the command runs in
 process group, killed as a whole.
 
 What it accepts (release 0a review, F6; release A2): only the commands the loop runs through
-it, each by name: `cursor-agent …` (a builder, or Review B with `--kind review`), `gh pr
-checks …` (the CI watch) and the test suites the supervisor awaits (`pytest`, `python -m
+it, each by name: `cursor-agent ...` (a builder, or Review B with `--kind review`), `gh pr
+checks ...` (the CI watch) and the test suites the supervisor awaits (`pytest`, `python -m
 pytest`, `python -m unittest`, `uv run pytest`, `npm test`, `npm run test*`, `pnpm test`,
 `yarn test`, `npx vitest`, `npx jest`, `npx playwright test`, `node --test`, `go test`,
 `cargo test`, `dotnet test`); an option that would run another program or delete a folder
@@ -109,6 +109,7 @@ import hashlib
 import json
 import math
 import os
+import stat
 import re
 import shlex
 import signal
@@ -1658,7 +1659,10 @@ def write_heavy_slots_setting(n, env=None):
     """Atomically write `{"slots": n}` under ~/.cursor-bridge."""
     import tempfile
     state_dir = os.path.dirname(heavy_state_paths(env)[0])
-    os.makedirs(state_dir, exist_ok=True)
+    if sys.platform == "win32":
+        os.makedirs(state_dir, exist_ok=True)
+    else:
+        os.makedirs(state_dir, mode=0o700, exist_ok=True)
     path = _heavy_slots_setting_path(env)
     fd, tmp = tempfile.mkstemp(dir=state_dir, prefix=".heavy-slots.", suffix=".tmp")
     try:
@@ -1674,15 +1678,25 @@ def write_heavy_slots_setting(n, env=None):
         except OSError:
             pass
         raise
-    os.replace(tmp, path)
+    for _ in range(5):
+        try:
+            os.replace(tmp, path)
+            return
+        except (OSError, PermissionError):
+            time.sleep(0.02)
+    try:
+        os.remove(tmp)
+    except OSError:
+        pass
+    raise OSError("could not replace heavy-slots.json")
 
 
 def checkout_identity_hash(folder, argv):
     """SHA-256 (hex) of the checkout the run works in."""
     ws = workspace_of(argv, folder)
-    top = _git_rev_parse_path(folder, "--show-toplevel")
+    top = _git_rev_parse_path(ws, "--show-toplevel")
     if top is None:
-        top = os.path.abspath(ws)
+        top = os.path.realpath(os.path.abspath(ws))
     else:
         top = os.path.realpath(top)
     if sys.platform == "win32":
@@ -1699,7 +1713,8 @@ def folder_lock_paths(identity_hash, env=None):
 
 def run_heavy_slots_option(argv):
     """Set the slot count when argv is exactly `--heavy-slots <n>`; exit code or None."""
-    if "--heavy-slots" not in argv:
+    launcher = argv[:argv.index("--")] if "--" in argv else argv
+    if "--heavy-slots" not in launcher:
         return None
     if len(argv) != 2 or argv[0] != "--heavy-slots":
         sys.stderr.write("bridge-run: refused - --heavy-slots must be given alone\n")
@@ -2039,15 +2054,25 @@ def _earliest_live_record(records, grace):
 
 def _open_heavy_lock(lock_path, state_dir):
     if sys.platform == "win32":
+        if bridge_env.is_link(lock_path):
+            raise OSError("link")
         os.makedirs(state_dir, exist_ok=True)
-        return os.open(lock_path, os.O_RDWR | os.O_CREAT)
-    os.makedirs(state_dir, mode=0o700, exist_ok=True)
-    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(lock_path, flags, 0o600)
-    try:
-        os.fchmod(fd, 0o600)
-    except OSError:
-        pass
+        fd = os.open(lock_path, os.O_RDWR | os.O_CREAT)
+    else:
+        os.makedirs(state_dir, mode=0o700, exist_ok=True)
+        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(lock_path, flags, 0o600)
+        try:
+            os.fchmod(fd, 0o600)
+        except OSError:
+            pass
+    st = os.fstat(fd)
+    if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        raise OSError("link")
     return fd
 
 
@@ -2155,87 +2180,9 @@ def _open_slot_lock_fds(num_slots, state_dir):
     return fds, paths
 
 
-def _acquire_heavy_slot_many(kind, run_id, limit, scale, num_slots):
-    """Take the first free slot among num_slots; return (lock_fd, waited, slot_k) or None or 'refused'."""
-    state_dir = os.path.dirname(heavy_state_paths()[0])
-    opened = _open_slot_lock_fds(num_slots, state_dir)
-    if opened == "refused":
-        return "refused"
-    slot_fds, lock_paths = opened
-    holder_paths = [heavy_slot_paths(k + 1)[1] for k in range(num_slots)]
-    grace = SLOT_GRACE * scale
-    report = max(0.001, SLOT_REPORT * scale)
-    wait_mono = time.monotonic()
-    wait_wall = time.time()
-    provisional_wall = wait_wall + (SLOT_BUILDER_CAP + SLOT_GRACE) * scale
-    own_floor_wall = wait_wall + KINDS[kind] * scale
-    deadline_mono = wait_mono + (SLOT_BUILDER_CAP + SLOT_GRACE) * scale
-    bound_wall = None
-    last_report = 0.0
-    last_slot_lives = [None] * num_slots
-    suffix = " (slot %d of %d)"
-    try:
-        while True:
-            for k, lock_fd in enumerate(slot_fds):
-                try:
-                    got_lock = _try_lock_byte(lock_fd)
-                except OSError as exc:
-                    sys.stderr.write("bridge-run: refused - ~/.cursor-bridge/%s (%s)\n"
-                                     % (os.path.basename(lock_paths[k]), exc.__class__.__name__))
-                    _close_heavy_fds(slot_fds)
-                    return "refused"
-                if got_lock:
-                    waited = int(time.monotonic() - wait_mono)
-                    for j, other in enumerate(slot_fds):
-                        if j != k:
-                            try:
-                                os.close(other)
-                            except OSError:
-                                pass
-                    _publish_slot_taken(kind, run_id, limit, holder_paths[k], suffix % (k + 1, num_slots))
-                    return lock_fd, waited, k + 1
-            now_mono = time.monotonic()
-            fresh = []
-            for i, h in enumerate(holder_paths):
-                live = read_holder_record(h)
-                if live is not None:
-                    last_slot_lives[i] = live
-                fresh.append(live)
-            lives = list(last_slot_lives)
-            if bound_wall is None:
-                earliest = _earliest_live_record(fresh, grace)
-                if earliest is not None:
-                    start_epoch = _slot_start_epoch(earliest["start"])
-                    if start_epoch is not None:
-                        try:
-                            end_epoch = start_epoch + earliest["limit"] + grace
-                            bound_wall = min(provisional_wall, max(own_floor_wall, end_epoch))
-                            deadline_mono = wait_mono + (bound_wall - wait_wall)
-                        except (OverflowError, OSError, ValueError):
-                            pass
-            if now_mono > deadline_mono:
-                pick = _earliest_live_record(fresh, grace) or _earliest_live_record(lives, grace)
-                sys.stderr.write(_slot_not_free_line(pick, grace))
-                sys.stderr.write("bridge-run: exit 123\n")
-                sys.stderr.flush()
-                _close_heavy_fds(slot_fds)
-                return None
-            if last_report == 0.0 or now_mono - last_report >= report - 0.001:
-                sys.stderr.write(_waiting_line_multi(num_slots, lives, grace))
-                sys.stderr.flush()
-                last_report = now_mono
-            time.sleep(1)
-    except Exception:
-        _close_heavy_fds(slot_fds)
-        raise
-
-
 def acquire_heavy_slot(kind, run_id, limit, scale):
-    """Take a machine-wide heavy slot; return (lock_fd, waited_seconds[, slot_k]) or None or 'refused'."""
-    num_slots, _ = read_heavy_slots_count()
-    if num_slots == 1:
-        return _acquire_heavy_slot_one(kind, run_id, limit, scale)
-    return _acquire_heavy_slot_many(kind, run_id, limit, scale, num_slots)
+    """Take a machine-wide heavy slot; return (lock_fd, waited_seconds) or None or 'refused'."""
+    return _acquire_heavy_slot_one(kind, run_id, limit, scale)
 
 
 def acquire_heavy_for_launch(kind, run_id, limit, scale, argv, folder, num_slots):
@@ -2413,7 +2360,16 @@ def acquire_heavy_for_launch(kind, run_id, limit, scale, argv, folder, num_slots
                     last_report = now_mono
             time.sleep(1)
     except Exception:
-        _close_heavy_fds([folder_fd] + slot_fds)
+        for fd in [folder_fd] + slot_fds:
+            if fd is not None:
+                try:
+                    _unlock_byte(fd)
+                except OSError:
+                    pass
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
         raise
 
 
@@ -3300,20 +3256,6 @@ def main():
             heavy_slots_note = "heavy-slots.json ignored (%s); one heavy slot" % heavy_slots_cause
             num_slots = 1
     run_id = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
-    taken = [r.get("id") for r in read_log(folder)]
-    suffix_n = 2
-    reserved_pid_file = None
-    while True:
-        while run_id in taken:
-            run_id = run_id.split("Z")[0] + "Z-%d" % suffix_n
-            suffix_n += 1
-        pid_try = create_pid_file_exclusive(folder, run_id)
-        if pid_try is False:
-            run_id = run_id.split("Z")[0] + "Z-%d" % suffix_n
-            suffix_n += 1
-            continue
-        reserved_pid_file = pid_try
-        break
     if "--key-file" in flags and kind != "driver":
         if read_keys is None:
             try:
@@ -3339,6 +3281,20 @@ def main():
     if kind == "watch" and kind_of(cmd) != "watch":
         sys.stderr.write(WATCH_ONLY_REFUSE)
         return 125
+    taken = [r.get("id") for r in read_log(folder)]
+    suffix_n = 2
+    reserved_pid_file = None
+    while True:
+        while run_id in taken:
+            run_id = run_id.split("Z")[0] + "Z-%d" % suffix_n
+            suffix_n += 1
+        pid_try = create_pid_file_exclusive(folder, run_id)
+        if pid_try is False:
+            run_id = run_id.split("Z")[0] + "Z-%d" % suffix_n
+            suffix_n += 1
+            continue
+        reserved_pid_file = pid_try
+        break
     sys.stderr.write("bridge-run: started %s\n" % run_id)         # the FIRST line: review-guard and pr-activity-check read it
     for note in NOTES:
         sys.stderr.write("bridge-run: note - %s\n" % note)
@@ -3379,6 +3335,7 @@ def main():
     if kind == "driver" and driver_prog is not None:
         cmd = list(cmd)
         cmd[driver_prog_index] = driver_prog
+    cmd_before_resolve = list(cmd)
     cmd, is_agent = resolve(cmd)
     try:
         env = bridge_env.stripped_env(is_agent=is_agent) if (is_agent or strip) else dict(os.environ)
@@ -3436,7 +3393,7 @@ def main():
 
     if kind in HEAVY_KINDS:
         slot_attempt = time.monotonic()
-        slot_result = acquire_heavy_for_launch(kind, run_id, limit, slot_scale, argv, folder, num_slots)
+        slot_result = acquire_heavy_for_launch(kind, run_id, limit, slot_scale, cmd_before_resolve, folder, num_slots)
         if slot_result == "refused":
             return _abort_before_child(125)
         if slot_result is None:
@@ -3603,7 +3560,7 @@ def main():
         except subprocess.TimeoutExpired:
             proc.kill()
         rc = 124
-    remove_pid_file(pid_file)
+    remove_pid_file(pid_file or reserved_pid_file)
     if not timed_out:
         report_git_config()
         if rc != 124:

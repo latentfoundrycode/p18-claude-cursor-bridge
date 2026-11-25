@@ -14,6 +14,7 @@ is an error and is not run. ASCII-only on purpose (cp1252 consoles).
 """
 import argparse
 import hashlib
+import stat
 import importlib.machinery
 import json
 import os
@@ -1549,12 +1550,23 @@ def main(argv=None):
     scratch_base, work_sub = validate_scratch(scratch_base, workspace, run_id)
     run_lock_path = os.path.join(scratch_base, ".mutation-run-%s.lock" % run_id)
     os.makedirs(scratch_base, exist_ok=True)
-    if os.path.lexists(run_lock_path) and bridge_env is not None and bridge_env.is_link(run_lock_path):
-        raise Refuse("mutation-run: existing mutation run lock is a link")
     lock_fd = None
     try:
-        lock_flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
-        lock_fd = os.open(run_lock_path, lock_flags, 0o600)
+        if os.path.lexists(run_lock_path) and bridge_env is not None and bridge_env.is_link(run_lock_path):
+            raise Refuse("mutation-run: existing mutation run lock is a link")
+        try:
+            lock_flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+            lock_fd = os.open(run_lock_path, lock_flags, 0o600)
+        except OSError as e:
+            raise Refuse("mutation-run: refused - could not open the run lock (%s)" % e)
+        st = os.fstat(lock_fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+            try:
+                os.close(lock_fd)
+            except OSError:
+                pass
+            lock_fd = None
+            raise Refuse("mutation-run: refused - %s (OSError)" % os.path.basename(run_lock_path))
         if not _try_lock_byte(lock_fd):
             try:
                 os.close(lock_fd)
@@ -1562,31 +1574,20 @@ def main(argv=None):
                 pass
             lock_fd = None
             raise Refuse("mutation-run: refused - this mutants file is already running (%s); wait for it to end" % run_id)
-    except Refuse:
-        raise
-    except OSError as e:
-        if lock_fd is not None:
-            try:
-                os.close(lock_fd)
-            except OSError:
-                pass
-            lock_fd = None
-        raise Refuse("mutation-run: refused - could not open the run lock (%s)" % e)
-    if os.path.isdir(work_sub):
-        shutil.rmtree(work_sub, ignore_errors=True)
-    os.makedirs(work_sub, exist_ok=True)
-    copy_root = os.path.join(work_sub, "tree")
-    os.makedirs(copy_root, exist_ok=True)
-    cache_path = os.path.join(workspace, "run", "supervisor", "mutation-cache", run_id + ".jsonl")
-    validate_cache_file(cache_path)
-    cache = read_cache(cache_path)
-    plugin_dir = work_sub
-    ensure_outcomes_plugin(plugin_dir)
-    env = dict(os.environ)
-    results = []
-    counts = {"run": 0, "cached": 0, "killed": 0, "survived": 0, "not applied": 0,
-              "error": 0, "expected survive": 0}
-    try:
+        if os.path.isdir(work_sub):
+            shutil.rmtree(work_sub, ignore_errors=True)
+        os.makedirs(work_sub, exist_ok=True)
+        copy_root = os.path.join(work_sub, "tree")
+        os.makedirs(copy_root, exist_ok=True)
+        cache_path = os.path.join(workspace, "run", "supervisor", "mutation-cache", run_id + ".jsonl")
+        validate_cache_file(cache_path)
+        cache = read_cache(cache_path)
+        plugin_dir = work_sub
+        ensure_outcomes_plugin(plugin_dir)
+        env = dict(os.environ)
+        results = []
+        counts = {"run": 0, "cached": 0, "killed": 0, "survived": 0, "not applied": 0,
+                  "error": 0, "expected survive": 0}
         if args.checkpoint:
             validate_tracked_copy(workspace, tracked_list)
             copied_conftest = archive_checkpoint(workspace, args.checkpoint, copy_root, new_tests, untracked)
@@ -1796,14 +1797,14 @@ def main(argv=None):
                 return 1
         return 0
     finally:
+        if os.path.isdir(work_sub):
+            shutil.rmtree(work_sub, ignore_errors=True)
         if lock_fd is not None:
             _unlock_byte(lock_fd)
             try:
                 os.close(lock_fd)
             except OSError:
                 pass
-        if os.path.isdir(work_sub):
-            shutil.rmtree(work_sub, ignore_errors=True)
 
 
 def run_main():
