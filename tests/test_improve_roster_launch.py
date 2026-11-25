@@ -107,7 +107,7 @@ def base_env():
 
 def run_quiet(args, cwd, env=None, timeout=TIMEOUT):
     return subprocess.run(args, cwd=str(cwd), env=env or base_env(), capture_output=True, timeout=timeout,
-                          stdin=subprocess.DEVNULL, creationflags=NO_WINDOW)
+                          stdin=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
 
 def git(ws, *args):
@@ -272,7 +272,7 @@ def launch(tmp_path, ws, cmd, kind, limit="300", prog=PROG, **env_kw):
     before = record_bytes(ws)
     p = subprocess.run([sys.executable, prog, "--limit", limit, "--kind", kind, "--"] + list(cmd), cwd=str(ws),
                        env=launch_env(tmp_path, **env_kw), capture_output=True, timeout=TIMEOUT,
-                       stdin=subprocess.DEVNULL, creationflags=NO_WINDOW)
+                       stdin=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     return Run(p, ws, before, marker)
 
 
@@ -1111,7 +1111,7 @@ def test_r8_the_row_of_a_launch_that_never_got_the_slot_carries_both_keys(tmp_pa
     scale = {"BRIDGE_RUN_SLOT_SCALE": "0.0003"}
     holder = subprocess.Popen([sys.executable, str(script), PROG, str(holding), str(release)], cwd=str(tmp_path),
                               env=launch_env(tmp_path, allow_any=True, extra=scale), stdin=subprocess.DEVNULL,
-                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=NO_WINDOW)
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     try:
         deadline = time.time() + 60
         while not holding.exists() and holder.poll() is None and time.time() < deadline:
