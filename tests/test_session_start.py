@@ -24,7 +24,16 @@ def test_digest_is_at_the_head_and_within_what_a_compaction_keeps():
     a, b = TEXT.find("<!-- digest:start -->"), TEXT.find("<!-- digest:end -->")
     assert 0 < a < b
     assert b < 20000, "the digest must end inside the first 20,000 characters, the part a compaction keeps"
-    assert len(TEXT[a:b]) <= 9500, "the digest part (digest + its header line) must stay under the hook's cap with margin"
+    whole = TEXT[a:b]
+    assert len(whole) <= 10500, "the whole digest must stay at most 10,500 characters"
+    mark = "<!-- digest:part -->"
+    inner = TEXT[a + len("<!-- digest:start -->"):b].strip()
+    lines = inner.split("\n")
+    at = next(i for i, line in enumerate(lines) if line.strip() == mark)
+    part1 = "\n".join(lines[:at]).strip()
+    part2 = "\n".join(lines[at + 1:]).strip()
+    assert len(part1) <= 8800, "the first digest part must stay at most 8,800 characters (%d)" % len(part1)
+    assert len(part2) <= 8800, "the second digest part must stay at most 8,800 characters (%d)" % len(part2)
 
 
 def test_digest_names_every_standing_rule_and_founding_rule():
@@ -111,14 +120,15 @@ def test_both_parts_fit_under_the_cap_for_every_phase_on_a_realistic_status_file
     (root / "Workspace" / "docs" / "PROJECT_STATUS.md").write_text(realistic_status(phase, "the owner must decide " + "y" * 4000), encoding="utf-8")
     rc, pointers = run_hook(root, home, "pointers")
     rc2, digest = run_hook(root / "Workspace", home, "digest")
-    assert rc == 0 and rc2 == 0
-    for out in (pointers, digest):
+    rc3, digest2 = run_hook(root / "Workspace", home, "digest-2")   # R-109: the digest's second part
+    assert rc == 0 and rc2 == 0 and rc3 == 0
+    for out in (pointers, digest, digest2):
         assert len(out) < CAP and "cut at" not in out and "truncated" not in out
     assert "PROJECT STATE: Phase: %s" % phase in pointers
     assert "BEFORE YOUR NEXT ACTION" in pointers and "  - ~/.claude/cursor-bridge/workflow/phases/" in pointers   # TASK-015: modules, not line ranges
     assert "read docs/PROJECT_STATUS.md whole" in pointers and "the ONE phase file" in pointers and "On demand, by the section" in pointers   # release S
     assert "WAITING FOR THE OWNER" in pointers and "(read it whole in docs/PROJECT_STATUS.md)" in pointers
-    assert "**Founding rules.**" in digest and "43 Never end a turn" in digest
+    assert "**Founding rules.**" in digest and "43 Never end a turn" in digest + digest2   # the standing rules may stand in the second part
     installed = open(os.path.join(CLAUDE, "cursor-bridge", "VERSION"), encoding="utf-8").read().strip()
     assert "(bridge %s)" % installed in digest, "the digest is the installed release's, whatever the status file records"
     assert "the status file records 2026.10.04c, so this project is not calibrated to the installed bridge" in pointers and "maintainer session's message (rule 57)" in pointers
