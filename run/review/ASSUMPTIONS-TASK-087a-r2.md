@@ -1,4 +1,4 @@
-# ASSUMPTIONS: TASK-087a (Review B, round 1)
+# ASSUMPTIONS: TASK-087a (Review B, round 2)
 
 Supervisor-written text: no builder ran, so there is no builder's `Assumed, not verified` list. The accept commit's own Assumptions section, as places to look, never as your scope:
 

@@ -1,6 +1,6 @@
-# SCOPE: TASK-087a (Review B, round 1)
+# SCOPE: TASK-087a (Review B, round 2)
 
-Increment: TASK-087a, "The rule budget: the rulebook's and the step file's caps raised, ten passages retired, three sentences corrected (R-109)". Supervisor-written instruction text: no builder, no brief; the plan entry is the specification (docs/BUILD_PLAN.md, TASK-087a), with docs/DESIGN.md, Change: the improvements release, the paragraph "The rule budget." under Data model and development data, its bullets and the paragraph after them on the three corrected sentences. The diff is the branch against origin/main at 0cb7846 (TASK-087b merged), the merged main's commits and the review files left out: run/review/REVIEW-TASK-087a-r1.diff. Where the increment ends: R-109's rule budget. R-109 stays planned until TASK-118 (the stamp lowers the caps); the release's new text comes in later increments.
+Increment: TASK-087a, "The rule budget: the rulebook's and the step file's caps raised, ten passages retired, three sentences corrected (R-109)". Supervisor-written instruction text: no builder, no brief; the plan entry is the specification (docs/BUILD_PLAN.md, TASK-087a), with docs/DESIGN.md, Change: the improvements release, the paragraph "The rule budget." under Data model and development data, its bullets and the paragraph after them on the three corrected sentences. The diff is the branch against origin/main at 0cb7846 (TASK-087b merged), the merged main's commits and the review files left out: run/review/REVIEW-TASK-087a-r2.diff. Since round 1, one commit answers its one finding: HARDENING's proofs line quotes the trace check's count with TASK-087b merged in (0 dropped, 119 excused) beside the fix commit's 118: run/review/DELTA-TASK-087a-r2.diff. Where the increment ends: R-109's rule budget. R-109 stays planned until TASK-118 (the stamp lowers the caps); the release's new text comes in later increments.
 
 ## The owner's rule (2026-11-24, intake, quoted in the accept commit)
 Retire only what the latest release made redundant or deprecated, with care; never cut useful guidance to make room; then add the new text and raise the limit.
@@ -34,4 +34,4 @@ Review A round 1: REJECT on one records finding (the accept commit's after count
 trace-check.py RESULT: OK (0 dropped, 118 excused); trace-check.py --moves RESULT: OK (18 excused); the 49 test files that read the edited texts: 1786 passed, 31 skipped.
 
 ## Round
-Review B's first round for this increment (the guard's count 0).
+Review B's second round (the guard's count 1). Round 1: REJECT on one records finding (the trace check's excused count in HARDENING), answered by the delta commit; it confirmed the ten retirements, the three corrections, the word counts and the caps against the programs.
