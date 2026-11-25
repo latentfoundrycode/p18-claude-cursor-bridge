@@ -1561,21 +1561,26 @@ def create_pid_file_exclusive(folder, run_id):
     """Reserve `run/launcher/pids/<run id>` exclusively, or False when the name is taken."""
     if not os.path.isdir(os.path.join(folder, "run")):
         return None
+    d = os.path.join(folder, "run", "launcher", "pids")
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, run_id.replace(":", "-"))
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_BINARY", 0)
     try:
-        d = os.path.join(folder, "run", "launcher", "pids")
-        os.makedirs(d, exist_ok=True)
-        path = os.path.join(d, run_id.replace(":", "-"))
-        flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_BINARY", 0)
         fd = os.open(path, flags)
+    except FileExistsError:
+        return False
+    try:
         try:
             os.write(fd, ("%d %d\n" % (os.getpid(), os.getpid())).encode("ascii"))
         finally:
             os.close(fd)
         return path
-    except FileExistsError:
-        return False
     except OSError:
-        return None
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        raise
 
 
 def heavy_state_paths(env=None):
@@ -3296,7 +3301,12 @@ def main():
         while run_id in taken:
             run_id = run_id.split("Z")[0] + "Z-%d" % suffix_n
             suffix_n += 1
-        pid_try = create_pid_file_exclusive(folder, run_id)
+        try:
+            pid_try = create_pid_file_exclusive(folder, run_id)
+        except OSError as exc:
+            sys.stderr.write("bridge-run: refused - cannot reserve run/launcher/pids/%s (%s)\n"
+                             % (run_id, exc.__class__.__name__))
+            return 125
         if pid_try is False:
             run_id = run_id.split("Z")[0] + "Z-%d" % suffix_n
             suffix_n += 1
