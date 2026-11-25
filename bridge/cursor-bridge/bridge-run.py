@@ -2583,12 +2583,13 @@ def branch_of(folder):
         p = subprocess.run(
             ["git", "-C", folder or ".", "rev-parse", "--abbrev-ref", "HEAD"],
             capture_output=True,
-            text=True,
             creationflags=NO_WINDOW,
             timeout=bridge_env.GIT_TIMEOUT,
         )
-        return p.stdout.strip() if p.returncode == 0 else None
-    except (OSError, subprocess.TimeoutExpired):
+        if p.returncode != 0:
+            return None
+        return p.stdout.decode("utf-8", errors="replace").strip()
+    except Exception:
         return None
 
 
