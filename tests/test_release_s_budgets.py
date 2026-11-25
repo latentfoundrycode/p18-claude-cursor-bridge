@@ -6,7 +6,8 @@
    cost of a compaction is bounded by the largest file the hook can name for any phase.
 
 Both are counted the plain way, `len(text.split())`, so anyone can check a number with one line. The digest's caps (10,500
-characters for the whole, 8,800 a part) are held in tests/test_improve_digest_parts.py and the four tests named in TASK-087b.
+characters for the whole, 8,800 a part) are held in tests/test_improve_digest_parts.py, tests/test_session_start.py,
+tests/test_loop_text_pace.py and tests/test_a5_followups.py.
 
 Register: R-066's two budgets are test_the_rulebook_stays_within_its_word_budget and
 test_the_file_of_any_step_stays_within_what_one_re_read_may_cost; R-069's one file of the step in hand is

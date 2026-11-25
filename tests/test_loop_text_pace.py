@@ -215,6 +215,14 @@ def test_r042_the_digest_stays_within_its_cap_with_every_rule_number():
     numbers, 1 to 9, read apart: Review A, round 1, consider 2)."""
     d = digest()
     assert len(d) <= 10500, "the whole digest must stay at most 10,500 characters (%d)" % len(d)
+    mark = "<!-- digest:part -->"
+    inner = d[len("<!-- digest:start -->"):].strip()
+    lines = inner.split("\n")
+    at = next(i for i, line in enumerate(lines) if line.strip() == mark)
+    part1 = "\n".join(lines[:at]).strip()
+    part2 = "\n".join(lines[at + 1:]).strip()
+    assert len(part1) <= 8800, "the first digest part must stay at most 8,800 characters (%d)" % len(part1)
+    assert len(part2) <= 8800, "the second digest part must stay at most 8,800 characters (%d)" % len(part2)
     rules = d[d.index("**Standing rules.**"):d.index("**Permissions.**")]
     for n in range(1, 59):
         assert re.search(r"(?:\*\* | )%d [A-Z`]" % n, rules), n

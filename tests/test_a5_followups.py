@@ -97,7 +97,16 @@ def test_the_changelog_entry_exists_and_the_digest_is_unchanged_in_size():
         assert part in entry, part
     assert "Maintainer requests:" in entry
     a, b = SV.index("<!-- digest:start -->"), SV.index("<!-- digest:end -->")
-    assert len(SV[a:b]) <= 10500, "a text release adds nothing to the digest (whole at most 10,500 characters)"
+    whole = SV[a:b]
+    assert len(whole) <= 10500, "a text release adds nothing to the digest (whole at most 10,500 characters)"
+    mark = "<!-- digest:part -->"
+    inner = SV[a + len("<!-- digest:start -->"):b].strip()
+    lines = inner.split("\n")
+    at = next(i for i, line in enumerate(lines) if line.strip() == mark)
+    part1 = "\n".join(lines[:at]).strip()
+    part2 = "\n".join(lines[at + 1:]).strip()
+    assert len(part1) <= 8800, "the first digest part must stay at most 8,800 characters (%d)" % len(part1)
+    assert len(part2) <= 8800, "the second digest part must stay at most 8,800 characters (%d)" % len(part2)
 
 
 # --- the two program lines --------------------------------------------------------------

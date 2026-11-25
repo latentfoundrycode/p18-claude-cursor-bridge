@@ -24,7 +24,16 @@ def test_digest_is_at_the_head_and_within_what_a_compaction_keeps():
     a, b = TEXT.find("<!-- digest:start -->"), TEXT.find("<!-- digest:end -->")
     assert 0 < a < b
     assert b < 20000, "the digest must end inside the first 20,000 characters, the part a compaction keeps"
-    assert len(TEXT[a:b]) <= 10500, "the whole digest must stay at most 10,500 characters"
+    whole = TEXT[a:b]
+    assert len(whole) <= 10500, "the whole digest must stay at most 10,500 characters"
+    mark = "<!-- digest:part -->"
+    inner = TEXT[a + len("<!-- digest:start -->"):b].strip()
+    lines = inner.split("\n")
+    at = next(i for i, line in enumerate(lines) if line.strip() == mark)
+    part1 = "\n".join(lines[:at]).strip()
+    part2 = "\n".join(lines[at + 1:]).strip()
+    assert len(part1) <= 8800, "the first digest part must stay at most 8,800 characters (%d)" % len(part1)
+    assert len(part2) <= 8800, "the second digest part must stay at most 8,800 characters (%d)" % len(part2)
 
 
 def test_digest_names_every_standing_rule_and_founding_rule():

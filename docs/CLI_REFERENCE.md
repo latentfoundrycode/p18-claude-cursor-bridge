@@ -1151,9 +1151,11 @@ only where it holds a command the settings file lacks):
                     <!-- digest:part --> when present, else the whole digest), the core
                     before the standing rules;
   --part digest-2   the second part: text after <!-- digest:part --> when present (else
-                    nothing).
+                    nothing);
+  --part all        the pointers, the digest's first part and, where the marker stands, the
+                    second part, each as its own --part prints it (tests, manual runs).
 
-Without --part both the pointers and both digest parts are printed (tests, manual runs).
+Without --part, the same as --part all.
 
 Pointer-line grammar (module files under workflow/phases/, read as UTF-8 with BOM dropped):
 a line outside fenced blocks (opening_fence / closing_fence as workflow-check.py reads them;
@@ -1194,9 +1196,9 @@ hand-edited
 install, not a hostile checker, which runs in-process and could write to its output directly.
 The hook still never blocks.
 
-It prints nothing outside a bridge
-project (no docs/PROJECT_STATUS.md found from the session's folder, its Workspace, a parent,
-or a worktree). It FAILS OPEN on purpose: a session that is not the project's supervisor
+It prints nothing outside a bridge project (no docs/PROJECT_STATUS.md found from the session's
+folder, its Workspace, a parent, or a worktree).
+It FAILS OPEN on purpose: a session that is not the project's supervisor
 (a review or a planning session opened in a project folder) is told to ignore the message,
 because a gate on the transcript silenced the hook on two of three live supervisor sessions
 (one invoked through the Skill tool, one continuing an earlier transcript; the 0b review's

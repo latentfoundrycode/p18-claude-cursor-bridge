@@ -30,9 +30,11 @@ only where it holds a command the settings file lacks):
                     <!-- digest:part --> when present, else the whole digest), the core
                     before the standing rules;
   --part digest-2   the second part: text after <!-- digest:part --> when present (else
-                    nothing).
+                    nothing);
+  --part all        the pointers, the digest's first part and, where the marker stands, the
+                    second part, each as its own --part prints it (tests, manual runs).
 
-Without --part both the pointers and both digest parts are printed (tests, manual runs).
+Without --part, the same as --part all.
 
 Pointer-line grammar (module files under workflow/phases/, read as UTF-8 with BOM dropped):
 a line outside fenced blocks (opening_fence / closing_fence as workflow-check.py reads them;
@@ -73,9 +75,9 @@ hand-edited
 install, not a hostile checker, which runs in-process and could write to its output directly.
 The hook still never blocks.
 
-It prints nothing outside a bridge
-project (no docs/PROJECT_STATUS.md found from the session's folder, its Workspace, a parent,
-or a worktree). It FAILS OPEN on purpose: a session that is not the project's supervisor
+It prints nothing outside a bridge project (no docs/PROJECT_STATUS.md found from the session's
+folder, its Workspace, a parent, or a worktree).
+It FAILS OPEN on purpose: a session that is not the project's supervisor
 (a review or a planning session opened in a project folder) is told to ignore the message,
 because a gate on the transcript silenced the hook on two of three live supervisor sessions
 (one invoked through the Skill tool, one continuing an earlier transcript; the 0b review's
@@ -252,7 +254,9 @@ def split_digest(digest):
     lines = digest.split("\n")
     for i, line in enumerate(lines):
         if line.strip() == DIGEST_PART_MARK:
-            return "\n".join(lines[:i]).strip(), "\n".join(lines[i + 1:]).strip(), True
+            first = "\n".join(lines[:i]).strip()
+            rest = [ln for ln in lines[i + 1:] if ln.strip() != DIGEST_PART_MARK]
+            return first, "\n".join(rest).strip(), True
     return digest, "", False
 
 
@@ -624,9 +628,16 @@ def pointers_part(status, source, status_path):
     return "\n".join(out)
 
 
-def digest_part(digest, version):
+def digest_part(digest, version, continues_in_second=False):
     head = "CLAUDE-CURSOR BRIDGE core digest (bridge %s) - the condensed core of ~/.claude/commands/supervisor.md; the full text governs:" % version
-    return head + "\n\n" + (digest if digest else "(no digest found in supervisor.md; re-read the whole file)")
+    if digest:
+        body = digest
+    elif continues_in_second:
+        body = ("(the first part of the digest is empty here; the standing rules and permissions "
+                "continue in the second part; re-read supervisor.md for the full text)")
+    else:
+        body = "(no digest found in supervisor.md; re-read the whole file)"
+    return head + "\n\n" + body
 
 
 def digest_part_2(body, version):
@@ -672,10 +683,11 @@ def main():
         else:
             parts.append(cap(pointers, MAX_OUTPUT, "the section pointers"))
     if part in ("digest", "all"):
-        parts.append(cap(digest_part(digest1, version), MAX_OUTPUT, "the digest"))
+        parts.append(cap(digest_part(digest1, version, split and not digest1), MAX_OUTPUT, "the digest"))
     if part in ("digest-2", "all") and split:
-        parts.append(cap(digest_part_2(digest2, version), MAX_OUTPUT, "the digest's second part"))
-    sys.stdout.write("\n\n".join(parts) + "\n")
+        parts.append(cap(digest_part_2(digest2, version), MAX_OUTPUT, "the second part"))
+    if parts:
+        sys.stdout.write("\n\n".join(parts) + "\n")
     return 0
 
 
