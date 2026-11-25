@@ -894,3 +894,160 @@ def test_hotfix24a_mutation_run_refuses_its_run_id_in_use(tmp_path, env):
             kill_tree(helper)
     again = _run_mutation(ws, mf, scratch, env)
     assert "already running" not in again.stdout + again.stderr, (again.stdout + again.stderr)[-2000:]
+
+
+# ---------------------------------------------------------------- round 2: round 1's review
+
+
+def _repo(folder):
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "f.txt").write_text("x\n", encoding="utf-8")
+    _git(folder, "init", "-q", "-b", "main")
+    _git(folder, "add", "-A")
+    _git(folder, "commit", "-q", "-m", "init")
+    return folder
+
+
+def test_hotfix24a_r2_identity_follows_the_builders_workspace(tmp_path, monkeypatch):
+    """Round 2, Review A B1 and the security audit's Blocking finding; the slots, "One heavy run per checkout":
+    "`<h>` the SHA-256 (hex) of its checkout's identity: the folder the run works in (`workspace_of(argv, launch
+    folder)`: a builder's `--workspace`, else the launch folder), raised to `git rev-parse --show-toplevel` of that
+    folder": a builder launched from checkout A with `--workspace` into checkout B (its subfolder, or `--workspace=`)
+    hashes as B, never as A."""
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+    a = _repo(tmp_path / "a")
+    b = _repo(tmp_path / "b")
+    (b / "sub").mkdir()
+    br = load_br()
+    h_a = br.checkout_identity_hash(str(a), ["python", "-c", "pass"])
+    h_b = br.checkout_identity_hash(str(b), ["python", "-c", "pass"])
+    assert h_a != h_b
+    assert br.checkout_identity_hash(str(a), ["cursor-agent", "-p", "--workspace", str(b / "sub"), "x"]) == h_b
+    assert br.checkout_identity_hash(str(a), ["cursor-agent", "--workspace=" + str(b), "-p", "x"]) == h_b
+    assert br.checkout_identity_hash(str(b / "sub"), ["python"]) == h_b
+
+
+class _Stop(Exception):
+    pass
+
+
+def test_hotfix24a_r2_the_identity_reads_the_command_never_the_launchers_options(tmp_path, monkeypatch, env):
+    """Round 2, Review A B1: `checkout_identity_hash(folder, argv)` is given the command as written after `--`,
+    before the launcher resolves it, never the launcher's own options (`--limit` first made `workspace_of` blind to
+    a builder's `--workspace`)."""
+    for name in ("HOME", "USERPROFILE", "APPDATA", "BRIDGE_RUN_ALLOW_ANY"):
+        monkeypatch.setenv(name, env[name])
+    monkeypatch.delenv("BRIDGE_RUN_SLOT_SCALE", raising=False)
+    root = launch_dir(tmp_path, "a")
+    monkeypatch.chdir(str(root))
+    br = load_br()
+    seen = []
+
+    def fake(folder, argv):
+        seen.append(list(argv))
+        raise _Stop()
+
+    monkeypatch.setattr(br, "checkout_identity_hash", fake)
+    monkeypatch.setattr(sys, "argv", [PROG, "--limit", "30", "--kind", "test", "--", "python", "-c", "pass"])
+    with pytest.raises(_Stop):
+        br.main()
+    assert seen == [["python", "-c", "pass"]], seen
+
+
+@pytest.mark.parametrize("case", ["cap", "watch-only", "key-file"])
+def test_hotfix24a_r2_an_early_refusal_leaves_no_pid_file(tmp_path, env, case):
+    """Round 2, Review A B2 and the security audit's Should fix 1; Run ids, "Every exit before the child starts
+    (each refusal with 125, an exit 123, a refused slot) removes it, so a refused launch leaves no pid file": the
+    refusals of a limit above the cap, a watch launch of another command, and an unreadable key file."""
+    root = launch_dir(tmp_path, "a")
+    marker = root / "ran.txt"
+    cmd = [sys.executable, "-c", "open('ran.txt','w')"]
+    if case == "cap":
+        args = ["--limit", "99999", "--kind", "test", "--"] + cmd
+    elif case == "watch-only":
+        args = ["--limit", "30", "--kind", "watch", "--"] + cmd
+    else:
+        args = ["--limit", "30", "--key-file", str(tmp_path / "missing.env"), "--kind", "test", "--"] + cmd
+    out = run_bridge(root, env, *args)
+    assert out.returncode == 125, out.stderr
+    assert "Traceback" not in out.stderr
+    assert not marker.exists()
+    assert pid_names(root) == set(), pid_names(root)
+
+
+def test_hotfix24a_r2_heavy_slots_after_the_separator_belongs_to_the_command(tmp_path, env):
+    """Round 2, Review A B3 and the security audit's Should fix 3; the setting, "`--heavy-slots <n>` ... Given with a
+    command (`--`) or any other option: exit 125" reads the launcher's own words only: a `--heavy-slots` after `--`
+    is the command's argument, so the launch runs and the setting is not written."""
+    root = launch_dir(tmp_path, "a")
+    out = run_bridge(root, env, "--limit", "30", "--kind", "test", "--", sys.executable, "-c",
+                     "open('ran.txt','w')", "--heavy-slots", "2")
+    assert out.returncode == 0, out.stderr
+    assert (root / "ran.txt").exists()
+    assert not os.path.exists(settings_path(env))
+
+
+@pytest.mark.parametrize("which", ["heavy.lock", "heavy-2.lock", "folder"])
+def test_hotfix24a_r2_a_linked_lock_file_is_refused(tmp_path, env, which):
+    """Round 2, the security audit's Should fix 2 (the brief: every file under ~/.cursor-bridge is opened with no
+    link followed): a lock file that is a hard link to another file (no privilege needed, on Windows too) refuses
+    the launch with 125 naming it; the command never starts and the linked file is unchanged."""
+    write_settings(env, json.dumps({"slots": 2}))
+    root = launch_dir(tmp_path, "a")
+    if which == "folder":
+        first = run_bridge(root, env, "--limit", "30", "--", sys.executable, "-c", "pass")
+        assert first.returncode == 0, first.stderr
+        made = [n for n in os.listdir(state_dir(env)) if re.fullmatch(r"heavy-folder-[0-9a-f]{64}\.lock", n)]
+        assert len(made) == 1, sorted(os.listdir(state_dir(env)))
+        name = made[0]
+    else:
+        name = which
+    path = os.path.join(state_dir(env), name)
+    if os.path.exists(path):
+        os.remove(path)
+    victim = tmp_path / "victim.txt"
+    victim.write_bytes(b"keep me")
+    os.link(str(victim), path)
+    marker = root / "ran.txt"
+    out = run_bridge(root, env, "--limit", "30", "--", sys.executable, "-c", "open('ran.txt','w')")
+    assert out.returncode == 125, out.stderr
+    assert re.search(r"^bridge-run: refused - ~/\.cursor-bridge/%s \([^)]+\)$" % re.escape(name), out.stderr,
+                     re.M), out.stderr
+    assert "Traceback" not in out.stderr
+    assert not marker.exists()
+    assert victim.read_bytes() == b"keep me"
+
+
+def test_hotfix24a_r2_a_linked_mutation_lock_is_refused(tmp_path, env):
+    """Round 2, the security audit (mutation-run.py's lock, the link check before the open): a run lock that is a hard
+    link to another file ends the run with exit 2 and a `mutation-run: refused - ` line, the linked file unchanged
+    and nothing written in the scratch base or the cache."""
+    ws = _mutation_fixture(tmp_path)
+    mf = _mutants_file(ws, "linkt")
+    cache = ws / "run" / "supervisor" / "mutation-cache" / "linkt.jsonl"
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    victim = tmp_path / "victim.txt"
+    victim.write_bytes(b"keep me")
+    os.link(str(victim), str(scratch / ".mutation-run-linkt.lock"))
+    before = _snapshot(scratch)
+    out = _run_mutation(ws, mf, scratch, env)
+    text = out.stdout + out.stderr
+    assert out.returncode == 2, text[-2000:]
+    assert any(ln.startswith("mutation-run: refused - ") for ln in text.splitlines()), text[-2000:]
+    assert _snapshot(scratch) == before
+    assert not cache.exists()
+    assert victim.read_bytes() == b"keep me"
+
+
+def test_hotfix24a_r2_a_failed_setting_write_leaves_no_temporary_file(tmp_path, env):
+    """Round 2, Review A C1 and the security audit; the setting, "`--heavy-slots <n>` writes the file atomically (a
+    temporary file in the same folder, then replace)", with no temporary file left: a folder at heavy-slots.json
+    makes the replace fail; the launch exits 125 and the state folder holds nothing new."""
+    os.makedirs(settings_path(env))
+    root = launch_dir(tmp_path, "a")
+    out = run_bridge(root, env, "--heavy-slots", "2")
+    assert out.returncode == 125, out.stderr
+    assert "Traceback" not in out.stderr
+    assert sorted(os.listdir(state_dir(env))) == ["heavy-slots.json"]
+    assert os.path.isdir(settings_path(env))
