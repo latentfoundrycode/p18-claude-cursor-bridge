@@ -1168,3 +1168,35 @@ def test_hotfix24a_r4_a_pid_file_that_cannot_be_made_is_never_a_reservation(tmp_
     made = br.create_pid_file_exclusive(str(c), rid)
     assert made and os.path.isfile(made)
     assert br.create_pid_file_exclusive(str(c), rid) is False
+
+
+def test_hotfix24a_r4_an_open_failure_other_than_taken_raises(tmp_path, monkeypatch):
+    """Round 4, the supervisor's mutation run (requirement 37: False only when the exclusive open raises
+    FileExistsError): an open of the pid file that fails any other way (a permission error) raises to the caller,
+    never reads as a taken name, which would send the launch through the suffixes again without end."""
+    br = load_br()
+    root = launch_dir(tmp_path, "a")
+    (root / "run" / "launcher" / "pids").mkdir(parents=True)
+
+    def deny(path, flags, *args, **kwargs):
+        raise PermissionError(13, "denied", path)
+
+    monkeypatch.setattr(br.os, "open", deny)
+    with pytest.raises(PermissionError):
+        br.create_pid_file_exclusive(str(root), "2026-01-01T00:00:00Z")
+
+
+def test_hotfix24a_r4_a_failed_pid_write_leaves_no_pid_file(tmp_path, monkeypatch):
+    """Round 4, Review A of round 4 (requirement 37: "a pid file it created and could not write is removed"): when
+    the write into the newly created pid file fails, the call raises and the pids folder holds nothing."""
+    br = load_br()
+    root = launch_dir(tmp_path, "a")
+
+    def fail(fd, data):
+        raise OSError(28, "no space left")
+
+    monkeypatch.setattr(br.os, "write", fail)
+    with pytest.raises(OSError):
+        br.create_pid_file_exclusive(str(root), "2026-01-01T00:00:00Z")
+    monkeypatch.undo()
+    assert pid_names(root) == set(), pid_names(root)
