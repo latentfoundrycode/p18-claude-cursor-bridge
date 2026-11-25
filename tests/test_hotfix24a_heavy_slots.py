@@ -38,7 +38,8 @@ BRIDGE_DIR = os.path.join(ROOT, "bridge", "cursor-bridge")
 PROG = os.path.join(BRIDGE_DIR, "bridge-run.py")
 MUTATION_PROG = os.path.join(BRIDGE_DIR, "mutation-run.py")
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-SESSION = {"start_new_session": True} if sys.platform != "win32" else {"creationflags": NO_WINDOW}
+SESSION = ({"start_new_session": True} if sys.platform != "win32"
+           else {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)})
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.autocrlf=false",
        "-c", "commit.gpgsign=false"]
 STAMP_RE = r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"
@@ -195,7 +196,8 @@ def kill_tree(proc):
     if proc is None or proc.poll() is not None:
         return
     if sys.platform == "win32":
-        subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True, creationflags=NO_WINDOW)
+        subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     else:
         try:
             os.killpg(os.getpgid(proc.pid), 9)
