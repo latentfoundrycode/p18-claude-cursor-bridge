@@ -888,6 +888,21 @@ def test_r6_the_builder_model_is_refused_unless_the_entry_matches(tmp_path, case
         assert "review launch on the roster builder model" in out, out
 
 
+def test_r6_an_unknown_set_never_opens_the_exception_where_the_family_refusal_would_not(tmp_path):
+    """R6; M7 (the entry honoured where the set is unknown), found by the supervisor's mutation run (M7 survived:
+    elsewhere the family refusal on an unknown set refuses the builder model too, the roster's builders holding its
+    family): the set is unknown (a grok row and a torn line), the roster file names grok alone as a builder, the
+    resolved builder is composer and the deviation names composer for this branch with `built` ["xai"]; the family
+    refusal would let composer (cursor) through, so the builder-model refusal alone holds: the review is refused,
+    saying to resolve the roster again (pins round 2's answer)."""
+    ws = scratch_repo(tmp_path)
+    write_record(ws, row(GROK_B), '{"id": "torn", "kind": "bui')
+    write(ws, "docs/ROSTER.json", roster_text([FULL]))
+    write(ws, "docs/ROSTER.resolved.json", resolved_text(builder=COMPOSER, review_b=COMPOSER, deviation=deviation()))
+    out = refused(review(tmp_path, ws, COMPOSER))
+    assert COMPOSER in out and says_resolve_again(out), out
+
+
 def test_r6_the_alternate_still_meets_the_family_refusal(tmp_path):
     """R6; M9 (the family refusal skipped for the alternate): the resolved file's deviation names gpt as the
     alternate for this branch with `built` equal to the set, and gpt's family built the branch: the alternate's
