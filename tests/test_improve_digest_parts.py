@@ -30,7 +30,6 @@ CLAUDE = os.path.abspath(os.path.join(HERE, os.pardir, "bridge"))
 PROG = os.path.join(CLAUDE, "cursor-bridge", "session-start.py")
 SV = os.path.join(CLAUDE, "commands", "supervisor.md")
 SETTINGS_PATH = os.path.join(CLAUDE, "cursor-bridge", "settings.bridge.json")
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 START = "<!-- digest:start -->"
 END = "<!-- digest:end -->"
@@ -74,7 +73,7 @@ def run_hook_bytes(cwd, home, part):
     env = dict(os.environ, HOME=str(home), USERPROFILE=str(home))
     data = json.dumps({"cwd": str(cwd), "hook_event_name": "SessionStart", "source": "compact"}).encode("utf-8")
     p = subprocess.run([sys.executable, PROG, "--part", part], input=data, capture_output=True, env=env,
-                       creationflags=NO_WINDOW)
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     return p.returncode, p.stdout
 
 
