@@ -540,7 +540,7 @@ reflection point and folded into the Feedback file or the Issues file respective
 through the gate with the code it describes; do not commit it to local `main` afterward,
 where branch protection will strand it off the remote. `PROJECT_STATUS.md` rides every pull
 request the same way, in its records commit, written as it will read at that pull request's
-merge (ISS-009; a CI test checks it); the live position between merges lives in
+merge (ISS-009, KP-069); the live position between merges lives in
 `run/supervisor/in-flight.md`, which is gitignored. Nothing is ever committed on local `main`, which `sync-check.py` reports as stranded.
 
 ---
