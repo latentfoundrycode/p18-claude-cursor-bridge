@@ -32,7 +32,8 @@ CLASSES = ("behaviour", "security", "data integrity", "safety mechanism", "faili
 OLD_FIELDS = {"id", "kind", "head", "model", "branch", "limit", "seconds", "exit", "healthy", "boundary", "waited", "slot",
               "pid", "child_pid"}
 NEW_FIELDS = {"brief", "round", "brief_sha256", "lift", "brief_name", "merge_ids", "lift_line",
-              "cause"}                                     # release S (M1): a round after the first carries why it was opened, never the prompt
+              "cause",                                     # release S (M1): a round after the first carries why it was opened, never the prompt
+              "start_commit", "clean"}                     # TASK-086b (R-107): the commit a builder launch started on and whether its tree was clean
 NAME_RX = re.compile(r"^(.*?)(?:-r([1-9][0-9]*))?$")
 DASH = chr(0x2014)
 E_ACUTE = chr(0xE9)
