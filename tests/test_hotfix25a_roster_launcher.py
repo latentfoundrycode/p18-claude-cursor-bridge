@@ -138,8 +138,29 @@ def test_the_launcher_refuses_a_review_b_of_the_family_that_built_the_change(pro
     cmd = ["cursor-agent", "-p", "--force", "--model", "grok-4.7-high", "review the diff"]
     reason = br.review_family_refusal(cmd, str(tmp_path))
     assert reason and "xai" in reason and "rebuild" in reason, reason
-    log.write_text(builder_run("grok-4.7-medium", "task-1") + builder_run("composer-2.5", "task-1"), encoding="utf-8")
+    # TASK-086b (R-107): the rebuild's row is one the launcher writes since then: it started on the grok run's own
+    # commit with a clean tree, so git drops the grok run from the built set (the rows without the keys: below).
+    start = subprocess.run(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], check=True, capture_output=True,
+                           text=True).stdout.strip()
+    grok = dict(json.loads(builder_run("grok-4.7-medium", "task-1")), start_commit=start)
+    composer = dict(json.loads(builder_run("composer-2.5", "task-1")), start_commit=start, clean=True)
+    log.write_text(json.dumps(grok) + "\n" + json.dumps(composer) + "\n", encoding="utf-8")
     assert br.review_family_refusal(cmd, str(tmp_path)) is None, "after the rebuild by composer the grok review may run"
+
+
+def test_the_launcher_refuses_a_review_b_of_a_family_whose_run_no_rebuild_dropped(program, tmp_path, monkeypatch):
+    """TASK-086b (R-107; D-003): the same two rows without `start_commit` and `clean`, as every row written before
+    the release: git cannot place the grok run, so it stays in the built set beside composer's and the grok review
+    is refused (red on the checkpoint, which read the last builder run alone)."""
+    git_repo(tmp_path)
+    (tmp_path / "run" / "launcher").mkdir(parents=True)
+    log = tmp_path / "run" / "launcher" / "runs.jsonl"
+    log.write_text(builder_run("grok-4.7-medium", "task-1") + builder_run("composer-2.5", "task-1"), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    br = program("bridge-run")
+    cmd = ["cursor-agent", "-p", "--force", "--model", "grok-4.7-high", "review the diff"]
+    reason = br.review_family_refusal(cmd, str(tmp_path))
+    assert reason and "xai" in reason and "rebuild" in reason, reason
 
 
 def test_pytest_without_its_cache_is_accepted_after_python_m_pytest(program):
