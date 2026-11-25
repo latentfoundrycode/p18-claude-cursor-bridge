@@ -1551,6 +1551,7 @@ def main(argv=None):
     run_lock_path = os.path.join(scratch_base, ".mutation-run-%s.lock" % run_id)
     os.makedirs(scratch_base, exist_ok=True)
     lock_fd = None
+    run_lock_held = False
     try:
         if os.path.lexists(run_lock_path) and bridge_env is not None and bridge_env.is_link(run_lock_path):
             raise Refuse("mutation-run: existing mutation run lock is a link")
@@ -1574,6 +1575,7 @@ def main(argv=None):
                 pass
             lock_fd = None
             raise Refuse("mutation-run: refused - this mutants file is already running (%s); wait for it to end" % run_id)
+        run_lock_held = True
         if os.path.isdir(work_sub):
             shutil.rmtree(work_sub, ignore_errors=True)
         os.makedirs(work_sub, exist_ok=True)
@@ -1797,10 +1799,12 @@ def main(argv=None):
                 return 1
         return 0
     finally:
-        if os.path.isdir(work_sub):
-            shutil.rmtree(work_sub, ignore_errors=True)
+        if run_lock_held:
+            if os.path.isdir(work_sub):
+                shutil.rmtree(work_sub, ignore_errors=True)
+            if lock_fd is not None:
+                _unlock_byte(lock_fd)
         if lock_fd is not None:
-            _unlock_byte(lock_fd)
             try:
                 os.close(lock_fd)
             except OSError:

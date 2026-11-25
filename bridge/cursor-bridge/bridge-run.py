@@ -2062,10 +2062,18 @@ def _open_heavy_lock(lock_path, state_dir):
         os.makedirs(state_dir, mode=0o700, exist_ok=True)
         flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
         fd = os.open(lock_path, flags, 0o600)
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            raise OSError("link")
         try:
             os.fchmod(fd, 0o600)
         except OSError:
             pass
+        return fd
     st = os.fstat(fd)
     if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
         try:
