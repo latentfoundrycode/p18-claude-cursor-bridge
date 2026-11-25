@@ -92,3 +92,4 @@ The file stays after the merge. A change to it takes the full gate (`review-guar
 - 40ee76f87d9a99d79c0a107b5768ffffa238abb524688ef48c77a189217a4c05 2. **Design revision** (Phase 2, scaled). Pause before
 - 0b33400ae19eff10c453d9ae02a47ed7db9bfa9d54bd32e5a2074578a4e0490c name: diff-reviewer description: Read-only review of a diff
 - 23488fb25600cb1925eb8790e149d0379795fd70a184317c4054978cbce46d0a name: spec-packager description: Turns one increment of the
+- 5c2d7fa12fa475a356ef115dd2518af3103394bd8ae38d78ba1f74acbc131989 <!-- maintainer: the slice between the digest markers
