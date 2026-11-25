@@ -1,4 +1,4 @@
-"""HOTFIX-004 (hotfix 2026.11.24a): the heavy slots, a setting of 1 to 4 machine-wide heavy slots, one heavy run per
+"""HOTFIX-004 (hotfix 2026.11.24a, R-137): the heavy slots, a setting of 1 to 4 machine-wide heavy slots, one heavy run per
 folder, unique run ids, and the mutation engine's per-run-id lock. The supervisor's acceptance tests
 (run/supervisor/hotfix-004-design.md, "The behaviour" and "Tests", cases 1 to 10; case 11 is the existing suite);
 each names the design line it enforces.
