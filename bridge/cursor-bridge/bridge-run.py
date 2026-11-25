@@ -1049,12 +1049,18 @@ def write_log(folder, entry):
     try:
         os.makedirs(os.path.dirname(os.path.join(folder, LOG)), exist_ok=True)
         path = os.path.join(folder, LOG)
-        with open(path, "a", encoding="utf-8") as f:
+        with open(path, "a", encoding="utf-8", newline="\n") as f:
+            need_nl = False
             if os.path.isfile(path) and os.path.getsize(path) > 0:
-                with open(path, "rb") as tail:
-                    tail.seek(-1, os.SEEK_END)
-                    if tail.read(1) not in (b"\n", b"\r"):
-                        f.write("\n")
+                try:
+                    with open(path, "rb") as tail:
+                        tail.seek(-1, os.SEEK_END)
+                        if tail.read(1) != b"\n":
+                            need_nl = True
+                except OSError:
+                    need_nl = False
+            if need_nl:
+                f.write("\n")
             f.write(json.dumps(entry) + "\n")
     except OSError as e:
         sys.stderr.write("bridge-run: run log not written (%s)\n" % e)
@@ -1203,10 +1209,6 @@ def roster_builder_model(folder):
     return None
 
 
-def _resolved_builder_model(ws):
-    return roster_builder_model(ws)
-
-
 def _read_roster_json(ws):
     try:
         with open(os.path.join(ws, "docs", "ROSTER.json"), encoding="utf-8", errors="replace") as f:
@@ -1219,6 +1221,8 @@ def _read_roster_json(ws):
     if profiles is None:
         profiles = []
     elif not isinstance(profiles, list):
+        return None, None
+    elif any(not isinstance(p, dict) for p in profiles):
         return None, None
     return data, profiles
 
@@ -1258,7 +1262,7 @@ def _git_launch_state(ws):
         return None, False
     try:
         p = subprocess.run(
-            ["git", "-C", base, "status", "--porcelain"],
+            ["git", "-C", base, "status", "--porcelain", "-z", "--untracked-files=normal", "--ignore-submodules=none"],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -1267,16 +1271,31 @@ def _git_launch_state(ws):
             timeout=bridge_env.GIT_TIMEOUT,
         )
         if p.returncode != 0:
-            return start_commit, False
-        for line in p.stdout.splitlines():
-            if not line.strip():
+            return None, False
+        allowed = "docs/ROSTER.resolved.json"
+        parts = p.stdout.split("\0")
+        i = 0
+        while i < len(parts):
+            chunk = parts[i]
+            if not chunk:
+                i += 1
                 continue
-            path = line[3:].strip()
-            if " -> " in path:
-                path = path.split(" -> ", 1)[1].strip()
-            if path.replace("\\", "/") == "docs/ROSTER.resolved.json":
+            if len(chunk) < 2:
+                i += 1
                 continue
-            return start_commit, False
+            xy = chunk[:2]
+            rest = chunk[2:]
+            if rest.startswith(" "):
+                rest = rest[1:]
+            paths = [rest.replace("\\", "/")]
+            if "R" in xy or "C" in xy:
+                i += 1
+                if i < len(parts) and parts[i]:
+                    paths.append(parts[i].replace("\\", "/"))
+            for path in paths:
+                if path != allowed:
+                    return start_commit, False
+            i += 1
         return start_commit, True
     except (OSError, subprocess.TimeoutExpired):
         return None, False
@@ -1294,30 +1313,40 @@ def _load_deviation(folder):
     return deviation if isinstance(deviation, dict) else None
 
 
+_LAUNCH_BUILT_SET = None
+
+
 def _built_set_at_launch(roster, folder, ws, branch):
+    global _LAUNCH_BUILT_SET
+    log_path = os.path.join(folder, LOG)
+    try:
+        log_stamp = os.path.getmtime(log_path) if os.path.isfile(log_path) else None
+    except OSError:
+        log_stamp = None
+    cache_key = (folder, ws, branch, log_stamp)
+    if _LAUNCH_BUILT_SET is not None and _LAUNCH_BUILT_SET[0] == cache_key:
+        return _LAUNCH_BUILT_SET[1]
     roster_data, profiles = _read_roster_json(ws)
     try:
         bset = roster.built_families(
-            os.path.join(folder, LOG),
+            log_path,
             branch=branch,
             cwd=ws,
             roster=roster_data or {},
             profiles=profiles or [],
         )
-    except Exception:
-        bset = {"status": "unknown", "families": set(), "unknown_causes": [("runs.jsonl", "runs.jsonl")],
-                "parsing_rows": [], "run_log_base": "runs.jsonl"}
-    return bset, roster_data, profiles
+    except Exception as e:
+        bset = {"status": "bset_error", "error": e}
+    _LAUNCH_BUILT_SET = (cache_key, (bset, roster_data, profiles))
+    return _LAUNCH_BUILT_SET[1]
 
 
 def _unknown_cause_text(bset):
     causes = bset.get("unknown_causes") or []
     if not causes:
         return bset.get("run_log_base") or "runs.jsonl"
-    needle, label = causes[0]
-    if needle and needle not in label:
-        return "%s (%s)" % (label, needle.replace("\\", "/").split("/")[-1])
-    return label
+    labels = [label for _needle, label in causes]
+    return ", ".join(labels)
 
 
 def _deviation_allows_builder_review(argv, folder, model, roster):
@@ -1406,12 +1435,11 @@ def review_launch_refusal(argv, folder):
         roster, roster_err = _roster_for_review()
         if roster_err:
             return roster_err
-        if _deviation_allows_builder_review(argv, folder, model, roster):
-            return None
-        if _load_deviation(folder) is None:
-            return ("review launch on the roster builder model (%s) is refused; Review B uses a reviewer model; "
-                    "resolve the roster again" % builder)
-        return "review launch on the roster builder model (%s) is refused; resolve the roster again" % builder
+        if not _deviation_allows_builder_review(argv, folder, model, roster):
+            if _load_deviation(folder) is None:
+                return ("review launch on the roster builder model (%s) is refused; Review B uses a reviewer model; "
+                        "resolve the roster again" % builder)
+            return "review launch on the roster builder model (%s) is refused; resolve the roster again" % builder
     for token in bridge_env.handoff_brief_tokens(argv):
         if bridge_env.parse_review_name(token):
             return "a review launch must not name a brief (%s); only the launcher counts builder briefs" % token
@@ -2612,6 +2640,10 @@ def review_family_refusal(argv, folder):
     bset, roster_data, profiles = _built_set_at_launch(roster, folder, ws, branch)
     status = bset.get("status")
     review_fam = roster.family_of(model)
+    if status == "bset_error":
+        exc = bset.get("error")
+        return ("Review B %s cannot run: the built set could not be read (%s); run bridge-check.py on the installed tree"
+                % (model, exc))
     if status == "unreadable":
         cause = bset.get("unreadable_cause") or "runs.jsonl"
         return ("Review B %s cannot run: the branch's built set cannot be read (%s); resolve the roster again"
@@ -2629,22 +2661,27 @@ def review_family_refusal(argv, folder):
     if status != "unknown":
         return None
     cause = _unknown_cause_text(bset)
-    refused_fams = set()
-    roster_usable = roster_data is not None
-    if roster_usable:
+    cannot = "Review B %s cannot run: the built set is unknown (%s); resolve the roster again" % (model, cause)
+    try:
+        parsing_fams = roster._parsing_row_families(
+            bset.get("parsing_rows") or [], roster_data or {}, profiles or [])
+    except Exception:
+        return cannot
+    roster_fams = set()
+    if roster_data is not None:
         try:
-            refused_fams = roster._roster_builder_families(roster_data, profiles or [])
-            refused_fams |= roster._parsing_row_families(bset.get("parsing_rows") or [], roster_data, profiles or [])
+            roster_fams = roster._roster_builder_families(roster_data, profiles or [])
         except Exception:
-            roster_usable = False
-    if not roster_usable:
-        resolved_builder = _resolved_builder_model(ws)
+            return cannot
+    if not roster_fams:
+        resolved_builder = roster_builder_model(ws)
         if resolved_builder is None:
-            return ("Review B %s cannot run: the built set is unknown (%s); resolve the roster again" % (model, cause))
+            return cannot
         built_fam = roster.family_of(resolved_builder)
         if not built_fam:
-            return ("Review B %s cannot run: the built set is unknown (%s); resolve the roster again" % (model, cause))
-        refused_fams = {built_fam}
+            return cannot
+        roster_fams = {built_fam}
+    refused_fams = roster_fams | parsing_fams
     if not review_fam or review_fam not in refused_fams:
         return None
     return ("Review B %s is of the %s family, which built this change (the built set is unknown, %s): "
