@@ -408,3 +408,88 @@ def test_r109_the_installer_appends_the_new_group_once_and_the_rollback_removes_
     assert back == before, "the rollback removes the new group alone"
     assert back["hooks"]["SessionStart"] == [owner_group, PREVIOUS_GROUP]
     capsys.readouterr()
+
+# ---------------------------------------------------------------------------------------------------------------
+# Round 2 (handoff/TASK-087b-r2.md): the gate's round-1 findings, each case naming its requirement and finding.
+# Mutation labels: K5 a cut note longer than the room the cap leaves; K6 a placeholder that says no digest was found
+# beside a digest; K7 a later marker line printed inside a part; K8 a part with nothing to print writing a line feed.
+
+@pytest.mark.parametrize("part", ["digest", "digest-2"])
+def test_r2_a_cut_part_never_passes_max_output(tmp_path, program, part):
+    """R-109, TASK-087b round 2, Requirement 1 (Review A and the security audit, R4): a part cut by the cap, its note
+    included, is at most MAX_OUTPUT characters; the note still names its part. Mutation K5 (a cut note longer than the
+    room the cap leaves)."""
+    limit = program("session-start").MAX_OUTPUT
+    big1 = block("ALPHA-START long first part", "ALPHA-END", 12000)
+    big2 = block("OMEGA-START long second part", "OMEGA-END", 12000)
+    home = make_home(tmp_path, synthetic_supervisor(big1, big2))
+    cwd = make_project(tmp_path)
+    rc, out = run_hook(cwd, home, part)
+    assert rc == 0
+    text = out.rstrip("\n")
+    assert "cut at %d characters" % limit in text
+    assert len(text) <= limit, "K5: the cut %s is %d characters, over MAX_OUTPUT (%d)" % (part, len(text), limit)
+    note = text[text.rfind("\n[") + 1:]
+    if part == "digest-2":
+        assert SECOND.search(note), note
+    else:
+        assert not SECOND.search(note), note
+
+
+def test_r2_a_marker_first_never_says_no_digest_was_found(tmp_path):
+    """R-109, TASK-087b round 2, Requirement 3 (Review A, should-fix): where the marker stands first, so the first
+    part is empty, `--part digest` prints its header and never the words that no digest was found, since there is
+    one; `--part digest-2` prints the text after the marker. Mutation K6 (a placeholder that says no digest was found
+    beside a digest)."""
+    home = make_home(tmp_path, synthetic_supervisor("", OMEGA))
+    cwd = make_project(tmp_path)
+    rc, out = run_hook(cwd, home, "digest")
+    assert rc == 0
+    first = out.strip().splitlines()[0]
+    assert "CLAUDE-CURSOR BRIDGE core digest" in first and "(bridge %s)" % installed_version() in first, first
+    assert "no digest found" not in out, "K6: a digest stands in the file; the empty first part says otherwise: %r" % out[:400]
+    assert "OMEGA-START" not in out and "digest:part" not in out
+    rc2, out2 = run_hook(cwd, home, "digest-2")
+    assert rc2 == 0
+    head_of(out2.replace("\r\n", "\n"), OMEGA)
+
+
+def test_r2_a_repeated_marker_line_is_never_printed(tmp_path):
+    """R-109, TASK-087b round 2, Requirement 4 (Review A, should-fix; R2's "without the marker line"): where the
+    marker line stands twice, the digest splits at the first, no part prints a marker line, and the text after the
+    second marker stays in the second part. Mutation K7 (a later marker line printed inside a part)."""
+    tail = block("TAIL-START after a second marker", "TAIL-END", 400)
+    home = make_home(tmp_path, synthetic_supervisor(ALPHA, OMEGA + "\n" + MARK + "\n" + tail))
+    cwd = make_project(tmp_path)
+    for part in ("digest", "digest-2", "all"):
+        rc, out = run_hook(cwd, home, part)
+        assert rc == 0
+        assert "digest:part" not in out, "K7: %s prints a marker line" % part
+    _rc, out1 = run_hook(cwd, home, "digest")
+    assert "OMEGA-START" not in out1 and "TAIL-START" not in out1
+    _rc, out2 = run_hook(cwd, home, "digest-2")
+    assert "OMEGA-START" in out2 and "TAIL-START" in out2 and "TAIL-END" in out2
+    assert out2.index("OMEGA-END") < out2.index("TAIL-START")
+
+
+def test_r2_the_second_part_without_the_marker_writes_nothing_at_all(tmp_path):
+    """R-109, TASK-087b round 2, Requirement 5 (the security audit's advisory; R2's "it prints nothing"): where the
+    digest holds no marker line, `--part digest-2` writes no byte, as the hook writes none outside a bridge project.
+    Mutation K8 (a part with nothing to print writing a line feed)."""
+    home = make_home(tmp_path, synthetic_supervisor(ALPHA + "\n\n" + OMEGA))
+    cwd = make_project(tmp_path)
+    rc, raw = run_hook_bytes(cwd, home, "digest-2")
+    assert rc == 0 and raw == b"", "K8: %r" % raw[:200]
+
+
+@pytest.mark.parametrize("rel", ["tests/test_session_start.py", "tests/test_loop_text_pace.py", "tests/test_a5_followups.py"])
+def test_r2_each_cap_test_holds_the_whole_and_each_part(rel):
+    """R-109, TASK-087b round 2, Requirement 2 (Review A, blocking: R7 and the plan's Done when, "the tests that held
+    the digest at 9,500 characters hold the whole digest at 10,500 and each part at 8,800"): each of the three tests
+    names both numbers and splits the digest at the marker line, as the maintainer's comment above the digest says
+    they do. A text check of the test's source: the numbers themselves are run by that test."""
+    src = read_text(os.path.join(HERE, os.pardir, rel))
+    assert "10500" in src, "%s holds the whole digest at 10,500" % rel
+    assert "8800" in src, "%s holds each part at 8,800" % rel
+    assert "digest:part" in src, "%s splits the digest at the marker line" % rel
+    assert "9500" not in src, "%s no longer holds the old cap" % rel
