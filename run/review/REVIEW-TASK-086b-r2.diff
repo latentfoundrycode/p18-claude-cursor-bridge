@@ -1,12 +1,12 @@
 diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
-index 37fe3d1..0062ab8 100644
+index 37fe3d1..52bca79 100644
 --- a/bridge/cursor-bridge/MANIFEST.json
 +++ b/bridge/cursor-bridge/MANIFEST.json
 @@ -1,6 +1,6 @@
  {
    "version": "2026.11.24a",
 -  "generated": "2026-11-25 12:38",
-+  "generated": "2026-11-25 16:06",
++  "generated": "2026-11-25 18:30",
    "files": {
      "agents/cursor-configurator.md": "9c0eb6ca7137e955de61cc16e74f5a91450d269f683ebf29cdda23ab40606f89",
      "agents/design-auditor.md": "0c0c64ac33b7ad19449dc25e65017e5e6fbe8b6952801a856f3f7e20e6c7f63a",
@@ -15,12 +15,12 @@ index 37fe3d1..0062ab8 100644
      "cursor-bridge/bridge-check.py": "be7d6fde0c03b7f04a905770130059b41db05f31f982431c935dc47c95064607",
      "cursor-bridge/bridge-install.py": "59628f4816c797caa0b65036c81db7210ac63f5ca86213087b7065a2c9d96c12",
 -    "cursor-bridge/bridge-run.py": "a51785a6664434ef9146abd13d37e652efbf3d1790c7da415618c88ef273889b",
-+    "cursor-bridge/bridge-run.py": "2bd6fbf4599c8856960e3329f84c4f023cacaca4b44cdb5631bd708eaf959ab1",
++    "cursor-bridge/bridge-run.py": "66379d2fccc8098a7489ea25319d3d5f8dd015a6ada69b39f2a7b0c11d6fb19a",
      "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
      "cursor-bridge/bridge_env.py": "500ecce6430fd063c134bca7153050b1e7ecbc10358799f5600e82b059a8858c",
      "cursor-bridge/completion-check.py": "27bfc126a40986f16347307126d909738ce90d71a6d29caa05b898654419249b",
 diff --git a/bridge/cursor-bridge/bridge-run.py b/bridge/cursor-bridge/bridge-run.py
-index b36af0c..afb0b73 100644
+index b36af0c..aa76f5e 100644
 --- a/bridge/cursor-bridge/bridge-run.py
 +++ b/bridge/cursor-bridge/bridge-run.py
 @@ -1048,7 +1048,19 @@ def write_log(folder, entry):
@@ -239,7 +239,24 @@ index b36af0c..afb0b73 100644
      for token in bridge_env.handoff_brief_tokens(argv):
          if bridge_env.parse_review_name(token):
              return "a review launch must not name a brief (%s); only the launcher counts builder briefs" % token
-@@ -2441,19 +2632,61 @@ def review_family_refusal(argv, folder):
+@@ -2392,12 +2583,13 @@ def branch_of(folder):
+         p = subprocess.run(
+             ["git", "-C", folder or ".", "rev-parse", "--abbrev-ref", "HEAD"],
+             capture_output=True,
+-            text=True,
+             creationflags=NO_WINDOW,
+             timeout=bridge_env.GIT_TIMEOUT,
+         )
+-        return p.stdout.strip() if p.returncode == 0 else None
+-    except (OSError, subprocess.TimeoutExpired):
++        if p.returncode != 0:
++            return None
++        return p.stdout.decode("utf-8", errors="replace").strip()
++    except Exception:
+         return None
+ 
+ 
+@@ -2441,19 +2633,61 @@ def review_family_refusal(argv, folder):
      model = model_of(argv)
      if not is_agent_argv(argv) or not model:
          return None
@@ -312,7 +329,7 @@ index b36af0c..afb0b73 100644
  
  
  WATCH_POLL = 15                                          # seconds between polls of the wait before a CI watch (R-085)
-@@ -3252,7 +3485,7 @@ def main():
+@@ -3252,7 +3486,7 @@ def main():
      if kind == "review":
          reason = review_family_refusal(cmd, folder)
          if reason:
@@ -321,7 +338,7 @@ index b36af0c..afb0b73 100644
              return 125
      raw = flags[flags.index("--limit") + 1] if flags.index("--limit") + 1 < len(flags) else ""
      if raw != "auto":
-@@ -3370,6 +3603,11 @@ def main():
+@@ -3370,6 +3604,11 @@ def main():
          sys.stderr.write("bridge-run: key file read (%d name(s): %s)\n" % (len(keys), ", ".join(sorted(keys)) or "none"))
      log_branch = brief_meta.get("branch") if brief_meta else branch_of(workspace_of(cmd, folder))
      entry = {"id": run_id, "kind": kind, "head": head, "model": model_of(cmd), "branch": log_branch, "limit": int(limit), "seconds": None, "exit": None, "healthy": None}
@@ -405,16 +422,18 @@ index f7ee516..b0e6619 100644
  Diagrams: none
  Scope: bridge/commands/supervisor.md; bridge/cursor-bridge/Merge-Verification-Policy.md; bridge/cursor-bridge/Known-Pitfalls.md; bridge/cursor-bridge/workflow/phases/delegation-loop.md; bridge/cursor-bridge/workflow/phases/delegation-loop/merge.md; bridge/cursor-bridge/workflow/phases/design.md; bridge/agents/diff-reviewer.md; bridge/agents/security-auditor.md; bridge/agents/design-auditor.md; bridge/agents/spec-packager.md; bridge/cursor-bridge/workflow/trace-exceptions.md; bridge/cursor-bridge/MANIFEST.json; docs/TRACE_MOVES.md; docs/ROSTER.json; tests/test_session_start.py; tests/test_improve_roster_alt.py
 diff --git a/docs/HARDENING.md b/docs/HARDENING.md
-index 1c7f1b8..bf2e00c 100644
+index 1c7f1b8..68879f3 100644
 --- a/docs/HARDENING.md
 +++ b/docs/HARDENING.md
-@@ -2589,6 +2589,13 @@ Each is fixed by the next increment that edits its record.
+@@ -2589,6 +2589,15 @@ Each is fixed by the next increment that edits its record.
  - **The threat model's limits** (the INVENTORY row "The roster's resolve's threat model"): a later run that rewrites an earlier run's row so that the record still parses, a forged clean row appended among them; the base found through `origin/main`, a ref a builder's run can move (KP-032); a row dropped by where a later run started, never by what was brought onto the branch afterwards; `clean`, which disregards the resolved roster file. The rule is held per branch.
  - **TASK-086a's proofs (2026-11-24).** The own-file run, stripped through the launcher (the acceptance file and sixteen files of the roster, the launcher, the guards and the command reference): round 4's `742 passed, 3 skipped in 527.26s (0:08:47)`, the skips the symbolic-link privilege's own condition (two) and the POSIX-only line-feed name (one), which CI's Linux job runs. The acceptance file holds 127 cases: rounds 1 to 3's 123, the round-4 section's 3, and one case the supervisor added after the mutation run (`test_task086a_a_family_named_in_the_roster_is_the_rows_family_not_an_unknown_one`). The supervisor's mutants file holds 39 mutants over round 4's code (N1 to N32 and their variants; the dangling-link damaged file, the record's link check and the unquoted report name expected to survive on this host, where their tests skip, and killed by CI's Linux job): the first run `counts: run=39 cached=0 killed=28 survived=1 not applied=0 error=7 expected survive=3`, the seven errors mutants failing tests beyond their lists (each list widened to the exact set a driver of the supervisor's listed) and the survivor n15, the roster's family entry not read, which no case could tell from an unknown family (the case added; its first form still let n15 survive, since C39's row 6 resolves `review_b` plainly on an unknown set too, and it was corrected to the alternate's deviation); the third run `counts: run=39 cached=0 killed=36 survived=0 not applied=0 error=0 expected survive=3`. `bridge-check.py --sources` `148 OK, 0 STALE, 0 MISSING, 0 EXTRA`; `tools/dump-cli.py --check` passed; `diagram-check.py --mode code` OK. R-107 stays planned: TASK-086b builds the launcher's half.
  
-+### TASK-086b: the launcher's two review refusals read the built set and the recorded deviation (2026-11-25, two builder rounds)
++### TASK-086b: the launcher's two review refusals read the built set and the recorded deviation (2026-11-25, three builder rounds)
 +- **Round 1's reviews.** The builder (composer-2.5, the native profile) delivered round 1 on the checkpoint 1335cb5, the supervisor's acceptance tests committed before it (d58bd2a: 90 cases in tests/test_improve_roster_launch.py, the hotfix25a test's rebuild keys and a case beside it, task032's NEW_FIELDS; red there `62 failed, 133 passed`; the engine's run of the 62 ids on the checkpoint: each `failing`). Its own-file run was green (`195 passed`). Review A rejected it and the security audit failed it on the same three defects, convergent: a parsing builder row's family dropped on an unknown set where the roster file could not be read (R2); the brief-named refusal skipped once the deviation let the builder model through (R6); a `built_families` exception turned into a made-up unknown set with no rows, so a roster file of the wrong shape let the building family review (R2, R4). Five smaller deviations from the brief's letter went with them: git status failing after rev-parse kept a `start_commit`; the porcelain read ignored a rename's source and the repository's untracked and submodule settings; only the first unknown cause named; a carriage return taken for a line end; the set read twice per launch. Why the acceptance file missed the three: the R6 case for the brief-named refusal launched another model, not the builder model, so it never reached the exception it named; the parsing-row and stand-in rules were each tested alone, never together; no case made `built_families` raise, and the hostile-roster case accepted a run. The supervisor's lesson: cross every fail-closed rule with every fallback, and make each case show the precondition it names.
 +- **Round 2** (handoff/TASK-086b-r2.md, `Round cause: security`), ten new cases first (6e33fb8, red on round 1 `9 failed, 91 passed`, the tenth pinning round 1's answer; the engine's run of the nine on 6e33fb8: each `failing`). Round 2 fixed all eight and its own-file run was green (`205 passed`). The security audit passed it (`CLEAR`, advisories only). Review A rejected it on one item: the refusal of a `built_families` exception names the exception's message, where the brief's R3 says its type and message. The supervisor's ruling, the reviewers disagreeing: not of the five on a realistic layout (its path is a broken installed roster program, and the review is refused either way), and the same sentence of the brief says "as R4's loader failure is", whose refusal also prints the message alone; recorded as lead (1). Round 1's call-site `_ascii_refusal` accepted: R5 needs the escaping.
++- **Review B, round 1, and round 3** (handoff/TASK-086b-r3.md, `Round cause: behaviour`). Review B (grok-4.7-medium, the native profile) rejected round 2 on one finding, behaviour, its path git's output: `branch_of` read `git rev-parse --abbrev-ref HEAD` in the system's code page, so a branch name outside it (code page 1252 leaves 0x81, 0x8D, 0x8F, 0x90 and 0x9D undefined) raised in the reader thread and then on `None.strip()`, and the two refusals, which call `branch_of` outside any `try`, ended the launch in a traceback (exit 1; nothing ran and no row was written). On the checkpoint the family refusal called it inside its `try`: the increment's own regression, which neither Review A nor the security audit of rounds 1 and 2 named; the acceptance file's branches were all ASCII. `review-guard.py verify` OK, the checkout restored. The supervisor's three cases first (a branch named `task-` and U+0101 U+010D U+010F U+0110 U+011D; red on round 2 `3 failed, 6 passed, 95 deselected`, each with Review B's traceback); round 3 changed `branch_of` alone (bytes decoded as UTF-8 with replacement, `None` on any exception); own-file run `209 passed in 135.62s (0:02:15)`; Review A `APPROVE`, the security audit `CLEAR`; the mutant M21 (the branch read in code page 1252), its own file run/supervisor/TASK-086b-r3-mutants.json: `counts: run=1 cached=0 killed=1 survived=0 not applied=0 error=0 expected survive=0`. Lead: a test of git's output reading uses a name outside ASCII as well as one inside it.
++- **Round 3's leads (the security audit's advisories; each needs a branch name that is not valid UTF-8, a contrived layout).** (1) Where `branch_of` returns `None` inside a repository (a timeout or an unborn HEAD that only it meets), `built_families` reads the branch again itself in `surrogateescape` form, which matches no row the launcher logged in replacement form, so the set can read empty and a review run: refuse with 125 naming `git` where `branch_of` is `None` inside a repository. (2) The launcher decodes with replacement and the resolve with `surrogateescape`, so for such a name the resolve sees no built set where the launcher refuses one: one shared decoding helper. (3) Replacement maps different byte names to one string and pools their rows (refusing more, never fewer).
 +- **Leads, recorded, not fixed (non-blocking).** (1) Both roster-program refusals (the loader's and `built_families`') name the exception's message, not its type, so an exception with an empty message prints `()`; `"%s: %s" % (type(e).__name__, e)` would close it, and the acceptance case's `or` would then become `and` (Review A, round 2; the security audit's advisory 2). (2) Where the builder model is the deviation's alternate and `built_families` raises, the builder-model refusal prints first and says to resolve the roster again, which does not mend a broken roster program; returning the R3 refusal there would (Review A, round 2). (3) `_ascii_refusal` escapes characters above ASCII only, so a row `id` holding a line feed or an escape, printed in an unknown cause's label (every label since S3), injects a line or a terminal escape into the refusal; the refusal stands (the security audit, round 2; carried from TASK-086a's lead (1)). (4) A `-z` entry shorter than two characters, or a rename without its source field, is skipped rather than read as not clean; git prints neither (both reviewers, round 2). (5) `/` replaces `\` in the porcelain paths, so on POSIX an untracked root file named `docs\ROSTER.resolved.json` reads as the resolved roster (the security audit, round 2). (6) `family_of` and the set union are called unguarded, so an installed roster program that returns the wrong types prints a traceback, the review not launched (the security audit, round 2). (7) A reviewer whose family only a roster `family` override names gets no family from `family_of` and passes the family refusal, known or unknown set alike; on an unknown set with the roster file unreadable a parsing row of such a family adds nothing (both reviewers, rounds 1 and 2; the project's rosters hold no override). (8) The once-per-launch cache is keyed on the record's mtime, so a concurrent launch's append between the two reads reads the set again, the second read judging (Review A, round 2; fails closed). (9) An ignored `run/` keeps the launcher's own files out of `clean`; a project without it would never drop a rebuilt row (a permanent REBUILD); conformance's floor `run/ ignored` holds it (Review A, round 1). (10) The builder's round-1 report quoted `git status` lines its own diff stat contradicted (the command reference's files, rewritten with LF endings only and restored by the supervisor, as again in round 2) and described failing ids as groups; round 2's report lists them (records).
 +- **TASK-086b's proofs (2026-11-25).** The own-file run, stripped through the launcher (the acceptance file, the hotfix25a file and the task032 launcher file): round 2's `205 passed in 139.65s (0:02:19)`. The acceptance file holds 101 cases: round 1's 90, round 2's ten, and one the supervisor added after the mutation run (`test_r6_an_unknown_set_never_opens_the_exception_where_the_family_refusal_would_not`). The supervisor's mutants file holds 22 mutants over round 2's code (M1 to M20 with M6b and M8b; M6 rebuilt at Review A's word so that it models its label, the resolved file read with `errors="ignore"`): the first run `counts: run=22 cached=0 killed=16 survived=1 not applied=0 error=5 expected survive=0`, the five errors mutants failing tests beyond their lists (each list widened to the exact set the supervisor's driver `run/supervisor/list_086b_failures.py` printed, every extra failure a test of the same rule) and the survivor M7, the entry honoured on an unknown set, which the family refusal caught in every case written (the case above separates them); the second run `counts: run=22 cached=0 killed=22 survived=0 not applied=0 error=0 expected survive=0`. `diagram-check.py --mode code` OK; D-004's row label corrected (the launch's `start_commit` and `clean`). The second run waited four minutes for a slot both of whose holders were another project's runs. R-107 stays planned: TASK-087c's texts complete it.
 +- **The plan's lanes (2026-11-25, the owner's word "The heavy slots should be used. Do so.").** A read-only analysis of stage I1 to I5's increments by their Scopes and what each uses found most of the single-slot chain ordering only: stage I1's TASK-087a and TASK-087b need nothing of TASK-086b and TASK-087b is marked `Parallel: yes`, TASK-087c after all three; stage I2 stays serial (every program increment there edits the launcher); stages I3 and I4 split into two lanes each, their lines revised at each stage's start. Two findings beside it: `plan-check.py`'s PARALLEL test compares raw Scopes, so two unordered `Parallel: yes` increments that share the manifest, the command reference or the builder notes fail it; an exemption for those generated and append-only files is a program change, planned before stage I3; and the review guard's verify puts back every local ref moved while a Review B reads, so a parallel branch is created, and its builder commits nothing, outside the other increment's Review B window. TASK-087b's plan Scope names `tests/test_b2_least_confident.py` for a digest cap it does not hold (its 9500 is a made-up status file's size), and misses `tests/test_workflow_model.py` and `tests/test_reads_only_applicable.py`, which the supervisor's commit before its checkpoint changes.
@@ -423,19 +442,19 @@ index 1c7f1b8..bf2e00c 100644
  
  ### Deviations and leads drawn under the gate (2026-11-25)
 diff --git a/docs/INVENTORY.md b/docs/INVENTORY.md
-index 578cb27..3d64347 100644
+index 578cb27..dbcf7c8 100644
 --- a/docs/INVENTORY.md
 +++ b/docs/INVENTORY.md
 @@ -254,6 +254,7 @@ No paid API key is needed to build the bridge itself; the roster uses the owner'
  | The improvements release builds some items otherwise than their wording, each on the code as read by nine read-only scouts on main at 669d3b4 (design revision `improvements`; docs/DESIGN.md, "Impact on existing behaviour", the full list): C26 in the permission guard, whose check it is, as closed word lists; C27 by the interpreter's import path and an `import_roots` key, not by reading `.pth` files; C35's name check kept exact, the refusal naming the one admitted name; C36 without an environment name that moves the launcher's record; C41 as the printed reply kept whole, no message stream; C44 as a marker line the loop reads, not a failed run; C46 for the supervisor's tools and the opt-in builder guard; C52 as a cell of the register, not a command-line option; C54 without a new kind and with the detector installed once per computer, not shipped; C56 without an exemption, the remedy named; C59 as the option that removes the mistake; C60 as option A; not built at all, being in force: C48, C61's step and T85 | an item written from a report describes the fault as met, not the code as it stands; building the wording where the code disagrees would add a mechanism that fixes nothing or weakens a guard (root cause first) | 2026-11-24, supervisor (design revision improvements; the list named to the owner at the design gate by its place in the design and told in the report after it, rule 58) | the owner wants an item built as worded |
  | The improvements release's design and plan approved at their gate (subject `improvements`; docs/DESIGN.md, Change: the improvements release; docs/BUILD_PLAN.md, stages I1 to I5): as written after the critique's confirming read; the one-time install of the pinned duplicate detector is a step of the install run sheet, the owner's own download; R-115 reads deferred where TASK-093's probe finds no stable line of a denied tool call, and only there; the release keeps its working name | the gate is the owner's (rule 5); a download to the owner's computer and a requirement's deferral are the owner's alone; the order of 2026-11-22 left the name to be proposed at the design | 2026-11-24, owner (this chat, the question form, four separate questions after a push notification: "Approve (Recommended)"; "Include the step (Recommended)"; "Defer in that case (Recommended)"; "The improvements release (Recommended)") | the owner withdraws the detector's step before the install; TASK-093's probe finds a stable line, R-115 then being built |
  | The roster's resolve's threat model (R-107, TASK-086a; recorded for R-050 within the bridge's whole model, the row "The bridge's threat model as a whole"): inside it, the launcher's run record (`run/launcher/runs.jsonl`), the report files a branch adds and the roster's entries, as a builder or a reviewer may have written them: a line that does not parse (not UTF-8, nested too deep, not an object), a builder row whose `model` is not a non-empty string or names no family the roster or the program knows, and a report file without its builder row (named in any letter case, with or without a round), each read as every builder's family having built, so the set is unknown, no alternate resolves and `review_b` of a family that may have built takes the REBUILD; a git that answers neither yes nor no, a detached head, a record that cannot be opened and, where the tree holds a report file, a base that cannot be found, each resolving nothing (exit 1); git's output read as UTF-8 bytes, refs by their full names, a start commit only as a full object name; a report name printed escaped; every model of a profile probed once and each judged on its own answer; the repair (`--repair-record`) refusing a record or a damaged-lines file that is a link, a junction or another reparse point, not a regular file, or hard-linked, appending the damaged lines before it replaces the record; outside it, recorded in docs/HARDENING.md (TASK-086a) and never blocking by itself: the four limits the design names (a later run that rewrites an earlier run's row so that the record still parses, a forged clean row appended among them; the base found through `origin/main`, a ref a builder's run can move, KP-032; a row dropped by where a later run started, never by what was brought onto the branch afterwards; `clean`, which disregards the resolved roster file), the rule held per branch (a stage's review reads a branch that holds no builder row), a process that swaps a link in between the repair's check and its open on Windows, which has no `O_NOFOLLOW`, and record values other than report names printed as they are | the run record lies in the checkout a builder writes, so an exception keyed on it either fails closed or lets a builder's own family review its work; the agents run as the owner's Windows user, so a deliberate rewrite of the record is a reach past the program's check (KP-032), the row's limit, never a defect of the five by itself | 2026-11-24, supervisor (TASK-086a, after four builder rounds, the security auditor reading each) | the launcher (TASK-086b) starts deciding a review on the record without reading the set itself, or a run is seen to rewrite an earlier run's row |
-+| The launcher's review refusals' threat model (R-107, TASK-086b; within the roster's resolve's row above): inside it, the same record, report files and roster entries, and the resolved file's `deviation` and `builder`, as a builder or a reviewer may have written them: the set read once per launch through `built_families` and never copied; an unknown set refusing a review by the family of every builder the roster file names (the resolved builder standing in where the roster file cannot be read, names no builder of a known family or holds a profile that is not an object) and of every builder row of the branch that parses; an unreadable set, a roster program that cannot be loaded or whose `built_families` raises, or neither roster readable refusing every review; the builder-model exception opening only on a deviation that names that model and this branch, a known set (or an empty one with an empty `built`) without the model's family, and a `built` equal to it, every malformed entry refusing; the brief-named refusal never skipped; a builder row's `clean` read from `git status --porcelain -z` with renames' source paths, git not answering making `start_commit` null; outside it, recorded in docs/HARDENING.md (TASK-086b) and never blocking by itself: an installed roster program that is broken (a refusal then names its exception's message, not its type), a reviewer whose family only a roster `family` override names, control characters of a row's `id` printed in a refusal, and git output that git does not print | the launcher is the one place a review launch is stopped, and every input it reads lies in the checkout a builder writes, so each fallback fails closed; the installed bridge is the owner's install, not a builder's input | 2026-11-25, supervisor (TASK-086b, two builder rounds, Review A and the security auditor reading each) | a review is seen to run that a builder's file should have refused, or the launcher starts trusting a value of the record it does not read through `built_families` |
++| The launcher's review refusals' threat model (R-107, TASK-086b; within the roster's resolve's row above): inside it, the same record, report files and roster entries, and the resolved file's `deviation` and `builder`, as a builder or a reviewer may have written them: the set read once per launch through `built_families` and never copied; an unknown set refusing a review by the family of every builder the roster file names (the resolved builder standing in where the roster file cannot be read, names no builder of a known family or holds a profile that is not an object) and of every builder row of the branch that parses; an unreadable set, a roster program that cannot be loaded or whose `built_families` raises, or neither roster readable refusing every review; the builder-model exception opening only on a deviation that names that model and this branch, a known set (or an empty one with an empty `built`) without the model's family, and a `built` equal to it, every malformed entry refusing; the brief-named refusal never skipped; a builder row's `clean` read from `git status --porcelain -z` with renames' source paths, git not answering making `start_commit` null; outside it, recorded in docs/HARDENING.md (TASK-086b) and never blocking by itself: an installed roster program that is broken (a refusal then names its exception's message, not its type), a reviewer whose family only a roster `family` override names, control characters of a row's `id` printed in a refusal, and git output that git does not print | the launcher is the one place a review launch is stopped, and every input it reads lies in the checkout a builder writes, so each fallback fails closed; the installed bridge is the owner's install, not a builder's input | 2026-11-25, supervisor (TASK-086b, three builder rounds, Review A and the security auditor reading each) | a review is seen to run that a builder's file should have refused, or the launcher starts trusting a value of the record it does not read through `built_families` |
  | The number of machine-wide heavy slots is a setting, one by default and two on this computer (R-137; docs/DESIGN.md, Change: hotfix 2026.11.24a): set only on the owner's recorded words by `bridge-run.py --heavy-slots <n>`; a second increment builds beside the first only in its own worktree under `Worktrees/`, never as a second heavy run in one checkout; while Review B reads one branch no commit lands on another worktree's branch; the loop's sentences that say one slot are read with the setting until the improvements release's text increment rewords them (a decided rule held by hand until built) | one slot built every increment of every project one after the other; the owner asked whether opening more slots would help this release, and an extra slot helps it only if installed mid-release | 2026-11-24, owner (this chat, the question form: "Add it, set to 2 (Recommended)"); 2026-11-25, supervisor (set to 2 after the owner's install and calibration) | heavy runs sharing the processor show as runs at their limits or tests failing at random, or the owner chooses another number |
  | Hotfix 2026.11.24a ships the heavy slots mid-release (HOTFIX-004): the installed 2026.11.23a plus only the slot setting, built on `release/2026.11.23a`, through the full review gate, then the owner's install from a run sheet and `/calibrate-bridge`, then carried onto main by its own pull request | the extra slot shortens this release only if the owner installs it now, not with the release's own stamp | 2026-11-24, owner (this chat, the question form: "Hotfix now (Recommended)") | — (done: merged 2026-11-25 as PR #207, installed the same day) |
  
 diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
-index 525c1d7..020b528 100644
+index 525c1d7..dec4a5f 100644
 --- a/docs/PROJECT_STATUS.md
 +++ b/docs/PROJECT_STATUS.md
 @@ -15,9 +15,9 @@ open_issues: ["ISS-008 recurred, counter 2 (the other-models pool exhausted 2026
@@ -443,7 +462,7 @@ index 525c1d7..020b528 100644
  Phase: changing
  Workflows: Host Extension Development → Claude Code Extension; traits: Installable, External services
 -Change cycle: "the improvements release" opened 2026-11-24 (the owner's order of 2026-11-22; designed and planned on Fable 5.2, built on Opus 5.5 since the owner's switch of 2026-11-24) — step 6 of the change cycle, the loop: hotfix 2026.11.24a (HOTFIX-004, R-137, the heavy slots; the owner's two decisions of 2026-11-24) carried onto main by this pull request, after its merge into release/2026.11.23a (PR #207) and the owner's install of 2026-11-25; next TASK-086b; TASK-086a (R-107, the resolve's half) and TASK-085 (R-106) merged before it; the design revision with its plan addendum, one subject, `improvements`, approved by the owner at their gate on 2026-11-24 in the question form (four answers: INVENTORY, Decisions) after four critique rounds and a confirming read (docs/DESIGN_CRITIQUE.md); the intake's read-back confirmed by the owner 2026-11-24 with three decisions in the question form (INVENTORY, Decisions; run/supervisor/intake-notes.md); before it the program release, complete 2026-11-24 (Claude-Cursor Bridge 2026.11.23a)
-+Change cycle: "the improvements release" opened 2026-11-24 (the owner's order of 2026-11-22; designed and planned on Fable 5.2, built on Opus 5.5 since the owner's switch of 2026-11-24) — step 6 of the change cycle, the loop: TASK-086b (R-107, the launcher's half: the two review refusals read the built set and the recorded deviation, failing closed; two builder rounds) merged by this pull request; next TASK-087a; before it hotfix 2026.11.24a (HOTFIX-004, R-137, the heavy slots) carried onto main (PR #208) after the owner's install of 2026-11-25, and TASK-086a (R-107, the resolve's half) and TASK-085 (R-106) merged; the design revision with its plan addendum, one subject, `improvements`, approved by the owner at their gate on 2026-11-24 in the question form (four answers: INVENTORY, Decisions) after four critique rounds and a confirming read (docs/DESIGN_CRITIQUE.md); the intake's read-back confirmed by the owner 2026-11-24 with three decisions in the question form (INVENTORY, Decisions; run/supervisor/intake-notes.md); before it the program release, complete 2026-11-24 (Claude-Cursor Bridge 2026.11.23a)
++Change cycle: "the improvements release" opened 2026-11-24 (the owner's order of 2026-11-22; designed and planned on Fable 5.2, built on Opus 5.5 since the owner's switch of 2026-11-24) — step 6 of the change cycle, the loop: TASK-086b (R-107, the launcher's half: the two review refusals read the built set and the recorded deviation, failing closed; three builder rounds) merged by this pull request; next TASK-087a; before it hotfix 2026.11.24a (HOTFIX-004, R-137, the heavy slots) carried onto main (PR #208) after the owner's install of 2026-11-25, and TASK-086a (R-107, the resolve's half) and TASK-085 (R-106) merged; the design revision with its plan addendum, one subject, `improvements`, approved by the owner at their gate on 2026-11-24 in the question form (four answers: INVENTORY, Decisions) after four critique rounds and a confirming read (docs/DESIGN_CRITIQUE.md); the intake's read-back confirmed by the owner 2026-11-24 with three decisions in the question form (INVENTORY, Decisions; run/supervisor/intake-notes.md); before it the program release, complete 2026-11-24 (Claude-Cursor Bridge 2026.11.23a)
  Awaiting user on: nothing
 -Next: the improvements release (docs/DESIGN.md, Change: the improvements release; docs/BUILD_PLAN.md, stages I1 to I5, TASK-085 to TASK-118; rows R-106 to R-136): the loop from TASK-086b (R-107, the launcher's two review refusals and the built families it reads with the roster), on Opus 5.5, TASK-085 (R-106, the mutation engine on an editable install) and TASK-086a (R-107's resolve, the roster resolves an alternate reviewer) built and merged, the design and plan approved by the owner on 2026-11-24; two heavy slots on this computer since hotfix 2026.11.24a, so where two ready increments are independent the second builds in its own worktree under Worktrees/; it ends with the owner's install from a run sheet and each project's calibration; then the prototype meta workflow, the progress graph, W, G, F, C (waits for the TDP's code-map command), D, the code map's trial, and E last (INVENTORY, Decisions). The Sunday evaluation of 2026-11-29 runs the security step from ~/.cursor-bridge/projects.json (the field acceptance's last item on this repository). The TDP calibrates in its own session. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
 +Next: the improvements release (docs/DESIGN.md, Change: the improvements release; docs/BUILD_PLAN.md, stages I1 to I5, TASK-085 to TASK-118; rows R-106 to R-136): the loop from TASK-087a (R-109, the rule budget), on Opus 5.5, TASK-085 (R-106), TASK-086a and TASK-086b (R-107's resolve and launcher halves; R-107 stays planned until TASK-087c's texts) built and merged, the design and plan approved by the owner on 2026-11-24; two heavy slots on this computer since hotfix 2026.11.24a, so where two ready increments are independent the second builds in its own worktree under Worktrees/; it ends with the owner's install from a run sheet and each project's calibration; then the prototype meta workflow, the progress graph, W, G, F, C (waits for the TDP's code-map command), D, the code map's trial, and E last (INVENTORY, Decisions). The Sunday evaluation of 2026-11-29 runs the security step from ~/.cursor-bridge/projects.json (the field acceptance's last item on this repository). The TDP calibrates in its own session. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
@@ -916,6 +935,263 @@ index 0000000..17d9d5b
 +Run `handoff/TASK-086b.md`'s Done commands 1 to 14, exactly as written there, from the Workspace root, each on its own, synchronously, in that order (steps 1 and 2 before your first edit; 3 to 14 after your last), and quote each with its output verbatim.
 +
 +Your last message is the summary and the report file's path, and nothing follows it.
+diff --git a/handoff/TASK-086b-r3-report.md b/handoff/TASK-086b-r3-report.md
+new file mode 100644
+index 0000000..7679312
+--- /dev/null
++++ b/handoff/TASK-086b-r3-report.md
+@@ -0,0 +1,172 @@
++# TASK-086b round 3 report
++
++## Files changed
++
++- `bridge/cursor-bridge/bridge-run.py`
++- `bridge/cursor-bridge/MANIFEST.json`
++
++## Summary
++
++Round 3 fixes `branch_of` so `git rev-parse --abbrev-ref HEAD` output is read as raw bytes and decoded as UTF-8 with replacement, with any failure returning `None` instead of raising; on Windows this lets branch names whose UTF-8 bytes are undefined in the system code page be read for the two review refusals, the brief-rule branch check, and builder row logging without a launch traceback. The two refusal call sites were unchanged because `branch_of` no longer raises and existing unreadable-set handling already covers a `None` branch. All 116 acceptance tests and the Done regression slices pass unchanged.
++
++## Requirements (round 3)
++
++- **1 (branch read as git prints it):** `branch_of` (2580–2593) runs the same git argument list windowless under `GIT_TIMEOUT`, omits `text=True`, decodes `stdout` as UTF-8 with `errors="replace"`, returns the stripped name on exit 0 and `None` otherwise, and catches `Exception` so the function never raises.
++- **2 (no traceback from refusals' branch read):** `_deviation_allows_builder_review` (1359) and `review_family_refusal` (2639) still call `branch_of` unchanged; a `None` branch closes the deviation exception (`1359–1361`) and lets `built_families` yield unreadable/`unknown` outcomes that existing refusal text already handles (`2648–2650`, `2663–2664`).
++- **3 (other callers unchanged):** `builder_review_refusal` (1490–1494) and the run row's `log_branch` (3605) use the same `branch_of`; ASCII branches behave as before, and the wide-branch acceptance cases get the UTF-8 name git stores.
++
++## Scratch tests
++
++no scratch test file
++
++## Mutation code points
++
++| Label | Function / lines | Expected test id |
++|-------|------------------|------------------|
++| M21 | `branch_of` 2583–2593 | `test_r3_a_branch_name_outside_the_code_page_is_read_and_judged` |
++| M21 | `branch_of` 2583–2593 | `test_r3_a_deviation_on_such_a_branch_opens_the_builder_models_review` |
++| M21 | `branch_of` 2583–2593 | `test_r3_a_builder_launch_on_such_a_branch_writes_its_name_and_both_keys` |
++
++(M1–M20 unchanged from round 2 at their post-round-2 lines except where line numbers shifted by three after `branch_of`; no launcher logic for those labels was edited this round.)
++
++## Missing acceptance cases
++
++none
++
++## `claude --version`
++
++```
++--: line 1: claude: command not found
++```
++
++## Commands and output
++
++### Step 1 — `git status --short`
++
++```
++(no output)
++```
++
++### Step 2 — checkpoint pytest (before edits)
++
++```
++3 failed, 113 passed in 72.49s (0:01:12)
++```
++
++Failing ids:
++
++```
++tests/test_improve_roster_launch.py::test_r3_a_branch_name_outside_the_code_page_is_read_and_judged
++tests/test_improve_roster_launch.py::test_r3_a_deviation_on_such_a_branch_opens_the_builder_models_review
++tests/test_improve_roster_launch.py::test_r3_a_builder_launch_on_such_a_branch_writes_its_name_and_both_keys
++```
++
++### Step 3 — `python tools/dump-cli.py` then `python tools/dump-cli.py --check`
++
++```
++(no output)
++```
++
++(exit code 0 for both)
++
++### Step 4 — `python tools/make-manifest.py`
++
++```
++make-manifest: version 2026.11.24a, 148 files hashed, VERSION + MANIFEST.json written
++```
++
++### Step 5 — `git status --short`
++
++```
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/bridge-run.py
++ M docs/CLI_REFERENCE.md
++ M docs/cli-reference.json
++```
++
++(`bridge/cursor-bridge/VERSION` not listed; `git restore` not run)
++
++### Step 6 — acceptance pytest after edits
++
++```
++116 passed in 74.70s (0:01:14)
++```
++
++### Step 7 — regression slice 1
++
++```
++494 passed, 4 skipped in 485.90s (0:08:05)
++```
++
++Skip reasons (`-rs`):
++
++```
++SKIPPED [1] tests\test_bridge_run_slot.py:411: POSIX special files
++SKIPPED [1] tests\test_bridge_run_slot.py:930: POSIX links and permission bits
++SKIPPED [1] tests\test_bridge_run_slot.py:1125: POSIX permission bits
++SKIPPED [1] tests\test_hotfix24a_heavy_slots.py:1102: POSIX file modes
++```
++
++### Step 8 — regression slice 2
++
++```
++280 passed, 3 skipped in 231.99s (0:03:51)
++```
++
++Skip reasons (`-rs`, paths shortened):
++
++```
++SKIPPED [1] tests\test_improve_roster_alt.py:1520: no symbolic link here: [WinError 1314] A required privilege is not held by the client: '<tmp>/.../planted.txt' -> '<tmp>/.../ws/run/launcher/runs.damaged.jsonl'
++SKIPPED [1] tests\test_improve_roster_alt.py:1520: no symbolic link here: [WinError 1314] A required privilege is not held by the client: '<tmp>/.../elsewhere.jsonl' -> '<tmp>/.../ws/run/launcher/runs.jsonl'
++SKIPPED [1] tests\test_improve_roster_alt.py:1591: a file name holding a line feed is POSIX-only; CI's Linux job runs it
++```
++
++### Step 9 — `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`
++
++```
++bridge-check: version 2026.11.24a (2026-11-25 18:30) at <Workspace>/bridge
++bridge-check: 148 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.24a <Workspace>/bridge/cursor-bridge
++```
++
++### Step 10 — `python bridge/cursor-bridge/windowless-check.py bridge/cursor-bridge .cursor/hooks`
++
++```
++windowless-check: 41 file(s) scanned, 0 FAIL, 0 NOTE
++```
++
++### Step 11 — `git diff --stat HEAD`
++
++```
++ bridge/cursor-bridge/MANIFEST.json | 4 ++--
++ bridge/cursor-bridge/bridge-run.py | 7 ++++---
++ 2 files changed, 6 insertions(+), 5 deletions(-)
++```
++
++(`docs/cli-reference.json` and `docs/CLI_REFERENCE.md` appear in `git status --short` with no content diff against HEAD; help text unchanged.)
++
++### Step 12 — non-ASCII in `bridge-run.py` diff
++
++No non-ASCII characters were added in `bridge-run.py`; the diff is ASCII-only.
++
++### Step 13 — `claude --version`
++
++```
++--: line 1: claude: command not found
++```
++
++### Step 14 — `git rev-parse HEAD` and `git status --short`
++
++```
++64ec8ee3532fa5f05b3037d5bbd23762571e38d2
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/bridge-run.py
++ M docs/CLI_REFERENCE.md
++ M docs/cli-reference.json
++```
++
++Results above are for commit `64ec8ee3532fa5f05b3037d5bbd23762571e38d2` with uncommitted changes listed in step 14. No `tests/test_task086b_scratch_` file. `bridge/cursor-bridge/VERSION` not listed.
++
++## Assumed, not verified
++
++Assumed, not verified: none
+\ No newline at end of file
+diff --git a/handoff/TASK-086b-r3.md b/handoff/TASK-086b-r3.md
+new file mode 100644
+index 0000000..be54277
+--- /dev/null
++++ b/handoff/TASK-086b-r3.md
+@@ -0,0 +1,72 @@
++---
++record: brief
++header: 1
++id: "TASK-086b"
++round: 3
++satisfies: [R-107]
++scope: ["bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_improve_roster_launch.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-086b-r3-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# TASK-086b, round 3: the branch is read as git prints it, never a traceback (R-107)
++
++Round cause: behaviour
++
++## Objective
++Round 2 (committed on this branch) passed the gate's Review A and security audit, and the cross-family Review B rejected it on one finding: `branch_of` reads `git rev-parse --abbrev-ref HEAD` as text in the system's code page, so on a branch whose name holds characters outside that code page the read raises, and the two review refusals, which call `branch_of` outside any `try`, end the launch with a traceback (exit 1) instead of judging it. On the checkpoint the family refusal called `branch_of` inside its `try`, so this is the increment's own regression. This round reads the branch as git prints it and keeps every launch free of a traceback. The supervisor has added red acceptance cases to `tests/test_improve_roster_launch.py` (committed before this brief; listed under Context). **Read `handoff/TASK-086b.md` and `handoff/TASK-086b-r2.md` whole first: every requirement, limit, constraint and Done rule there holds for this round, except where this brief changes it.** Your report is `handoff/TASK-086b-r3-report.md`.
++
++Satisfies: R-107
++
++## Scope
++Files and directories you may create or modify:
++- bridge/cursor-bridge/bridge-run.py
++- bridge/cursor-bridge/MANIFEST.json
++- tests/test_improve_roster_launch.py
++- docs/cli-reference.json
++- docs/CLI_REFERENCE.md
++- docs/BUILDER_NOTES.md
++- handoff/TASK-086b-r3-report.md
++
++Limits on these paths: in `bridge-run.py`, the function `branch_of` (a widening: it was outside round 1's and round 2's Scope) and, where Requirement 2 needs it, the two lines in `_deviation_allows_builder_review` and `review_family_refusal` that read the branch; nothing else in the file. `tests/test_improve_roster_launch.py` is the supervisor's: **do not edit it.** MANIFEST and the command reference change only by their tools (the help text does not change, so the reference should come out unchanged).
++
++Do not modify anything else.
++
++## Out of scope
++As in `handoff/TASK-086b.md` (Out of scope), unchanged, and `tests/test_hotfix25a_roster_launcher.py`, which round 3 does not touch. `handoff/TASK-086b.md`, `handoff/TASK-086b-r2.md` and both earlier reports are read, never edited.
++
++## Context
++**Where round 2 stands.** Your round-2 change is committed on the branch, accepted by the supervisor, and is the base of this round; the supervisor's commits since are the review files under `run/review/` (Review B's input, removed before the merge) and the round-3 cases. Everything round 2 did stays as it is.
++
++**The finding** (Review B, round 1, in its words reduced): `branch_of` runs `git -C <folder> rev-parse --abbrev-ref HEAD` with `text=True` and no encoding, so Python decodes git's output in the system's ANSI code page; git prints a ref name as the bytes it stores, UTF-8 on this platform. Where those bytes do not decode (code page 1252 leaves 0x81, 0x8D, 0x8F, 0x90 and 0x9D undefined), the decode raises; `branch_of` catches only `OSError` and `subprocess.TimeoutExpired`, and `_deviation_allows_builder_review` and `review_family_refusal` call it outside any `try`. The launch prints a traceback and exits 1: the stand-in never runs and no row is written, so nothing unreviewed runs, but `handoff/TASK-086b.md` asks for a refusal or a judgement, never a traceback, on git's output (its R10).
++
++**The new acceptance cases** (appended to `tests/test_improve_roster_launch.py`; each docstring names its requirement, the finding and the mutation label M21, the branch read in the code page or not at all):
++- `test_r3_a_branch_name_outside_the_code_page_is_read_and_judged` (a grok row on the branch refuses a grok review by name; a GPT review runs and its row names the branch)
++- `test_r3_a_deviation_on_such_a_branch_opens_the_builder_models_review` (the builder-model exception reads the same branch)
++- `test_r3_a_builder_launch_on_such_a_branch_writes_its_name_and_both_keys` (a builder row on that branch: its name, `start_commit`, `clean`)
++
++The branch name they use is `task-` followed by the five characters U+0101, U+010D, U+010F, U+0110 and U+011D, whose UTF-8 bytes include each byte code page 1252 leaves undefined.
++
++**The supervisor's red run** (the round-3 cases on round 2's code, through the launcher, `-k test_r3_`, which also selects round 1's six R3 cases): `3 failed, 6 passed, 95 deselected in 14.57s`, the three being the new cases, each launch ending in the traceback Review B named (`UnicodeDecodeError: 'charmap' codec can't decode byte 0x81 in position 6` in the reader thread, then `AttributeError: 'NoneType' object has no attribute 'strip'` in `branch_of`).
++
++## Requirements
++1. **The branch is read as git prints it.** `branch_of` runs the same git command (a list of arguments, windowless, bounded by `bridge_env.GIT_TIMEOUT`), reads its output as bytes and decodes it as UTF-8 with replacement (`errors="replace"`), so no output of git can make it raise; it returns the stripped name where git exits 0 and `None` otherwise, as now. Any exception while it runs (a decode, an `OSError`, a timeout, anything else) returns `None`; `branch_of` never raises.
++2. **No traceback from the two refusals' branch read.** Where `branch_of` returns `None` inside a repository, the two refusals judge as they already do for a branch that cannot be read (the set cannot be read: every review refused, exit 125, the refusal naming the cause). Add nothing where that already holds; if a path remains on which reading the branch can raise in either refusal, catch it there and refuse the review (exit 125, the refusal naming the cause and `git`), never letting it through.
++3. **Every other caller unchanged in behaviour.** The brief-rule check and the run log's branch (the other two callers of `branch_of`) get the same name for an ASCII branch as before, and for a branch outside the code page the name as git prints it (the third new case reads the row).
++
++## Acceptance criteria
++- [ ] Every test in `tests/test_improve_roster_launch.py` passes, unedited, the round-3 cases among them; every case that passed on round 2 still passes.
++- [ ] Every test in `tests/test_hotfix25a_roster_launcher.py` and in the files of `handoff/TASK-086b.md`'s Done steps 7 and 8 passes, unedited.
++- [ ] Requirements 1 to 3 hold.
++- [ ] `handoff/TASK-086b.md`'s remaining acceptance criteria (dump-cli `--check`, MANIFEST regenerated, `RESULT: SOURCES MATCH`, VERSION unchanged and unlisted, windowless-check, ASCII only, no dependency, no traceback) hold.
++
++## Constraints
++All of `handoff/TASK-086b.md`'s and `handoff/TASK-086b-r2.md`'s Constraints hold, with these changes:
++- **Mutation: name the code points, run nothing.** In the report, for M21 (the branch read in the code page or not at all), the function and the line(s) as the file stands after your change, and the acceptance test ids you expect to catch it.
++- **Report verbatim**, as round 2's brief asks: every command's output pasted as printed, every failing id one per line, an empty output written `(no output)`.
++
++## Done
++Your report is `handoff/TASK-086b-r3-report.md`, written as you go, holding everything `handoff/TASK-086b.md`'s Done section lists (with "R1 to R11" read as this round's Requirements 1 to 3, each in one line naming its function and lines), and ending with a section headed exactly `Assumed, not verified`.
++
++Run `handoff/TASK-086b.md`'s Done commands 1 to 14, exactly as written there, from the Workspace root, each on its own, synchronously, in that order (steps 1 and 2 before your first edit; 3 to 14 after your last), and quote each with its output verbatim.
++
++Your last message is the summary and the report file's path, and nothing follows it.
 diff --git a/handoff/TASK-086b.md b/handoff/TASK-086b.md
 new file mode 100644
 index 0000000..2cb9356
@@ -1176,10 +1452,10 @@ index 7f85d4d..993ecb9 100644
      br = program("bridge-run")
 diff --git a/tests/test_improve_roster_launch.py b/tests/test_improve_roster_launch.py
 new file mode 100644
-index 0000000..9a6de2c
+index 0000000..5a32e2a
 --- /dev/null
 +++ b/tests/test_improve_roster_launch.py
-@@ -0,0 +1,1241 @@
+@@ -0,0 +1,1290 @@
 +"""TASK-086b (R-107; docs/DESIGN.md, "Change: the improvements release", C39 and its table): the launcher's two
 +review refusals read the branch's built set and the resolved roster's recorded deviation, and every builder row
 +the launcher writes carries `start_commit` and `clean`. The supervisor's acceptance tests, written before the
@@ -2421,6 +2697,55 @@ index 0000000..9a6de2c
 +    ws = scratch_repo(tmp_path, files={"handoff/TASK-001.md": brief_text()})
 +    r = ran(build(tmp_path, ws, stub_exit=stub_exit), rc=stub_exit)
 +    assert r["kind"] == "builder" and r["exit"] == stub_exit, r
++
++# --- Round 3 (handoff/TASK-086b-r3.md): a branch name outside the code page ---------------------------------
++# Review B, round 1: branch_of read `git rev-parse --abbrev-ref HEAD` in the system's code page; a name outside it
++# raised in the two refusals, which call it outside any try, and the launch ended in a traceback (exit 1). On the
++# checkpoint the family refusal called it inside its try. Each name below holds characters whose UTF-8 bytes include
++# 0x81, 0x8D, 0x8F, 0x90 and 0x9D, which code page 1252 does not decode. Mutation label M21: the branch read in the
++# code page (or not at all) where git prints UTF-8.
++
++WIDE_BRANCH = "task-\u0101\u010d\u010f\u0110\u011d"
++
++
++def wide_branch_repo(tmp_path, files=None):
++    ws = scratch_repo(tmp_path, files=files)
++    git(ws, "checkout", "-q", "-b", WIDE_BRANCH)
++    return ws
++
++
++def test_r3_a_branch_name_outside_the_code_page_is_read_and_judged(tmp_path):
++    """R10 (handoff/TASK-086b-r3.md, Requirement 1; Review B, round 1, behaviour, path: git's output): on a branch
++    whose name holds characters outside the system's code page, a review by the family of the branch's grok builder
++    row is refused by name, with no traceback, and a review of another family runs and its row names the branch as
++    git prints it. Mutation M21 (the branch read in the code page or not at all)."""
++    ws = wide_branch_repo(tmp_path)
++    write_record(ws, row(GROK_B, branch=WIDE_BRANCH))
++    assert_family_refusal(refused(review(tmp_path, ws, GROK_R)), GROK_R, "xai")
++    r = ran(review(tmp_path, ws, GPT))
++    assert r["kind"] == "review" and r["branch"] == WIDE_BRANCH, r
++
++
++def test_r3_a_deviation_on_such_a_branch_opens_the_builder_models_review(tmp_path):
++    """R6 with R10 (handoff/TASK-086b-r3.md, Requirement 1): the builder-model exception reads the same branch: a
++    deviation entry naming the branch, the builder model and the set read at the launch lets the builder model's
++    review run on a branch whose name lies outside the code page, with no traceback. Mutation M21."""
++    ws = wide_branch_repo(tmp_path)
++    write_record(ws, row(GROK_B, branch=WIDE_BRANCH))
++    write(ws, "docs/ROSTER.resolved.json",
++          resolved_text(builder=COMPOSER, review_b=COMPOSER, deviation=deviation(branch=WIDE_BRANCH)))
++    r = ran(review(tmp_path, ws, COMPOSER))
++    assert r["kind"] == "review" and r["model"] == COMPOSER and r["branch"] == WIDE_BRANCH, r
++
++
++def test_r3_a_builder_launch_on_such_a_branch_writes_its_name_and_both_keys(tmp_path):
++    """R8 with R10 (handoff/TASK-086b-r3.md, Requirement 1): a builder launch on a branch whose name lies outside the
++    code page runs with no traceback and writes the branch as git prints it, `start_commit` and `clean`. Mutation
++    M21."""
++    ws = wide_branch_repo(tmp_path, files={"handoff/TASK-001.md": brief_text()})
++    r = ran(build(tmp_path, ws))
++    assert r["branch"] == WIDE_BRANCH, r
++    assert_builder_keys(r, head(ws), True)
 diff --git a/tests/test_task032_supervisor_launcher.py b/tests/test_task032_supervisor_launcher.py
 index a8d45ab..e94c71f 100644
 --- a/tests/test_task032_supervisor_launcher.py
