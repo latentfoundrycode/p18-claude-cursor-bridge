@@ -100,7 +100,7 @@ builder never does. Its reader is an **AI** — the supervisor of a later projec
 requirements overlap, which receives it at its Phase 4 step 0 — so write it for machine
 comprehension: precise conditions, exact symptoms, the confirmed cause, the fix, and what
 would have prevented it, with file names and versions where they matter. No narrative for a
-human reader; the human reads the Project Summary. There is no separate `docs/LESSONS.md`.
+human reader; the human reads the Project Summary.
 
 - **On detection** — an entry under the ID with the title, the task, the symptom as
   observed, and status `open`. This is the one mid-stage write to `Documents/`.

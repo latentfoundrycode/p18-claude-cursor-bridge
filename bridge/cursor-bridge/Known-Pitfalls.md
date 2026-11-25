@@ -470,10 +470,9 @@ it applies.** Each heading states its pitfall in one sentence, since the heading
 - **Applies:** every project with a lock-reading scanner in CI. The sign: several pull requests failing the scanner on the same advisory on the same day.
 
 ### KP-051 — A CI watch started right after a push reported the previous commit's finished run
-- **Surfaced:** the TDP, 2026-09-30 (TASK-117-r2; gotcha 14): the watch ended green on the run of the commit before the push, since the new run had not started when the watch began.
-- **Cause:** the watch takes the newest run it sees, not the run of the pushed head.
-- **Correction:** when a watch ends, `review-guard.py ready <n>` confirms the required checks ran green on the pushed head before the merge (step 8); `premerge` checks the pull request's head as well; the maintainer's own rule is the same (a release is handed over only after its checks ran green on the pushed head, 2026-10-11).
-- **Applies:** every CI watch. The sign: a watch that ends within seconds of the push.
+- **Surfaced:** the TDP, 2026-09-30: a watch ended green on the previous commit's run.
+- **Correction:** the launcher's watch waits for the pushed head's checks and `review-guard.py ready <n>` proves them (step 8); a release, the maintainer's too, is handed over only after its checks ran green on the pushed head.
+- **Applies:** every CI watch.
 
 ### KP-052 — An escape typed in a here-document arrived as the real character
 - **Mistake:** a backslash escape typed into a file, through a shell or a writing tool, taken to arrive as typed.
@@ -584,7 +583,7 @@ it applies.** Each heading states its pitfall in one sentence, since the heading
 ### KP-069 — A squash-merged status file describes the pre-gate state on `main`
 - **Mistake:** the status file a pull request carries was written in the form true while its gate ran.
 - **Surfaced:** the bridge, 2026-10-16 to 19 (ISS-009, stage B1's review rounds 1 to 3): on `main` the file named the merged increment as before its gate and its Next line the gate already run, so a session resuming from it would have gated a merged branch.
-- **Correction:** every pull request carries the status file as it reads at that pull request's merge (In flight none; Next the step after the merge), which a CI test of the file checks; the live position between merges lives in `run/supervisor/in-flight.md`. Release S took the `Increment:` and `Last accepted:` lines out of the file: no program read them, git names the merged increment, and a line that had to name its own pull request's number in advance cost a re-review whenever another merge came first.
+- **Correction:** every pull request carries the status file as it reads at that pull request's merge (In flight none; Next the step after the merge), which a CI test of the file checks; the live position between merges lives in `run/supervisor/in-flight.md`.
 - **Applies:** every project whose records merge by squash. The sign: a status file on `main` naming a gate as still to run.
 
 ### KP-070 — A wall-clock schedule walked in naive local time never revisits the hour that repeats when summer time ends
@@ -614,7 +613,7 @@ it applies.** Each heading states its pitfall in one sentence, since the heading
 ### KP-074 — Status-file tests gated on CI variables skip locally
 - **Mistake:** a local suite run taken for the CI run of a pull request.
 - **Surfaced:** the bridge, 2026-10-30 (ISS-022, TASK-027's stamp): two tests every local run passed failed on CI, one gated on the GitHub pull-request variables and so skipped locally, one in a file no local selection included.
-- **Correction:** a test gated on CI's variables names the gate in its skip reason, and before the first push of a pull request that changes what such a test reads, that test file runs alone with `GITHUB_REF=refs/pull/<n>/merge`, `GITHUB_BASE_REF=main` and `GITHUB_EVENT_NAME=pull_request` set for the launcher's run, through a key file of `NAME=value` lines outside the Workspace (`--key-file`), `<n>` the pull request's number or, before it is opened, the next the repository issues. The whole suite is CI's run, once per pull request (release S; until then it also ran locally with those variables, a third whole run per pull request).
+- **Correction:** a test gated on CI's variables names the gate in its skip reason, and before the first push of a pull request that changes what such a test reads, that test file runs alone with `GITHUB_REF=refs/pull/<n>/merge`, `GITHUB_BASE_REF=main` and `GITHUB_EVENT_NAME=pull_request` set for the launcher's run, through a key file of `NAME=value` lines outside the Workspace (`--key-file`), `<n>` the pull request's number or, before it is opened, the next the repository issues. The whole suite is CI's run, once per pull request (release S).
 - **Applies:** every pull request that changes a file a CI-gated test reads. The sign: a test skipped locally that CI runs.
 
 ### KP-075 — A question's sort left to the supervisor invited guessed feature options at intake
@@ -662,5 +661,5 @@ it applies.** Each heading states its pitfall in one sentence, since the heading
 
 ### KP-083 — A builder told to run a long command runs it in the background and waits past its limit
 - **Surfaced:** the bridge (ISS-030): a builder ran the whole test tree in the background and waited on it to the launcher's limit, its edits complete; marked healthy at the merge, that run then lengthened the learned limit of every builder run after it.
-- **Correction:** no brief has a builder run the whole test tree (`spec-packager`); a builder or review run that ended at its limit never raises the learned limit, and the launcher refuses its `--healthy` mark.
+- **Correction:** no brief has a builder run the whole test tree (`spec-packager`); the launcher holds the rest (step 8).
 - **Applies:** every brief with a verification command.

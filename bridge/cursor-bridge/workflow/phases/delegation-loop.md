@@ -44,11 +44,6 @@ succeed even when the tree does not pass lint (a partial or inherited state). Th
 run a plain `git commit` and must pass it. Using `--no-verify` on an increment commit is a
 gate-integrity flag, not a shortcut.
 
-Issue each git command on its own line — never join them with `&&`, `|`, or `;`.
-The permission allowlist matches a command against a single rule, so a chained
-command like `git add -A && git commit` matches none of them and forces an approval
-prompt on every checkpoint, defeating the point of the allowlist.
-
 Never delegate from a dirty tree. You will not be able to tell Cursor's changes from
 whatever was already there.
 
@@ -82,8 +77,6 @@ Rules for this call, all of which matter:
   branch's first brief declares. Then re-issue the *same* constant pointer command, naming the
   new brief. If you catch yourself typing instructions inside the quotes,
   stop and put them in the file.
-- If a run needs a specific model, add `--model <name>`; `cursor-agent --list-models`
-  shows what is available.
 
 **Parallel increments** (only when `docs/RUN_PARAMETERS.md` says `Parallel increments: on`). When `python ~/.claude/cursor-bridge/plan-check.py` lists ready increments under `TOGETHER` (all `Parallel: yes`, scopes disjoint, no dependency between them), you may prepare and launch their **builders** together. The launcher's one heavy slot (R-040, step 3) holds each builder run, so a builder launched while another runs waits for the slot and starts when it frees (or ends with 123 at its bound): the builders build one after the other, each in its own checkout, while everything you do stays sequential and happens in your own checkout. Claude Code asks before running git in another folder (that folder's hooks could run) and before touching files outside your working directory, so **you never work inside a worktree**: it exists only so a second builder has a checkout of its own.
 
@@ -145,9 +138,8 @@ returned. Only a tree with no finished work goes through the restart below. Ever
 ended at its limit gets an Issues entry (`ISS-nnn`): what the inspection found, what was kept,
 the kind's ceiling and the longest healthy run on record (`run/launcher/runs.jsonl`), so a kind
 that keeps reaching its ceiling is diagnosed rather than retried forever (release A2). The
-entry leads somewhere: when the kept work merged, mark that run healthy too
-(`bridge-run.py --healthy <run id>`), so the kind's ceiling grows from it; when a kind reaches
-its ceiling twice with nothing kept, the brief is too large for one run and is split.
+entry leads somewhere: when a kind reaches its ceiling twice with nothing kept, the brief is
+too large for one run and is split.
 
 ```bash
 python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json --record-failure <model id> --stderr-file <the .err file of that call>
@@ -240,9 +232,11 @@ python ~/.claude/cursor-bridge/diagram-check.py --mode code
 
 An `IMPORT` or `SCHEMA` failure is **design regression**: the code crossed a boundary the component diagram does not draw, or the schema drifted from the entity-relationship diagram. It is handled like `SCOPE DRIFT` — re-delegate with the diagram restated — unless the builder raised an objection in its summary, which goes to "Objections — bottom-up escalation" instead.
 
-And read `docs/BOUNDARY_VIOLATIONS.md` if it exists. Git cannot see a write outside the
-repository, so this log — written by the `boundary-check` hook — is the only trace of the
-builder reaching outside `Workspace/`. Any new entry is handled like `SCOPE DRIFT`: undo the
+And read the run's `bridge-run: BOUNDARY` lines, in its `.err` file and in its row of
+`run/launcher/runs.jsonl` (`boundary`). Git cannot see a write outside the repository, and the
+`boundary-check` hook does not run in a headless builder run (ISS-010), so the launcher, which
+lists the files beside the Workspace before and after every builder and review run, is the
+detection; read `docs/BOUNDARY_VIOLATIONS.md` as well where it exists. Any new line or entry is handled like `SCOPE DRIFT`: undo the
 outside edit by hand (`Documents/` is not under git), re-delegate, open an issue.
 
 **Then triage the builder's `Assumed, not verified` list** (rule 42). It is the one thing the builder knows that no reviewer can see — where it guessed. It stands in the builder's report file, `handoff/TASK-<nnn>-r<N>-report.md`, which the accept commit keeps (`git add -f` where the project ignores `handoff/`); where a builder printed it only in its last message, copy it verbatim into `run/agent/TASK-<nnn>.assumptions.md` before anything else, since the message is lost with the run. A missing section means *unknown*, never *none*: note it, and the reviewers hunt unaided. Give every item exactly one disposition:
@@ -276,7 +270,7 @@ brief has no `## Scope` — a `spec-packager` defect; fix the brief, do not proc
 python ~/.claude/cursor-bridge/bridge-run.py --limit auto --strip --kind test -- <the recorded suite command> > run/agent/TASK-<nnn>-suite.out 2>&1
 ```
 
-It runs under the heavy launch's `timeout` (step 3); its completion wakes you, and `test-runner` then reads that file. The launcher starts it windowless and in the computer's one slot, and the Bash tool ends a foreground command at ten minutes (600 seconds, KP-061), so a suite never runs in the foreground and its expected length no longer chooses the path. A run of the increment's own test files alone goes through the launcher the same way, yours and never `test-runner`'s, since it runs code no reviewer has read: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --strip --kind test -- <the project's test command> <the increment's test files> > run/agent/TASK-<nnn>-own.out 2>&1`, in the background under the same `timeout`, and `test-runner` reads that file. A stripped suite or own-file run that fails for want of a variable takes `--key-file` as above, a variable nothing names being the run's failure, back to the builder or the owner, and for want of a file a variable naming a copy outside the Workspace, never a home variable, which would undo the home redirect; it is never run again without `--strip`, and a 125 on a runner you know, or naming the agent home, is a defect to fix, not a runner the launcher does not know. A runner the launcher does not know answers 125 and runs directly in the background with `# wake` (rule 43), named with its reason in the status file. The strip is instructed, no program holding the flag, and reaches only what goes through the launcher. Whatever else runs what a builder wrote on this computer runs in a session's own environment, stated limits (`docs/INVENTORY.md`, Decisions; D-004), among them: a runner the launcher refuses, and a benchmark or profile; a build, a type check or a linter; a hook a commit runs; a reviewer's or auditor's own run beside its reading; a root-cause reproduction; an installer rehearsal; a live smoke and a stage demonstration's start of the product.
+It runs under the heavy launch's `timeout` (step 3); its completion wakes you, and `test-runner` then reads that file. The launcher starts it windowless and in the computer's one slot, and the Bash tool ends a foreground command at ten minutes (600 seconds, KP-061), so a suite never runs in the foreground and its expected length no longer chooses the path. A run of the increment's own test files alone goes through the launcher the same way, yours and never `test-runner`'s, since it runs code no reviewer has read: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --strip --kind test -- <the project's test command> <the increment's test files> > run/agent/TASK-<nnn>-own.out 2>&1`, in the background under the same `timeout`, and `test-runner` reads that file. A stripped suite or own-file run that fails for want of a variable takes `--key-file` as above, a variable nothing names being the run's failure, back to the builder or the owner, and for want of a file a variable naming a copy outside the Workspace; it is never run again without `--strip`, and a 125 on a runner you know, or naming the agent home, is a defect to fix, not a runner the launcher does not know. A runner the launcher does not know answers 125 and runs directly in the background with `# wake` (rule 43), named with its reason in the status file. The strip is instructed, no program holding the flag, and reaches only what goes through the launcher. Whatever else runs what a builder wrote on this computer runs in a session's own environment, stated limits (`docs/INVENTORY.md`, Decisions; D-004), among them: a runner the launcher refuses, and a benchmark or profile; a build, a type check or a linter; a hook a commit runs; a reviewer's or auditor's own run beside its reading; a root-cause reproduction; an installer rehearsal; a live smoke and a stage demonstration's start of the product.
 
 **Then every new test runs once against the checkpoint's code**, through the same engine: list the increment's new tests in the mutants file's `new_tests` (a new test file by its path, a changed file by its new tests' ids), make step 4's read of `.git/config` and the hooks folders, then stage them (`git add`), and launch the engine in the background like any mutation run, stripped and with its scratch folder named as step 7 says (`delegation-loop/decide.md`, "The mutation run"), the `python` after the `--` being the project's own interpreter:
 
