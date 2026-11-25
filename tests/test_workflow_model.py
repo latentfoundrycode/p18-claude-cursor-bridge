@@ -143,4 +143,4 @@ def test_the_digest_keeps_its_limits():
     """The new section must not push the digest past the hook's cap or out of a compaction's reach."""
     a, b = TEXT.find("<!-- digest:start -->"), TEXT.find("<!-- digest:end -->")
     assert 0 < a < b < 20000
-    assert len(TEXT[a:b]) <= 9500
+    assert len(TEXT[a:b]) <= 10500   # R-109: the whole digest's cap; each part's 8,800 in tests/test_improve_digest_parts.py

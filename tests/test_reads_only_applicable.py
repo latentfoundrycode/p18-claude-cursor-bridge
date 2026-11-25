@@ -227,7 +227,10 @@ def test_r030_the_other_part_is_the_core_and_names_no_workflow_file(tmp_path, ho
     """The hook's other part re-injects the core's digest, the core a session reads in every phase, and names no
     module or conditional workflow file."""
     out = hook(tmp_path, home, "digest", "Phase: design", SAMPLES[0])
+    out2 = hook(tmp_path, home, "digest-2", "Phase: design", SAMPLES[0])   # R-109: the digest's second part
     core = read(os.path.join(BRIDGE, "commands", "supervisor.md"))
     digest = core[core.index("<!-- digest:start -->") + len("<!-- digest:start -->"):core.index("<!-- digest:end -->")]
-    assert "**Standing rules.**" in digest and digest.strip() in out.replace("\r\n", "\n"), out[:400]
-    assert W not in out, out
+    both = (out + "\n" + out2).replace("\r\n", "\n")
+    parts = [p.strip() for p in digest.split("<!-- digest:part -->")]
+    assert "**Standing rules.**" in digest and all(p in both for p in parts), out[:400]
+    assert W not in out and W not in out2, out + out2

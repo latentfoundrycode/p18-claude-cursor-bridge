@@ -111,14 +111,15 @@ def test_both_parts_fit_under_the_cap_for_every_phase_on_a_realistic_status_file
     (root / "Workspace" / "docs" / "PROJECT_STATUS.md").write_text(realistic_status(phase, "the owner must decide " + "y" * 4000), encoding="utf-8")
     rc, pointers = run_hook(root, home, "pointers")
     rc2, digest = run_hook(root / "Workspace", home, "digest")
-    assert rc == 0 and rc2 == 0
-    for out in (pointers, digest):
+    rc3, digest2 = run_hook(root / "Workspace", home, "digest-2")   # R-109: the digest's second part
+    assert rc == 0 and rc2 == 0 and rc3 == 0
+    for out in (pointers, digest, digest2):
         assert len(out) < CAP and "cut at" not in out and "truncated" not in out
     assert "PROJECT STATE: Phase: %s" % phase in pointers
     assert "BEFORE YOUR NEXT ACTION" in pointers and "  - ~/.claude/cursor-bridge/workflow/phases/" in pointers   # TASK-015: modules, not line ranges
     assert "read docs/PROJECT_STATUS.md whole" in pointers and "the ONE phase file" in pointers and "On demand, by the section" in pointers   # release S
     assert "WAITING FOR THE OWNER" in pointers and "(read it whole in docs/PROJECT_STATUS.md)" in pointers
-    assert "**Founding rules.**" in digest and "43 Never end a turn" in digest
+    assert "**Founding rules.**" in digest and "43 Never end a turn" in digest + digest2   # the standing rules may stand in the second part
     installed = open(os.path.join(CLAUDE, "cursor-bridge", "VERSION"), encoding="utf-8").read().strip()
     assert "(bridge %s)" % installed in digest, "the digest is the installed release's, whatever the status file records"
     assert "the status file records 2026.10.04c, so this project is not calibrated to the installed bridge" in pointers and "maintainer session's message (rule 57)" in pointers
