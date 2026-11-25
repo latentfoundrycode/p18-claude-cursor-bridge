@@ -1116,3 +1116,55 @@ def test_hotfix24a_r3_a_linked_lock_files_mode_is_left_as_it_was(tmp_path, env):
     assert out.returncode == 125, out.stderr
     assert not (root / "ran.txt").exists()
     assert stat.S_IMODE(os.stat(str(victim)).st_mode) == 0o755
+
+
+# ---------------------------------------------------------------- round 4: Review B round 1
+
+
+def test_hotfix24a_r4_an_unusable_pids_folder_refuses_the_launch(tmp_path, env):
+    """Round 4, Review B round 1 (behaviour): with a file where `run/launcher/pids` should be, the pid file cannot be
+    reserved under any run id; the launch is refused at once with 125 and `bridge-run: refused - cannot reserve
+    run/launcher/pids/<run id> (<error class>)`, before its started line, the command never run (round 3's code
+    tried the next suffix forever)."""
+    root = launch_dir(tmp_path, "a")
+    (root / "run" / "launcher").mkdir()
+    (root / "run" / "launcher" / "pids").write_text("not a folder", encoding="utf-8")
+    out = run_bridge(root, env, "--limit", "30", "--kind", "test", "--", sys.executable, "-c", "open('ran.txt','w')",
+                     timeout=60)
+    assert out.returncode == 125, out.stderr[-2000:]
+    assert re.search(r"^bridge-run: refused - cannot reserve run/launcher/pids/\S+ \([A-Za-z]+\)$", out.stderr,
+                     re.M), out.stderr[-2000:]
+    assert "bridge-run: started" not in out.stderr
+    assert "Traceback" not in out.stderr
+    assert not (root / "ran.txt").exists()
+    assert (root / "run" / "launcher" / "pids").read_text(encoding="utf-8") == "not a folder"
+
+
+def test_hotfix24a_r4_a_pid_file_that_cannot_be_made_is_never_a_reservation(tmp_path):
+    """Round 4, Review B round 1 (safety mechanism): `create_pid_file_exclusive(folder, run_id)` answers None only
+    where the folder has no `run/`, False only when the exclusive open finds the name taken, and raises OSError for
+    every other failure, so the launch never keeps a run id it did not reserve: a file at `run/launcher/pids` raises;
+    a folder at the pid file's own name is taken (False) or raises, never None."""
+    br = load_br()
+    rid = "2026-01-01T00:00:00Z"
+    bare = tmp_path / "bare"
+    bare.mkdir()
+    assert br.create_pid_file_exclusive(str(bare), rid) is None
+    a = launch_dir(tmp_path, "a")
+    (a / "run" / "launcher").mkdir()
+    (a / "run" / "launcher" / "pids").write_text("not a folder", encoding="utf-8")
+    with pytest.raises(OSError):
+        br.create_pid_file_exclusive(str(a), rid)
+    b = launch_dir(tmp_path, "b")
+    pids = b / "run" / "launcher" / "pids"
+    pids.mkdir(parents=True)
+    (pids / rid.replace(":", "-")).mkdir()
+    try:
+        got = br.create_pid_file_exclusive(str(b), rid)
+    except OSError:
+        got = "raised"
+    assert got is False or got == "raised", got
+    c = launch_dir(tmp_path, "c")
+    made = br.create_pid_file_exclusive(str(c), rid)
+    assert made and os.path.isfile(made)
+    assert br.create_pid_file_exclusive(str(c), rid) is False
