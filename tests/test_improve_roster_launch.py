@@ -1239,3 +1239,52 @@ def test_r11_an_accepted_builder_launch_keeps_its_started_line_and_exit(tmp_path
     ws = scratch_repo(tmp_path, files={"handoff/TASK-001.md": brief_text()})
     r = ran(build(tmp_path, ws, stub_exit=stub_exit), rc=stub_exit)
     assert r["kind"] == "builder" and r["exit"] == stub_exit, r
+
+# --- Round 3 (handoff/TASK-086b-r3.md): a branch name outside the code page ---------------------------------
+# Review B, round 1: branch_of read `git rev-parse --abbrev-ref HEAD` in the system's code page; a name outside it
+# raised in the two refusals, which call it outside any try, and the launch ended in a traceback (exit 1). On the
+# checkpoint the family refusal called it inside its try. Each name below holds characters whose UTF-8 bytes include
+# 0x81, 0x8D, 0x8F, 0x90 and 0x9D, which code page 1252 does not decode. Mutation label M21: the branch read in the
+# code page (or not at all) where git prints UTF-8.
+
+WIDE_BRANCH = "task-\u0101\u010d\u010f\u0110\u011d"
+
+
+def wide_branch_repo(tmp_path, files=None):
+    ws = scratch_repo(tmp_path, files=files)
+    git(ws, "checkout", "-q", "-b", WIDE_BRANCH)
+    return ws
+
+
+def test_r3_a_branch_name_outside_the_code_page_is_read_and_judged(tmp_path):
+    """R10 (handoff/TASK-086b-r3.md, Requirement 1; Review B, round 1, behaviour, path: git's output): on a branch
+    whose name holds characters outside the system's code page, a review by the family of the branch's grok builder
+    row is refused by name, with no traceback, and a review of another family runs and its row names the branch as
+    git prints it. Mutation M21 (the branch read in the code page or not at all)."""
+    ws = wide_branch_repo(tmp_path)
+    write_record(ws, row(GROK_B, branch=WIDE_BRANCH))
+    assert_family_refusal(refused(review(tmp_path, ws, GROK_R)), GROK_R, "xai")
+    r = ran(review(tmp_path, ws, GPT))
+    assert r["kind"] == "review" and r["branch"] == WIDE_BRANCH, r
+
+
+def test_r3_a_deviation_on_such_a_branch_opens_the_builder_models_review(tmp_path):
+    """R6 with R10 (handoff/TASK-086b-r3.md, Requirement 1): the builder-model exception reads the same branch: a
+    deviation entry naming the branch, the builder model and the set read at the launch lets the builder model's
+    review run on a branch whose name lies outside the code page, with no traceback. Mutation M21."""
+    ws = wide_branch_repo(tmp_path)
+    write_record(ws, row(GROK_B, branch=WIDE_BRANCH))
+    write(ws, "docs/ROSTER.resolved.json",
+          resolved_text(builder=COMPOSER, review_b=COMPOSER, deviation=deviation(branch=WIDE_BRANCH)))
+    r = ran(review(tmp_path, ws, COMPOSER))
+    assert r["kind"] == "review" and r["model"] == COMPOSER and r["branch"] == WIDE_BRANCH, r
+
+
+def test_r3_a_builder_launch_on_such_a_branch_writes_its_name_and_both_keys(tmp_path):
+    """R8 with R10 (handoff/TASK-086b-r3.md, Requirement 1): a builder launch on a branch whose name lies outside the
+    code page runs with no traceback and writes the branch as git prints it, `start_commit` and `clean`. Mutation
+    M21."""
+    ws = wide_branch_repo(tmp_path, files={"handoff/TASK-001.md": brief_text()})
+    r = ran(build(tmp_path, ws))
+    assert r["branch"] == WIDE_BRANCH, r
+    assert_builder_keys(r, head(ws), True)
