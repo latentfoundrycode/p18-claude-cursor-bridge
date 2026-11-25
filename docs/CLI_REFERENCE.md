@@ -160,6 +160,7 @@ process tree.
 
   python ~/.claude/cursor-bridge/bridge-run.py --limit <seconds|auto> [--kind <kind>] [--key-file <path>] -- <command> [args...]
   python ~/.claude/cursor-bridge/bridge-run.py --healthy <run id> [--kind <kind>]
+  python ~/.claude/cursor-bridge/bridge-run.py --heavy-slots <n>
 
 Why it exists (KP-033): a background builder, reviewer or watch that hangs holds the loop
 until the owner notices, and on Windows a plain timeout kills only the first process while
@@ -234,14 +235,19 @@ rule of 2026-10-05: no secret through the environment the owner sets).
 - The first line on stderr is `bridge-run: started <UTC time>Z`, which is what
   pr-activity-check.py's --since needs; the last is `bridge-run: exit <code>`, which
   review-guard.py reads to tell a review that reached a verdict from one that failed.
-- Heavy runs (`builder`, `test`, `driver`) take one machine-wide slot on
-  `~/.cursor-bridge/heavy.lock` before the command starts and hold it until the launcher
-  process ends; a second heavy run waits, prints who holds the slot once a minute, and exits
-  123 if the wait bound passes without the slot. `review` and `watch` take no slot. After
+- Heavy runs (`builder`, `test`, `driver`) share a setting for the number of machine-wide slots
+  (1 by default, 1 to 4 by `bridge-run.py --heavy-slots <n>`, stored in
+  `~/.cursor-bridge/heavy-slots.json`). Slot k uses `~/.cursor-bridge/heavy.lock` for k=1 and
+  `heavy-<k>.lock` for k>1. At most one heavy run per checkout holds
+  `~/.cursor-bridge/heavy-folder-<h>.lock` (taken before any slot). Before the command starts
+  the launcher waits on those locks as needed, prints who holds a busy slot once a minute, and
+  exits 123 if the wait bound passes without a slot. With more than one slot the `slot taken`
+  line carries ` (slot <k> of <n>)`. `review` and `watch` take no slot and no folder lock. After
   `bridge-run: started <run id>`, the launch's own notes, the limit line and the other launch
   lines, and before the command starts: waiting lines, then `bridge-run: slot taken <UTC time>Z`,
   or `bridge-run: slot not free - ...` and `bridge-run: exit 123`. A run that waited logs
-  `waited` (whole seconds in the slot queue); a run that ended waiting logs `"slot": "not free"`.
+  `waited` (whole seconds in the slot queue); a run that ended waiting logs `"slot": "not free"`;
+  a run that took a slot logs `"slot": <k>`.
 - The exit code is the command's own; 123 = the slot was not free in time; 124 = the limit was
   hit; 125 = refused or could not start.
 - `BRIDGE_RUN_SLOT_SCALE` (test-only, honoured only beside `BRIDGE_RUN_ALLOW_ANY=1`): when set

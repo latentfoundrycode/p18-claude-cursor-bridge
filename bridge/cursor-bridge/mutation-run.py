@@ -5,8 +5,9 @@ Run from the Workspace root: python ~/.claude/cursor-bridge/mutation-run.py <mut
 [--all] [--checkpoint <commit>] [--scratch <folder>] [--mutant-timeout <seconds>]. The mutants
 file is run/supervisor/<id>-mutants.json. Scratch defaults to ~/.cursor-bridge/scratch/<project>/.
 Exit 0 when every mutant is killed (or cached kill); 1 when any survived, was not applied, or an
-expect-survive mutant was killed; 2 for a malformed file, refused path or resolution check, or
---all with --checkpoint; 3 when any mutant errored or on an internal crash; 4 in --checkpoint mode
+expect-survive mutant was killed; 2 for a malformed file, refused path or resolution check, when
+the same run id is already running in the scratch base, or --all with --checkpoint; 3 when any
+mutant errored or on an internal crash; 4 in --checkpoint mode
 when any listed new test passed on the old code; 5 when a tests list fails or errors on the
 unmutated code before any mutant runs. A mutant whose tests list times out on the unmutated code
 is an error and is not run. ASCII-only on purpose (cp1252 consoles).
@@ -98,6 +99,40 @@ def pytest_sessionfinish(session, exitstatus):
     _state["exitstatus"] = exitstatus
     _write()
 """
+
+
+def _try_lock_byte(fd):
+    if sys.platform == "win32":
+        import errno
+        import msvcrt
+        try:
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            return True
+        except OSError as exc:
+            if exc.errno in (errno.EACCES, errno.EDEADLOCK):
+                return False
+            raise
+    import fcntl
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except BlockingIOError:
+        return False
+
+
+def _unlock_byte(fd):
+    if sys.platform == "win32":
+        import msvcrt
+        try:
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
+    else:
+        import fcntl
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        except OSError:
+            pass
 
 
 class Refuse(Exception):
@@ -1512,7 +1547,31 @@ def main(argv=None):
         validate_checkpoint(args.checkpoint, new_tests, workspace, tracked_set)
     scratch_base = args.scratch if args.scratch else default_scratch(workspace, os.environ)
     scratch_base, work_sub = validate_scratch(scratch_base, workspace, run_id)
+    run_lock_path = os.path.join(scratch_base, ".mutation-run-%s.lock" % run_id)
     os.makedirs(scratch_base, exist_ok=True)
+    if os.path.lexists(run_lock_path) and bridge_env is not None and bridge_env.is_link(run_lock_path):
+        raise Refuse("mutation-run: existing mutation run lock is a link")
+    lock_fd = None
+    try:
+        lock_flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+        lock_fd = os.open(run_lock_path, lock_flags, 0o600)
+        if not _try_lock_byte(lock_fd):
+            try:
+                os.close(lock_fd)
+            except OSError:
+                pass
+            lock_fd = None
+            raise Refuse("mutation-run: refused - this mutants file is already running (%s); wait for it to end" % run_id)
+    except Refuse:
+        raise
+    except OSError as e:
+        if lock_fd is not None:
+            try:
+                os.close(lock_fd)
+            except OSError:
+                pass
+            lock_fd = None
+        raise Refuse("mutation-run: refused - could not open the run lock (%s)" % e)
     if os.path.isdir(work_sub):
         shutil.rmtree(work_sub, ignore_errors=True)
     os.makedirs(work_sub, exist_ok=True)
@@ -1737,6 +1796,12 @@ def main(argv=None):
                 return 1
         return 0
     finally:
+        if lock_fd is not None:
+            _unlock_byte(lock_fd)
+            try:
+                os.close(lock_fd)
+            except OSError:
+                pass
         if os.path.isdir(work_sub):
             shutil.rmtree(work_sub, ignore_errors=True)
 

@@ -114,3 +114,7 @@
 2026-11-21 TASK-070-r3: a foreground pytest of the three mutation files was killed (exit 143, Terminated) after about five minutes even though the wait was longer, so that command was started again and left running until it finished. The partial dot line from the killed run is not a result.
 
 2026-11-21 TASK-073-r2: `git checkout -- bridge-install.py` during mutation checks reverts the whole file; keep a sidecar copy and re-run `make-manifest.py` if a scratch file was hashed before deletion.
+
+2026-11-25 HOTFIX-004-r1: `tests/test_bridge_run_slot.py::test_r040_wait_timeout_exit_123_and_log` still expects no `slot` key on a successful heavy run row; HOTFIX-004 requirement 22 requires `"slot": <k>` on every heavy run that took a slot, so the regression batch stays red on that assertion until the supervisor updates the suite.
+
+2026-11-25 HOTFIX-004-r1: verification command 6 (ASCII-only scan) flags Unicode ellipsis on module docstring lines 20-21 of `bridge-run.py`, which predates this increment; the hotfix-added docstring lines are ASCII.
