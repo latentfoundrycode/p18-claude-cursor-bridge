@@ -1129,10 +1129,12 @@ supervisor carried on for hours without its loop, its gate and its standing rule
 record shows the rule-breaking that followed.
 
 Claude Code caps every hook's plain stdout at 10,000 characters and, above that, replaces it
-with a file path and a 2,000-character preview. The two things this hook prints do not fit
+with a file path and a 2,000-character preview. The pointers and the digest do not fit
 together under that cap on a real project (the 0b review measured 9,841 characters, and the
-part that was cut was the pointers), so the bridge registers the hook TWICE for the same
-event, each run printing one part under its own cap:
+part that was cut was the pointers), and the digest has outgrown one output, so the bridge
+registers the hook THREE times for the same event, each run printing one part under its own
+cap (the digest's second part in a SessionStart group of its own; the installer adds a group
+only where it holds a command the settings file lacks):
 
   --part pointers   the project's phase from docs/PROJECT_STATUS.md (the "awaiting" text
                     capped); what to read first (the status file whole, the last entries
@@ -1144,9 +1146,16 @@ event, each run printing one part under its own cap:
                     conventions that phase relies on and the inventory, read on demand by
                     section; and whether to continue or to wait for the owner; no
                     supervisor.md line ranges;
-  --part digest     the digest at the top of ~/.claude/commands/supervisor.md (between the
-                    markers <!-- digest:start --> and <!-- digest:end -->), the one text the
-                    maintainer keeps as the condensed core.
+  --part digest     the digest's first part in ~/.claude/commands/supervisor.md (from
+                    <!-- digest:start --> to <!-- digest:end -->, text before
+                    <!-- digest:part --> when present, else the whole digest), the core
+                    before the standing rules;
+  --part digest-2   the second part: text after <!-- digest:part --> when present (else
+                    nothing);
+  --part all        the pointers, the digest's first part and, where the marker stands, the
+                    second part, each as its own --part prints it (tests, manual runs).
+
+Without --part, the same as --part all.
 
 Pointer-line grammar (module files under workflow/phases/, read as UTF-8 with BOM dropped):
 a line outside fenced blocks (opening_fence / closing_fence as workflow-check.py reads them;
@@ -1187,9 +1196,9 @@ hand-edited
 install, not a hostile checker, which runs in-process and could write to its output directly.
 The hook still never blocks.
 
-Without --part both are printed (tests, manual runs). It prints nothing outside a bridge
-project (no docs/PROJECT_STATUS.md found from the session's folder, its Workspace, a parent,
-or a worktree). It FAILS OPEN on purpose: a session that is not the project's supervisor
+It prints nothing outside a bridge project (no docs/PROJECT_STATUS.md found from the session's
+folder, its Workspace, a parent, or a worktree).
+It FAILS OPEN on purpose: a session that is not the project's supervisor
 (a review or a planning session opened in a project folder) is told to ignore the message,
 because a gate on the transcript silenced the hook on two of three live supervisor sessions
 (one invoked through the Skill tool, one continuing an earlier transcript; the 0b review's
