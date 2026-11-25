@@ -13,6 +13,7 @@ import json
 import os
 import queue
 import re
+import stat
 import subprocess
 import sys
 import threading
@@ -1051,3 +1052,67 @@ def test_hotfix24a_r2_a_failed_setting_write_leaves_no_temporary_file(tmp_path, 
     assert "Traceback" not in out.stderr
     assert sorted(os.listdir(state_dir(env))) == ["heavy-slots.json"]
     assert os.path.isdir(settings_path(env))
+
+
+# ---------------------------------------------------------------- round 3: round 2's review
+
+
+def test_hotfix24a_r3_a_refused_mutation_run_leaves_the_live_runs_scratch(tmp_path, env):
+    """Round 3, the supervisor's inspection of round 2 (requirement 31 moved the refusals inside the try whose finally
+    removes the run's scratch folder); test 10, the mutation engine [S7], "a second run of the same run id ends at once
+    with exit 2 ... writing nothing": while another process holds the run id's lock and its scratch folder
+    `mutation-run-<run id>` holds that run's work, the refused run leaves the folder and its files as they are."""
+    ws = _mutation_fixture(tmp_path)
+    mf = _mutants_file(ws, "livet")
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    live = scratch / "mutation-run-livet" / "tree"
+    live.mkdir(parents=True)
+    (live / "work.txt").write_text("the live run's work", encoding="utf-8")
+    lock = scratch / ".mutation-run-livet.lock"
+    helper_src = tmp_path / "lock_helper.py"
+    helper_src.write_text(LOCK_HELPER_SRC, encoding="utf-8")
+    ready, rel = tmp_path / "helper-ready", tmp_path / "helper-release"
+    helper = subprocess.Popen([sys.executable, str(helper_src), str(lock), str(ready), str(rel)],
+                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                              **SESSION)
+    try:
+        end = time.monotonic() + 15
+        while not ready.exists() and helper.poll() is None and time.monotonic() < end:
+            time.sleep(0.05)
+        assert ready.exists(), "the lock helper never held the lock (exit %r)" % helper.poll()
+        before = _snapshot(scratch)
+        refused = _run_mutation(ws, mf, scratch, env)
+        text = refused.stdout + refused.stderr
+        assert refused.returncode == 2, "want exit 2, got %s: %s" % (refused.returncode, text[-2000:])
+        assert ("mutation-run: refused - this mutants file is already running (livet); wait for it to end"
+                in text.splitlines()), text[-2000:]
+        assert (live / "work.txt").read_text(encoding="utf-8") == "the live run's work"
+        assert _snapshot(scratch) == before, "the refused run changed the scratch base"
+    finally:
+        rel.write_text("go", encoding="utf-8")
+        try:
+            helper.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            kill_tree(helper)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX file modes")
+def test_hotfix24a_r3_a_linked_lock_files_mode_is_left_as_it_was(tmp_path, env):
+    """Round 3, the security audit of round 2 (requirement 29: the regular-file and one-link check comes before any
+    change to the opened file): a heavy.lock hard-linked to an executable file is refused and the file keeps its
+    mode, never chmodded to 0600 first."""
+    write_settings(env, json.dumps({"slots": 2}))
+    root = launch_dir(tmp_path, "a")
+    path = os.path.join(state_dir(env), "heavy.lock")
+    os.makedirs(state_dir(env), exist_ok=True)
+    if os.path.exists(path):
+        os.remove(path)
+    victim = tmp_path / "victim.sh"
+    victim.write_bytes(b"#!/bin/sh\n")
+    os.chmod(str(victim), 0o755)
+    os.link(str(victim), path)
+    out = run_bridge(root, env, "--limit", "30", "--", sys.executable, "-c", "open('ran.txt','w')")
+    assert out.returncode == 125, out.stderr
+    assert not (root / "ran.txt").exists()
+    assert stat.S_IMODE(os.stat(str(victim)).st_mode) == 0o755
