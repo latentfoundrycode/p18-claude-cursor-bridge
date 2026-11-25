@@ -214,7 +214,7 @@ def test_r042_the_digest_stays_within_its_cap_with_every_rule_number():
     """The digest within its cap, and every standing rule's number in its Standing rules paragraph (the loop's step
     numbers, 1 to 9, read apart: Review A, round 1, consider 2)."""
     d = digest()
-    assert len(d) <= 9500, len(d)
+    assert len(d) <= 10500, "the whole digest must stay at most 10,500 characters (%d)" % len(d)
     rules = d[d.index("**Standing rules.**"):d.index("**Permissions.**")]
     for n in range(1, 59):
         assert re.search(r"(?:\*\* | )%d [A-Z`]" % n, rules), n

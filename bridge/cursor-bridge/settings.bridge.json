@@ -140,6 +140,16 @@
             "timeout": 20
           }
         ]
+      },
+      {
+        "matcher": "compact|resume|fork",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$HOME/.claude/cursor-bridge/session-start.py\" --part digest-2",
+            "timeout": 20
+          }
+        ]
       }
     ]
   }

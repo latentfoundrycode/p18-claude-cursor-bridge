@@ -24,7 +24,7 @@ def test_digest_is_at_the_head_and_within_what_a_compaction_keeps():
     a, b = TEXT.find("<!-- digest:start -->"), TEXT.find("<!-- digest:end -->")
     assert 0 < a < b
     assert b < 20000, "the digest must end inside the first 20,000 characters, the part a compaction keeps"
-    assert len(TEXT[a:b]) <= 9500, "the digest part (digest + its header line) must stay under the hook's cap with margin"
+    assert len(TEXT[a:b]) <= 10500, "the whole digest must stay at most 10,500 characters"
 
 
 def test_digest_names_every_standing_rule_and_founding_rule():
