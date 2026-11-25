@@ -4,6 +4,7 @@ process tree.
 
   python ~/.claude/cursor-bridge/bridge-run.py --limit <seconds|auto> [--kind <kind>] [--key-file <path>] -- <command> [args...]
   python ~/.claude/cursor-bridge/bridge-run.py --healthy <run id> [--kind <kind>]
+  python ~/.claude/cursor-bridge/bridge-run.py --heavy-slots <n>
 
 Why it exists (KP-033): a background builder, reviewer or watch that hangs holds the loop
 until the owner notices, and on Windows a plain timeout kills only the first process while
@@ -16,8 +17,8 @@ kills any orphan the command left behind. On other platforms the command runs in
 process group, killed as a whole.
 
 What it accepts (release 0a review, F6; release A2): only the commands the loop runs through
-it, each by name: `cursor-agent …` (a builder, or Review B with `--kind review`), `gh pr
-checks …` (the CI watch) and the test suites the supervisor awaits (`pytest`, `python -m
+it, each by name: `cursor-agent ...` (a builder, or Review B with `--kind review`), `gh pr
+checks ...` (the CI watch) and the test suites the supervisor awaits (`pytest`, `python -m
 pytest`, `python -m unittest`, `uv run pytest`, `npm test`, `npm run test*`, `pnpm test`,
 `yarn test`, `npx vitest`, `npx jest`, `npx playwright test`, `node --test`, `go test`,
 `cargo test`, `dotnet test`); an option that would run another program or delete a folder
@@ -78,14 +79,19 @@ rule of 2026-10-05: no secret through the environment the owner sets).
 - The first line on stderr is `bridge-run: started <UTC time>Z`, which is what
   pr-activity-check.py's --since needs; the last is `bridge-run: exit <code>`, which
   review-guard.py reads to tell a review that reached a verdict from one that failed.
-- Heavy runs (`builder`, `test`, `driver`) take one machine-wide slot on
-  `~/.cursor-bridge/heavy.lock` before the command starts and hold it until the launcher
-  process ends; a second heavy run waits, prints who holds the slot once a minute, and exits
-  123 if the wait bound passes without the slot. `review` and `watch` take no slot. After
+- Heavy runs (`builder`, `test`, `driver`) share a setting for the number of machine-wide slots
+  (1 by default, 1 to 4 by `bridge-run.py --heavy-slots <n>`, stored in
+  `~/.cursor-bridge/heavy-slots.json`). Slot k uses `~/.cursor-bridge/heavy.lock` for k=1 and
+  `heavy-<k>.lock` for k>1. At most one heavy run per checkout holds
+  `~/.cursor-bridge/heavy-folder-<h>.lock` (taken before any slot). Before the command starts
+  the launcher waits on those locks as needed, prints who holds a busy slot once a minute, and
+  exits 123 if the wait bound passes without a slot. With more than one slot the `slot taken`
+  line carries ` (slot <k> of <n>)`. `review` and `watch` take no slot and no folder lock. After
   `bridge-run: started <run id>`, the launch's own notes, the limit line and the other launch
   lines, and before the command starts: waiting lines, then `bridge-run: slot taken <UTC time>Z`,
   or `bridge-run: slot not free - ...` and `bridge-run: exit 123`. A run that waited logs
-  `waited` (whole seconds in the slot queue); a run that ended waiting logs `"slot": "not free"`.
+  `waited` (whole seconds in the slot queue); a run that ended waiting logs `"slot": "not free"`;
+  a run that took a slot logs `"slot": <k>`.
 - The exit code is the command's own; 123 = the slot was not free in time; 124 = the limit was
   hit; 125 = refused or could not start.
 - `BRIDGE_RUN_SLOT_SCALE` (test-only, honoured only beside `BRIDGE_RUN_ALLOW_ANY=1`): when set
@@ -103,6 +109,7 @@ import hashlib
 import json
 import math
 import os
+import stat
 import re
 import shlex
 import signal
@@ -1550,11 +1557,188 @@ def remove_pid_file(path):
             pass
 
 
+def create_pid_file_exclusive(folder, run_id):
+    """Reserve `run/launcher/pids/<run id>` exclusively, or False when the name is taken."""
+    if not os.path.isdir(os.path.join(folder, "run")):
+        return None
+    d = os.path.join(folder, "run", "launcher", "pids")
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, run_id.replace(":", "-"))
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_BINARY", 0)
+    try:
+        fd = os.open(path, flags)
+    except FileExistsError:
+        return False
+    try:
+        try:
+            os.write(fd, ("%d %d\n" % (os.getpid(), os.getpid())).encode("ascii"))
+        finally:
+            os.close(fd)
+        return path
+    except OSError:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        raise
+
+
 def heavy_state_paths(env=None):
     """`(~/.cursor-bridge/heavy.lock, ~/.cursor-bridge/heavy.lock.holder)` from the launcher's environment."""
     home = bridge_env.real_home(env or os.environ)
     folder = os.path.join(home, ".cursor-bridge")
     return os.path.join(folder, "heavy.lock"), os.path.join(folder, "heavy.lock.holder")
+
+
+def heavy_slot_paths(slot_k, env=None):
+    """`(lock, holder)` for machine-wide heavy slot k (1..4)."""
+    if slot_k == 1:
+        return heavy_state_paths(env)
+    home = bridge_env.real_home(env or os.environ)
+    folder = os.path.join(home, ".cursor-bridge")
+    lock = os.path.join(folder, "heavy-%d.lock" % slot_k)
+    return lock, lock + ".holder"
+
+
+def _heavy_slots_setting_path(env=None):
+    return os.path.join(os.path.dirname(heavy_state_paths(env)[0]), "heavy-slots.json")
+
+
+def _read_heavy_slots_file(path):
+    """Valid slot count 1..4, or (1, cause) when missing or untrusted."""
+    if bridge_env.is_link(path):
+        return 1, "not a regular file"
+    import stat
+    flags = (os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
+             | getattr(os, "O_BINARY", 0))
+    try:
+        fd = os.open(path, flags)
+    except OSError as exc:
+        if isinstance(exc, FileNotFoundError):
+            return 1, None
+        return 1, "not a regular file"
+    try:
+        try:
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode):
+                return 1, "not a regular file"
+            raw_b = os.read(fd, 4097)
+            if len(raw_b) > 4096:
+                return 1, "file too large"
+            if raw_b.startswith(b"\xef\xbb\xbf"):
+                return 1, "byte order mark"
+            if not raw_b.strip():
+                return 1, "empty file"
+            raw = raw_b.decode("utf-8")
+            data = json.loads(raw)
+        except (OSError, ValueError, RecursionError, MemoryError, OverflowError):
+            return 1, "invalid JSON"
+        if not isinstance(data, dict):
+            return 1, "not an object"
+        if set(data.keys()) != {"slots"}:
+            return 1, "extra keys"
+        slots = data.get("slots")
+        if type(slots) is not int:
+            return 1, "slots not an integer"
+        if slots < 1 or slots > 4:
+            return 1, "slots out of range"
+        return slots, None
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+
+
+def read_heavy_slots_count(env=None):
+    """The configured machine-wide slot count (1..4); a cause string when the file is ignored."""
+    path = _heavy_slots_setting_path(env)
+    if not os.path.lexists(path):
+        return 1, None
+    if os.path.isdir(path):
+        return 1, "not a regular file"
+    return _read_heavy_slots_file(path)
+
+
+def write_heavy_slots_setting(n, env=None):
+    """Atomically write `{"slots": n}` under ~/.cursor-bridge."""
+    import tempfile
+    state_dir = os.path.dirname(heavy_state_paths(env)[0])
+    if sys.platform == "win32":
+        os.makedirs(state_dir, exist_ok=True)
+    else:
+        os.makedirs(state_dir, mode=0o700, exist_ok=True)
+    path = _heavy_slots_setting_path(env)
+    fd, tmp = tempfile.mkstemp(dir=state_dir, prefix=".heavy-slots.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump({"slots": n}, f)
+    except OSError:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+    for _ in range(5):
+        try:
+            os.replace(tmp, path)
+            return
+        except (OSError, PermissionError):
+            time.sleep(0.02)
+    try:
+        os.remove(tmp)
+    except OSError:
+        pass
+    raise OSError("could not replace heavy-slots.json")
+
+
+def checkout_identity_hash(folder, argv):
+    """SHA-256 (hex) of the checkout the run works in."""
+    ws = workspace_of(argv, folder)
+    top = _git_rev_parse_path(ws, "--show-toplevel")
+    if top is None:
+        top = os.path.realpath(os.path.abspath(ws))
+    else:
+        top = os.path.realpath(top)
+    if sys.platform == "win32":
+        top = top.casefold()
+    return hashlib.sha256(top.encode("utf-8")).hexdigest()
+
+
+def folder_lock_paths(identity_hash, env=None):
+    """`(lock, holder)` for one heavy run per checkout."""
+    state_dir = os.path.dirname(heavy_state_paths(env)[0])
+    lock = os.path.join(state_dir, "heavy-folder-%s.lock" % identity_hash)
+    return lock, lock + ".holder"
+
+
+def run_heavy_slots_option(argv):
+    """Set the slot count when argv is exactly `--heavy-slots <n>`; exit code or None."""
+    launcher = argv[:argv.index("--")] if "--" in argv else argv
+    if "--heavy-slots" not in launcher:
+        return None
+    if len(argv) != 2 or argv[0] != "--heavy-slots":
+        sys.stderr.write("bridge-run: refused - --heavy-slots must be given alone\n")
+        return 125
+    try:
+        n = int(argv[1])
+    except ValueError:
+        sys.stderr.write("bridge-run: refused - heavy slots must be 1 to 4\n")
+        return 125
+    if n < 1 or n > 4:
+        sys.stderr.write("bridge-run: refused - heavy slots must be 1 to 4\n")
+        return 125
+    try:
+        write_heavy_slots_setting(n)
+    except OSError:
+        sys.stderr.write("bridge-run: refused - could not write heavy-slots.json\n")
+        return 125
+    sys.stderr.write("bridge-run: heavy slots set to %d\n" % n)
+    return 0
 
 
 def parse_slot_scale():
@@ -1839,22 +2023,99 @@ def _slot_not_free_line(record, grace):
             % (record["kind"], record["run_id"], record["start"], end))
 
 
+def _waiting_line_multi(num_slots, records, grace):
+    parts = []
+    for rec in records:
+        if rec is None:
+            parts.append("unknown")
+        else:
+            end = holder_end_time(rec, grace)
+            if end is None:
+                parts.append("unknown")
+            else:
+                parts.append("%s %s since %s, ends by %s" % (rec["kind"], rec["run_id"], rec["start"], end))
+    return ("bridge-run: waiting for a slot (%d of %d held): %s\n"
+            % (num_slots, num_slots, "; ".join(parts)))
+
+
+def _earliest_live_record(records, grace):
+    best = None
+    best_end = None
+    for rec in records:
+        if rec is None:
+            continue
+        start_epoch = _slot_start_epoch(rec["start"])
+        if start_epoch is None:
+            continue
+        try:
+            end_epoch = start_epoch + rec["limit"] + grace
+        except (OverflowError, OSError, ValueError):
+            continue
+        if best_end is None or end_epoch < best_end:
+            best_end = end_epoch
+            best = rec
+    return best
+
+
 def _open_heavy_lock(lock_path, state_dir):
     if sys.platform == "win32":
+        if bridge_env.is_link(lock_path):
+            raise OSError("link")
         os.makedirs(state_dir, exist_ok=True)
-        return os.open(lock_path, os.O_RDWR | os.O_CREAT)
-    os.makedirs(state_dir, mode=0o700, exist_ok=True)
-    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(lock_path, flags, 0o600)
-    try:
-        os.fchmod(fd, 0o600)
-    except OSError:
-        pass
+        fd = os.open(lock_path, os.O_RDWR | os.O_CREAT)
+    else:
+        os.makedirs(state_dir, mode=0o700, exist_ok=True)
+        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(lock_path, flags, 0o600)
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            raise OSError("link")
+        try:
+            os.fchmod(fd, 0o600)
+        except OSError:
+            pass
+        return fd
+    st = os.fstat(fd)
+    if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        raise OSError("link")
     return fd
 
 
-def acquire_heavy_slot(kind, run_id, limit, scale):
-    """Take the machine-wide heavy slot; return (lock_fd, waited_seconds) or None after printing exit 123."""
+def _close_heavy_fds(fds):
+    for fd in fds:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+
+def _publish_slot_taken(kind, run_id, limit, holder_path, taken_suffix=""):
+    taken = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+    pub_limit = max(1, int(limit))
+    created = process_creation_epoch(os.getpid())
+    record = None
+    if created is None:
+        sys.stderr.write("bridge-run: note - could not read this process creation time for the slot holder record\n")
+    else:
+        record = {"kind": kind, "run_id": run_id, "pid": os.getpid(), "created": created, "start": taken,
+                  "limit": pub_limit}
+        publish_holder_record(holder_path, record)
+    sys.stderr.write("bridge-run: slot taken %s%s\n" % (taken, taken_suffix))
+    sys.stderr.flush()
+    return taken, record
+
+
+def _acquire_heavy_slot_one(kind, run_id, limit, scale):
+    """Take slot 1 only (2026.11.23a behaviour); return (lock_fd, waited) or None or 'refused'."""
     lock_path, holder_path = heavy_state_paths()
     state_dir = os.path.dirname(lock_path)
     grace = SLOT_GRACE * scale
@@ -1872,7 +2133,6 @@ def acquire_heavy_slot(kind, run_id, limit, scale):
     except OSError as exc:
         sys.stderr.write("bridge-run: refused - ~/.cursor-bridge/heavy.lock (%s)\n" % exc.__class__.__name__)
         return "refused"
-    pub_limit = max(1, int(limit))
     while True:
         try:
             got_lock = _try_lock_byte(lock_fd)
@@ -1885,17 +2145,7 @@ def acquire_heavy_slot(kind, run_id, limit, scale):
             return "refused"
         if got_lock:
             waited = int(time.monotonic() - wait_mono)
-            taken = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
-            created = process_creation_epoch(os.getpid())
-            if created is None:
-                sys.stderr.write("bridge-run: note - could not read this process creation time for the slot holder record\n")
-            else:
-                publish_holder_record(holder_path, {
-                    "kind": kind, "run_id": run_id, "pid": os.getpid(),
-                    "created": created, "start": taken, "limit": pub_limit,
-                })
-            sys.stderr.write("bridge-run: slot taken %s\n" % taken)
-            sys.stderr.flush()
+            _publish_slot_taken(kind, run_id, limit, holder_path)
             return lock_fd, waited
         now_mono = time.monotonic()
         live = read_holder_record(holder_path)
@@ -1924,6 +2174,216 @@ def acquire_heavy_slot(kind, run_id, limit, scale):
             sys.stderr.flush()
             last_report = now_mono
         time.sleep(1)
+
+
+def _open_slot_lock_fds(num_slots, state_dir):
+    """Open every slot lock file; refuse on the first open error."""
+    fds = []
+    paths = []
+    for k in range(1, num_slots + 1):
+        lock_path, _ = heavy_slot_paths(k)
+        paths.append(lock_path)
+        try:
+            fds.append(_open_heavy_lock(lock_path, state_dir))
+        except OSError as exc:
+            sys.stderr.write("bridge-run: refused - ~/.cursor-bridge/%s (%s)\n"
+                             % (os.path.basename(lock_path), exc.__class__.__name__))
+            _close_heavy_fds(fds)
+            return "refused"
+    return fds, paths
+
+
+def acquire_heavy_slot(kind, run_id, limit, scale):
+    """Take a machine-wide heavy slot; return (lock_fd, waited_seconds) or None or 'refused'."""
+    return _acquire_heavy_slot_one(kind, run_id, limit, scale)
+
+
+def acquire_heavy_for_launch(kind, run_id, limit, scale, argv, folder, num_slots):
+    """Folder lock, then a slot; return (slot_fd, folder_fd, waited, slot_k) | None | 'refused'."""
+    identity = checkout_identity_hash(folder, argv)
+    folder_lock, folder_holder = folder_lock_paths(identity)
+    state_dir = os.path.dirname(heavy_state_paths()[0])
+    grace = SLOT_GRACE * scale
+    report = max(0.001, SLOT_REPORT * scale)
+    wait_mono = time.monotonic()
+    wait_wall = time.time()
+    provisional_wall = wait_wall + (SLOT_BUILDER_CAP + SLOT_GRACE) * scale
+    own_floor_wall = wait_wall + KINDS[kind] * scale
+    deadline_mono = wait_mono + (SLOT_BUILDER_CAP + SLOT_GRACE) * scale
+    bound_wall = None
+    last_report = 0.0
+    folder_fd = None
+    slot_fds = []
+    slot_holder_paths = []
+    lock_paths = []
+    try:
+        try:
+            folder_fd = _open_heavy_lock(folder_lock, state_dir)
+        except OSError as exc:
+            sys.stderr.write("bridge-run: refused - ~/.cursor-bridge/%s (%s)\n"
+                             % (os.path.basename(folder_lock), exc.__class__.__name__))
+            return "refused"
+        if num_slots > 1:
+            opened = _open_slot_lock_fds(num_slots, state_dir)
+            if opened == "refused":
+                try:
+                    os.close(folder_fd)
+                except OSError:
+                    pass
+                return "refused"
+            slot_fds, lock_paths = opened
+            slot_holder_paths = [heavy_slot_paths(k + 1)[1] for k in range(num_slots)]
+        else:
+            lock_path, holder_path = heavy_state_paths()
+            lock_paths = [lock_path]
+            slot_holder_paths = [holder_path]
+            try:
+                slot_fds = [_open_heavy_lock(lock_path, state_dir)]
+            except OSError as exc:
+                sys.stderr.write("bridge-run: refused - ~/.cursor-bridge/heavy.lock (%s)\n" % exc.__class__.__name__)
+                try:
+                    os.close(folder_fd)
+                except OSError:
+                    pass
+                return "refused"
+        have_folder = False
+        suffix = "" if num_slots == 1 else " (slot %d of %d)"
+        last_folder_live = None
+        last_slot_lives = [None] * num_slots
+        while True:
+            if not have_folder:
+                try:
+                    got_folder = _try_lock_byte(folder_fd)
+                except OSError as exc:
+                    sys.stderr.write("bridge-run: refused - ~/.cursor-bridge/%s (%s)\n"
+                                     % (os.path.basename(folder_lock), exc.__class__.__name__))
+                    _close_heavy_fds([folder_fd] + slot_fds)
+                    return "refused"
+                if got_folder:
+                    have_folder = True
+                else:
+                    now_mono = time.monotonic()
+                    live = read_holder_record(folder_holder)
+                    if live is not None:
+                        last_folder_live = live
+                    if live is not None and bound_wall is None:
+                        start_epoch = _slot_start_epoch(live["start"])
+                        if start_epoch is not None:
+                            try:
+                                end_epoch = start_epoch + live["limit"] + grace
+                                bound_wall = min(provisional_wall, max(own_floor_wall, end_epoch))
+                                deadline_mono = wait_mono + (bound_wall - wait_wall)
+                            except (OverflowError, OSError, ValueError):
+                                pass
+                    if now_mono > deadline_mono:
+                        sys.stderr.write(_slot_not_free_line(last_folder_live, grace))
+                        sys.stderr.write("bridge-run: exit 123\n")
+                        sys.stderr.flush()
+                        _close_heavy_fds([folder_fd] + slot_fds)
+                        return None
+                    if last_report == 0.0 or now_mono - last_report >= report - 0.001:
+                        sys.stderr.write(_waiting_line(last_folder_live, grace))
+                        sys.stderr.flush()
+                        last_report = now_mono
+                    time.sleep(1)
+                    continue
+            taken_slot = None
+            for k, lock_fd in enumerate(slot_fds):
+                try:
+                    got_lock = _try_lock_byte(lock_fd)
+                except OSError as exc:
+                    sys.stderr.write("bridge-run: refused - ~/.cursor-bridge/%s (%s)\n"
+                                     % (os.path.basename(lock_paths[k]), exc.__class__.__name__))
+                    _unlock_byte(folder_fd)
+                    _close_heavy_fds([folder_fd] + slot_fds)
+                    return "refused"
+                if got_lock:
+                    taken_slot = k + 1
+                    slot_fd = lock_fd
+                    break
+            if taken_slot is not None:
+                waited = int(time.monotonic() - wait_mono)
+                for j, other in enumerate(slot_fds):
+                    if j != taken_slot - 1:
+                        try:
+                            os.close(other)
+                        except OSError:
+                            pass
+                taken_suffix = suffix % (taken_slot, num_slots) if num_slots > 1 else ""
+                _, record = _publish_slot_taken(kind, run_id, limit, slot_holder_paths[taken_slot - 1], taken_suffix)
+                if record is not None:
+                    publish_holder_record(folder_holder, record)
+                return slot_fd, folder_fd, waited, taken_slot
+            now_mono = time.monotonic()
+            if num_slots == 1:
+                live = read_holder_record(slot_holder_paths[0])
+                if live is not None:
+                    last_slot_lives[0] = live
+                shown = last_slot_lives[0]
+                if live is not None and bound_wall is None:
+                    start_epoch = _slot_start_epoch(live["start"])
+                    if start_epoch is not None:
+                        try:
+                            end_epoch = start_epoch + live["limit"] + grace
+                            bound_wall = min(provisional_wall, max(own_floor_wall, end_epoch))
+                            deadline_mono = wait_mono + (bound_wall - wait_wall)
+                        except (OverflowError, OSError, ValueError):
+                            pass
+                if now_mono > deadline_mono:
+                    sys.stderr.write(_slot_not_free_line(shown, grace))
+                    sys.stderr.write("bridge-run: exit 123\n")
+                    sys.stderr.flush()
+                    _unlock_byte(folder_fd)
+                    _close_heavy_fds([folder_fd] + slot_fds)
+                    return None
+                if last_report == 0.0 or now_mono - last_report >= report - 0.001:
+                    sys.stderr.write(_waiting_line(shown, grace))
+                    sys.stderr.flush()
+                    last_report = now_mono
+            else:
+                fresh = []
+                for i, h in enumerate(slot_holder_paths):
+                    live = read_holder_record(h)
+                    if live is not None:
+                        last_slot_lives[i] = live
+                    fresh.append(live)
+                lives = list(last_slot_lives)
+                if bound_wall is None:
+                    earliest = _earliest_live_record(fresh, grace)
+                    if earliest is not None:
+                        start_epoch = _slot_start_epoch(earliest["start"])
+                        if start_epoch is not None:
+                            try:
+                                end_epoch = start_epoch + earliest["limit"] + grace
+                                bound_wall = min(provisional_wall, max(own_floor_wall, end_epoch))
+                                deadline_mono = wait_mono + (bound_wall - wait_wall)
+                            except (OverflowError, OSError, ValueError):
+                                pass
+                pick = _earliest_live_record(lives, grace)
+                if now_mono > deadline_mono:
+                    sys.stderr.write(_slot_not_free_line(pick, grace))
+                    sys.stderr.write("bridge-run: exit 123\n")
+                    sys.stderr.flush()
+                    _unlock_byte(folder_fd)
+                    _close_heavy_fds([folder_fd] + slot_fds)
+                    return None
+                if last_report == 0.0 or now_mono - last_report >= report - 0.001:
+                    sys.stderr.write(_waiting_line_multi(num_slots, lives, grace))
+                    sys.stderr.flush()
+                    last_report = now_mono
+            time.sleep(1)
+    except Exception:
+        for fd in [folder_fd] + slot_fds:
+            if fd is not None:
+                try:
+                    _unlock_byte(fd)
+                except OSError:
+                    pass
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+        raise
 
 
 def branch_of(folder):
@@ -2687,6 +3147,9 @@ def main():
     if argv[:1] == ["--healthy"]:
         kind = argv[argv.index("--kind") + 1] if "--kind" in argv and argv.index("--kind") + 1 < len(argv) else None
         return mark_healthy(argv[1], folder, kind) if len(argv) >= 2 and argv[1] and argv[1] != "--kind" else usage()
+    hs = run_heavy_slots_option(argv)
+    if hs is not None:
+        return hs
     if "--limit" not in argv or "--" not in argv:
         return usage()
     flags = argv[:argv.index("--")]
@@ -2798,12 +3261,14 @@ def main():
         except ValueError:
             return usage()
     head = head_of(cmd) if kind == "driver" else head_text(cmd)
+    num_slots = 1
+    heavy_slots_note = None
+    if kind in HEAVY_KINDS:
+        num_slots, heavy_slots_cause = read_heavy_slots_count()
+        if heavy_slots_cause:
+            heavy_slots_note = "heavy-slots.json ignored (%s); one heavy slot" % heavy_slots_cause
+            num_slots = 1
     run_id = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
-    taken = [r.get("id") for r in read_log(folder)]
-    n = 2
-    while run_id in taken:                                 # two runs in one second: the second gets a suffix
-        run_id = run_id.split("Z")[0] + "Z-%d" % n
-        n += 1
     if "--key-file" in flags and kind != "driver":
         if read_keys is None:
             try:
@@ -2829,12 +3294,57 @@ def main():
     if kind == "watch" and kind_of(cmd) != "watch":
         sys.stderr.write(WATCH_ONLY_REFUSE)
         return 125
+    taken = [r.get("id") for r in read_log(folder)]
+    suffix_n = 2
+    reserved_pid_file = None
+    while True:
+        while run_id in taken:
+            run_id = run_id.split("Z")[0] + "Z-%d" % suffix_n
+            suffix_n += 1
+        try:
+            pid_try = create_pid_file_exclusive(folder, run_id)
+        except OSError as exc:
+            sys.stderr.write("bridge-run: refused - cannot reserve run/launcher/pids/%s (%s)\n"
+                             % (run_id, exc.__class__.__name__))
+            return 125
+        if pid_try is False:
+            run_id = run_id.split("Z")[0] + "Z-%d" % suffix_n
+            suffix_n += 1
+            continue
+        reserved_pid_file = pid_try
+        break
     sys.stderr.write("bridge-run: started %s\n" % run_id)         # the FIRST line: review-guard and pr-activity-check read it
     for note in NOTES:
         sys.stderr.write("bridge-run: note - %s\n" % note)
+    if heavy_slots_note:
+        sys.stderr.write("bridge-run: note - %s\n" % heavy_slots_note)
     if scale_raw and os.environ.get("BRIDGE_RUN_ALLOW_ANY") != "1":
         sys.stderr.write("bridge-run: note - BRIDGE_RUN_SLOT_SCALE is ignored without BRIDGE_RUN_ALLOW_ANY=1\n")
     sys.stderr.flush()
+    slot_fd = None
+    folder_fd = None
+
+    def _release_heavy_locks():
+        nonlocal slot_fd, folder_fd
+        if slot_fd is not None:
+            _unlock_byte(slot_fd)
+            try:
+                os.close(slot_fd)
+            except OSError:
+                pass
+            slot_fd = None
+        if folder_fd is not None:
+            _unlock_byte(folder_fd)
+            try:
+                os.close(folder_fd)
+            except OSError:
+                pass
+            folder_fd = None
+
+    def _abort_before_child(code):
+        remove_pid_file(reserved_pid_file)
+        _release_heavy_locks()
+        return code
     if cap_note:
         sys.stderr.write("bridge-run: %s\n" % cap_note)
     if raw == "auto":
@@ -2843,18 +3353,19 @@ def main():
     if kind == "driver" and driver_prog is not None:
         cmd = list(cmd)
         cmd[driver_prog_index] = driver_prog
+    cmd_before_resolve = list(cmd)
     cmd, is_agent = resolve(cmd)
     try:
         env = bridge_env.stripped_env(is_agent=is_agent) if (is_agent or strip) else dict(os.environ)
     except bridge_env.AgentHomeError as e:
         sys.stderr.write("bridge-run: refused - %s\n" % e)
-        return 125
+        return _abort_before_child(125)
     if "--key-file" in flags:
         try:
             keys = read_keys if read_keys is not None else key_file_env(flags[flags.index("--key-file") + 1], folder)
         except (IndexError, OSError, ValueError) as e:
             sys.stderr.write("bridge-run: refused - key file: %s\n" % e)
-            return 125
+            return _abort_before_child(125)
         env.update(keys)
         sys.stderr.write("bridge-run: key file read (%d name(s): %s)\n" % (len(keys), ", ".join(sorted(keys)) or "none"))
     log_branch = brief_meta.get("branch") if brief_meta else branch_of(workspace_of(cmd, folder))
@@ -2896,19 +3407,18 @@ def main():
 
     if kind == "driver" and len(cmd) > driver_prog_index and not verify_driver_program_abs(cmd[driver_prog_index], folder):
         sys.stderr.write(DRIVER_REFUSE)
-        return 125
+        return _abort_before_child(125)
 
-    slot_fd = None
     if kind in HEAVY_KINDS:
         slot_attempt = time.monotonic()
-        slot_result = acquire_heavy_slot(kind, run_id, limit, slot_scale)
+        slot_result = acquire_heavy_for_launch(kind, run_id, limit, slot_scale, cmd_before_resolve, folder, num_slots)
         if slot_result == "refused":
-            return 125
+            return _abort_before_child(125)
         if slot_result is None:
             entry.update(waited=int(time.monotonic() - slot_attempt), seconds=0, exit=123, slot="not free", healthy=None)
             write_log(folder, entry)
-            return 123
-        slot_fd, entry["waited"] = slot_result[0], slot_result[1]
+            return _abort_before_child(123)
+        slot_fd, folder_fd, entry["waited"], entry["slot"] = slot_result
 
     if brief_meta is not None and slot_fd is not None:
         try:
@@ -2916,26 +3426,15 @@ def main():
         except OSError:
             after_sha = None
         if after_sha != brief_meta["brief_sha256"]:
-            _unlock_byte(slot_fd)
-            try:
-                os.close(slot_fd)
-            except OSError:
-                pass
             sys.stderr.write(
                 "bridge-run: refused - %s\n"
                 % _brief_rule_refusal("brief rule: the brief changed while the launch waited for the slot")
             )
-            return 125
+            return _abort_before_child(125)
 
     if kind == "driver" and len(cmd) > driver_prog_index and not verify_driver_program_abs(cmd[driver_prog_index], folder):
-        if slot_fd is not None:
-            _unlock_byte(slot_fd)
-            try:
-                os.close(slot_fd)
-            except OSError:
-                pass
         sys.stderr.write(DRIVER_REFUSE)
-        return 125
+        return _abort_before_child(125)
 
     git_watch = GitConfigWatch(folder) if kind in ("test", "driver") else None
     git_before = git_watch.before() if git_watch else None
@@ -2954,7 +3453,7 @@ def main():
     if kind == "watch":
         # The watch's own child is started from watch_loop, once per watch, with the seconds still left of this run.
         mark = time.time()
-        box = {"ran": False, "killer": None, "pid_file": write_pid_file(folder, run_id, os.getpid(), os.getpid())}
+        box = {"ran": False, "killer": None, "pid_file": reserved_pid_file}
 
         def run_child(words, seconds):
             resolved, _is_agent = resolve(words)
@@ -2974,26 +3473,14 @@ def main():
                                             creationflags=NO_WINDOW | 0x00000200)  # CREATE_NEW_PROCESS_GROUP
                 except OSError as e:
                     sys.stderr.write("bridge-run: cannot start %s (%s)\n" % (resolved[0], e))
-                    if slot_fd is not None:
-                        _unlock_byte(slot_fd)
-                        try:
-                            os.close(slot_fd)
-                        except OSError:
-                            pass
-                    return 125
+                    return _abort_before_child(125)
                 killer = box["killer"] if box["killer"] is not None else proc.kill
             else:
                 try:
                     proc = subprocess.Popen(resolved, env=env, preexec_fn=os.setsid, creationflags=NO_WINDOW)
                 except OSError as e:
                     sys.stderr.write("bridge-run: cannot start %s (%s)\n" % (resolved[0], e))
-                    if slot_fd is not None:
-                        _unlock_byte(slot_fd)
-                        try:
-                            os.close(slot_fd)
-                        except OSError:
-                            pass
-                    return 125
+                    return _abort_before_child(125)
                 killer = lambda: os.killpg(os.getpgid(proc.pid), signal.SIGKILL)  # noqa: E731
             box["ran"] = True
             entry.update(pid=os.getpid(), child_pid=proc.pid)
@@ -3055,13 +3542,7 @@ def main():
                                     creationflags=NO_WINDOW | 0x00000200)  # CREATE_NEW_PROCESS_GROUP
         except OSError as e:
             sys.stderr.write("bridge-run: cannot start %s (%s)\n" % (cmd[0], e))
-            if slot_fd is not None:
-                _unlock_byte(slot_fd)
-                try:
-                    os.close(slot_fd)
-                except OSError:
-                    pass
-            return 125
+            return _abort_before_child(125)
         if killer is None:
             killer = proc.kill
     else:
@@ -3069,13 +3550,7 @@ def main():
             proc = subprocess.Popen(cmd, env=env, preexec_fn=os.setsid, creationflags=NO_WINDOW)
         except OSError as e:
             sys.stderr.write("bridge-run: cannot start %s (%s)\n" % (cmd[0], e))
-            if slot_fd is not None:
-                _unlock_byte(slot_fd)
-                try:
-                    os.close(slot_fd)
-                except OSError:
-                    pass
-            return 125
+            return _abort_before_child(125)
         killer = lambda: os.killpg(os.getpgid(proc.pid), signal.SIGKILL)  # noqa: E731
 
     started = time.time()                                    # after the slot: the limit counts from here
@@ -3103,7 +3578,7 @@ def main():
         except subprocess.TimeoutExpired:
             proc.kill()
         rc = 124
-    remove_pid_file(pid_file)
+    remove_pid_file(pid_file or reserved_pid_file)
     if not timed_out:
         report_git_config()
         if rc != 124:

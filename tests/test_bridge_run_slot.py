@@ -863,7 +863,7 @@ def test_r040_wait_timeout_exit_123_and_log(tmp_path):
     free = run_bridge(root, env, "--limit", "5", "--", sys.executable, "-c", "import sys; sys.exit(123)")
     assert "slot taken" in free.stderr
     log2 = json.loads(log_path.read_text(encoding="utf-8").strip().splitlines()[-1])
-    assert "slot" not in log2
+    assert log2.get("slot") == 1  # hotfix 2026.11.24a: a run that took a slot logs it; only "not free" marks a wait
     ok = run_bridge(root, env, "--healthy", log2["id"])
     assert ok.returncode == 0
 
