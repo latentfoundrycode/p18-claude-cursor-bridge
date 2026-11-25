@@ -392,6 +392,10 @@ def broken_copy(tmp_path, breakage):
     elif breakage == "lacks-family-of":
         target.write_text("def built_families(*args, **kwargs):\n    return {'status': 'empty', 'families': set()}\n",
                           encoding="ascii")
+    elif breakage == "built-families-raises":
+        target.write_text("def family_of(model_id, override=None):\n    return None\n"
+                          "def built_families(*args, **kwargs):\n"
+                          "    raise RuntimeError('the built set is broken on purpose')\n", encoding="ascii")
     else:
         target.unlink()
     return str(cb / "bridge-run.py")
@@ -559,6 +563,51 @@ def test_r2_the_resolved_builder_stands_in_where_the_roster_file_cannot_be_read(
     ran(review(tmp_path, ws, GPT))
 
 
+@pytest.mark.parametrize("roster", ["absent", "malformed"])
+def test_r2_parsing_rows_count_where_the_roster_file_cannot_be_read(tmp_path, roster):
+    """R2 (round 2, Review A B1, the security audit's blocking 2); M14 (a parsing row's family dropped where the
+    roster file cannot be read): on an unknown set (a report without its row) with a grok builder row of the branch
+    that parses, docs/ROSTER.json absent or not JSON and the resolved builder gpt (openai), a grok review is refused
+    by the row's family, naming the cause; the resolved builder stands in for the roster file's builders only, so a
+    composer review (cursor: neither the row's family nor the resolved builder's) runs. Red on round 1, where the
+    resolved builder alone was refused."""
+    ws = unknown_by_report(tmp_path)
+    write_record(ws, row(GROK_B))
+    if roster == "malformed":
+        write(ws, "docs/ROSTER.json", "{ this is not json\n")
+    write(ws, "docs/ROSTER.resolved.json", resolved_text(builder=GPT, review_b=COMPOSER))
+    text = refused(review(tmp_path, ws, GROK_R))
+    assert_family_refusal(text, GROK_R, "xai")
+    assert "TASK-002-r1-report.md" in text and says_resolve_again(text), text
+    ran(review(tmp_path, ws, COMPOSER))
+
+
+def test_r2_the_refusal_names_each_unknown_cause(tmp_path):
+    """R2, R5 (round 2, Review A S3); M17 (only the first cause named): where the set is unknown for two causes, a
+    report file the branch adds without its row and a record line that does not parse, the family refusal names
+    both (the report file's name and runs.jsonl). Red on round 1, which named the first cause alone."""
+    ws = unknown_by_report(tmp_path)
+    write_record(ws, row(GROK_B), '{"id": "torn", "kind": "build')
+    write(ws, "docs/ROSTER.json", roster_text([{"name": "native", "builder": COMPOSER, "review_b": GPT}]))
+    text = refused(review(tmp_path, ws, GROK_R))
+    assert_family_refusal(text, GROK_R, "xai")
+    assert "TASK-002-r1-report.md" in text and "runs.jsonl" in text, "each cause named: " + text
+
+
+def test_r2_a_roster_file_naming_no_builder_family_lets_the_resolved_builder_stand_in(tmp_path):
+    """R2 (round 2, the supervisor's ruling on the security audit's advisory: unknown is never read as nobody having
+    built, DESIGN D-003); M19 (an empty refused set read as nobody having built): on an unknown set with no parsing
+    builder row, a roster file that reads but names no builder of a known family stands as one that cannot be read
+    for this rule: the resolved file's builder (grok) stands in, so a grok review is refused, naming the cause. Red on
+    round 1, where the refused set came out empty and every review ran."""
+    ws = unknown_by_report(tmp_path)
+    write(ws, "docs/ROSTER.json", json.dumps({"other_pool": "available", "profiles": []}) + "\n")
+    write(ws, "docs/ROSTER.resolved.json", resolved_text(builder=GROK_B, review_b=GPT))
+    text = refused(review(tmp_path, ws, GROK_R))
+    assert_family_refusal(text, GROK_R, "xai")
+    assert "TASK-002-r1-report.md" in text and says_resolve_again(text), text
+
+
 @pytest.mark.parametrize("case", ["both-absent", "both-malformed", "resolved-without-builder"])
 def test_r2_every_review_is_refused_where_neither_roster_can_be_read(tmp_path, case):
     """R2: on an unknown set where neither docs/ROSTER.json nor the resolved file's builder can be read, every
@@ -640,6 +689,38 @@ def test_r4_a_roster_program_that_cannot_be_loaded_refuses_the_review(tmp_path, 
         assert "built_families" in text, "the cause named: " + text
     elif breakage == "lacks-family-of":
         assert "family_of" in text, "the cause named: " + text
+
+
+def test_r4_a_roster_program_whose_built_set_raises_refuses_every_review(tmp_path):
+    """R4 (round 2, Review A B3, the security audit's blocking 2, path B); M16 (an exception of built_families read as
+    an unknown set): where the roster program loads but its `built_families` raises, the roster program cannot answer:
+    every review is refused with exit 125, naming the exception and `bridge-check.py`, a reviewer of a family no one
+    named among them. Red on round 1, which made up an unknown set and let the review through."""
+    prog = broken_copy(tmp_path, "built-families-raises")
+    ws = scratch_repo(tmp_path)
+    write_record(ws, row(GROK_B))
+    write(ws, "docs/ROSTER.resolved.json", resolved_text(builder=COMPOSER, review_b=GPT))
+    text = refused(review(tmp_path, ws, GPT, prog=prog))
+    assert "bridge-check.py" in text, text
+    assert "broken on purpose" in text or "RuntimeError" in text, "the exception named: " + text
+
+
+@pytest.mark.parametrize("profiles", ["a-number-and-null", "a-model-not-a-string"])
+def test_r4_a_roster_file_of_the_wrong_shape_never_opens_a_review_of_the_building_family(tmp_path, profiles):
+    """R2, R4 (round 2, Review A B3, the security audit's blocking 2, path B): a roster file whose profiles hold a
+    non-object, or a profile whose builder model is not a string, beside a grok builder row of the branch: the grok
+    review is refused (by the family refusal on the row, or by the roster program that cannot answer), never run.
+    Red on round 1, where the exception became an unknown set with no rows and composer stood in."""
+    ws = scratch_repo(tmp_path)
+    write_record(ws, row(GROK_B))
+    if profiles == "a-number-and-null":
+        write(ws, "docs/ROSTER.json", json.dumps({"profiles": [5, None]}) + "\n")
+    else:
+        write(ws, "docs/ROSTER.json", json.dumps({"profiles": [{"name": "x", "builder": {"model": 5},
+                                                                "review_b": GPT}]}) + "\n")
+    write(ws, "docs/ROSTER.resolved.json", resolved_text(builder=COMPOSER, review_b=GPT))
+    text = refused(review(tmp_path, ws, GROK_R))
+    assert GROK_R in text, text
 
 
 def test_r4_a_builder_launch_does_not_need_the_roster_program(tmp_path):
@@ -819,13 +900,16 @@ def test_r6_the_alternate_still_meets_the_family_refusal(tmp_path):
     assert_family_refusal(refused(review(tmp_path, ws, GPT)), GPT, "openai")
 
 
-def test_r6_a_brief_named_in_a_review_launch_stays_refused(tmp_path):
-    """R6: the refusal of a brief named in a review launch stands as it is, beside a matching deviation (pins an
-    answer of the checkpoint)."""
+@pytest.mark.parametrize("model", [GPT, COMPOSER])
+def test_r6_a_brief_named_in_a_review_launch_stays_refused(tmp_path, model):
+    """R6; M15 (the brief-named refusal skipped for the alternate): the refusal of a brief named in a review launch
+    stands as it is, beside a matching deviation, for another reviewer (gpt) and for the alternate the deviation lets
+    through (composer, the builder model; round 2, Review A B2, the security audit's blocking 1: red on round 1, which
+    returned before the brief check)."""
     ws = scratch_repo(tmp_path, files={"handoff/TASK-001.md": brief_text()})
     write_record(ws, row(GROK_B))
     write(ws, "docs/ROSTER.resolved.json", resolved_text(builder=COMPOSER, review_b=COMPOSER, deviation=deviation()))
-    out = refused(launch(tmp_path, ws, agent(GPT, "Read handoff/TASK-001.md"), "review"))
+    out = refused(launch(tmp_path, ws, agent(model, "Read handoff/TASK-001.md"), "review"))
     assert "must not name a brief" in out, out
 
 
@@ -847,6 +931,22 @@ def test_r7_a_row_after_a_torn_last_line_begins_a_new_line(tmp_path):
     lines = [l.rstrip(b"\r") for l in after.split(b"\n") if l.strip()]
     assert lines[-2] == b'{"id": "torn", "kind": "bui', lines
     assert json.loads(lines[-1].decode("utf-8"))["kind"] == "builder", lines
+
+
+def test_r7_a_last_byte_of_a_carriage_return_is_a_torn_line(tmp_path):
+    """R7 (round 2, Review A S4, the security audit's advisory); M18 (a carriage return taken for a line end): R7's
+    test is the line feed: a record whose last byte is a carriage return (a torn CRLF) gets a line feed first, so the
+    new row is a line of its own that parses. Red on round 1, which glued the row on after the carriage return."""
+    ws = scratch_repo(tmp_path)
+    write_record(ws, review_row(), review_row(), tail=b"\r")
+    before = record_bytes(ws)
+    res = python_build(tmp_path, ws)
+    assert res.rc == 0 and "Traceback" not in res.err, res.err
+    after = record_bytes(ws)
+    assert after.startswith(before), after
+    assert after[len(before):len(before) + 1] == b"\n", "no line feed begun after the carriage return: %r" % after
+    last = after.split(b"\n")[-2] if after.endswith(b"\n") else after.split(b"\n")[-1]
+    assert json.loads(last.decode("utf-8"))["kind"] == "builder", after
 
 
 @pytest.mark.parametrize("case", ["ends-with-a-line-feed", "empty", "absent"])
@@ -934,6 +1034,19 @@ def test_r8_clean_reads_the_tree_and_the_index_apart_from_the_resolved_roster(tm
         git(ws, "add", "docs/ROSTER.resolved.json")
     r = ran(build(tmp_path, ws))
     assert_builder_keys(r, start, CLEAN_CASES[case])
+
+
+def test_r8_a_staged_rename_into_the_resolved_roster_is_not_clean(tmp_path):
+    """R8 (round 2, Review A's should-fix, the security audit's advisory); M20 (a rename's source ignored): a staged
+    rename of another tracked file onto docs/ROSTER.resolved.json removes that file from the tree, so `clean` is
+    false; only the resolved roster's own change is set aside. Red on round 1, which read the rename's target
+    alone."""
+    files = {"handoff/TASK-001.md": brief_text(), "docs/ROSTER.json": roster_text(), "other.json": resolved_text()}
+    ws = scratch_repo(tmp_path, files=files)
+    start = head(ws)
+    git(ws, "mv", "other.json", "docs/ROSTER.resolved.json")
+    r = ran(build(tmp_path, ws))
+    assert_builder_keys(r, start, False)
 
 
 def test_r8_the_builders_own_changes_do_not_enter_clean(tmp_path):
