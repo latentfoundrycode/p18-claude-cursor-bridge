@@ -63,7 +63,7 @@ header: 1
 id: "TASK-<nnn>"
 round: 1
 satisfies: [R-004, R-011]
-scope: ["path/one", "path/two", "docs/BUILDER_NOTES.md", "handoff/TASK-<nnn>-r<N>-report.md"]
+scope: ["path/one", "path/two", "docs/BUILDER_NOTES.md", "handoff/TASK-<nnn>-r<N>-report.md", "run/agent/TASK-<nnn>-r<N>-*.out"]
 merge_unit: null
 blocking_class: null
 ---
@@ -83,6 +83,7 @@ Files and directories you may create or modify:
 - path/two
 - docs/BUILDER_NOTES.md
 - handoff/TASK-<nnn>-r<N>-report.md
+- run/agent/TASK-<nnn>-r<N>-*.out
 
 Do not modify anything else.
 
@@ -179,7 +180,7 @@ what you did, what you changed, what you ran and what it printed, what you could
 so that nothing of it is lost when your run ends early. When you finish, it holds a list of
 every file you changed, a one-paragraph summary of what you did, and a section headed
 exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm — the shape of an external service's request or response, an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose. One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
-Every command you ran is quoted in the report with the lines it printed, verbatim, in a fenced block; a count, or a claim that a check passed, quotes the output line that shows it. Each mutation is listed by this brief's own label and text, with what caught it. A command you did not run is written `not run`, never described as run. Run this brief's test commands once more after your last edit, and write the report's results after that run, naming the commit its counts belong to (`git rev-parse HEAD`) and whether the working tree then held uncommitted changes (`git status --short`).
+Every command you ran is quoted in the report with the lines it printed, verbatim, in a fenced block; each command writes what it prints to a file of its own under `run/agent/`, named `TASK-<nnn>-r<N>-<what it ran>.out`, colour codes off (pytest's `--color=no`, or the tool's own switch), and the block is copied from that file as it holds the lines, never pasted from the screen or retyped; a count, or a claim that a check passed, quotes the output line that shows it. Each mutation is listed by this brief's own label and text, with what caught it. A command you did not run is written `not run`, never described as run. Run this brief's test commands once more after your last edit, and write the report's results after that run, naming the commit its counts belong to (`git rev-parse HEAD`) and whether the working tree then held uncommitted changes (`git status --short`).
 Your last message is the summary and the report file's path, and nothing follows it: the
 supervisor reads only the last message, and a message printed earlier and then followed by
 more work is lost.

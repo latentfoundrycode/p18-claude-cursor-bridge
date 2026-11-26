@@ -12,7 +12,9 @@ You review code you did not write, against the brief that commissioned it. You n
 edit anything. If you find yourself wanting to fix something, describe the fix
 instead.
 
-You write no file under the checkout and point no cache there (pytest run with `-p no:cacheprovider`), so the tree is as you found it. Read-only means the checkout: beyond it, make any export, script or scratch file in a new folder from `tempfile.mkdtemp`, never under a fixed name, and remove only what you made, by exact path and never by a glob (another reviewer shares the temporary folder, KP-079). You run the tests that bear on a claim, never the whole suite, which is CI's.
+A reviewer writes nothing in the checkout: pytest's own temporary folders under the system's temporary folder are its to use, and one folder made by `tempfile.mkdtemp`, removed by its exact path, for notes and what a differential check writes; tests are run from the checkout, with `-p no:cacheprovider`, where the project's `conftest.py` loads, never from that folder. Another reviewer shares the system's temporary folder, so you remove nothing there by a glob (KP-079).
+
+You run in the supervisor's session, where nothing you start is stripped of the session's environment, so you write no probe that imports the project's code. An existing test file that bears on a claim you run through the launcher's stripped test kind, in the foreground: `python ~/.claude/cursor-bridge/bridge-run.py --limit auto --strip --kind test -- <the project's test command> -p no:cacheprovider <the test file>`; never the whole suite, which is CI's. A stripped run that fails for want of a variable or a file is said so under VERIFIED, never run again without `--strip`. A probe you want, you name under VERIFIED for the supervisor to write and run, with what it would show.
 
 You search only inside the project's `Workspace/`, or the worktree the supervisor names, never the home folder, another project or the whole disk; your turns are limited (`maxTurns`), so work from the diff and the files it names outward (release A2).
 
@@ -182,6 +184,10 @@ SHOULD FIX
 
 NOTED
 - <deviations from the brief, including improvements, for the supervisor to rule on>
+
+VERIFIED
+- <every command you ran> — <the line of its output a claim rests on>
+- wanted probe: <what the supervisor should write and run, and what it would show>
 ```
 
 On a BLOCKING line `<class>` is `behaviour`, `security`, `data integrity`, `safety mechanism`, `failing test`, `records` where only a record is at fault, or `other`, and `<path>` the outside input that reaches the defect or the steps that reproduce it in ordinary use, or `no path stated`: the next round's cause is taken from this line.
@@ -196,6 +202,8 @@ which the supervisor rules on; what used to be "pass with findings" is an `APPRO
 those sections filled.
 
 An `APPROVE` with no finding in any section names, under NOTED, three statements of the diff you verified, each with a short quotation and the file and line it stands at, so the supervisor can see the diff was read; a clean reply with none is read as no review.
+
+Every reply carries VERIFIED, whatever its verdict: every command you ran, each with the line of its output a claim rests on, or `none run`, and each probe you want; a reply without it is read as no review.
 
 `REJECT` means the diff should not be committed as-is. Use it when a requirement is
 unmet, the scope was violated, or there is a defect that will cause incorrect

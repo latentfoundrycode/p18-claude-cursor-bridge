@@ -28,7 +28,7 @@ today, three distinct families, each model proven to answer (KP-022, KP-024):
 python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json --command "<the delegate command you are about to run>"
 ```
 
-It skips every profile that needs Cursor's Other Models pool while `docs/ROSTER.json` says `"other_pool": "exhausted"` — set **automatically** when a call returns a usage-limit error or a model fails twice in a row (step 3b), or when the owner says *usage exhausted*, because a probe cannot see a nearly-empty quota, only a refusal — and it restores the pool by itself on the roster's `reset_day` (UTC). It probes the remaining profiles with a one-word request and writes the chosen one to `docs/ROSTER.resolved.json`. Read the builder id from that file into the delegate command (`--model <builder>`) and the Review B id into the Review B invocation. `FAIL` stops the delegation. If the profile in use is not the preferred one, say so in the report's first line, with the ids taken from the resolved file, never from this example: "running on the native profile: builder composer-2.5, Review B grok-4.7-high — the full profile returns on <the next reset day> UTC, or earlier if you say *usage reset*".
+It skips every profile that needs Cursor's Other Models pool while `docs/ROSTER.json` says `"other_pool": "exhausted"` — set **automatically** when a call returns a usage-limit error or a model fails twice in a row (step 3b), or when the owner says *usage exhausted*, because a probe cannot see a nearly-empty quota, only a refusal — and it restores the pool by itself on the roster's `reset_day` (UTC). It probes the remaining profiles with a one-word request and writes the chosen one to `docs/ROSTER.resolved.json`. Read the builder id from that file into the delegate command (`--model <builder>`) and the Review B id into the Review B invocation. `FAIL`, no profile answering, is the owner's decision (step 3b), never a pause of the other work. If the profile in use is not the preferred one, say so in the report's first line, with the ids taken from the resolved file, never from this example: "running on the native profile: builder composer-2.5, Review B grok-4.7-high — the full profile returns on <the next reset day> UTC, or earlier if you say *usage reset*".
 
 **Start every new branch from the remote's base.** When this checkpoint opens a new branch (the first increment of a merge unit, a refactoring pass, a fix), first run `python ~/.claude/cursor-bridge/sync-check.py --apply`, then create the branch from the remote-tracking base — `git switch -c <branch> origin/main` — never from local `main`. A stale local copy then can never become the starting point of new work (KP-026). Then:
 
@@ -114,7 +114,7 @@ ceiling: ` is the design critique's ceiling holding, never a model's failure: it
 and no `--record-failure` follows it; Phase 2. A design-critique reply that names nothing from
 its file is recorded like any failed call and follows the exits below, which Phase 2 counts: the
 exit-4 retry, the exit-3 re-resolve and one run on the profile it gives, then the wait Phase 2
-describes. Nor is the launcher's and the guard's `header: ` refusal a model's failure: a header of a brief, of
+describes for a third failure, which an exhausted pool never causes. Nor is the launcher's and the guard's `header: ` refusal a model's failure: a header of a brief, of
 the run parameters or, where a merge unit is checked, of the plan that the reader cannot read or the
 schema refuses, a brief's header that disagrees with the brief's prose, a run parameters' lift list (the
 launcher's three, the guard's `review_rounds_above_ceiling`) that disagrees with its lines, or a plan header
@@ -169,13 +169,13 @@ that is not a model of the roster (exit 2) and changes nothing (KP-034).
      that follows rewrites `docs/ROSTER.resolved.json` after the reset (KP-034).
   2. **Re-resolve:** `python ~/.claude/cursor-bridge/roster-check.py docs/ROSTER.json` —
      the next profile that answers is written to `docs/ROSTER.resolved.json`. `FAIL` here
-     (no profile answers at all) is the one case that stops the loop: report it as the
-     single decision — buy usage, or add a candidate — and wait.
+     (no profile answers at all) is the owner's decision: report it as the
+     single decision — buy usage, or add a candidate — in the question form, and go on with every step that needs no Cursor model meanwhile; an exhausted pool never parks or pauses work.
   3. **Restart the interrupted step** with the newly resolved models. A delegation: the
      same brief is re-issued with the new `--model`. A Review B launch: re-run on the same
      committed diff file with the new reviewer. A resolution round or a stage-close pass:
      re-run the failed call with the new model; earlier completed calls stand. Nothing
-     partial survives, nothing completed is redone. A change in flight that the old profile's builder built is rebuilt by the new profile's builder before any Review B reads it: `roster-check.py` prints a `REBUILD` line when the new Review B is of the family that built it, and the launcher refuses that Review B until the rebuild.
+     partial survives, nothing completed is redone. A change in flight that the old profile's builder built is rebuilt by the new profile's builder before any Review B reads it: `roster-check.py` prints a `REBUILD` line when the new Review B is of the family that built it, and the launcher refuses that Review B until the rebuild. The rebuild comes last: where the profile names an alternate reviewer (`review_b_alt`) that is independent and usable, `roster-check.py` resolves it instead with a `DEVIATION` line, reported after the gate (rule 58), and prints no `REBUILD`. The order is fixed: the next profile, the alternate reviewer, the rebuild. A refused `roster-check.py --review-alt <reason>` is the owner's decision, as `FAIL` is; the Cursor tool's sign-in (`SIGN-IN`, exit 5) is apart, a run sheet.
   4. **Record and report.** Open an issue (`ISS-nnn`) whose entry carries the stderr
      excerpt — that text is how the maintainer sharpens the classifier — and put the switch
      in the **first line of the next report**: "auto-switched to the native profile at
