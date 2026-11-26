@@ -3,7 +3,7 @@ record: brief
 header: 1
 id: TASK-029
 round: 4
-satisfies: []
+satisfies: [R-040, R-039]
 scope: ["bridge/cursor-bridge/bridge-run.py", "docs/BUILDER_NOTES.md", "handoff/TASK-029-r4-report.md"]
 merge_unit: null
 blocking_class: null

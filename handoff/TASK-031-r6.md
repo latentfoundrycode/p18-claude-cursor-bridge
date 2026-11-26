@@ -3,7 +3,7 @@ record: brief
 header: 1
 id: TASK-031
 round: 6
-satisfies: []
+satisfies: [R-041]
 scope: ["bridge/cursor-bridge/mutation-run.py", "tests/test_mutation_run.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-031-r6-report.md"]
 merge_unit: null
 blocking_class: null
