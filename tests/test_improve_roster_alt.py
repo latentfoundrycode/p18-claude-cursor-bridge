@@ -1677,10 +1677,12 @@ def test_task086a_both_reviewers_silent_under_the_family_deviation_skip_the_prof
 POLICY = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "Merge-Verification-Policy.md")
 
 
-def test_task087c_the_policys_roster_template_names_the_alternate_in_both_profiles():
-    """TASK-087c Done when: "the policy's roster template and docs/ROSTER.json name `review_b_alt` in both profiles"
-    (the template is the JSON block after "`docs/ROSTER.json`:" under the policy's "Model roster" heading). Each
-    profile's alternate is neither its own Review B nor Review A's model."""
+def test_task087c_the_policys_roster_template_names_the_native_profiles_alternate():
+    """TASK-087c (R-107), Done when: "the policy's roster template ... name `review_b_alt`" (the template is the JSON
+    block after "`docs/ROSTER.json`:" under the policy's "Model roster" heading). The native profile names it; the
+    full profile names none until the design's table resolves the next profile before an alternate whose profile's
+    Review B its pool excludes (the deviation recorded with TASK-087c). An alternate is neither its own profile's
+    Review B nor Review A's model."""
     with open(POLICY, encoding="utf-8") as f:
         text = f.read()
     section = text.split("## Model roster (this project)", 1)[1]
@@ -1688,6 +1690,7 @@ def test_task087c_the_policys_roster_template_names_the_alternate_in_both_profil
     template = json.loads(block)
     profiles = {p["name"]: p for p in template["profiles"]}
     assert set(profiles) == {"full", "native"}, profiles
+    assert profiles["native"].get("review_b_alt"), profiles["native"]
     for name, p in profiles.items():
-        assert p.get("review_b_alt"), name
-        assert p["review_b_alt"] not in (p["review_b"], template["review_a"]), name
+        if p.get("review_b_alt"):
+            assert p["review_b_alt"] not in (p["review_b"], template["review_a"]), name

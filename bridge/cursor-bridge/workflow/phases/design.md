@@ -165,7 +165,7 @@ or refused; the commit its file was built from; critic; the counts of Blocking, 
 Consider; what was fixed), **Resolution** (the
 question, what was settled, how). The commit its file was built from is the subject's head when the round's file was assembled; a round in which one critic delivered is a critique round, the other critic's row reading `not run (<the reason>)`. The `run/review/DESIGN-*` files are
 removed with `git rm` in the commit that passes the gate, as step 8 removes the review files.
-When no roster profile is usable at intake (`FAIL`, every pool exhausted), Review B's
+When no roster profile is usable at intake (`FAIL`, no profile answering), Review B's
 critique is the owner's decision, asked in the question form while the rest of the design goes on, as rule 38 says; Cursor not signed in is the sign-in, a run sheet, apart; `plan-critic` alone is
 never the gate's critique.
 

@@ -143,13 +143,13 @@ pick the strongest model each pool offers at that time — this table records th
   "reset_day": 16,
   "review_a": "claude-opus-5-5",
   "profiles": [
-    { "name": "full",   "builder": "grok-4.7-high", "review_b": "gpt-5.6-sol-high", "review_b_alt": "composer-2.5" },
+    { "name": "full",   "builder": "grok-4.7-high", "review_b": "gpt-5.6-sol-high" },
     { "name": "native", "builder": "composer-2.5",  "review_b": "grok-4.7-high",    "review_b_alt": "composer-2.5" }
   ]
 }
 ```
 
-`review_b_alt` is the profile's alternate reviewer, of a family neither Review A's nor one that built the change in flight; it may be of the profile's own builder's family, as the native profile's is, since the families that built a branch are read from the launcher's run record (`roster-check.py`'s help).
+`review_b_alt` is the profile's alternate reviewer, of a family neither Review A's nor one that built the change in flight; it may be of the profile's own builder's family, as the native profile's is, since the families that built a branch are read from the launcher's run record (`roster-check.py`'s help). The full profile names none: `roster-check.py` resolves a profile's alternate before it tries the next profile when the profile's Review B is excluded by its pool, so an alternate there would keep the full profile, its Review B the weaker native model, while the native profile is the one the exhausted pool calls for.
 
 `other_pool` flips to `exhausted` in two ways: **automatically**, when a call to a model
 in that pool returns a usage-limit message or fails twice in a row

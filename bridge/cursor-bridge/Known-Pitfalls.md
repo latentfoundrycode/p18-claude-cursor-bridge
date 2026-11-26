@@ -641,7 +641,7 @@ it applies.** Each heading states its pitfall in one sentence, since the heading
 
 ### KP-079 — Read-only subagents share the session's temporary folders
 - **Surfaced:** the bridge (ISS-027, twice): an auditor's `rm -rf` on a fixed-name scratch folder emptied another reviewer's export; a later glob cleanup removed a folder it had not made.
-- **Correction:** every reviewer and auditor carries one sentence on where it writes, in the same words in the merge step's directive clause (`delegation-loop/merge.md`, step 8), `diff-reviewer`, `security-auditor` and `design-auditor`: nothing in the checkout, pytest's own temporary folders, and one `tempfile.mkdtemp` folder removed by its exact path, never by a glob.
+- **Correction:** every reviewer and auditor carries one sentence on where it writes, in the same words in the merge step's directive clause (`delegation-loop/merge.md`, step 8), `diff-reviewer`, `security-auditor` and `design-auditor`: nothing in the checkout, pytest's own temporary folders, and one `tempfile.mkdtemp` folder removed by its exact path; the three agents carry a second sentence, nothing removed there by a glob.
 - **Applies:** every run of two or more subagents at once.
 
 ### KP-080 — A mutation run's copy of the Workspace holds no repository

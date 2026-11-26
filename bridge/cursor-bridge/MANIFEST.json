@@ -1,6 +1,6 @@
 {
   "version": "2026.11.24a",
-  "generated": "2026-11-26 01:05",
+  "generated": "2026-11-26 01:17",
   "files": {
     "agents/cursor-configurator.md": "9c0eb6ca7137e955de61cc16e74f5a91450d269f683ebf29cdda23ab40606f89",
     "agents/design-auditor.md": "c69924173f18e10bbb83afb6cca9e0caea237f5b76d4d6745a0e7b1d4b06fc3d",
@@ -21,8 +21,8 @@
     "cursor-bridge/Delivery-Conventions.md": "244da0bee53f84d6db2825eaadbcf4f98b8c4a853854f8ea5d1f68e18c7f6d48",
     "cursor-bridge/Diagram-Planning-Conventions.md": "52ae7a341030be82c22630662dc148f5f2740bc860e2354a10327228ad45fbb9",
     "cursor-bridge/Glossary.md": "e9fb987436d8655195bc50ac3d916d14518a5f082105c8da4c2d78fe45ed69a6",
-    "cursor-bridge/Known-Pitfalls.md": "3de0197d0ce5719433eec868c1b95bec27bba97a473a26024e72a55a138a316c",
-    "cursor-bridge/Merge-Verification-Policy.md": "0e0606d99fe9d224a02845a3cd91c7ac54d0b69234d888f3f5c573560f83b4ec",
+    "cursor-bridge/Known-Pitfalls.md": "ae8cd73e500b3501a8c7e44340fdf23eda050eb042bd09695c26791092d9bb96",
+    "cursor-bridge/Merge-Verification-Policy.md": "9b83d1dfddde4ce1b2a22c27cd3aabe347e5f60c5b2bea400e1942da3962fc45",
     "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
     "cursor-bridge/Performance-Conventions.md": "4acd70a4765e15de93a688869d55aa22e8c6ff24f17f35f006be7c910dec6c99",
     "cursor-bridge/Performance-Patterns.md": "04676bfb33ac0e06cfc13b2156a24c358660edcb36379924aae865354196bee5",
@@ -120,7 +120,7 @@
     "cursor-bridge/workflow/phases/delegation-loop/decide.md": "cf2419f90eeea5a33eae79fad947554ba81d37734526a9deb9af71fc635a678c",
     "cursor-bridge/workflow/phases/delegation-loop/merge.md": "4dcc08e6b8494c200dd7e994df64cc5348b7b8bdaf7aebe0359a17fe6f9fb27a",
     "cursor-bridge/workflow/phases/delegation-loop/refactoring-pass.md": "bec0f719a2c9f1eb9b586f19898606d8b2009cfaf3a125d7656146383a3156f0",
-    "cursor-bridge/workflow/phases/design.md": "88975eea41ead3c1f82d7f60cf3c25687eb00854101a31b47639733984640972",
+    "cursor-bridge/workflow/phases/design.md": "40566685209968b70d2597d6cc5fa4d53c9a89cb457fad02ba38eaf272f25e4c",
     "cursor-bridge/workflow/phases/intake.md": "b7899faf63a94511ff2730986d4d9c6c0721de1e6f344d49198b210571509cd9",
     "cursor-bridge/workflow/phases/interface.md": "60ca1451f8e6acd6a94ca01f121b9b47d0bc68ab6904f4f78f5c47e48ccbf6f7",
     "cursor-bridge/workflow/phases/interface/command-design.md": "7a6f12a00a4c7da411ed51fd7eb485e24ef14fd1dcc606db5052fbf4ab1d2caf",
