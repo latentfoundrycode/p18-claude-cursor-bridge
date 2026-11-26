@@ -3,7 +3,7 @@ record: brief
 header: 1
 id: "REFAC-017"
 round: 1
-satisfies: [R-039, R-107]
+satisfies: [R-107, R-039]
 scope: ["bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/REFAC-017-r1-report.md"]
 merge_unit: null
 blocking_class: null
