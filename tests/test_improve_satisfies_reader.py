@@ -312,6 +312,43 @@ def test_task088_r2_one_locator_finds_the_line_for_the_reader_and_the_refusal(mo
     assert line is not None and "R-777" in line, line
 
 
+@pytest.mark.parametrize("lines", [
+    "Satisfies: none (R-105 is TASK-084's)\n",
+    "Satisfies: none\n- R-105\n",
+    "Satisfies: **none**\n- R-105\n",
+], ids=["on-the-line", "beneath-refused-on-main", "bold-beneath-refused-on-main"])
+def test_task088_r3_a_none_that_carries_ids_is_refused_whatever_the_headers_list(tmp_path, lines):
+    """The supervisor's reading of round 2 (R-110: a none followed by an id is refused by name; round 1's Requirement 5,
+    "whatever its header's list"): a header naming the same ids as the none line agrees as a set, and is still refused.
+    The two cases with the id beneath were refused on main (`header: disagrees satisfies`; the security audit, round 2)."""
+    line = t32.assert_refused(launch(tmp_path, header(["R-105"]) + body(lines)), "bridge-run: refused - ")
+    assert NONE_REMEDY in line, line
+
+
+@pytest.mark.parametrize("lines", [
+    "Satisfies: none: R-105\n",
+    "Satisfies: none—R-105 is TASK-084's\n",
+    "Satisfies: none-R-105\n",
+    "Satisfies: none/R-105\n",
+    "Satisfies: none) R-105\n",
+    "Satisfies: none! R-105\n",
+], ids=["colon", "em-dash", "hyphen", "slash", "closing-parenthesis", "exclamation"])
+def test_task088_r3_none_ends_at_a_word_boundary(lines):
+    """Review A, round 2 (blocking, behaviour): R-2's word boundary was built as a list of the characters that may
+    follow, which left these out."""
+    got = reader()(body(lines))
+    assert got[1] is True, got
+
+
+def test_task088_r3_plan_checks_disagreement_line_carries_the_launchers_remedy(tmp_path):
+    """Review A, round 2 (should fix): one wording of each remedy, the launcher's and plan-check's."""
+    r = tpc.make(tmp_path)
+    (r / "handoff" / "TASK-003.md").write_text(_plan_brief(["R-003"], "Satisfies: R-003, R-004\n"), encoding="utf-8")
+    rc, out = tpc.run(r)
+    lines = [l for l in _brief_lines(out) if "satisfies" in l.lower()]
+    assert rc == 1 and any(SAME_ROWS in l for l in lines), out
+
+
 def test_task088_r2_a_wrong_id_is_told_before_a_none_that_carries_ids(tmp_path):
     """Review A, round 1 (should-fix): the none refusal stands where satisfies stands in the order of the keys."""
     text = header([]).replace("id: TASK-001", "id: TASK-002") + body("Satisfies: none (R-105 is TASK-084's)\n")

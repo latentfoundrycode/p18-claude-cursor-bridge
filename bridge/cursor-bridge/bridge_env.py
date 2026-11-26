@@ -572,23 +572,30 @@ def plan_body(text):
 
 
 _BRIEF_SAT_BULLET_RX = re.compile(r"^\s*[-*]\s+(.*)$")
+_SAT_NONE_FIRST_RX = re.compile(r"^[\*_`]*none(?=$|[\s,;.(\[]|[\*`_])", re.I)
+
+
+def brief_satisfies_line(body):
+    """Index, stripped line and stripped value of the first Satisfies field line, or None."""
+    for i, line in enumerate((body or "").splitlines()):
+        m = FIELD_RX.match(line)
+        if m and m.group(1).lower() == "satisfies":
+            return (i, line.strip(), (m.group(2) or "").rstrip())
+    return None
+
+
+def _satisfies_value_reads_none(val):
+    return bool(_SAT_NONE_FIRST_RX.match((val or "").strip()))
 
 
 def brief_satisfies_ids(body):
     """R-ids on the brief's first Satisfies line and bullet lines beneath; none_carries_ids when none carries an id."""
-    lines = (body or "").splitlines()
-    sat_idx = None
-    sat_val = ""
-    for i, line in enumerate(lines):
-        m = FIELD_RX.match(line)
-        if m and m.group(1).lower() == "satisfies":
-            sat_idx = i
-            sat_val = (m.group(2) or "").rstrip()
-            break
-    if sat_idx is None:
+    loc = brief_satisfies_line(body)
+    if loc is None:
         return [], False
-    words = sat_val.strip().split()
-    first_none = bool(words and words[0].lower() == "none")
+    sat_idx, _line, sat_val = loc
+    lines = (body or "").splitlines()
+    reads_none = _satisfies_value_reads_none(sat_val)
     bullet_texts = []
     j = sat_idx + 1
     while j < len(lines):
@@ -596,16 +603,14 @@ def brief_satisfies_ids(body):
         if not ln.strip():
             j += 1
             continue
+        if FIELD_RX.match(ln):
+            break
         bm = _BRIEF_SAT_BULLET_RX.match(ln)
         if bm:
             bullet_texts.append(bm.group(1))
             j += 1
             continue
         break
-    if first_none:
-        line_has_r = bool(_PLAN_R_RX.search(sat_val))
-        bullet_has_r = any(_PLAN_R_RX.search(t) for t in bullet_texts)
-        return [], line_has_r or bullet_has_r
     ids = []
     seen = set()
 
@@ -618,7 +623,8 @@ def brief_satisfies_ids(body):
     _add(sat_val)
     for bt in bullet_texts:
         _add(bt)
-    return ids, False
+    none_carries = reads_none and bool(ids)
+    return ids, none_carries
 
 
 def _brief_fallback_from_body(body, brief_name):
@@ -3737,33 +3743,54 @@ def brief_prose_fallback(text, brief_name):
     return rec.fallback
 
 
-def _ascii_record_quote(text):
-    return (text or "").encode("ascii", "backslashreplace").decode("ascii")
+def ascii_brief_quote(text):
+    """Escape brief text for launcher refusals and plan-check BRIEF lines: ASCII, C0 controls and non-ASCII."""
+    parts = []
+    for ch in text or "":
+        o = ord(ch)
+        if o < 0x20 or o == 0x7F:
+            parts.append("\\x%02x" % o)
+        elif o < 128:
+            parts.append(ch)
+        else:
+            parts.append(ch.encode("ascii", "backslashreplace").decode("ascii"))
+    return "".join(parts)
 
 
-def _brief_satisfies_prose_line(body):
-    for line in (body or "").splitlines():
-        m = FIELD_RX.match(line)
-        if m and m.group(1).lower() == "satisfies":
-            return line.strip()
-    return "Satisfies:"
+def ascii_brief_list(items):
+    return "[" + ", ".join(ascii_brief_quote(str(x)) for x in items) + "]"
 
 
-def _brief_none_carries_refusal(body):
-    prose = _ascii_record_quote(_brief_satisfies_prose_line(body))
+def brief_none_carries_message(body):
+    loc = brief_satisfies_line(body)
+    prose = ascii_brief_quote(loc[1] if loc else "Satisfies:")
     return (
-        "header: a brief that satisfies no row reads exactly Satisfies: none; "
+        "a brief that satisfies no row reads exactly Satisfies: none; "
         "the brief names %s" % prose
     )
 
 
-def _brief_satisfies_disagree_refusal(header, fallback):
+def brief_satisfies_disagree_lists(header, fallback):
     hv = list(header.get("satisfies") or [])
     fv = list(fallback.get("satisfies") or [])
+    return ascii_brief_list(hv), ascii_brief_list(fv)
+
+
+def brief_satisfies_disagree_message(header, fallback):
+    ha, fa = brief_satisfies_disagree_lists(header, fallback)
+    return "header disagrees satisfies header %s prose %s" % (ha, fa)
+
+
+def _brief_none_carries_refusal(body):
+    return "header: " + brief_none_carries_message(body)
+
+
+def _brief_satisfies_disagree_refusal(header, fallback):
+    ha, fa = brief_satisfies_disagree_lists(header, fallback)
     return (
         "header: disagrees satisfies header %s prose %s; "
         "the header and the prose name the same rows"
-        % (hv, fv)
+        % (ha, fa)
     )
 
 
@@ -3780,15 +3807,15 @@ def brief_header_refusal(text, shown_path, keys=None):
         return None
     check_satisfies = keys is None or "satisfies" in keys
     body = rec.body if rec.body is not None else ""
-    if check_satisfies and rec.fallback and rec.fallback.get("none_carries_ids"):
-        return _brief_none_carries_refusal(body)
     disagrees = list(rec.disagrees)
     if keys is not None:
         disagrees = [k for k in disagrees if k in keys]
-    if disagrees:
-        if disagrees[0] == "satisfies" and check_satisfies:
+    for key in disagrees:
+        if key == "satisfies" and check_satisfies:
+            if rec.fallback and rec.fallback.get("none_carries_ids"):
+                return _brief_none_carries_refusal(body)
             return _brief_satisfies_disagree_refusal(rec.header, rec.fallback)
-        return "header: disagrees %s" % disagrees[0]
+        return "header: disagrees %s" % key
     return None
 
 

@@ -1,6 +1,6 @@
 {
   "version": "2026.11.24a",
-  "generated": "2026-11-26 10:53",
+  "generated": "2026-11-26 11:13",
   "files": {
     "agents/cursor-configurator.md": "9c0eb6ca7137e955de61cc16e74f5a91450d269f683ebf29cdda23ab40606f89",
     "agents/design-auditor.md": "c69924173f18e10bbb83afb6cca9e0caea237f5b76d4d6745a0e7b1d4b06fc3d",
@@ -33,7 +33,7 @@
     "cursor-bridge/bridge-install.py": "59628f4816c797caa0b65036c81db7210ac63f5ca86213087b7065a2c9d96c12",
     "cursor-bridge/bridge-run.py": "31cb923fa4980e715da76fb469386dc5059e2cb29371828d28bf3497b291df26",
     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
-    "cursor-bridge/bridge_env.py": "a72276f32c7a8e7932eecbfdf8e34ee751ad9db5bf3d453dd0b168c5e448b47e",
+    "cursor-bridge/bridge_env.py": "acb7d92702a2251cba00e37342927092d23681a0163f23b6a79a53ed50706764",
     "cursor-bridge/completion-check.py": "27bfc126a40986f16347307126d909738ce90d71a6d29caa05b898654419249b",
     "cursor-bridge/conformance-check.py": "4f5744439447343f3ccfc7527612e28303826f4676c5ac620e13894d66447aa3",
     "cursor-bridge/cursor-agent.shim": "a524585b139ce42a15edc3ea1e6f6d0ce83dee9c41c5ace7e71e3958e5c73ad7",
@@ -89,7 +89,7 @@
     "cursor-bridge/mutation-run.py": "96ec8d7986420f0efa0e4b643197187231ab9dc530aa8c1e62c7140bc78c67c2",
     "cursor-bridge/pace-report.py": "bf76580ce298085f60471a6eca2652e5973139336377be5de3dd9a380e88542c",
     "cursor-bridge/permission-guard.py": "6e85731afcca3f8fa4a71c80a3501d9875c7f4f470128ca3f10f8e089db6c31a",
-    "cursor-bridge/plan-check.py": "babcb627d129d14f6b1b5f5dfd1f946e6e127d50f947aa8bd103942ebfde184a",
+    "cursor-bridge/plan-check.py": "ac6732cd440f37b7c07a83fd8e5ac9b24abc64ac36152da7502b8704790a6fde",
     "cursor-bridge/pr-activity-check.py": "7b6f59a14a52c34d14222939d5af52f677e7494e9008d702e3a5bb0bdb8a8768",
     "cursor-bridge/push-scan.py": "dfd5e756ac887efb355e6bc6297c7ea6ff762927f7a90657e4cb339ef2651e73",
     "cursor-bridge/records-check.py": "6c5ec6e7aef58c634096bc0bf8ed94415e62d16c6a173be166d1f22d445dcd69",

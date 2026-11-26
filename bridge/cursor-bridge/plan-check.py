@@ -162,18 +162,9 @@ def brief_findings(path, item):
             found.append("does not name %s, which %s satisfies" % (rid, item["id"]))
     if rec.refusal is None and rec.header is not None:
         if rec.fallback.get("none_carries_ids"):
-            found.append(
-                "a brief that satisfies no row reads exactly Satisfies: none; "
-                "the brief names %s"
-                % bridge_env._ascii_record_quote(bridge_env._brief_satisfies_prose_line(body_src))
-            )
+            found.append(bridge_env.brief_none_carries_message(body_src))
         elif "satisfies" in rec.disagrees:
-            hv = list(rec.header.get("satisfies") or [])
-            fv = list(rec.fallback.get("satisfies") or [])
-            found.append(
-                "header disagrees satisfies header %s prose %s"
-                % (hv, fv)
-            )
+            found.append(bridge_env.brief_satisfies_disagree_message(rec.header, rec.fallback))
     return found
 
 
