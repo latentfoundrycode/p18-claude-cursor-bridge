@@ -149,7 +149,7 @@ pick the strongest model each pool offers at that time — this table records th
 }
 ```
 
-`review_b_alt` is the profile's alternate reviewer, of a family neither Review A's nor one that built the change in flight; it may be of the profile's own builder's family, as the native profile's is, since the families that built a branch are read from the launcher's run record (`roster-check.py`'s help). The full profile names none: `roster-check.py` resolves a profile's alternate before it tries the next profile when the profile's Review B is excluded by its pool, so an alternate there would keep the full profile, its Review B the weaker native model, while the native profile is the one the exhausted pool calls for.
+`review_b_alt` is the profile's alternate reviewer, of a family neither Review A's nor one that built the change in flight; it may be of the profile's own builder's family, as the native profile's is, since the families that built a branch are read from the launcher's run record (`roster-check.py`'s help). The full profile names none: `roster-check.py` resolves a profile's alternate before it tries the next profile when the profile's Review B is excluded by its pool, so an alternate there would keep the full profile, its Review B the weaker native model, while the native profile is the one the exhausted pool calls for. A provider's safety refusal under the full profile then has no alternate either: the refused `--review-alt` is the owner's decision.
 
 `other_pool` flips to `exhausted` in two ways: **automatically**, when a call to a model
 in that pool returns a usage-limit message or fails twice in a row

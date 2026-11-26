@@ -1,6 +1,6 @@
 {
   "version": "2026.11.24a",
-  "generated": "2026-11-26 01:17",
+  "generated": "2026-11-26 01:21",
   "files": {
     "agents/cursor-configurator.md": "9c0eb6ca7137e955de61cc16e74f5a91450d269f683ebf29cdda23ab40606f89",
     "agents/design-auditor.md": "c69924173f18e10bbb83afb6cca9e0caea237f5b76d4d6745a0e7b1d4b06fc3d",
@@ -22,7 +22,7 @@
     "cursor-bridge/Diagram-Planning-Conventions.md": "52ae7a341030be82c22630662dc148f5f2740bc860e2354a10327228ad45fbb9",
     "cursor-bridge/Glossary.md": "e9fb987436d8655195bc50ac3d916d14518a5f082105c8da4c2d78fe45ed69a6",
     "cursor-bridge/Known-Pitfalls.md": "ae8cd73e500b3501a8c7e44340fdf23eda050eb042bd09695c26791092d9bb96",
-    "cursor-bridge/Merge-Verification-Policy.md": "9b83d1dfddde4ce1b2a22c27cd3aabe347e5f60c5b2bea400e1942da3962fc45",
+    "cursor-bridge/Merge-Verification-Policy.md": "c0d7171173a9a2ed755693cbeb8afea45e7e5672b9333c5745d0a15f592f438d",
     "cursor-bridge/Observability-Conventions.md": "b4e80c3a958ec39a1965488ce8ee4a79496d9b1a28e761c061aebfb13f2cce40",
     "cursor-bridge/Performance-Conventions.md": "4acd70a4765e15de93a688869d55aa22e8c6ff24f17f35f006be7c910dec6c99",
     "cursor-bridge/Performance-Patterns.md": "04676bfb33ac0e06cfc13b2156a24c358660edcb36379924aae865354196bee5",
