@@ -166,17 +166,10 @@ def built_by(run_log, branch=None):
     branch = branch or current_branch()
     entries = []
     for line_b in raw:
-        if not line_b.strip():
+        e = _parse_run_line(line_b)
+        if not e:
             continue
-        try:
-            line = line_b.decode("utf-8")
-        except UnicodeDecodeError:
-            continue
-        try:
-            e = json.loads(line)
-        except (ValueError, RecursionError):
-            continue
-        if isinstance(e, dict) and e.get("kind") == "builder" and e.get("model"):
+        if e.get("kind") == "builder" and e.get("model"):
             if e.get("slot") == "not free":
                 continue
             entries.append(e)
@@ -465,6 +458,12 @@ def _branch_builder_rows(entries, branch):
     return rows
 
 
+def _unreadable(result, cause):
+    result["status"] = "unreadable"
+    result["unreadable_cause"] = cause
+    return result
+
+
 def built_families(run_log, branch=None, cwd=None, roster=None, profiles=None):
     """Families that built the branch, or empty / unknown / unreadable.
 
@@ -485,52 +484,34 @@ def built_families(run_log, branch=None, cwd=None, roster=None, profiles=None):
         result["status"] = "empty"
         return result
     branch_name, head_fail = _branch_from_head(cwd)
-    if head_fail == "git":
-        result["status"] = "unreadable"
-        result["unreadable_cause"] = "git"
-        return result
-    if head_fail == "detached":
-        result["status"] = "unreadable"
-        result["unreadable_cause"] = "detached"
-        return result
+    if head_fail:
+        return _unreadable(result, head_fail)
     branch = branch_arg or branch_name
     result["branch"] = branch
     tree_reports, rep_fail = _tree_report_names(cwd)
     if rep_fail:
-        result["status"] = "unreadable"
-        result["unreadable_cause"] = rep_fail
-        return result
+        return _unreadable(result, rep_fail)
     added_reports = []
     if tree_reports:
         base, fail = _merge_base_with_main(branch, cwd)
         if fail:
-            result["status"] = "unreadable"
-            result["unreadable_cause"] = fail
-            return result
+            return _unreadable(result, fail)
         if base is None:
-            result["status"] = "unreadable"
-            result["unreadable_cause"] = "main"
-            return result
+            return _unreadable(result, "main")
         base_reports = _reports_at_commit(base, cwd)
         if base_reports is None:
-            result["status"] = "unreadable"
-            result["unreadable_cause"] = "git"
-            return result
+            return _unreadable(result, "git")
         base_cf = {p.casefold() for p in base_reports}
         added_reports = [r for r in tree_reports if r.casefold() not in base_cf]
     entries, open_fail, bad_lines, _raw, _good = _parse_run_log_raw(run_log)
     if open_fail:
-        result["status"] = "unreadable"
-        result["unreadable_cause"] = open_fail
-        return result
+        return _unreadable(result, open_fail)
     parsing_rows = _branch_builder_rows(entries, branch)
     result["parsing_rows"] = list(parsing_rows)
     commit_cache = {}
     counted = _apply_drop_rule(parsing_rows, cwd, commit_cache)
     if counted is None:
-        result["status"] = "unreadable"
-        result["unreadable_cause"] = "git"
-        return result
+        return _unreadable(result, "git")
     result["counted_rows"] = counted
     unknown = []
     if bad_lines:
@@ -1181,7 +1162,7 @@ def main():
         print("FAIL  --review-alt refused: the built set is not known")
         return 1
 
-    def _rebuild_line_open(r_id, r_fam, rb_model, builder_id):
+    def _rebuild_line_open(r_id, r_fam, builder_id):
         rows_for_rb = bset["counted_rows"] if set_status != "unknown" else bset["parsing_rows"]
         rb = _rebuild_built_by_model(rows_for_rb, r_fam, roster, profiles, built_model)
         if rb and _roster_model_family(roster, profiles, rb) == r_fam:
@@ -1192,6 +1173,19 @@ def main():
                 r_id, r_fam, builder_id)), rb
         return ("    REBUILD  review_b %s is of the %s family, and a builder row of the branch names a model whose family cannot be named: this profile's builder %s rebuilds it before Review B (step 3b); the reviewer of a change is never of the family that built it (release A4)" % (
             r_id, r_fam, builder_id)), rb
+
+    def _rebuild_entry(r_id, r_fam, builder_id, ask_new_branch):
+        rb_line, rb_model = _rebuild_line_open(r_id, r_fam, builder_id)
+        rebuild = {"built_by": rb_model, "rebuild_with": builder_id}
+        end_marker = None
+        new_branch_git_fail = False
+        if ask_new_branch:
+            nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
+            if nb is None:
+                new_branch_git_fail = True
+            elif nb:
+                end_marker = "new branch"
+        return rb_line, rebuild, end_marker, new_branch_git_fail
 
     print("roster-check: other_pool=%s  review_a=%s (%s)" % (other_pool, ra_id, ra_fam))
     if built_model:
@@ -1345,15 +1339,12 @@ def main():
                 if r_excl:
                     print("    skip: review_b is excluded and no alternate may be resolved on an unknown built set"); continue
                 if r_fam in roster_b_fams or r_fam in parse_b_fams or parsing_unknown_family:
-                    rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
-                    rebuild = {"built_by": rb_model, "rebuild_with": b_id}
-                    if family_only_unknown:
-                        nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
-                        if nb is None:
-                            print("FAIL  cannot read the families that built this branch (git)")
-                            return 1
-                        if nb:
-                            profile_rebuild_end = "new branch"
+                    rb_line, rebuild, end_marker, new_branch_git_fail = _rebuild_entry(r_id, r_fam, b_id, family_only_unknown)
+                    if new_branch_git_fail:
+                        print("FAIL  cannot read the families that built this branch (git)")
+                        return 1
+                    if end_marker:
+                        profile_rebuild_end = end_marker
                     print(rb_line)
             elif set_status in ("known", "empty"):
                 if not r_excl and r_id in unavailable:
@@ -1367,14 +1358,12 @@ def main():
                         known_built = sorted(built_fam_set)
                         deviation = {"review_b_alt": a_id, "reason": "family", "branch": bset["branch"], "built": known_built}
                     else:
-                        rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
-                        rebuild = {"built_by": rb_model, "rebuild_with": b_id}
-                        nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
-                        if nb is None:
+                        rb_line, rebuild, end_marker, new_branch_git_fail = _rebuild_entry(r_id, r_fam, b_id, True)
+                        if new_branch_git_fail:
                             print("FAIL  cannot read the families that built this branch (git)")
                             return 1
-                        if nb:
-                            profile_rebuild_end = "new branch"
+                        if end_marker:
+                            profile_rebuild_end = end_marker
                         print(rb_line)
                 elif r_excl:
                     if a_id and _alt_independent(a_fam, built_fam_set, ra_fam) and _alt_pool_ok(a_id, a_pool):
@@ -1405,14 +1394,12 @@ def main():
                         print("    skip: a model did not answer"); continue
                 elif deviation and family_deviation and rebuild is None:
                     if not ok_alt:
-                        rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
-                        rebuild = {"built_by": rb_model, "rebuild_with": b_id}
-                        nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
-                        if nb is None:
+                        rb_line, rebuild, end_marker, new_branch_git_fail = _rebuild_entry(r_id, r_fam, b_id, True)
+                        if new_branch_git_fail:
                             print("FAIL  cannot read the families that built this branch (git)")
                             return 1
-                        if nb:
-                            profile_rebuild_end = "new branch"
+                        if end_marker:
+                            profile_rebuild_end = end_marker
                         deviation = None
                         use_r_id, use_r_fam = r_id, r_fam
                         print(rb_line)
