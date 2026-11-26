@@ -232,6 +232,77 @@ def test_task087d_r2_an_alternate_that_did_not_answer_is_refused_on_its_one_answ
     assert resolved_path(ws).read_bytes() == before
 
 
+def test_task087d_r2_an_alternate_the_evaluation_did_not_probe_is_probed_once_by_the_request(program, tmp_path,
+                                                                                           monkeypatch, capsys):
+    """Round 2 (the builder's assumption 2): where the profile in use resolves without its alternate (Review B of no
+    built family, not excluded), the evaluation does not probe the alternate and the request probes it once: granted
+    where it answers, refused by its `did not answer its probe` line where it does not, the resolved file unchanged
+    then."""
+    for failing, want_rc in ((set(), 0), ({COMPOSER}, 1)):
+        sub = tmp_path / ("fail" if failing else "ok")
+        sub.mkdir()
+        ws = scratch_repo(sub)
+        commit(ws, "checkpoint")
+        write_roster(ws, [dict(FULL, review_b_alt=COMPOSER)])
+        before = plant_resolved(ws)
+        mod = program("roster-check")
+        probed = []
+        monkeypatch.setattr(mod, "probe", _fake_probe(probed, failing=failing))
+        rc, out = _main_in_process(mod, ws, monkeypatch, capsys, "--review-alt", "safety-refusal")
+        assert rc == want_rc, out
+        assert len(_alt_probe_lines(out)) == 1 and probed.count(COMPOSER) == 1, (probed, out)
+        if want_rc == 0:
+            assert _deviation_lines(out) == [ON_REQUEST], out
+        else:
+            assert "did not answer its probe" in fail_text(out), out
+            assert resolved_path(ws).read_bytes() == before
+
+
+def test_task087d_r3_an_alternate_that_did_not_answer_for_an_earlier_profile_is_not_probed_again(program, tmp_path,
+                                                                                               monkeypatch, capsys):
+    """Round 3 (Review A, round 2, blocking 1): one run reads one answer from a model in the role `review_b_alt`.
+    Two profiles name the same alternate; the first profile's Review B is marked, so its evaluation probes the
+    alternate, which does not answer, and the profile is skipped; the profile in use resolves with no deviation. The
+    request reads the answer the run already holds and is refused by the alternate's `did not answer its probe`
+    line, with no second probe in that role that could grant it; the resolved file unchanged (red on round 2, whose
+    second probe answered and granted)."""
+    ws = scratch_repo(tmp_path)
+    commit(ws, "checkpoint")
+    write_roster(ws, [dict(FULL, review_b_alt=COMPOSER), NATIVE_ALT], unavailable=[GPT])
+    before = plant_resolved(ws)
+    mod = program("roster-check")
+    probed = []
+    answers = {"n": 0}
+
+    def first_fails(model_id, *args, **kwargs):
+        probed.append(model_id)
+        if model_id == COMPOSER:
+            answers["n"] += 1
+            if answers["n"] == 1:
+                return False, "exit 1; stdout=''; stderr='refused'"
+        return True, "answered"
+
+    monkeypatch.setattr(mod, "probe", first_fails)
+    rc, out = _main_in_process(mod, ws, monkeypatch, capsys, "--review-alt", "safety-refusal")
+    assert rc == 1 and not deviation_printed(out), out
+    assert "did not answer its probe" in fail_text(out) and COMPOSER in fail_text(out), out
+    assert len(_alt_probe_lines(out)) == 1, out
+    assert resolved_path(ws).read_bytes() == before
+
+
+def test_task087d_r2_no_profile_in_use_refuses_the_request(tmp_path):
+    """Round 2 (the builder's assumption 4): where the resolve would pick no profile, the request ends with exit 1
+    and its `no profile is in use` cause, the resolved file unchanged."""
+    ws = scratch_repo(tmp_path)
+    commit(ws, "checkpoint")
+    write_roster(ws, [FULL], other_pool="exhausted")
+    before = plant_resolved(ws)
+    rc, out = resolve(ws, "--review-alt", "safety-refusal")
+    assert rc == 1 and not deviation_printed(out), out
+    assert "no profile is in use" in fail_text(out), out
+    assert resolved_path(ws).read_bytes() == before
+
+
 def test_task087d_a_sign_in_ends_the_request_with_exit_5(program, tmp_path, monkeypatch, capsys):
     """The Cursor tool signed out: the request ends with SIGN-IN, exit 5, as the resolve does, the resolved file
     unchanged (as on the checkpoint)."""

@@ -1302,6 +1302,7 @@ def main():
                         print("    skip: review_b is excluded and no independent usable alternate")
                     return None
 
+        alt_probe_ok = None
         if do_probe:
             ok_b, sign_in_b = _probe_roles([("builder", b_id)])
             if sign_in_b:
@@ -1316,6 +1317,7 @@ def main():
                 ok_alt, sign_in_alt = _probe_roles([("review_b_alt", a_id)])
                 if sign_in_alt:
                     return "sign-in"
+                alt_probe_ok = ok_alt
             if not ok_b:
                 if verbose:
                     print("    skip: a model did not answer")
@@ -1348,10 +1350,12 @@ def main():
         fams_out = {"builder": b_fam, "review_a": ra_fam, "review_b": use_r_fam}
         return {"profile": name, "builder": b_id, "review_a": ra_id, "review_b": use_r_id, "families": fams_out,
                 "deviation": deviation, "rebuild": rebuild, "profile_rebuild_end": profile_rebuild_end,
-                "a_id": a_id, "a_fam": a_fam, "a_pool": a_pool, "r_id": r_id, "r_fam": r_fam}
+                "a_id": a_id, "a_fam": a_fam, "a_pool": a_pool, "r_id": r_id, "r_fam": r_fam,
+                "alt_probe_ok": alt_probe_ok}
 
     if review_alt_reason is not None:
         in_use = None
+        in_use_ev = None
         for prof in profiles:
             u = _evaluate_profile(prof, False)
             if u == "sign-in":
@@ -1361,6 +1365,7 @@ def main():
                 return 1
             if u is not None:
                 in_use = prof
+                in_use_ev = u
                 break
         if in_use is None:
             print("FAIL  --review-alt refused: no profile is in use (every profile is skipped)")
@@ -1391,13 +1396,18 @@ def main():
         b_id, b_fam_o, _ = norm_entry(in_use.get("builder"))
         b_fam = family_of(b_id, b_fam_o)
         if do_probe:
-            ok, detail = probe(a_id)
-            if ok is PROBE_SIGN_IN:
-                print("    probe %-8s %s: tool sign-in required" % ("review_b_alt", a_id))
-                print(SIGN_IN_LINE)
-                return 5
-            print("    probe %-8s %s: %s" % ("review_b_alt", a_id, detail))
-            if not ok:
+            cached_alt = in_use_ev.get("alt_probe_ok")
+            if cached_alt is None:
+                ok, detail = probe(a_id)
+                if ok is PROBE_SIGN_IN:
+                    print("    probe %-8s %s: tool sign-in required" % ("review_b_alt", a_id))
+                    print(SIGN_IN_LINE)
+                    return 5
+                print("    probe %-8s %s: %s" % ("review_b_alt", a_id, detail))
+                if not ok:
+                    print("FAIL  --review-alt refused: review_b_alt %s did not answer its probe" % a_id)
+                    return 1
+            elif not cached_alt:
                 print("FAIL  --review-alt refused: review_b_alt %s did not answer its probe" % a_id)
                 return 1
         fams = {"builder": b_fam, "review_a": ra_fam, "review_b": a_fam}
