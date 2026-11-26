@@ -968,9 +968,9 @@ docs/ROSTER.json (v2):
                                                     A probe cannot see 1% remaining.
   "review_a": "claude-opus-5-5",                  <- Review A runs in Claude Code, not Cursor.
   "profiles": [                                   <- tried in order; the first usable one wins
-    {"name": "full",   "builder": "grok-4.7-high", "review_b": "gpt-5.6-sol-high",
-                        "review_b_alt": "composer-2.5"},
-    {"name": "native", "builder": "composer-2.5",  "review_b": "grok-4.7-high"}
+    {"name": "full",   "builder": "grok-4.7-high", "review_b": "gpt-5.6-sol-high"},
+    {"name": "native", "builder": "composer-2.5",  "review_b": "grok-4.7-high",
+                        "review_b_alt": "composer-2.5"}
   ]
 }
 A model entry is an id string or {"model": id, "family": name, "pool": "native"|"other"}.
@@ -1007,9 +1007,9 @@ family, unavailable, or the reason given with --review-alt) instead of a rebuild
 the profile still resolves with a REBUILD line and a rebuild entry when the table says so.
 --repair-record  rewrites the run record keeping every line that parses, appends the others to
 run/launcher/runs.damaged.jsonl, prints both counts, resolves nothing.
---review-alt <reason>  resolve the alternate on request; reason is one word of ASCII letters and
-hyphens; exit 1 when the alternate cannot be resolved (the built set unknown or not readable
-among the causes).
+--review-alt <reason>  resolve the alternate on request for the profile the resolve without it
+picks, never passing to a later profile; reason is one word of ASCII letters and hyphens; exit 1
+when the alternate cannot be resolved (the built set unknown or not readable among the causes).
 --record-failure <model> --stderr-file <path> [--stdout-file <path>]
   Classify a failed cursor-agent call. <model> must be a model id of this roster (a wrong
   argument exits 2 and changes nothing). USAGE-LIMIT (a usage/quota/limit message) or a

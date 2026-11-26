@@ -13,9 +13,9 @@ docs/ROSTER.json (v2):
                                                     A probe cannot see 1% remaining.
   "review_a": "claude-opus-5-5",                  <- Review A runs in Claude Code, not Cursor.
   "profiles": [                                   <- tried in order; the first usable one wins
-    {"name": "full",   "builder": "grok-4.7-high", "review_b": "gpt-5.6-sol-high",
-                        "review_b_alt": "composer-2.5"},
-    {"name": "native", "builder": "composer-2.5",  "review_b": "grok-4.7-high"}
+    {"name": "full",   "builder": "grok-4.7-high", "review_b": "gpt-5.6-sol-high"},
+    {"name": "native", "builder": "composer-2.5",  "review_b": "grok-4.7-high",
+                        "review_b_alt": "composer-2.5"}
   ]
 }
 A model entry is an id string or {"model": id, "family": name, "pool": "native"|"other"}.
@@ -52,9 +52,9 @@ family, unavailable, or the reason given with --review-alt) instead of a rebuild
 the profile still resolves with a REBUILD line and a rebuild entry when the table says so.
 --repair-record  rewrites the run record keeping every line that parses, appends the others to
 run/launcher/runs.damaged.jsonl, prints both counts, resolves nothing.
---review-alt <reason>  resolve the alternate on request; reason is one word of ASCII letters and
-hyphens; exit 1 when the alternate cannot be resolved (the built set unknown or not readable
-among the causes).
+--review-alt <reason>  resolve the alternate on request for the profile the resolve without it
+picks, never passing to a later profile; reason is one word of ASCII letters and hyphens; exit 1
+when the alternate cannot be resolved (the built set unknown or not readable among the causes).
 --record-failure <model> --stderr-file <path> [--stdout-file <path>]
   Classify a failed cursor-agent call. <model> must be a model id of this roster (a wrong
   argument exits 2 and changes nothing). USAGE-LIMIT (a usage/quota/limit message) or a
@@ -1215,40 +1215,170 @@ def main():
     def _r_excluded(r_id, r_pool):
         return r_id in unavailable or (other_pool == "exhausted" and r_pool == "other")
 
-    def _profile_in_use(prof):
+    global_rebuild_end = rebuild_end
+    alt_probe_answers = {}
+
+    def _alt_probe_result(a_id):
+        if a_id in alt_probe_answers:
+            return alt_probe_answers[a_id], False
+        ok, detail = probe(a_id)
+        if ok is PROBE_SIGN_IN:
+            print("    probe %-8s %s: tool sign-in required" % ("review_b_alt", a_id))
+            print(SIGN_IN_LINE)
+            return None, True
+        print("    probe %-8s %s: %s" % ("review_b_alt", a_id, detail))
+        alt_probe_answers[a_id] = bool(ok)
+        return bool(ok), False
+
+    def _evaluate_profile(prof, verbose):
         name = prof.get("name", "?")
         b_id, b_fam_o, b_pool_o = norm_entry(prof.get("builder"))
         r_id, r_fam_o, r_pool_o = norm_entry(prof.get("review_b"))
+        a_id, a_fam_o, a_pool_o = norm_entry(prof.get("review_b_alt"))
         b_fam, r_fam = family_of(b_id, b_fam_o), family_of(r_id, r_fam_o)
-        b_pool = pool_of(b_id, b_pool_o)
+        a_fam = family_of(a_id, a_fam_o) if a_id else None
+        b_pool, r_pool = pool_of(b_id, b_pool_o), pool_of(r_id, r_pool_o)
+        a_pool = pool_of(a_id, a_pool_o) if a_id else None
+        if verbose:
+            print("  profile %-8s builder=%s (%s, %s)  review_b=%s (%s, %s)" % (name, b_id, b_fam, b_pool, r_id, r_fam, r_pool))
         if b_fam is None or r_fam is None:
+            if verbose:
+                print("    skip: family unknown - add {\"model\": ..., \"family\": ...}")
             return None
         if other_pool == "exhausted" and b_pool == "other":
+            how = (" automatically at " + roster["auto_exhausted_at"]) if roster.get("auto_exhausted_at") else " by the owner"
+            if verbose:
+                print("    skip: uses the other-models pool, marked exhausted%s" % how)
             return None
         if b_id in unavailable:
+            if verbose:
+                print("    skip: a model was marked unavailable after repeated failures (%s)" % b_id)
             return None
         fams = {"builder": b_fam, "review_a": ra_fam, "review_b": r_fam}
         if len(set(fams.values())) < 3:
+            if verbose:
+                print("    skip: family collision %s" % fams)
             return None
-        if do_probe:
-            ok, detail = probe(b_id)
-            if ok is PROBE_SIGN_IN:
-                print("    probe %-8s %s: tool sign-in required" % ("builder", b_id))
-                print(SIGN_IN_LINE)
-                return "sign-in"
-            print("    probe %-8s %s: %s" % ("builder", b_id, detail))
-            if not ok:
+
+        r_excl = _r_excluded(r_id, r_pool)
+        use_r_id, use_r_fam = r_id, r_fam
+        rebuild = None
+        deviation = None
+        profile_rebuild_end = global_rebuild_end
+        family_deviation = False
+
+        family_only_unknown = (
+            parsing_unknown_family
+            and all("whose family cannot be named" in label for _n, label in bset["unknown_causes"]))
+
+        if set_status == "unknown":
+            if r_excl:
+                if verbose:
+                    print("    skip: review_b is excluded and no alternate may be resolved on an unknown built set")
                 return None
-        return prof
+            if r_fam in roster_b_fams or r_fam in parse_b_fams or parsing_unknown_family:
+                rb_line, rebuild, end_marker, new_branch_git_fail = _rebuild_entry(r_id, r_fam, b_id, family_only_unknown)
+                if new_branch_git_fail:
+                    return "git-fail"
+                if end_marker:
+                    profile_rebuild_end = end_marker
+                if verbose:
+                    print(rb_line)
+        elif set_status in ("known", "empty"):
+            if not r_excl and r_id in unavailable:
+                if verbose:
+                    print("    skip: a model was marked unavailable after repeated failures (%s)" % r_id)
+                return None
+            if not r_excl and r_fam not in built_fam_set:
+                pass
+            elif not r_excl and r_fam in built_fam_set:
+                family_deviation = True
+                if a_id and _alt_independent(a_fam, built_fam_set, ra_fam) and _alt_pool_ok(a_id, a_pool):
+                    use_r_id, use_r_fam = a_id, a_fam
+                    known_built = sorted(built_fam_set)
+                    deviation = {"review_b_alt": a_id, "reason": "family", "branch": bset["branch"], "built": known_built}
+                else:
+                    rb_line, rebuild, end_marker, new_branch_git_fail = _rebuild_entry(r_id, r_fam, b_id, True)
+                    if new_branch_git_fail:
+                        return "git-fail"
+                    if end_marker:
+                        profile_rebuild_end = end_marker
+                    if verbose:
+                        print(rb_line)
+            elif r_excl:
+                if a_id and _alt_independent(a_fam, built_fam_set, ra_fam) and _alt_pool_ok(a_id, a_pool):
+                    use_r_id, use_r_fam = a_id, a_fam
+                    known_built = sorted(built_fam_set)
+                    deviation = {"review_b_alt": a_id, "reason": "unavailable", "branch": bset["branch"], "built": known_built}
+                else:
+                    if verbose:
+                        print("    skip: review_b is excluded and no independent usable alternate")
+                    return None
+
+        alt_probe_ok = None
+        if do_probe:
+            ok_b, sign_in_b = _probe_roles([("builder", b_id)])
+            if sign_in_b:
+                return "sign-in"
+            ok_rb = True
+            ok_alt = True
+            if not _r_excluded(r_id, r_pool):
+                ok_rb, sign_in_rb = _probe_roles([("review_b", r_id)])
+                if sign_in_rb:
+                    return "sign-in"
+            if deviation and a_id and _alt_pool_ok(a_id, a_pool):
+                ok_alt, sign_in_alt = _alt_probe_result(a_id)
+                if sign_in_alt:
+                    return "sign-in"
+                alt_probe_ok = ok_alt
+            if not ok_b:
+                if verbose:
+                    print("    skip: a model did not answer")
+                return None
+            if deviation and deviation.get("reason") == "unavailable":
+                if not ok_alt:
+                    if verbose:
+                        print("    skip: a model did not answer")
+                    return None
+            elif deviation and family_deviation and rebuild is None:
+                if not ok_alt:
+                    rb_line, rebuild, end_marker, new_branch_git_fail = _rebuild_entry(r_id, r_fam, b_id, True)
+                    if new_branch_git_fail:
+                        return "git-fail"
+                    if end_marker:
+                        profile_rebuild_end = end_marker
+                    deviation = None
+                    use_r_id, use_r_fam = r_id, r_fam
+                    if verbose:
+                        print(rb_line)
+                    if not ok_rb:
+                        if verbose:
+                            print("    skip: a model did not answer")
+                        return None
+            elif not deviation and not _r_excluded(r_id, r_pool) and not ok_rb:
+                if verbose:
+                    print("    skip: a model did not answer")
+                return None
+
+        fams_out = {"builder": b_fam, "review_a": ra_fam, "review_b": use_r_fam}
+        return {"profile": name, "builder": b_id, "review_a": ra_id, "review_b": use_r_id, "families": fams_out,
+                "deviation": deviation, "rebuild": rebuild, "profile_rebuild_end": profile_rebuild_end,
+                "a_id": a_id, "a_fam": a_fam, "a_pool": a_pool, "r_id": r_id, "r_fam": r_fam,
+                "alt_probe_ok": alt_probe_ok}
 
     if review_alt_reason is not None:
         in_use = None
+        in_use_ev = None
         for prof in profiles:
-            u = _profile_in_use(prof)
+            u = _evaluate_profile(prof, False)
             if u == "sign-in":
                 return 5
+            if u == "git-fail":
+                print("FAIL  cannot read the families that built this branch (git)")
+                return 1
             if u is not None:
-                in_use = u
+                in_use = prof
+                in_use_ev = u
                 break
         if in_use is None:
             print("FAIL  --review-alt refused: no profile is in use (every profile is skipped)")
@@ -1279,13 +1409,10 @@ def main():
         b_id, b_fam_o, _ = norm_entry(in_use.get("builder"))
         b_fam = family_of(b_id, b_fam_o)
         if do_probe:
-            ok, detail = probe(a_id)
-            if ok is PROBE_SIGN_IN:
-                print("    probe %-8s %s: tool sign-in required" % ("review_b_alt", a_id))
-                print(SIGN_IN_LINE)
+            ok_alt, sign_in_alt = _alt_probe_result(a_id)
+            if sign_in_alt:
                 return 5
-            print("    probe %-8s %s: %s" % ("review_b_alt", a_id, detail))
-            if not ok:
+            if not ok_alt:
                 print("FAIL  --review-alt refused: review_b_alt %s did not answer its probe" % a_id)
                 return 1
         fams = {"builder": b_fam, "review_a": ra_fam, "review_b": a_fam}
@@ -1301,123 +1428,25 @@ def main():
         chosen = None
         chosen_rebuild_end = None
 
-    global_rebuild_end = rebuild_end
     if review_alt_reason is None:
         for prof in profiles:
-            name = prof.get("name", "?")
-            b_id, b_fam_o, b_pool_o = norm_entry(prof.get("builder"))
-            r_id, r_fam_o, r_pool_o = norm_entry(prof.get("review_b"))
-            a_id, a_fam_o, a_pool_o = norm_entry(prof.get("review_b_alt"))
-            b_fam, r_fam = family_of(b_id, b_fam_o), family_of(r_id, r_fam_o)
-            a_fam = family_of(a_id, a_fam_o) if a_id else None
-            b_pool, r_pool = pool_of(b_id, b_pool_o), pool_of(r_id, r_pool_o)
-            a_pool = pool_of(a_id, a_pool_o) if a_id else None
-            print("  profile %-8s builder=%s (%s, %s)  review_b=%s (%s, %s)" % (name, b_id, b_fam, b_pool, r_id, r_fam, r_pool))
-            if b_fam is None or r_fam is None:
-                print("    skip: family unknown - add {\"model\": ..., \"family\": ...}"); continue
-            if other_pool == "exhausted" and b_pool == "other":
-                how = (" automatically at " + roster["auto_exhausted_at"]) if roster.get("auto_exhausted_at") else " by the owner"
-                print("    skip: uses the other-models pool, marked exhausted%s" % how); continue
-            if b_id in unavailable:
-                print("    skip: a model was marked unavailable after repeated failures (%s)" % b_id); continue
-            fams = {"builder": b_fam, "review_a": ra_fam, "review_b": r_fam}
-            if len(set(fams.values())) < 3:
-                print("    skip: family collision %s" % fams); continue
-
-            r_excl = _r_excluded(r_id, r_pool)
-            use_r_id, use_r_fam = r_id, r_fam
-            rebuild = None
-            deviation = None
-            profile_rebuild_end = global_rebuild_end
-            family_deviation = False
-
-            family_only_unknown = (
-                parsing_unknown_family
-                and all("whose family cannot be named" in label for _n, label in bset["unknown_causes"]))
-
-            if set_status == "unknown":
-                if r_excl:
-                    print("    skip: review_b is excluded and no alternate may be resolved on an unknown built set"); continue
-                if r_fam in roster_b_fams or r_fam in parse_b_fams or parsing_unknown_family:
-                    rb_line, rebuild, end_marker, new_branch_git_fail = _rebuild_entry(r_id, r_fam, b_id, family_only_unknown)
-                    if new_branch_git_fail:
-                        print("FAIL  cannot read the families that built this branch (git)")
-                        return 1
-                    if end_marker:
-                        profile_rebuild_end = end_marker
-                    print(rb_line)
-            elif set_status in ("known", "empty"):
-                if not r_excl and r_id in unavailable:
-                    print("    skip: a model was marked unavailable after repeated failures (%s)" % r_id); continue
-                if not r_excl and r_fam not in built_fam_set:
-                    pass
-                elif not r_excl and r_fam in built_fam_set:
-                    family_deviation = True
-                    if a_id and _alt_independent(a_fam, built_fam_set, ra_fam) and _alt_pool_ok(a_id, a_pool):
-                        use_r_id, use_r_fam = a_id, a_fam
-                        known_built = sorted(built_fam_set)
-                        deviation = {"review_b_alt": a_id, "reason": "family", "branch": bset["branch"], "built": known_built}
-                    else:
-                        rb_line, rebuild, end_marker, new_branch_git_fail = _rebuild_entry(r_id, r_fam, b_id, True)
-                        if new_branch_git_fail:
-                            print("FAIL  cannot read the families that built this branch (git)")
-                            return 1
-                        if end_marker:
-                            profile_rebuild_end = end_marker
-                        print(rb_line)
-                elif r_excl:
-                    if a_id and _alt_independent(a_fam, built_fam_set, ra_fam) and _alt_pool_ok(a_id, a_pool):
-                        use_r_id, use_r_fam = a_id, a_fam
-                        known_built = sorted(built_fam_set)
-                        deviation = {"review_b_alt": a_id, "reason": "unavailable", "branch": bset["branch"], "built": known_built}
-                    else:
-                        print("    skip: review_b is excluded and no independent usable alternate"); continue
-
-            if do_probe:
-                ok_b, sign_in_b = _probe_roles([("builder", b_id)])
-                if sign_in_b:
-                    return 5
-                ok_rb = True
-                ok_alt = True
-                if not _r_excluded(r_id, r_pool):
-                    ok_rb, sign_in_rb = _probe_roles([("review_b", r_id)])
-                    if sign_in_rb:
-                        return 5
-                if deviation and a_id and _alt_pool_ok(a_id, a_pool):
-                    ok_alt, sign_in_alt = _probe_roles([("review_b_alt", a_id)])
-                    if sign_in_alt:
-                        return 5
-                if not ok_b:
-                    print("    skip: a model did not answer"); continue
-                if deviation and deviation.get("reason") == "unavailable":
-                    if not ok_alt:
-                        print("    skip: a model did not answer"); continue
-                elif deviation and family_deviation and rebuild is None:
-                    if not ok_alt:
-                        rb_line, rebuild, end_marker, new_branch_git_fail = _rebuild_entry(r_id, r_fam, b_id, True)
-                        if new_branch_git_fail:
-                            print("FAIL  cannot read the families that built this branch (git)")
-                            return 1
-                        if end_marker:
-                            profile_rebuild_end = end_marker
-                        deviation = None
-                        use_r_id, use_r_fam = r_id, r_fam
-                        print(rb_line)
-                        if not ok_rb:
-                            print("    skip: a model did not answer"); continue
-                elif not deviation and not _r_excluded(r_id, r_pool) and not ok_rb:
-                    print("    skip: a model did not answer"); continue
-
-            fams_out = {"builder": b_fam, "review_a": ra_fam, "review_b": use_r_fam}
-            chosen = {"profile": name, "builder": b_id, "review_a": ra_id, "review_b": use_r_id, "families": fams_out,
-                      "other_pool": other_pool, "probed": do_probe,
-                      "resolved_at": stamp(now_utc()), "reset_day": roster.get("reset_day")}
-            if deviation:
-                chosen["deviation"] = deviation
-                print("DEVIATION  review_b is %s instead of %s (%s)" % (a_id, r_id, deviation["reason"]))
-            if rebuild:
-                chosen["rebuild"] = rebuild
-                chosen_rebuild_end = profile_rebuild_end
+            ev = _evaluate_profile(prof, True)
+            if ev == "sign-in":
+                return 5
+            if ev == "git-fail":
+                print("FAIL  cannot read the families that built this branch (git)")
+                return 1
+            if ev is None:
+                continue
+            chosen = {"profile": ev["profile"], "builder": ev["builder"], "review_a": ev["review_a"],
+                      "review_b": ev["review_b"], "families": ev["families"], "other_pool": other_pool,
+                      "probed": do_probe, "resolved_at": stamp(now_utc()), "reset_day": roster.get("reset_day")}
+            if ev["deviation"]:
+                chosen["deviation"] = ev["deviation"]
+                print("DEVIATION  review_b is %s instead of %s (%s)" % (ev["a_id"], ev["r_id"], ev["deviation"]["reason"]))
+            if ev["rebuild"]:
+                chosen["rebuild"] = ev["rebuild"]
+                chosen_rebuild_end = ev["profile_rebuild_end"]
             break
     if chosen is None:
         print("FAIL  no usable profile - the owner must buy usage, flip other_pool, or add a native profile")
