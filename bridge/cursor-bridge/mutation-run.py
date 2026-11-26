@@ -59,6 +59,7 @@ PLUGIN_NAME = "_mutation_resolution_check.py"
 PLUGIN_MOD = "_mutation_resolution_check"
 OUTCOMES_PLUGIN_NAME = "_mutation_outcomes.py"
 OUTCOMES_PLUGIN_MOD = "_mutation_outcomes"
+DEFAULT_DOTTED_PREFIXES = ("", "src/")
 OUTCOMES_PLUGIN_CODE = """import json
 import os
 
@@ -268,7 +269,7 @@ def validate_import_roots(data, workspace, checkpoint, commit):
 
 
 def module_dotted_prefixes(import_roots_norm, mapped_roots_norm):
-    prefixes = ["", "src/"]
+    prefixes = list(DEFAULT_DOTTED_PREFIXES)
     seen = set(prefixes)
     for r in import_roots_norm + mapped_roots_norm:
         rp = normalize_rel(r)
@@ -361,6 +362,17 @@ def run_interpreter_path_probe(plugin_dir, tree_root, env, timeout_sec):
         if not isinstance(p, str):
             return []
     return paths
+
+
+def run_paths(plugin_dir, copy_root, workspace, import_roots, env, timeout_sec):
+    probe_paths = run_interpreter_path_probe(plugin_dir, copy_root, env, timeout_sec)
+    mapped_all = map_probe_entries(probe_paths, workspace, copy_root)
+    mapped_active = active_mapped_roots(copy_root, mapped_all)
+    ir_active = active_import_roots(copy_root, import_roots)
+    dotted_ps = module_dotted_prefixes(ir_active, mapped_active)
+    path_kw = dict(
+        import_roots_rel=ir_active, mapped_roots_rel=mapped_active, dotted_prefixes=dotted_ps)
+    return ir_active, mapped_active, path_kw
 
 
 def mutants_file_ok(workspace, path):
@@ -879,7 +891,7 @@ def archive_checkpoint(workspace, commit, dest, new_tests, untracked):
 def dotted_module_paths(rel, dotted_prefixes=None):
     rel = normalize_rel(rel)
     out = []
-    for prefix in dotted_prefixes or ("", "src/"):
+    for prefix in dotted_prefixes or DEFAULT_DOTTED_PREFIXES:
         if prefix and not rel.startswith(prefix):
             continue
         rest = rel[len(prefix):] if prefix else rel
@@ -1354,11 +1366,8 @@ def pytest_configure(config):
 def _norm(p):
     return os.path.normcase(os.path.abspath(p))
 
-def _in_workspace(ap, nw, nwr):
-    return ap == nw or ap.startswith(nw + os.sep) or ap == nwr or ap.startswith(nwr + os.sep)
-
-def _in_copy(ap, nc, ncr):
-    return ap == nc or ap.startswith(nc + os.sep) or ap == ncr or ap.startswith(ncr + os.sep)
+def _under(ap, a, b):
+    return ap == a or ap.startswith(a + os.sep) or ap == b or ap.startswith(b + os.sep)
 
 def pytest_sessionfinish(session, exitstatus):
     import sys as _sys
@@ -1388,13 +1397,13 @@ def pytest_sessionfinish(session, exitstatus):
     for i, ap in enumerate(norm_path):
         if ap is None:
             continue
-        if _in_copy(ap, nc, ncr):
+        if _under(ap, nc, ncr):
             copy_indices.append(i)
     min_copy = min(copy_indices) if copy_indices else None
     for i, ap in enumerate(norm_path):
         if ap is None:
             continue
-        if _in_workspace(ap, nw, nwr):
+        if _under(ap, nw, nwr):
             if min_copy is None or i < min_copy:
                 path_ahead.append(raw_path[i])
     for name, mod in list(_sys.modules.items()):
@@ -1402,9 +1411,9 @@ def pytest_sessionfinish(session, exitstatus):
         if not f:
             continue
         af = _norm(f)
-        if not _in_workspace(af, nw, nwr):
+        if not _under(af, nw, nwr):
             continue
-        if _in_copy(af, nc, ncr):
+        if _under(af, nc, ncr):
             continue
         for t in TRACKED:
             wp = _norm(os.path.join(wroot, t.replace("/", os.sep)))
@@ -1429,19 +1438,8 @@ def pytest_sessionfinish(session, exitstatus):
 def pytest_env(plugin_dir, tree_root, env, results_path=None, import_roots_rel=(), mapped_roots_rel=()):
     parts = [plugin_dir]
     seen = set()
-    for rel in import_roots_rel:
+    for rel in list(import_roots_rel) + list(mapped_roots_rel):
         p = os.path.join(tree_root, rel.replace("/", os.sep))
-        if os.path.isdir(p):
-            ap = os.path.abspath(p)
-            nk = os.path.normcase(ap)
-            if nk not in seen:
-                parts.append(ap)
-                seen.add(nk)
-    for rel in mapped_roots_rel:
-        if rel == ".":
-            p = tree_root
-        else:
-            p = os.path.join(tree_root, rel.replace("/", os.sep))
         if os.path.isdir(p):
             ap = os.path.abspath(p)
             nk = os.path.normcase(ap)
@@ -1462,7 +1460,7 @@ def pytest_env(plugin_dir, tree_root, env, results_path=None, import_roots_rel=(
 
 def module_file_at_commit(workspace, commit, modname, dotted_prefixes=None):
     parts = modname.split(".")
-    for prefix in dotted_prefixes or ("", "src/"):
+    for prefix in dotted_prefixes or DEFAULT_DOTTED_PREFIXES:
         rel = prefix + "/".join(parts) + ".py"
         if git_try("cat-file", "-e", "%s:%s" % (commit, rel), cwd=workspace) is not None:
             return True
@@ -1549,7 +1547,7 @@ def checkpoint_collect_refused(workspace, commit, rc, err, out, new_tests, dotte
         elif blob:
             parts.append(blob)
     text = "".join(parts)
-    prefixes = dotted_prefixes or ("", "src/")
+    prefixes = dotted_prefixes or DEFAULT_DOTTED_PREFIXES
     for m in re.finditer(r"No module named '([^']+)'", text):
         mod = m.group(1)
         if module_file_at_commit(workspace, commit, mod, prefixes):
@@ -1570,7 +1568,7 @@ def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_t
                          checkpoint=False, checkpoint_commit=None, new_tests=None, copied_conftest=None,
                          import_roots_rel=(), mapped_roots_rel=(), dotted_prefixes=None):
     mutated_files = [{"file": m["file"]} for m in mutants]
-    dp = dotted_prefixes or ("", "src/")
+    dp = dotted_prefixes or DEFAULT_DOTTED_PREFIXES
     out_json = write_resolution_plugin(
         plugin_dir, copy_root, mutated_files, workspace_tracked, workspace, dp)
     if os.path.isfile(out_json):
@@ -1845,13 +1843,7 @@ def main(argv=None):
         if args.checkpoint:
             validate_tracked_copy(workspace, tracked_list)
             copied_conftest = archive_checkpoint(workspace, args.checkpoint, copy_root, new_tests, untracked)
-            probe_paths = run_interpreter_path_probe(plugin_dir, copy_root, env, timeout_sec)
-            mapped_all = map_probe_entries(probe_paths, workspace, copy_root)
-            mapped_active = active_mapped_roots(copy_root, mapped_all)
-            ir_active = active_import_roots(copy_root, import_roots)
-            dotted_ps = module_dotted_prefixes(ir_active, mapped_active)
-            path_kw = dict(
-                import_roots_rel=ir_active, mapped_roots_rel=mapped_active, dotted_prefixes=dotted_ps)
+            ir_active, mapped_active, path_kw = run_paths(plugin_dir, copy_root, workspace, import_roots, env, timeout_sec)
             chk_test_files = []
             for item in new_tests or []:
                 if "::" in item:
@@ -1898,17 +1890,9 @@ def main(argv=None):
                     print("%s: not run (%s)" % (item, blocked))
                     continue
                 chk_results = os.path.join(plugin_dir, "pytest-outcomes-chk-%d.json" % chk_idx)
-                if os.path.isfile(chk_results):
-                    os.remove(chk_results)
-                run_env = pytest_env(
-                    plugin_dir, copy_root, env, chk_results,
+                rc, out, err, timed, _, data = run_mutant_tests(
+                    plugin_dir, copy_root, [item], env, timeout_sec, chk_results,
                     import_roots_rel=ir_active, mapped_roots_rel=mapped_active)
-                cfg = pytest_config_argv(plugin_dir, copy_root)
-                rc, out, err, timed = run_process(
-                    interpreter_argv() + ["-m", "pytest", "-p", OUTCOMES_PLUGIN_MOD, "-p", "no:cacheprovider"]
-                    + cfg + [item],
-                    run_env, copy_root, timeout_sec)
-                data = read_pytest_results(chk_results)
                 if timed or data is None:
                     if "::" in item:
                         print("%s: not run" % item)
@@ -1944,13 +1928,7 @@ def main(argv=None):
             return 4 if any_pass else 0
         validate_tracked_copy(workspace, tracked_list)
         copy_tracked(workspace, copy_root, tracked_list, untracked)
-        probe_paths = run_interpreter_path_probe(plugin_dir, copy_root, env, timeout_sec)
-        mapped_all = map_probe_entries(probe_paths, workspace, copy_root)
-        mapped_active = active_mapped_roots(copy_root, mapped_all)
-        ir_active = active_import_roots(copy_root, import_roots)
-        dotted_ps = module_dotted_prefixes(ir_active, mapped_active)
-        path_kw = dict(
-            import_roots_rel=ir_active, mapped_roots_rel=mapped_active, dotted_prefixes=dotted_ps)
+        ir_active, mapped_active, path_kw = run_paths(plugin_dir, copy_root, workspace, import_roots, env, timeout_sec)
         res_tests = []
         for m in mutants:
             res_tests.extend(m["tests"])
