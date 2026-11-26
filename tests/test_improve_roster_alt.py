@@ -1671,3 +1671,26 @@ def test_task086a_both_reviewers_silent_under_the_family_deviation_skip_the_prof
     assert resolved_path(ws).read_bytes() == before
     assert probed.count(GROK_R) == 1 and probed.count(GPT) == 1, probed
 
+
+# --- TASK-087c: the policy's roster template names the alternate ----------------------------------------------
+
+POLICY = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "Merge-Verification-Policy.md")
+
+
+def test_task087c_the_policys_roster_template_names_the_native_profiles_alternate():
+    """TASK-087c (R-107), Done when: "the policy's roster template ... name `review_b_alt`" (the template is the JSON
+    block after "`docs/ROSTER.json`:" under the policy's "Model roster" heading). The native profile names it; the
+    full profile names none until the design's table resolves the next profile before an alternate whose profile's
+    Review B its pool excludes (the deviation recorded with TASK-087c). An alternate is neither its own profile's
+    Review B nor Review A's model."""
+    with open(POLICY, encoding="utf-8") as f:
+        text = f.read()
+    section = text.split("## Model roster (this project)", 1)[1]
+    block = section.split("`docs/ROSTER.json`:", 1)[1].split("```json", 1)[1].split("```", 1)[0]
+    template = json.loads(block)
+    profiles = {p["name"]: p for p in template["profiles"]}
+    assert set(profiles) == {"full", "native"}, profiles
+    assert profiles["native"].get("review_b_alt"), profiles["native"]
+    for name, p in profiles.items():
+        if p.get("review_b_alt"):
+            assert p["review_b_alt"] not in (p["review_b"], template["review_a"]), name

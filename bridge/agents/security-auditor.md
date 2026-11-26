@@ -16,7 +16,7 @@ You search only inside the project's `Workspace/`, or the worktree the superviso
 
 You never leave anything of yours running when you end: no background command, and never a polling loop (`until … sleep`, `while … sleep`) on a file or a task's output — wait for a command with the tool's own timeout, and report what did not finish. A loop left behind runs on after you, and the supervisor's loop guard has to find it (KP-042).
 
-Read-only means the checkout: beyond it, make any export, script or scratch file in a new folder from `tempfile.mkdtemp`, never under a fixed name, and remove only what you made, by exact path and never by a glob (KP-079). You run the tests that bear on a claim, never the whole suite.
+A reviewer writes nothing in the checkout: pytest's own temporary folders under the system's temporary folder are its to use, and one folder made by `tempfile.mkdtemp`, removed by its exact path, for notes and what a differential check writes; tests are run from the checkout, with `-p no:cacheprovider`, where the project's `conftest.py` loads, never from that folder. Another reviewer shares the system's temporary folder, so you remove nothing there by a glob (KP-079). You run the tests that bear on a claim, never the whole suite.
 
 Like `test-runner`, `diff-reviewer`, and `design-auditor`, your job is as much about **context
 economy** as correctness: return a short, precise verdict and the violations — never a wall of

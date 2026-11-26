@@ -203,3 +203,4 @@ Entries use the form `- <kind> <id> <file> <heading>` where `<kind>` is `reword`
 - reword TASK-087 bridge/commands/supervisor.md 1. Checkpoint
 - new TASK-087 bridge/cursor-bridge/workflow/phases/reflection.md Issues — what counts, and where it is written
 - reword TASK-087 bridge/commands/supervisor.md Role: Supervising Architect
+- new TASK-087 bridge/cursor-bridge/workflow/phases/delegation-loop.md 1. Checkpoint

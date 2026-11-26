@@ -78,8 +78,8 @@ names nothing from the file) spends no round and follows step 3b, every failed l
 a first failure is exit 4, and the same file runs once more; a second is exit 3, which marks the
 model and re-resolves, and the same file runs once more on the profile it gives, under its
 number (a connection error or a hit limit keeps step 3b's exit 4 or 5 and no mark). A third
-failure, an exit 5, or no usable profile makes the design wait (below), Review B's row recorded as
-`not run (<the reason>)`. A round counts against the four once either critic delivered in it (the record's definitions, below); a round in which neither delivered is never run and spends none of the four. The wait ends when the roster returns
+failure or an exit 5 makes the design wait (below), Review B's row recorded as
+`not run (<the reason>)`. A round counts against the four once either critic delivered in it (the record's definitions, below); a round in which neither delivered is never run and spends none of the four. An exhausted pool never makes the design wait, the re-resolve giving the next profile, and no usable profile (`FAIL`) is the owner's decision, asked while the design's other work goes on, the sign-in apart. The wait ends when the roster returns
 (rule 38) or on the owner's word; then the same file runs once under its number, with no
 re-runs. If that launch fails too, Review B's row stays `not run (<the reason>)` and the subject goes on to its
 resolution round or its gate, the report escalating it to the owner.
@@ -165,8 +165,8 @@ or refused; the commit its file was built from; critic; the counts of Blocking, 
 Consider; what was fixed), **Resolution** (the
 question, what was settled, how). The commit its file was built from is the subject's head when the round's file was assembled; a round in which one critic delivered is a critique round, the other critic's row reading `not run (<the reason>)`. The `run/review/DESIGN-*` files are
 removed with `git rm` in the commit that passes the gate, as step 8 removes the review files.
-When no roster profile is usable at intake (Cursor not signed in, both pools exhausted), the
-design waits and the report says so, as rule 38's failure path does; `plan-critic` alone is
+When no roster profile is usable at intake (`FAIL`, no profile answering), Review B's
+critique is the owner's decision, asked in the question form while the rest of the design goes on, as rule 38 says; Cursor not signed in is the sign-in, a run sheet, apart; `plan-critic` alone is
 never the gate's critique.
 
 **Development data stays apart from live data (rule 55).** The design names where the
