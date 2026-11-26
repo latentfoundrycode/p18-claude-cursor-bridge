@@ -2640,6 +2640,71 @@ Each is fixed by the next increment that edits its record.
 - **D1, the stage's mutants at the branch's tree (before the stage review):** 95 mutants in stage I1's five mutants files (TASK-085, TASK-086a, TASK-086b, TASK-086b-r3, TASK-087b; TASK-087a and TASK-087c are supervisor text) (run/supervisor/check_mutants_i1.py); 5 pairs no longer found once, all moved by the pass: TASK-085's m08 (`return paths` now before `def run_paths(`) and m14 (the one loop of `pytest_env`, the import roots dropped from it), TASK-086a's n29 (the new-branch question passed as `False` to `_rebuild_entry`) and n31 (`if not ok_alt or not ok_rb:` before the third `_rebuild_entry` site), and TASK-086b's M6 (`errors="ignore"` in `_read_docs_json`, which now reads for all three readers). Each re-anchored keeping its meaning (backups `.pre-refac`); the five run again on the branch's tree (run/supervisor/REFAC-I1-mutants.json): "counts: run=5 cached=0 killed=5 survived=0 not applied=0 error=0 expected survive=0".
 - **Review A, refactoring mode (the whole branch, 2026-11-26):** APPROVE, nothing blocking, nothing to fix. It ran the old and new run-log readers side by side on 28 byte inputs ("parse cases 28 differ []") and the old and new `pytest_env` on 24 root and roots combinations ("all equal True"); `_branch_from_head`'s four returns give exactly the two old head causes; `_git_rev_parse` the old argv, flags and failure ends; no removed name left in use in bridge/, tests/ or tools/; MANIFEST.json "148 OK, 0 STALE, 0 MISSING, 0 EXTRA"; its own runs "125 passed, 3 skipped", "104 passed", "26 passed". Noted, not findings: the shared row counter gives other row ids, which no assertion and no product decision reads; the launch file's old `row` took its parameters in another order, and every call passes all but the model by name; the "." proof is argued for ordinary absolute roots, the mutation copy never under a `\\?\` prefix.
 
+### Stage I1's review, round 1 (2026-11-26): approved by both, the review done
+- **Inputs.** The stages interleave (HOTFIX-004's carry, c76ea93, merged between TASK-086a and TASK-086b), so the change is the union of the stage's seven squash commits, 020cf7a fa3e4f1 5bb3874 0cb7846 91fc2d8 8b03c32 5e74ab8, written by `stage-diff.py` at 5e74ab8: 74 files, +11566 -427, the hotfix's 15 paths set back and nine OVERLAP paths read in the parts; cited as `stage-review/I1-1:run/review/STAGE-I1-r1.diff` and `stage-review/I1-1:run/review/SCOPE-STAGE-I1.md`. D1 before it: the stage's 95 mutants each found once at the stage branch's head (run/supervisor/check_mutants_i1.py). Snapshot STAGE-I1-r1, hash 570ab2aef337b1ae; `review-guard.py verify` OK, the same hash.
+- **Review A, five parts, each APPROVE with no finding of the five blocking classes:** TASK-085; TASK-086a; TASK-086b; TASK-087b with TASK-087a; TASK-087c with the refactoring pass. **Review B** (grok-4.7-medium, the native profile): APPROVE, VERIFIED `274 passed, 3 skipped` over the four acceptance files, `trace-check.py` OK, `--moves --base 1f8fab2` 12 files, 1,136 passages, 38 excused, OK, the digest 9,633 (parts 4,181 and 5,428). Its roster-check run wrote `.git/bridge/roster-state.json`, whose bytes the reviewer copied back; verify saw no change.
+- **Should fix, recorded, for the next edit of each file (none of the five):**
+  - (1) `roster-check.py`'s help (lines 15 to 19) shows `review_b_alt` in the full profile, against the policy's template, docs/ROSTER.json and the Decision of 2026-11-26; it goes into stage I2's `--review-alt` fix, which edits the file (Review A, part 5).
+  - (2) The find_spec refusal `resolves outside the copy` (mutation-run.py, about lines 1608 to 1614) names neither the editable install nor `import_roots` for a finder-only project whose module sits under `src/`, where the default prefix gives it a dotted name; R-106's line names both only on the loaded-module path (Review A, part 1).
+  - (3) `test_task085_finder_only_refused_with_the_cause_and_the_key_named` asserts `pkg` and `sdk`, which the place alone satisfies; a mutant dropping `(module %s;` survives it (Review A, part 1). The demonstration's check 2 asserts `(module pkg`.
+- **Notes, recorded, not fixed:**
+  - The roster and the launcher:
+    - The launcher's two refusals read a reviewer's family with `family_of` and no roster override, while the resolve uses `_roster_model_family`. Reproduced by Review A, part 3: a roster family `acme` named only by an override, its own model's review admitted. This is TASK-086b's lead (7), outside its threat model row; this project's roster holds no override. The fix's shape: `_roster_model_family` in both refusals.
+    - On an unknown set holding a parsing row of no nameable family, the launcher is more permissive than the resolve.
+    - A set status outside the four falls through to allowed; only a broken roster program reaches it.
+    - `clean` compares paths relative to the repository root, so a project in a subfolder of its repository always reads unclean, which fails safe (part 3).
+    - The REBUILD line names no reset to the first builder run's start commit, part of R-107's remaining text (part 2).
+    - roster-check.py:1350 is unreachable.
+    - A retried `--repair-record` after a failed replace appends the damaged lines twice.
+    - `_COMMIT_NAME_RX` takes 40 or 64 hex digits, stricter than the brief's 4 to 64, and pinned (part 2).
+    - A third failure in the design wait can itself be a usage limit on the profile resolved again; this belongs to the due design revision (part 5).
+  - The texts: verify lists a reviewer's `__pycache__` as removed where a project does not ignore it, which confirms TASK-087c's lead (3) in the code (part 5).
+  - The digest and the boundary report:
+    - The first part's header says nothing of a second part, so on a hand-edited install that lost the second entry a compaction re-injects the core without the standing rules, unseen (part 4).
+    - `report_boundary` is silent when the listing after the run exceeds 20,000 files; this is pre-stage code (part 4).
+    - An old session-start.py with the new supervisor.md prints 9,770 characters of 9,800 (part 4).
+  - The mutation engine:
+    - The probe can import a `sitecustomize.py` at the copy's root.
+    - `import_roots` is described only in its refusal line.
+    - An import root absent from the copy is dropped silently while staying in the cache key (part 1).
+  - The demonstration line: its `--review-alt` exit 1 is met by the wrong cause on this repository's roster, and its `--moves` OK is vacuous without a base. The live run read the family cause and named the base (below; Feedback FB-145).
+- **Records at the close.** R-109's Evidence names its built parts (tests/test_release_s_budgets.py, TASK-087a; tests/test_improve_digest_parts.py, TASK-087b) and stays planned until TASK-118 (Review A, part 5, note 4). The stage branch was tagged `stage-review/I1-1` and deleted; nothing of it reached main.
+
+### Stage I1's demonstration (2026-11-26, live on main 5e74ab8)
+- **The line** (BUILD_PLAN.md, Stage I1): 21 of 21 checks passed (run/supervisor/demo_i1.py, run/agent/demo_i1-live.out). Every program is the repository's, run through its own entry point on scratch fixtures under one mkdtemp folder, with HOME and the application-data folders inside it. 2026.11.23a's programs ran from the kept copy `~/.claude/cursor-bridge-previous/2026.11.23a`, read-only. A stand-in cursor-agent stood first on PATH for every launch. The harness was written by a subagent from the supervisor's brief and run twice; the second run is the record. Its scratch folder was removed by its exact path, the launcher's agent-home junction removed as a link first.
+- **mutation-run.py:**
+  - An `sdk/src` package importable only through a path entry: `m1: killed (ran)`, exit 0. 2026.11.23a ends exit 2 with `module from Workspace path sdk/src/pkg/__init__.py was loaded`.
+  - Through a finder alone it is refused, exit 2: `... was loaded (module pkg; an editable install of the project is the usual cause; use import_roots for a finder-style install)`. With `"import_roots": ["sdk/src"]` the mutant is killed.
+- **roster-check.py and the launcher** (a scratch repository with `origin/main`, the native profile naming `review_b_alt` composer-2.5):
+  - After a grok builder run through the launcher: `DEVIATION  review_b is composer-2.5 instead of grok-4.7-medium (family)`, and the resolved file's `deviation` reads `{"review_b_alt": "composer-2.5", "reason": "family", "branch": "task-1", "built": ["xai"]}`. 2026.11.23a prints REBUILD there.
+  - The launcher let the alternate's review through (the stand-in ran, a review row written).
+  - After a composer builder run on the branch, the same review was refused, exit 125: `review launch on the roster builder model (composer-2.5) is refused; resolve the roster again`. The alternate is the native builder model, so the builder-model refusal answers before the family refusal.
+  - The branch built by both families prints REBUILD.
+  - Step 3b's order: the reset to the checkpoint; a resolve rewriting the resolved roster; the rebuild through the launcher with `start_commit` at the checkpoint and `clean` true. The next resolve prints no REBUILD.
+  - The record with one damaged line: the launcher refuses the alternate; the resolve prints `unknown  the built set is not known (runs.jsonl)` and a REBUILD naming `--repair-record`, which then prints `repair-record  kept 1  moved 1`.
+  - `--review-alt safety-refusal` on a roster whose profile in use names the alternate, after a composer row: exit 1 with `FAIL  --review-alt refused: review_b_alt composer-2.5 is of the cursor family, which built the branch`. That is the family cause, not this repository's recorded profile defect.
+- **The digest:**
+  - `session-start.py --part digest` prints 4,331 characters and `--part digest-2` 5,596, each under its own header.
+  - The digest is 9,656 characters from marker to marker (9,633 read), its parts 4,181 and 5,428.
+- **The budgets and the moves:**
+  - `tests/test_release_s_budgets.py` through the launcher: `3 passed`.
+  - The rulebook is 149,896 words at 0cb7846 (before TASK-087a, limit 150,000) and 149,754 at 91fc2d8 (limit 158,000); the tree is at 150,853.
+  - TASK-087a's 18 entries stand in docs/TRACE_MOVES.md.
+  - `trace-check.py --moves --base 1f8fab2`: 12 files, 1,136 passages, 38 excused, `RESULT: OK`.
+
+### Least confident (stage I1's close, 2026-11-26)
+1. **The alternate reviewer on this project's own roster, in use.**
+   - Every case and the demonstration build the alternate path on scratch rosters. On docs/ROSTER.json the native profile's alternate is composer-2.5, the native builder model, so the launcher answers its review with the builder-model refusal unless a matching deviation stands. `--review-alt` reads the full profile while the pool is exhausted.
+   - No live review on this project has yet run on the alternate.
+   - Check: stage I2's first increment, the `--review-alt` fix. Its acceptance file runs the two-profile roster with the pool exhausted, and its demonstration resolves the native alternate with a DEVIATION line and launches its review through the launcher; a test, before stage I2's second delegation.
+2. **The digest's two parts after a real compaction.**
+   - The second SessionStart entry and `--part digest-2` are proven by tests and by a scratch home only; the installed bridge is 2026.11.24a, which prints the digest whole.
+   - Check: after the release's install, the first compaction's injected messages show both parts, the second under its own header. This is read in the session, at the release's install, under the host-extension rule's demonstration line.
+3. **The mutation engine on a real editable install.**
+   - The cases use scratch venvs with a `.pth` or a hand-made finder. No supervised project's real editable install (setuptools' finder, hatch, a `src` layout) has run through it.
+   - The find_spec refusal names no remedy for a `src/` finder-only layout (Should fix 2 above).
+   - Check: a mutation run on the next supervised project that installs itself in editable mode, its refusal line read. Before that, a case of a `src/` finder-only project, written when the refusal's next edit adds the remedy.
+
 ## Hotfix 2026.11.24a - the heavy slots (HOTFIX-004)
 
 ### Deviations and leads drawn under the gate (2026-11-25)
