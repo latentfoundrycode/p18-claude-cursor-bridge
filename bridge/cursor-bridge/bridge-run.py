@@ -1198,24 +1198,25 @@ def git_common_dir(folder):
         return None
 
 
-def roster_builder_model(folder):
+def _read_docs_json(folder, name):
     try:
-        with open(os.path.join(folder, "docs", "ROSTER.resolved.json"), encoding="utf-8", errors="replace") as f:
+        with open(os.path.join(folder, "docs", name), encoding="utf-8", errors="replace") as f:
             data = json.load(f)
-        if isinstance(data, dict) and isinstance(data.get("builder"), str):
-            return data["builder"]
     except (OSError, ValueError, RecursionError):
-        pass
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def roster_builder_model(folder):
+    data = _read_docs_json(folder, "ROSTER.resolved.json")
+    if data is not None and isinstance(data.get("builder"), str):
+        return data["builder"]
     return None
 
 
 def _read_roster_json(ws):
-    try:
-        with open(os.path.join(ws, "docs", "ROSTER.json"), encoding="utf-8", errors="replace") as f:
-            data = json.load(f)
-    except (OSError, ValueError, RecursionError):
-        return None, None
-    if not isinstance(data, dict):
+    data = _read_docs_json(ws, "ROSTER.json")
+    if data is None:
         return None, None
     profiles = data.get("profiles")
     if profiles is None:
@@ -1242,22 +1243,10 @@ def _git_launch_state(ws):
     """The commit and clean-tree reading for a builder row, before the child starts."""
     base = ws or "."
     start_commit = None
-    try:
-        p = subprocess.run(
-            ["git", "-C", base, "rev-parse", "HEAD"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            creationflags=NO_WINDOW,
-            timeout=bridge_env.GIT_TIMEOUT,
-        )
-        if p.returncode == 0:
-            cand = p.stdout.strip()
-            if len(cand) in (40, 64) and all(ch in "0123456789abcdef" for ch in cand.lower()):
-                start_commit = cand
-    except (OSError, subprocess.TimeoutExpired):
-        return None, False
+    cand = _git_rev_parse(ws, "HEAD")
+    if cand is not None:
+        if len(cand) in (40, 64) and all(ch in "0123456789abcdef" for ch in cand.lower()):
+            start_commit = cand
     if start_commit is None:
         return None, False
     try:
@@ -1302,12 +1291,8 @@ def _git_launch_state(ws):
 
 
 def _load_deviation(folder):
-    try:
-        with open(os.path.join(folder, "docs", "ROSTER.resolved.json"), encoding="utf-8", errors="replace") as f:
-            data = json.load(f)
-    except (OSError, ValueError, RecursionError):
-        return None
-    if not isinstance(data, dict):
+    data = _read_docs_json(folder, "ROSTER.resolved.json")
+    if data is None:
         return None
     deviation = data.get("deviation")
     return deviation if isinstance(deviation, dict) else None

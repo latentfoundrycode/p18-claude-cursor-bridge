@@ -24,7 +24,6 @@ record's file name, `git`, or `main`; the REBUILD line names `--repair-record` f
 
 enforces: docs/BUILD_PLAN.md, TASK-086a, Done when; docs/REQUIREMENTS.md R-107; docs/DESIGN.md C39 and its table
 """
-import itertools
 import json
 import os
 import re
@@ -35,29 +34,18 @@ import sys
 import pytest
 
 import conftest as test_conftest
+from roster_rows import (BRANCH, COMPOSER, FULL, GIT, GPT, GROK_B, GROK_R, NATIVE, REVIEW_A,  # noqa: F401
+                         lies_in_no_repository, rebuild_text, review_row, row)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "roster-check.py")
-GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.autocrlf=false",
-       "-c", "commit.gpgsign=false"]
 
 NOW = "2026-11-24T09:00"
 MARK = "2026-11-24T08:30 UTC: 2 consecutive failures -- x"
-BRANCH = "task-1"
 REPORT1 = "handoff/TASK-001-r1-report.md"
 REPORT2 = "handoff/TASK-001-r2-report.md"
 
-REVIEW_A = "claude-opus-5-5"        # anthropic, Review A's family
-GROK_B = "grok-4.7-high"            # xai, native pool
-GROK_R = "grok-4.7-medium"          # xai, native pool
-COMPOSER = "composer-2.5"           # cursor, native pool
-GPT = "gpt-5.6-sol-high"            # openai, other pool
 CLAUDE_ALT = "claude-sonnet-5"      # anthropic: Review A's family, never independent
-
-FULL = {"name": "full", "builder": GROK_B, "review_b": GPT}
-NATIVE = {"name": "native", "builder": COMPOSER, "review_b": GROK_R}
-
-_ids = itertools.count(1)
 
 
 # --- helpers -------------------------------------------------------------------------------------
@@ -126,26 +114,6 @@ def write_roster(ws, profiles, other_pool="available", unavailable=(), in_repo=T
         write(ws, ".git/bridge/roster-state.json", json.dumps(state, indent=2) + "\n")
 
 
-def row(model, branch=BRANCH, start=None, clean=None, brief="TASK-001", rnd=1, slot=None):
-    """A builder row as the launcher writes it; `start_commit` and `clean` only where given."""
-    e = {"id": "r%d" % next(_ids), "kind": "builder", "head": "cursor-agent", "model": model, "branch": branch,
-         "limit": 7200, "seconds": 100, "exit": 0, "healthy": True}
-    if brief:
-        e.update(brief=brief, round=rnd, brief_name=brief if rnd == 1 else "%s-r%d" % (brief, rnd))
-    if start is not None:
-        e["start_commit"] = start
-    if clean is not None:
-        e["clean"] = clean
-    if slot:
-        e.update(slot=slot, exit=123, seconds=0, healthy=None, waited=7320)
-    return json.dumps(e)
-
-
-def review_row(model=GPT, branch=BRANCH):
-    return json.dumps({"id": "v%d" % next(_ids), "kind": "review", "head": "cursor-agent", "model": model,
-                       "branch": branch, "limit": 3600, "seconds": 10, "exit": 0, "healthy": True})
-
-
 def record_path(ws):
     return ws / "run" / "launcher" / "runs.jsonl"
 
@@ -182,10 +150,6 @@ SENTINEL = '{"sentinel": "the resolved file as it stood before the run"}\n'
 def plant_resolved(ws):
     write(ws, "docs/ROSTER.resolved.json", SENTINEL)
     return resolved_path(ws).read_bytes()
-
-
-def rebuild_text(out):
-    return "\n".join(line for line in out.splitlines() if "REBUILD" in line)
 
 
 def deviation_printed(out):
@@ -236,17 +200,6 @@ def assert_cannot_read(ws, rc, out, before, needle):
     assert re.search(r"\b%s\b" % re.escape(needle), out.lower()), "the cause named (%s): %s" % (needle, out)
     assert "REBUILD" not in out and "RESOLVED" not in out, out
     assert resolved_path(ws).read_bytes() == before, "the resolved file is left unchanged"
-
-
-def lies_in_no_repository(path):
-    p = os.path.abspath(str(path))
-    while True:
-        if os.path.exists(os.path.join(p, ".git")):
-            return False
-        parent = os.path.dirname(p)
-        if parent == p:
-            return True
-        p = parent
 
 
 # --- the built set's histories ---------------------------------------------------------------------
