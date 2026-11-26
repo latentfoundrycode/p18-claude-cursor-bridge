@@ -34,7 +34,6 @@ set that cannot be read names `detached`, `runs.jsonl`, `git` or `main`; the loa
 enforces: docs/BUILD_PLAN.md, TASK-086b, Done when; docs/REQUIREMENTS.md R-107; docs/DESIGN.md C39 and its table;
 D-003; D-004
 """
-import itertools
 import json
 import os
 import re
@@ -45,30 +44,22 @@ import time
 
 import pytest
 
+from roster_rows import (BRANCH, COMPOSER, FULL, GIT, GPT, GROK_B, GROK_R, NATIVE, REVIEW_A,  # noqa: F401
+                         lies_in_no_repository, rebuild_text, review_row, row)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 CB = os.path.abspath(os.path.join(HERE, os.pardir, "bridge", "cursor-bridge"))
 PROG = os.path.join(CB, "bridge-run.py")
 ROSTER_PROG = os.path.join(CB, "roster-check.py")
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 TIMEOUT = 120
-GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.autocrlf=false",
-       "-c", "commit.gpgsign=false"]
 
 REFUSED = "bridge-run: refused - "
 STARTED_RX = re.compile(r"^bridge-run: started \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 COMMIT_RX = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
-BRANCH = "task-1"
 NOW = "2026-11-25T09:00"
 
-REVIEW_A = "claude-opus-5-5"        # anthropic
-GROK_B = "grok-4.7-high"            # xai
-GROK_R = "grok-4.7-medium"          # xai
-COMPOSER = "composer-2.5"           # cursor
-GPT = "gpt-5.6-sol-high"            # openai
 MYSTERY = "mystery-builder-2"       # a model whose family no rule names
-
-FULL = {"name": "full", "builder": GROK_B, "review_b": GPT}
-NATIVE = {"name": "native", "builder": COMPOSER, "review_b": GROK_R}
 
 REVIEW_PROMPT = "Review run/review/REVIEW-TASK-001.diff"
 REPORT2 = "handoff/TASK-002-r1-report.md"
@@ -91,8 +82,6 @@ deadline = time.time() + 90
 while time.time() < deadline and not os.path.exists(sys.argv[3]):
     time.sleep(0.1)
 '''
-
-_ids = itertools.count(1)
 
 
 # --- helpers -------------------------------------------------------------------------------------
@@ -169,37 +158,6 @@ def commit(ws, msg, files=None):
         git(ws, "add", "--", rel)
     git(ws, "commit", "-q", "--allow-empty", "-m", msg)
     return head(ws)
-
-
-def lies_in_no_repository(path):
-    p = os.path.abspath(str(path))
-    while True:
-        if os.path.exists(os.path.join(p, ".git")):
-            return False
-        parent = os.path.dirname(p)
-        if parent == p:
-            return True
-        p = parent
-
-
-def row(model, branch=BRANCH, brief="TASK-001", rnd=1, start=None, clean=None, slot=None):
-    """A builder row as the launcher writes it; `start_commit` and `clean` only where given."""
-    e = {"id": "r%d" % next(_ids), "kind": "builder", "head": "cursor-agent", "model": model, "branch": branch,
-         "limit": 7200, "seconds": 100, "exit": 0, "healthy": True}
-    if brief:
-        e.update(brief=brief, round=rnd, brief_name=brief if rnd == 1 else "%s-r%d" % (brief, rnd))
-    if start is not None:
-        e["start_commit"] = start
-    if clean is not None:
-        e["clean"] = clean
-    if slot:
-        e.update(slot=slot, exit=123, seconds=0, healthy=None, waited=7320)
-    return json.dumps(e)
-
-
-def review_row(model=GPT, branch=BRANCH):
-    return json.dumps({"id": "v%d" % next(_ids), "kind": "review", "head": "cursor-agent", "model": model,
-                       "branch": branch, "limit": 3600, "seconds": 10, "exit": 0, "healthy": True})
 
 
 def record(ws):
@@ -406,10 +364,6 @@ def resolve(ws):
     env["ROSTER_NOW"] = NOW
     p = run_quiet([sys.executable, ROSTER_PROG, "docs/ROSTER.json", "--no-probe"], ws, env=env)
     return p.returncode, (p.stdout + p.stderr).decode("utf-8", "replace")
-
-
-def rebuild_text(out):
-    return "\n".join(line for line in out.splitlines() if "REBUILD" in line)
 
 
 # --- R1: the family refusal reads the built set ------------------------------------------------------
