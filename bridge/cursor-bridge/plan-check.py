@@ -160,6 +160,13 @@ def brief_findings(path, item):
     for rid in re.findall(r"\bR-\d{3,}\b", item["fields"].get("satisfies") or ""):
         if not re.search(r"\b%s\b" % rid, body_src):
             found.append("does not name %s, which %s satisfies" % (rid, item["id"]))
+    if rec.refusal is None and rec.header is not None:
+        if rec.fallback.get("none_carries_ids"):
+            found.append(bridge_env.brief_none_carries_message(body_src))
+        elif "satisfies" in rec.disagrees:
+            found.append(
+                "header " + bridge_env.brief_satisfies_disagree_message(rec.header, rec.fallback)
+            )
     return found
 
 

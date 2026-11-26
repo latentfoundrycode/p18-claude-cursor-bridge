@@ -2723,6 +2723,33 @@ Each is fixed by the next increment that edits its record.
   - The builders' reports named wrong tests or code points in their mutation tables in every round (round 1's M6a, round 2's M5 and M2, round 3's M1), and the round-1 and round-2 reports quoted two paths of this computer. The supervisor replaced those with `<Workspace>` before committing them.
 - **Records.** R-107's Evidence names this test file. R-107 stays planned until the design revision that names the full profile's alternate (INVENTORY, Decisions, 2026-11-26).
 
+### TASK-088 - one reader for a brief's Satisfies ids (R-110; stage I2, 2026-11-26)
+- **Thirty merged briefs' headers, at the checkpoint.** Before the brief, a scan of every headed brief under `handoff/` with the new reading (run/supervisor/scan_briefs_088.py) found thirty merged briefs. Each lists its rows as bullets beneath a bare `Satisfies:` line, and the records migration headed them `satisfies: []` from the one-line reading. The supervisor's checkpoint commit set each header to the rows its prose lists: BUG-002, BUG-003, BUG-010, TASK-006, TASK-008, TASK-015 (and r2 to r7), TASK-016, TASK-024 (and r2), TASK-029-r4, TASK-031 (and r2 to r14). The header is derived from the prose; no prose changed. tests/test_program_own_records.py holds them.
+- **The acceptance file**, tests/test_improve_satisfies_reader.py, the supervisor's. Round 1 had 21 tests: the design's seven rows at the launcher, the reader, plan-check's two lines, and what stands. Rounds 2 and 3 added the tests of each review's finding, red on the round before; after round 1's build the supervisor added the guard's `none` case. The file holds 47 tests: 40 red on origin/main's code (a scratch run with main's three programs), 7 holding what stands.
+- **A changed expectation**, the supervisor's: tests/test_records_migrate.py, `test_r062_a_satisfies_id_named_twice_is_written_once`. The migration writes the reader's ids, each once (C29). Review A read it and judged it right.
+- **Round 1** (composer-2.5, the native profile): `brief_satisfies_ids`, the set comparison, the two refusal texts and plan-check's two lines.
+  - The security audit failed it (blocking, security, reproduced): ESC, BEL and backspace from the brief's line reached the refusal and plan-check's line raw. `backslashreplace` escapes only non-ASCII.
+  - Review A rejected it on three blocking findings: `none.` and `none,` (handoff/BUG-038.md's form) not read as `none`; a second loop finding the line for the refusal's text; plan-check's lists printed by repr.
+  - Should-fix, ruled by the supervisor into round 2: the ids beside a `none` returned (Requirement 1 as written); the `none` refusal at `satisfies`' place in the key order; a field written as a bullet ends the bullets.
+- **Round 2:** one escape (`ascii_brief_quote`: non-ASCII, C0 and DEL); one locator (`brief_satisfies_line`); `none` matched by a list of following characters; plan-check's remedy shared.
+  - The supervisor's own read found the `none` refusal reached only inside a `satisfies` disagreement (a new test, red). Both reviewers confirmed it as blocking: with the ids returned, a header listing the same ids agreed as a set and launched. One form of this, `Satisfies: none` with `- R-105` beneath, was refused on main.
+  - Review A also found `none:`, `none-`, `none` with an em dash, `/`, `)` and `!` not read as `none`, and plan-check's disagreement line without the launcher's remedy.
+- **Round 3** (at the review ceiling): the keys walked in the agreement's order, the `none` refusal at `satisfies` whatever the lists; `none\b`; one disagreement message for the launcher and plan-check.
+  - Review A and the security audit each named one blocking item: `Satisfies: _none_` or `__none__` with an id on a bullet beneath and the same id in the header launches, where main refused it. `\b` gives no boundary before a closing underscore. The cause is round 3's brief, whose S2 named `\b` and also allowed underscore marks.
+  - The supervisor ruled it outside the five at the ceiling, recorded here. It needs an underscore-emphasised `none`, which no brief in the repository writes and the packager never writes, plus a bullet id beneath it and a header naming that id. With an empty header the brief is still refused (reproduced: `header: disagrees satisfies header [] prose [R-105]; ...`). What launches is a brief whose header and prose, as read, name the same rows: the same launch a plainly consistent brief gets, with no reach gained.
+  - Both reviewers accepted the ruling, and gave their final verdicts by message: Review A APPROVE, the audit PASS, no other blocking finding.
+  - Own-file run: 30 test files, 1987 passed, 1 skipped (a symbolic-link platform skip).
+- **Mutation:** 18 mutants (run/supervisor/TASK-088-mutants.json), each killed in a scratch listing (run/supervisor/mutant_failures.py) before the engine's run. Each expected list was set from that listing.
+- **Leads, recorded, not fixed (none of the five):**
+  - The underscore-emphasised `none` above. A fix is `none(?![^\W_])`, with an `_none_` case beside `bold-beneath-refused-on-main`. `none1`, and `none` followed by a non-ASCII letter, are not read as `none` either (the audit, round 3).
+  - `check_satisfies` in `brief_header_refusal` is always true where it is tested, since the order is filtered by `keys` (Review A, round 3; dead, harmless).
+  - The launcher's `_ascii_refusal` still escapes only non-ASCII. Every brief-text path now escapes before it, but a future refusal that quotes brief text would lean on it (the audit, round 2).
+  - plan-check's pre-existing `names <path> in its Scope` line prints a Scope path unescaped (the audit, round 2; not reached in its probes).
+  - `ascii_brief_quote` leaves a literal backslash, so the text `\x1b` in a brief prints like an escaped ESC (Review A, round 2).
+  - Main's refusals of a list in another order, a repeated id and ids given only as bullets are given up, as the design's table asks (the audit, round 3).
+  - The builders' `Assumed, not verified` lists read `none` in rounds 2 and 3, while each round's reviewers found an unlisted reading (the `none` forms, the refusal's placement).
+- **Records.** R-110 stays planned until TASK-096, its text increment. Its Evidence names this test file.
+
 ## Hotfix 2026.11.24a - the heavy slots (HOTFIX-004)
 
 ### Deviations and leads drawn under the gate (2026-11-25)

@@ -3,7 +3,7 @@ record: brief
 header: 1
 id: TASK-006
 round: 1
-satisfies: []
+satisfies: [R-014, R-033]
 scope: ["bridge/cursor-bridge/workflow-check.py", ".github/workflows/tests.yml", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/TASK-006-r1-report.md"]
 merge_unit: null
 blocking_class: null

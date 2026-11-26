@@ -549,16 +549,17 @@ def test_r062_a_briefs_id_and_round_come_from_its_file_name(tmp_path, rel, want_
     assert re.search(r"(?m)^round: %d$" % want_round, head), head
 
 
-def test_r062_a_satisfies_id_named_twice_is_kept_twice_in_order(tmp_path):
-    """The supervisor's ruling for TASK-051: the migration writes the fallback's reading exactly, so a brief whose
-    `Satisfies:` line names an ID twice keeps both, in order, and the read-back agrees; the merge unit and the
-    blocking class are written from their lines too."""
+def test_r062_a_satisfies_id_named_twice_is_written_once(tmp_path):
+    """The supervisor's ruling for TASK-051: the migration writes the fallback's reading exactly. Since TASK-088 (R-110,
+    C29) that reading names each id once, so a brief whose `Satisfies:` line names an ID twice is headed with it once,
+    and the read-back agrees (the header's satisfies compares as a set); the merge unit and the blocking class are
+    written from their lines too. Changed expectation: before TASK-088 both were kept, in order."""
     rel = "handoff/TASK-007-r3.md"
     root = project(tmp_path, [rel])
     code, out = migrate(root)
     assert code == 0, out
     header, _head = assert_migrated("brief", rel, FIXTURES[rel][1], read(root, rel))
-    assert header["satisfies"] == ["R-062", "R-062"]
+    assert header["satisfies"] == ["R-062"]
     assert header["merge_unit"] == ["TASK-007", "TASK-008"]
     assert header["blocking_class"] == "data integrity"
     assert header["scope"] == ["src/writer.py", "tests/test_writer.py"]

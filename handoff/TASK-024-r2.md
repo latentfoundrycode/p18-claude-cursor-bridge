@@ -3,7 +3,7 @@ record: brief
 header: 1
 id: TASK-024
 round: 2
-satisfies: []
+satisfies: [R-027, R-033]
 scope: ["bridge/cursor-bridge/conformance-check.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_calibrate_program.py", "tests/test_workflows_line_check.py", "tests/test_b2_least_confident.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-024-r2-report.md"]
 merge_unit: null
 blocking_class: null
