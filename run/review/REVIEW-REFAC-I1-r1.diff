@@ -1,0 +1,2448 @@
+diff --git a/bridge/cursor-bridge/MANIFEST.json b/bridge/cursor-bridge/MANIFEST.json
+index 90cd542..7cdbacd 100644
+--- a/bridge/cursor-bridge/MANIFEST.json
++++ b/bridge/cursor-bridge/MANIFEST.json
+@@ -1,6 +1,6 @@
+ {
+   "version": "2026.11.24a",
+-  "generated": "2026-11-26 01:21",
++  "generated": "2026-11-26 04:42",
+   "files": {
+     "agents/cursor-configurator.md": "9c0eb6ca7137e955de61cc16e74f5a91450d269f683ebf29cdda23ab40606f89",
+     "agents/design-auditor.md": "c69924173f18e10bbb83afb6cca9e0caea237f5b76d4d6745a0e7b1d4b06fc3d",
+@@ -31,7 +31,7 @@
+     "cursor-bridge/boundary-check.py": "10aa333b4387f7f14ae85f9edb68fc5e8bda5a17a391f6161004f40cef4e7242",
+     "cursor-bridge/bridge-check.py": "be7d6fde0c03b7f04a905770130059b41db05f31f982431c935dc47c95064607",
+     "cursor-bridge/bridge-install.py": "59628f4816c797caa0b65036c81db7210ac63f5ca86213087b7065a2c9d96c12",
+-    "cursor-bridge/bridge-run.py": "66379d2fccc8098a7489ea25319d3d5f8dd015a6ada69b39f2a7b0c11d6fb19a",
++    "cursor-bridge/bridge-run.py": "31cb923fa4980e715da76fb469386dc5059e2cb29371828d28bf3497b291df26",
+     "cursor-bridge/bridge-stop.py": "0277c26c23d578b96a16af816629e1e2e5bf2000116d3f317f371a21004415d0",
+     "cursor-bridge/bridge_env.py": "500ecce6430fd063c134bca7153050b1e7ecbc10358799f5600e82b059a8858c",
+     "cursor-bridge/completion-check.py": "27bfc126a40986f16347307126d909738ce90d71a6d29caa05b898654419249b",
+@@ -86,7 +86,7 @@
+     "cursor-bridge/lock-check.py": "f843dd5a213583d2fb9896bb269c2803511b3ea7b46a561337dc74a67b4e45fe",
+     "cursor-bridge/loop-guard.py": "e6a4b1453f22b4317047995cfbd1ad5deb6478b1a67a3d91d08f0c839f16b9d9",
+     "cursor-bridge/minimal-code.snapshot.md": "b822c4d7abd69971dc5fee671b8a63daa58ba62a2711c9cf07849ed82d01a215",
+-    "cursor-bridge/mutation-run.py": "046c7c69e856c1ded6d91ce68d32a38a7f7a84472416d320d6446ae9b9194a2f",
++    "cursor-bridge/mutation-run.py": "96ec8d7986420f0efa0e4b643197187231ab9dc530aa8c1e62c7140bc78c67c2",
+     "cursor-bridge/pace-report.py": "bf76580ce298085f60471a6eca2652e5973139336377be5de3dd9a380e88542c",
+     "cursor-bridge/permission-guard.py": "6e85731afcca3f8fa4a71c80a3501d9875c7f4f470128ca3f10f8e089db6c31a",
+     "cursor-bridge/plan-check.py": "f8167ac2793c34c7cd8ea8c5fe96ab24937dae28f8051709b9b9f6b248139405",
+@@ -96,7 +96,7 @@
+     "cursor-bridge/records-migrate.py": "2d3e07ab28b244c74efdcb49a6ccf0830b6d52559b1243f975e752ff363cdad2",
+     "cursor-bridge/refactor-check.py": "4950674a1de1bccf2ac95a4bcec6ab5cc767f1c0a171c01cf164891d1c7d7c36",
+     "cursor-bridge/review-guard.py": "f40efd0817933ce0aef8261ce400e065c9b61c27ec445d0532afb5c44039b19f",
+-    "cursor-bridge/roster-check.py": "11bc1298be30bd554a75dfc1207617c4d06b1a191dcbd3da971902c1135a73d2",
++    "cursor-bridge/roster-check.py": "27a7015d96a5b4b81f43398e43bfb34c74f9f1d5f0b5e8f9746206790824d743",
+     "cursor-bridge/run-hidden.py": "bcae418e3cca9d7f1be7bf421ce44b879b343613301df4590d9cc45d00f5be5c",
+     "cursor-bridge/scope-check.py": "0c9377dbd74236d256a4cbee74b082d0c4a2cd03ab20b2ad6e15a5a40d32b9d5",
+     "cursor-bridge/secure-coding.snapshot.md": "3f41667754917ffef6fb47308645356be6a5fd2fc362cc9c3dedf92a9457324e",
+diff --git a/bridge/cursor-bridge/bridge-run.py b/bridge/cursor-bridge/bridge-run.py
+index aa76f5e..3e58867 100644
+--- a/bridge/cursor-bridge/bridge-run.py
++++ b/bridge/cursor-bridge/bridge-run.py
+@@ -1198,24 +1198,25 @@ def git_common_dir(folder):
+         return None
+ 
+ 
+-def roster_builder_model(folder):
++def _read_docs_json(folder, name):
+     try:
+-        with open(os.path.join(folder, "docs", "ROSTER.resolved.json"), encoding="utf-8", errors="replace") as f:
++        with open(os.path.join(folder, "docs", name), encoding="utf-8", errors="replace") as f:
+             data = json.load(f)
+-        if isinstance(data, dict) and isinstance(data.get("builder"), str):
+-            return data["builder"]
+     except (OSError, ValueError, RecursionError):
+-        pass
++        return None
++    return data if isinstance(data, dict) else None
++
++
++def roster_builder_model(folder):
++    data = _read_docs_json(folder, "ROSTER.resolved.json")
++    if data is not None and isinstance(data.get("builder"), str):
++        return data["builder"]
+     return None
+ 
+ 
+ def _read_roster_json(ws):
+-    try:
+-        with open(os.path.join(ws, "docs", "ROSTER.json"), encoding="utf-8", errors="replace") as f:
+-            data = json.load(f)
+-    except (OSError, ValueError, RecursionError):
+-        return None, None
+-    if not isinstance(data, dict):
++    data = _read_docs_json(ws, "ROSTER.json")
++    if data is None:
+         return None, None
+     profiles = data.get("profiles")
+     if profiles is None:
+@@ -1242,22 +1243,10 @@ def _git_launch_state(ws):
+     """The commit and clean-tree reading for a builder row, before the child starts."""
+     base = ws or "."
+     start_commit = None
+-    try:
+-        p = subprocess.run(
+-            ["git", "-C", base, "rev-parse", "HEAD"],
+-            capture_output=True,
+-            text=True,
+-            encoding="utf-8",
+-            errors="replace",
+-            creationflags=NO_WINDOW,
+-            timeout=bridge_env.GIT_TIMEOUT,
+-        )
+-        if p.returncode == 0:
+-            cand = p.stdout.strip()
+-            if len(cand) in (40, 64) and all(ch in "0123456789abcdef" for ch in cand.lower()):
+-                start_commit = cand
+-    except (OSError, subprocess.TimeoutExpired):
+-        return None, False
++    cand = _git_rev_parse(ws, "HEAD")
++    if cand is not None:
++        if len(cand) in (40, 64) and all(ch in "0123456789abcdef" for ch in cand.lower()):
++            start_commit = cand
+     if start_commit is None:
+         return None, False
+     try:
+@@ -1302,12 +1291,8 @@ def _git_launch_state(ws):
+ 
+ 
+ def _load_deviation(folder):
+-    try:
+-        with open(os.path.join(folder, "docs", "ROSTER.resolved.json"), encoding="utf-8", errors="replace") as f:
+-            data = json.load(f)
+-    except (OSError, ValueError, RecursionError):
+-        return None
+-    if not isinstance(data, dict):
++    data = _read_docs_json(folder, "ROSTER.resolved.json")
++    if data is None:
+         return None
+     deviation = data.get("deviation")
+     return deviation if isinstance(deviation, dict) else None
+diff --git a/bridge/cursor-bridge/mutation-run.py b/bridge/cursor-bridge/mutation-run.py
+index 8baea32..14b97a0 100644
+--- a/bridge/cursor-bridge/mutation-run.py
++++ b/bridge/cursor-bridge/mutation-run.py
+@@ -59,6 +59,7 @@ PLUGIN_NAME = "_mutation_resolution_check.py"
+ PLUGIN_MOD = "_mutation_resolution_check"
+ OUTCOMES_PLUGIN_NAME = "_mutation_outcomes.py"
+ OUTCOMES_PLUGIN_MOD = "_mutation_outcomes"
++DEFAULT_DOTTED_PREFIXES = ("", "src/")
+ OUTCOMES_PLUGIN_CODE = """import json
+ import os
+ 
+@@ -268,7 +269,7 @@ def validate_import_roots(data, workspace, checkpoint, commit):
+ 
+ 
+ def module_dotted_prefixes(import_roots_norm, mapped_roots_norm):
+-    prefixes = ["", "src/"]
++    prefixes = list(DEFAULT_DOTTED_PREFIXES)
+     seen = set(prefixes)
+     for r in import_roots_norm + mapped_roots_norm:
+         rp = normalize_rel(r)
+@@ -363,6 +364,17 @@ def run_interpreter_path_probe(plugin_dir, tree_root, env, timeout_sec):
+     return paths
+ 
+ 
++def run_paths(plugin_dir, copy_root, workspace, import_roots, env, timeout_sec):
++    probe_paths = run_interpreter_path_probe(plugin_dir, copy_root, env, timeout_sec)
++    mapped_all = map_probe_entries(probe_paths, workspace, copy_root)
++    mapped_active = active_mapped_roots(copy_root, mapped_all)
++    ir_active = active_import_roots(copy_root, import_roots)
++    dotted_ps = module_dotted_prefixes(ir_active, mapped_active)
++    path_kw = dict(
++        import_roots_rel=ir_active, mapped_roots_rel=mapped_active, dotted_prefixes=dotted_ps)
++    return ir_active, mapped_active, path_kw
++
++
+ def mutants_file_ok(workspace, path):
+     try:
+         rel = os.path.relpath(os.path.abspath(path), workspace).replace("\\", "/")
+@@ -879,7 +891,7 @@ def archive_checkpoint(workspace, commit, dest, new_tests, untracked):
+ def dotted_module_paths(rel, dotted_prefixes=None):
+     rel = normalize_rel(rel)
+     out = []
+-    for prefix in dotted_prefixes or ("", "src/"):
++    for prefix in dotted_prefixes or DEFAULT_DOTTED_PREFIXES:
+         if prefix and not rel.startswith(prefix):
+             continue
+         rest = rel[len(prefix):] if prefix else rel
+@@ -1354,11 +1366,8 @@ def pytest_configure(config):
+ def _norm(p):
+     return os.path.normcase(os.path.abspath(p))
+ 
+-def _in_workspace(ap, nw, nwr):
+-    return ap == nw or ap.startswith(nw + os.sep) or ap == nwr or ap.startswith(nwr + os.sep)
+-
+-def _in_copy(ap, nc, ncr):
+-    return ap == nc or ap.startswith(nc + os.sep) or ap == ncr or ap.startswith(ncr + os.sep)
++def _under(ap, a, b):
++    return ap == a or ap.startswith(a + os.sep) or ap == b or ap.startswith(b + os.sep)
+ 
+ def pytest_sessionfinish(session, exitstatus):
+     import sys as _sys
+@@ -1388,13 +1397,13 @@ def pytest_sessionfinish(session, exitstatus):
+     for i, ap in enumerate(norm_path):
+         if ap is None:
+             continue
+-        if _in_copy(ap, nc, ncr):
++        if _under(ap, nc, ncr):
+             copy_indices.append(i)
+     min_copy = min(copy_indices) if copy_indices else None
+     for i, ap in enumerate(norm_path):
+         if ap is None:
+             continue
+-        if _in_workspace(ap, nw, nwr):
++        if _under(ap, nw, nwr):
+             if min_copy is None or i < min_copy:
+                 path_ahead.append(raw_path[i])
+     for name, mod in list(_sys.modules.items()):
+@@ -1402,9 +1411,9 @@ def pytest_sessionfinish(session, exitstatus):
+         if not f:
+             continue
+         af = _norm(f)
+-        if not _in_workspace(af, nw, nwr):
++        if not _under(af, nw, nwr):
+             continue
+-        if _in_copy(af, nc, ncr):
++        if _under(af, nc, ncr):
+             continue
+         for t in TRACKED:
+             wp = _norm(os.path.join(wroot, t.replace("/", os.sep)))
+@@ -1429,7 +1438,7 @@ def pytest_sessionfinish(session, exitstatus):
+ def pytest_env(plugin_dir, tree_root, env, results_path=None, import_roots_rel=(), mapped_roots_rel=()):
+     parts = [plugin_dir]
+     seen = set()
+-    for rel in import_roots_rel:
++    for rel in list(import_roots_rel) + list(mapped_roots_rel):
+         p = os.path.join(tree_root, rel.replace("/", os.sep))
+         if os.path.isdir(p):
+             ap = os.path.abspath(p)
+@@ -1437,17 +1446,6 @@ def pytest_env(plugin_dir, tree_root, env, results_path=None, import_roots_rel=(
+             if nk not in seen:
+                 parts.append(ap)
+                 seen.add(nk)
+-    for rel in mapped_roots_rel:
+-        if rel == ".":
+-            p = tree_root
+-        else:
+-            p = os.path.join(tree_root, rel.replace("/", os.sep))
+-        if os.path.isdir(p):
+-            ap = os.path.abspath(p)
+-            nk = os.path.normcase(ap)
+-            if nk not in seen:
+-                parts.append(ap)
+-                seen.add(nk)
+     tr = os.path.abspath(tree_root)
+     nk = os.path.normcase(tr)
+     if nk not in seen:
+@@ -1462,7 +1460,7 @@ def pytest_env(plugin_dir, tree_root, env, results_path=None, import_roots_rel=(
+ 
+ def module_file_at_commit(workspace, commit, modname, dotted_prefixes=None):
+     parts = modname.split(".")
+-    for prefix in dotted_prefixes or ("", "src/"):
++    for prefix in dotted_prefixes or DEFAULT_DOTTED_PREFIXES:
+         rel = prefix + "/".join(parts) + ".py"
+         if git_try("cat-file", "-e", "%s:%s" % (commit, rel), cwd=workspace) is not None:
+             return True
+@@ -1549,7 +1547,7 @@ def checkpoint_collect_refused(workspace, commit, rc, err, out, new_tests, dotte
+         elif blob:
+             parts.append(blob)
+     text = "".join(parts)
+-    prefixes = dotted_prefixes or ("", "src/")
++    prefixes = dotted_prefixes or DEFAULT_DOTTED_PREFIXES
+     for m in re.finditer(r"No module named '([^']+)'", text):
+         mod = m.group(1)
+         if module_file_at_commit(workspace, commit, mod, prefixes):
+@@ -1570,7 +1568,7 @@ def run_resolution_check(plugin_dir, copy_root, mutants, test_files, workspace_t
+                          checkpoint=False, checkpoint_commit=None, new_tests=None, copied_conftest=None,
+                          import_roots_rel=(), mapped_roots_rel=(), dotted_prefixes=None):
+     mutated_files = [{"file": m["file"]} for m in mutants]
+-    dp = dotted_prefixes or ("", "src/")
++    dp = dotted_prefixes or DEFAULT_DOTTED_PREFIXES
+     out_json = write_resolution_plugin(
+         plugin_dir, copy_root, mutated_files, workspace_tracked, workspace, dp)
+     if os.path.isfile(out_json):
+@@ -1845,13 +1843,7 @@ def main(argv=None):
+         if args.checkpoint:
+             validate_tracked_copy(workspace, tracked_list)
+             copied_conftest = archive_checkpoint(workspace, args.checkpoint, copy_root, new_tests, untracked)
+-            probe_paths = run_interpreter_path_probe(plugin_dir, copy_root, env, timeout_sec)
+-            mapped_all = map_probe_entries(probe_paths, workspace, copy_root)
+-            mapped_active = active_mapped_roots(copy_root, mapped_all)
+-            ir_active = active_import_roots(copy_root, import_roots)
+-            dotted_ps = module_dotted_prefixes(ir_active, mapped_active)
+-            path_kw = dict(
+-                import_roots_rel=ir_active, mapped_roots_rel=mapped_active, dotted_prefixes=dotted_ps)
++            ir_active, mapped_active, path_kw = run_paths(plugin_dir, copy_root, workspace, import_roots, env, timeout_sec)
+             chk_test_files = []
+             for item in new_tests or []:
+                 if "::" in item:
+@@ -1898,17 +1890,9 @@ def main(argv=None):
+                     print("%s: not run (%s)" % (item, blocked))
+                     continue
+                 chk_results = os.path.join(plugin_dir, "pytest-outcomes-chk-%d.json" % chk_idx)
+-                if os.path.isfile(chk_results):
+-                    os.remove(chk_results)
+-                run_env = pytest_env(
+-                    plugin_dir, copy_root, env, chk_results,
++                rc, out, err, timed, _, data = run_mutant_tests(
++                    plugin_dir, copy_root, [item], env, timeout_sec, chk_results,
+                     import_roots_rel=ir_active, mapped_roots_rel=mapped_active)
+-                cfg = pytest_config_argv(plugin_dir, copy_root)
+-                rc, out, err, timed = run_process(
+-                    interpreter_argv() + ["-m", "pytest", "-p", OUTCOMES_PLUGIN_MOD, "-p", "no:cacheprovider"]
+-                    + cfg + [item],
+-                    run_env, copy_root, timeout_sec)
+-                data = read_pytest_results(chk_results)
+                 if timed or data is None:
+                     if "::" in item:
+                         print("%s: not run" % item)
+@@ -1944,13 +1928,7 @@ def main(argv=None):
+             return 4 if any_pass else 0
+         validate_tracked_copy(workspace, tracked_list)
+         copy_tracked(workspace, copy_root, tracked_list, untracked)
+-        probe_paths = run_interpreter_path_probe(plugin_dir, copy_root, env, timeout_sec)
+-        mapped_all = map_probe_entries(probe_paths, workspace, copy_root)
+-        mapped_active = active_mapped_roots(copy_root, mapped_all)
+-        ir_active = active_import_roots(copy_root, import_roots)
+-        dotted_ps = module_dotted_prefixes(ir_active, mapped_active)
+-        path_kw = dict(
+-            import_roots_rel=ir_active, mapped_roots_rel=mapped_active, dotted_prefixes=dotted_ps)
++        ir_active, mapped_active, path_kw = run_paths(plugin_dir, copy_root, workspace, import_roots, env, timeout_sec)
+         res_tests = []
+         for m in mutants:
+             res_tests.extend(m["tests"])
+diff --git a/bridge/cursor-bridge/roster-check.py b/bridge/cursor-bridge/roster-check.py
+index 73f16b2..38d9f93 100644
+--- a/bridge/cursor-bridge/roster-check.py
++++ b/bridge/cursor-bridge/roster-check.py
+@@ -166,17 +166,10 @@ def built_by(run_log, branch=None):
+     branch = branch or current_branch()
+     entries = []
+     for line_b in raw:
+-        if not line_b.strip():
+-            continue
+-        try:
+-            line = line_b.decode("utf-8")
+-        except UnicodeDecodeError:
+-            continue
+-        try:
+-            e = json.loads(line)
+-        except (ValueError, RecursionError):
++        e = _parse_run_line(line_b)
++        if not e:
+             continue
+-        if isinstance(e, dict) and e.get("kind") == "builder" and e.get("model"):
++        if e.get("kind") == "builder" and e.get("model"):
+             if e.get("slot") == "not free":
+                 continue
+             entries.append(e)
+@@ -465,6 +458,12 @@ def _branch_builder_rows(entries, branch):
+     return rows
+ 
+ 
++def _unreadable(result, cause):
++    result["status"] = "unreadable"
++    result["unreadable_cause"] = cause
++    return result
++
++
+ def built_families(run_log, branch=None, cwd=None, roster=None, profiles=None):
+     """Families that built the branch, or empty / unknown / unreadable.
+ 
+@@ -485,52 +484,34 @@ def built_families(run_log, branch=None, cwd=None, roster=None, profiles=None):
+         result["status"] = "empty"
+         return result
+     branch_name, head_fail = _branch_from_head(cwd)
+-    if head_fail == "git":
+-        result["status"] = "unreadable"
+-        result["unreadable_cause"] = "git"
+-        return result
+-    if head_fail == "detached":
+-        result["status"] = "unreadable"
+-        result["unreadable_cause"] = "detached"
+-        return result
++    if head_fail:
++        return _unreadable(result, head_fail)
+     branch = branch_arg or branch_name
+     result["branch"] = branch
+     tree_reports, rep_fail = _tree_report_names(cwd)
+     if rep_fail:
+-        result["status"] = "unreadable"
+-        result["unreadable_cause"] = rep_fail
+-        return result
++        return _unreadable(result, rep_fail)
+     added_reports = []
+     if tree_reports:
+         base, fail = _merge_base_with_main(branch, cwd)
+         if fail:
+-            result["status"] = "unreadable"
+-            result["unreadable_cause"] = fail
+-            return result
++            return _unreadable(result, fail)
+         if base is None:
+-            result["status"] = "unreadable"
+-            result["unreadable_cause"] = "main"
+-            return result
++            return _unreadable(result, "main")
+         base_reports = _reports_at_commit(base, cwd)
+         if base_reports is None:
+-            result["status"] = "unreadable"
+-            result["unreadable_cause"] = "git"
+-            return result
++            return _unreadable(result, "git")
+         base_cf = {p.casefold() for p in base_reports}
+         added_reports = [r for r in tree_reports if r.casefold() not in base_cf]
+     entries, open_fail, bad_lines, _raw, _good = _parse_run_log_raw(run_log)
+     if open_fail:
+-        result["status"] = "unreadable"
+-        result["unreadable_cause"] = open_fail
+-        return result
++        return _unreadable(result, open_fail)
+     parsing_rows = _branch_builder_rows(entries, branch)
+     result["parsing_rows"] = list(parsing_rows)
+     commit_cache = {}
+     counted = _apply_drop_rule(parsing_rows, cwd, commit_cache)
+     if counted is None:
+-        result["status"] = "unreadable"
+-        result["unreadable_cause"] = "git"
+-        return result
++        return _unreadable(result, "git")
+     result["counted_rows"] = counted
+     unknown = []
+     if bad_lines:
+@@ -1181,7 +1162,7 @@ def main():
+         print("FAIL  --review-alt refused: the built set is not known")
+         return 1
+ 
+-    def _rebuild_line_open(r_id, r_fam, rb_model, builder_id):
++    def _rebuild_line_open(r_id, r_fam, builder_id):
+         rows_for_rb = bset["counted_rows"] if set_status != "unknown" else bset["parsing_rows"]
+         rb = _rebuild_built_by_model(rows_for_rb, r_fam, roster, profiles, built_model)
+         if rb and _roster_model_family(roster, profiles, rb) == r_fam:
+@@ -1193,6 +1174,19 @@ def main():
+         return ("    REBUILD  review_b %s is of the %s family, and a builder row of the branch names a model whose family cannot be named: this profile's builder %s rebuilds it before Review B (step 3b); the reviewer of a change is never of the family that built it (release A4)" % (
+             r_id, r_fam, builder_id)), rb
+ 
++    def _rebuild_entry(r_id, r_fam, builder_id, ask_new_branch):
++        rb_line, rb_model = _rebuild_line_open(r_id, r_fam, builder_id)
++        rebuild = {"built_by": rb_model, "rebuild_with": builder_id}
++        end_marker = None
++        new_branch_git_fail = False
++        if ask_new_branch:
++            nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
++            if nb is None:
++                new_branch_git_fail = True
++            elif nb:
++                end_marker = "new branch"
++        return rb_line, rebuild, end_marker, new_branch_git_fail
++
+     print("roster-check: other_pool=%s  review_a=%s (%s)" % (other_pool, ra_id, ra_fam))
+     if built_model:
+         print("roster-check: the last builder run was %s (%s family), from %s" % (built_model, built_fam_one, run_log))
+@@ -1345,15 +1339,12 @@ def main():
+                 if r_excl:
+                     print("    skip: review_b is excluded and no alternate may be resolved on an unknown built set"); continue
+                 if r_fam in roster_b_fams or r_fam in parse_b_fams or parsing_unknown_family:
+-                    rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
+-                    rebuild = {"built_by": rb_model, "rebuild_with": b_id}
+-                    if family_only_unknown:
+-                        nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
+-                        if nb is None:
+-                            print("FAIL  cannot read the families that built this branch (git)")
+-                            return 1
+-                        if nb:
+-                            profile_rebuild_end = "new branch"
++                    rb_line, rebuild, end_marker, new_branch_git_fail = _rebuild_entry(r_id, r_fam, b_id, family_only_unknown)
++                    if new_branch_git_fail:
++                        print("FAIL  cannot read the families that built this branch (git)")
++                        return 1
++                    if end_marker:
++                        profile_rebuild_end = end_marker
+                     print(rb_line)
+             elif set_status in ("known", "empty"):
+                 if not r_excl and r_id in unavailable:
+@@ -1367,14 +1358,12 @@ def main():
+                         known_built = sorted(built_fam_set)
+                         deviation = {"review_b_alt": a_id, "reason": "family", "branch": bset["branch"], "built": known_built}
+                     else:
+-                        rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
+-                        rebuild = {"built_by": rb_model, "rebuild_with": b_id}
+-                        nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
+-                        if nb is None:
++                        rb_line, rebuild, end_marker, new_branch_git_fail = _rebuild_entry(r_id, r_fam, b_id, True)
++                        if new_branch_git_fail:
+                             print("FAIL  cannot read the families that built this branch (git)")
+                             return 1
+-                        if nb:
+-                            profile_rebuild_end = "new branch"
++                        if end_marker:
++                            profile_rebuild_end = end_marker
+                         print(rb_line)
+                 elif r_excl:
+                     if a_id and _alt_independent(a_fam, built_fam_set, ra_fam) and _alt_pool_ok(a_id, a_pool):
+@@ -1405,14 +1394,12 @@ def main():
+                         print("    skip: a model did not answer"); continue
+                 elif deviation and family_deviation and rebuild is None:
+                     if not ok_alt:
+-                        rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
+-                        rebuild = {"built_by": rb_model, "rebuild_with": b_id}
+-                        nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
+-                        if nb is None:
++                        rb_line, rebuild, end_marker, new_branch_git_fail = _rebuild_entry(r_id, r_fam, b_id, True)
++                        if new_branch_git_fail:
+                             print("FAIL  cannot read the families that built this branch (git)")
+                             return 1
+-                        if nb:
+-                            profile_rebuild_end = "new branch"
++                        if end_marker:
++                            profile_rebuild_end = end_marker
+                         deviation = None
+                         use_r_id, use_r_fam = r_id, r_fam
+                         print(rb_line)
+diff --git a/docs/HARDENING.md b/docs/HARDENING.md
+index ab8a4b7..13b6299 100644
+--- a/docs/HARDENING.md
++++ b/docs/HARDENING.md
+@@ -2627,6 +2627,19 @@ Each is fixed by the next increment that edits its record.
+ - **CI's first run failed on the status file's cap.** `tests/test_program_own_records.py`'s `test_r101_inventory_check_passes_over_this_repository_s_records`: `STATUS TOO LONG: docs/PROJECT_STATUS.md is 28 lines / 12778 chars (cap 120 / 12000)`. The records commit's added sentences crossed the cap; the program release's told deviations moved to docs/archive/STATUS_HISTORY.md (`status: 28 lines / 11101 chars`, `RESULT: OK`), read again by Review B's second round. Cause: no own run included `inventory-check.py` or that test after the status file was written. Lead: a records commit that grows the status file runs `inventory-check.py` before the push.
+ - **Proofs.** `trace-check.py` `RESULT: OK` (0 dropped, 122 excused, one entry added: `new TASK-087 bridge/cursor-bridge/workflow/phases/delegation-loop.md 1. Checkpoint`); `trace-check.py --moves` `RESULT: OK` (19 excused, each entry pasted from the mode's failure line); MANIFEST regenerated, `bridge-check.py --sources`: `148 OK, 0 STALE, 0 MISSING, 0 EXTRA`. R-107 and R-108 stay planned (R-108 until TASK-096).
+ 
++### Stage I1's refactoring pass (REFAC-015 to REFAC-017, 2026-11-26)
++- **Inputs:** jscpd was not launched: an `npx` download needs the owner's yes (the run sheet at the release's end carries it), as at stages P1 to P3. refactor-scout read the union of stage I1's six squash commits (020cf7a fa3e4f1 5bb3874 0cb7846 91fc2d8 8b03c32; HOTFIX-004's carry, c76ea93, left out, a hotfix of its own) against the 400-line budget: twelve production candidates and one tests-lane candidate, about 280 lines, nothing cut; optimization candidates none (no budgets).
++- **Taken, the tests lane (4568aa9, the supervisor's):** tests/roster_rows.py holds the helpers and constants tests/test_improve_roster_alt.py and tests/test_improve_roster_launch.py both carried (`row`, `review_row`, `rebuild_text`, `lies_in_no_repository`, the model ids, `FULL`, `NATIVE`, the row counter); each file keeps its own `NOW`, `CLAUDE_ALT` or `MYSTERY`. The collected set "before 232, after 232, identical True"; `refactor-check.py --lane tests` PURE, 103 lines; the two files with tests/test_tests_windowless.py "239 passed, 3 skipped".
++- **Taken, one brief and one commit each, the builder composer-2.5 (the native profile):**
++  - REFAC-015 (candidates 1, 2, 7): roster-check.py's three REBUILD sites call one nested `_rebuild_entry` (the unread model parameter of `_rebuild_line_open` gone); `built_families`' eight unreadable exits go through `_unreadable(result, cause)`, the two head exits merged since `_branch_from_head` gives only `git` or `detached` as a cause; `built_by` reads its lines through `_parse_run_line`. The six roster test files "281 passed, 3 skipped" before and after.
++  - REFAC-016 (candidates 3, 4, 6, 10, 11): mutation-run.py's `run_paths`; the checkpoint loop calls `run_mutant_tests`; `pytest_env` one loop, its "." branch gone (joining "." and taking the absolute path gives the tree root, the builder's check `True True True`); `DEFAULT_DOTTED_PREFIXES`; the generated plugin's `_under`. Its five covering files with tests/test_dump_cli.py "324 passed, 2 skipped".
++  - REFAC-017 (candidates 5, 8): bridge-run.py's `_git_launch_state` reads HEAD through `_git_rev_parse`; `_read_docs_json(folder, name)` reads the three docs/*.json files. Its ten covering files "622 passed, 4 skipped". Its first launch was refused (`header: disagrees satisfies`): the header listed R-039 before R-107 and the prose line R-107 first; the header reordered in a records commit, no builder ran.
++- **Held, an input to stage I2's first increment:** candidates 9 (two inline probe blocks repeating `_probe_roles`) and 12 (`_profile_in_use` repeating the main loop's builder-side skips), both in the function the `--review-alt` fix changes (TASK-087c's section).
++- **Scope:** the three briefs were committed together, and scope-check reads a brief's range from the commit that first added it, so REFAC-016's and REFAC-017's drift lines named the earlier briefs' committed files; each builder's uncommitted changes were in its Scope. Stage P3's lesson, repeated: commit each brief just before its run.
++- **Purity:** `refactor-check.py main --max-lines 400` reads the whole branch IMPURE by the tests lane's commit ("files: 13 | changed lines: 399"); the two readings that hold are per lane: `refactor-check.py 4568aa9 --max-lines 400` "files: 10 | changed lines: 240 (budget 400)", PURE, and the tests lane's above.
++- **D1, the stage's mutants at the branch's tree (before the stage review):** 95 mutants in stage I1's five mutants files (TASK-085, TASK-086a, TASK-086b, TASK-086b-r3, TASK-087b; TASK-087a and TASK-087c are supervisor text) (run/supervisor/check_mutants_i1.py); 5 pairs no longer found once, all moved by the pass: TASK-085's m08 (`return paths` now before `def run_paths(`) and m14 (the one loop of `pytest_env`, the import roots dropped from it), TASK-086a's n29 (the new-branch question passed as `False` to `_rebuild_entry`) and n31 (`if not ok_alt or not ok_rb:` before the third `_rebuild_entry` site), and TASK-086b's M6 (`errors="ignore"` in `_read_docs_json`, which now reads for all three readers). Each re-anchored keeping its meaning (backups `.pre-refac`); the five run again on the branch's tree (run/supervisor/REFAC-I1-mutants.json): "counts: run=5 cached=0 killed=5 survived=0 not applied=0 error=0 expected survive=0".
++- **Review A, refactoring mode (the whole branch, 2026-11-26):** APPROVE, nothing blocking, nothing to fix. It ran the old and new run-log readers side by side on 28 byte inputs ("parse cases 28 differ []") and the old and new `pytest_env` on 24 root and roots combinations ("all equal True"); `_branch_from_head`'s four returns give exactly the two old head causes; `_git_rev_parse` the old argv, flags and failure ends; no removed name left in use in bridge/, tests/ or tools/; MANIFEST.json "148 OK, 0 STALE, 0 MISSING, 0 EXTRA"; its own runs "125 passed, 3 skipped", "104 passed", "26 passed". Noted, not findings: the shared row counter gives other row ids, which no assertion and no product decision reads; the launch file's old `row` took its parameters in another order, and every call passes all but the model by name; the "." proof is argued for ordinary absolute roots, the mutation copy never under a `\\?\` prefix.
++
+ ## Hotfix 2026.11.24a - the heavy slots (HOTFIX-004)
+ 
+ ### Deviations and leads drawn under the gate (2026-11-25)
+diff --git a/docs/PROJECT_STATUS.md b/docs/PROJECT_STATUS.md
+index c140fdb..ba751b7 100644
+--- a/docs/PROJECT_STATUS.md
++++ b/docs/PROJECT_STATUS.md
+@@ -15,9 +15,9 @@ open_issues: ["ISS-008 recurred, counter 2 (the other-models pool exhausted 2026
+ Last updated: 2026-11-26
+ Phase: changing
+ Workflows: Host Extension Development → Claude Code Extension; traits: Installable, External services
+-Change cycle: "the improvements release" opened 2026-11-24 (the owner's order of 2026-11-22; designed and planned on Fable 5.2, built on Opus 5.5 since the owner's switch of 2026-11-24) — step 6 of the change cycle, the loop: TASK-087c (R-107, R-108, stage I1's texts: the reviewers' one sentence, the report's outputs, an exhausted pool; supervisor text; the full profile's alternate withheld, INVENTORY, Decisions) merged by this pull request; next stage I1's close; before it TASK-087a (R-109, the rule budget: ten passages retired, three sentences corrected, the rulebook's and the step file's caps raised once; supervisor text), TASK-087b (R-109, the digest's half: the hook prints the core digest in two parts, each within its cap; two builder rounds, the first increment built in its own worktree), TASK-086b (R-107, the launcher's half: the two review refusals read the built set and the recorded deviation, failing closed; three builder rounds), hotfix 2026.11.24a (HOTFIX-004, R-137, the heavy slots) carried onto main (PR #208) after the owner's install of 2026-11-25, and TASK-086a (R-107, the resolve's half) and TASK-085 (R-106) merged; the design revision with its plan addendum, one subject, `improvements`, approved by the owner at their gate on 2026-11-24 in the question form (four answers: INVENTORY, Decisions) after four critique rounds and a confirming read (docs/DESIGN_CRITIQUE.md); the intake's read-back confirmed by the owner 2026-11-24 with three decisions in the question form (INVENTORY, Decisions; run/supervisor/intake-notes.md); before it the program release, complete 2026-11-24 (Claude-Cursor Bridge 2026.11.23a)
++Change cycle: "the improvements release" opened 2026-11-24 (the owner's order of 2026-11-22; designed and planned on Fable 5.2, built on Opus 5.5 since the owner's switch of 2026-11-24) — step 6 of the change cycle, the loop: stage I1's refactoring pass (REFAC-015 to REFAC-017 and the tests lane, behaviour unchanged; HARDENING) merged by this pull request; next stage I1's review; before it TASK-087c (R-107, R-108, stage I1's texts; the full profile's alternate withheld, INVENTORY, Decisions), TASK-087a (R-109, the rule budget: ten passages retired, three sentences corrected, the rulebook's and the step file's caps raised once; supervisor text), TASK-087b (R-109, the digest's half: the hook prints the core digest in two parts, each within its cap; two builder rounds, the first increment built in its own worktree), TASK-086b (R-107, the launcher's half: the two review refusals read the built set and the recorded deviation, failing closed; three builder rounds), hotfix 2026.11.24a (HOTFIX-004, R-137, the heavy slots) carried onto main (PR #208) after the owner's install of 2026-11-25, and TASK-086a (R-107, the resolve's half) and TASK-085 (R-106) merged; the design revision with its plan addendum, one subject, `improvements`, approved by the owner at their gate on 2026-11-24 in the question form (four answers: INVENTORY, Decisions) after four critique rounds and a confirming read (docs/DESIGN_CRITIQUE.md); the intake's read-back confirmed by the owner 2026-11-24 with three decisions in the question form (INVENTORY, Decisions; run/supervisor/intake-notes.md); before it the program release, complete 2026-11-24 (Claude-Cursor Bridge 2026.11.23a)
+ Awaiting user on: nothing
+-Next: the improvements release (docs/DESIGN.md, Change: the improvements release; docs/BUILD_PLAN.md, stages I1 to I5, TASK-085 to TASK-118; rows R-106 to R-136): stage I1's close (the refactoring pass, both reviewers on the stage, its demonstration, the reflection), then stage I2 from its plan revision at its start (its Depends on lines, and first a builder increment that makes `roster-check.py --review-alt` read the profile the resolve picks: HARDENING, TASK-087c), on Opus 5.5; TASK-085 (R-106), TASK-086a, TASK-086b and TASK-087c (R-107, which stays planned until that fix merges and the design revision below names the full profile's alternate; R-108's texts) and TASK-087a and TASK-087b (R-109's rule budget and digest in two parts; R-109 stays planned until TASK-118) built and merged, the design and plan approved by the owner on 2026-11-24; two heavy slots on this computer since hotfix 2026.11.24a, so where two ready increments are independent the second builds in its own worktree under Worktrees/; a design revision corrects the roster table's row so that the next profile is tried before a profile's alternate (INVENTORY, Decisions, 2026-11-26), due before the other pool returns on 2026-12-16, on Fable 5.2 at the owner's switch (rule 48); it ends with the owner's install from a run sheet and each project's calibration; then the prototype meta workflow, the progress graph, W, G, F, C (waits for the TDP's code-map command), D, the code map's trial, and E last (INVENTORY, Decisions). The Sunday evaluation of 2026-11-29 runs the security step from ~/.cursor-bridge/projects.json (the field acceptance's last item on this repository). The TDP calibrates in its own session. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
++Next: the improvements release (docs/DESIGN.md, Change: the improvements release; docs/BUILD_PLAN.md, stages I1 to I5, TASK-085 to TASK-118; rows R-106 to R-136): stage I1's close (both reviewers on the stage, its demonstration, the reflection; its refactoring pass merged), then stage I2 from its plan revision at its start (its Depends on lines, and first a builder increment that makes `roster-check.py --review-alt` read the profile the resolve picks: HARDENING, TASK-087c), on Opus 5.5; TASK-085 (R-106), TASK-086a, TASK-086b and TASK-087c (R-107, which stays planned until that fix merges and the design revision below names the full profile's alternate; R-108's texts) and TASK-087a and TASK-087b (R-109's rule budget and digest in two parts; R-109 stays planned until TASK-118) built and merged, the design and plan approved by the owner on 2026-11-24; two heavy slots on this computer since hotfix 2026.11.24a, so where two ready increments are independent the second builds in its own worktree under Worktrees/; a design revision corrects the roster table's row so that the next profile is tried before a profile's alternate (INVENTORY, Decisions, 2026-11-26), due before the other pool returns on 2026-12-16, on Fable 5.2 at the owner's switch (rule 48); it ends with the owner's install from a run sheet and each project's calibration; then the prototype meta workflow, the progress graph, W, G, F, C (waits for the TDP's code-map command), D, the code map's trial, and E last (INVENTORY, Decisions). The Sunday evaluation of 2026-11-29 runs the security step from ~/.cursor-bridge/projects.json (the field acceptance's last item on this repository). The TDP calibrates in its own session. A brief records the `claude --version` it tests on, or that the session has none on PATH. No non-increment pull-request title names a plan ID inside its closing parenthesis (ISS-013).
+ Deviations accepted: none; told to the owner (rule 58): TASK-087c's Done when names `review_b_alt` in both roster profiles; the full profile names none, in the policy's template and in docs/ROSTER.json, until the design's table tries the next profile first (INVENTORY, Decisions, 2026-11-26), and R-107 stays planned until `--review-alt` reads the profile the resolve picks (HARDENING, TASK-087c); the program release's, docs/archive/STATUS_HISTORY.md
+ Terms fixed: conditional workflow — a type, sub-type or trait file that adds to the main workflow at extension points; a type or sub-type file may also set values where a point allows or replace a whole module the registry marks replaceable — Risky (sense revised 2026-10-17; re-anchor at the next report); extension point — a named place in a phase module where any type, sub-type or trait file may add, and a type or sub-type file may set a value where the point allows; a replacement swaps a whole module instead — Risky (sense revised 2026-10-17; re-anchor at the next report); phase module — one file holding one part of the workflow's procedure; a phase uses one or more modules — Risky (sense revised 2026-10-17; re-anchor at the next report)
+ Software name: Claude-Cursor Bridge
+@@ -26,7 +26,7 @@ Worktrees: none
+ In flight: none
+ Working files: run/supervisor/working-files.md lists this project's local working files under run/supervisor/ (gitignored), in-flight.md first, the scratch log a resume reads before anything else; intake-notes.md holds the improvements release's intake questions and answers.
+ Delegated gates: none
+-Remote sync: main at the merge of this pull request, TASK-087c's, in sync with origin/main at that merge; local main is fast-forwarded after every merge
++Remote sync: main at the merge of this pull request, stage I1's refactoring pass, in sync with origin/main at that merge; local main is fast-forwarded after every merge
+ Stage: the program release complete 2026-11-24 (stages P1 to P4; HARDENING, The program release's stages and Project end of the program release); release B2 complete 2026-11-11; release T 2026-11-04; release B and earlier: docs/archive/STATUS_HISTORY.md. Last reflection: the improvements release's design and plan gate, 2026-11-24 (conformance 26 OK, 0 MISSING, 5 NOTE; no issue opened; Feedback FB-138 to FB-140; the Project Summary patched); before it project end of the program release, 2026-11-24
+ Deferred increments: none (TASK-027's two calibrations closed 2026-11-24: reAngle's part dropped by the owner, the video factory calibrated 2026-11-12; R-031, R-037)
+ Open issues: ISS-008 recurred, counter 2 (the other-models pool exhausted 2026-11-21 until 2026-12-16; the reduced roster runs the work, the owner's word). ISS-037 worked around (Review B's provider stopped a review of the guards as security activity; one re-run with context approved). ISS-001 recurred, counter 2 (a review log named apart from its snapshot). ISS-010 open (the afterFileEdit hook never runs in headless builder runs; not relied on). ISS-024 recurred, counter 4. ISS-033 recurred, counter 5. ISS-034 recurred, counter 3. ISS-036 recurred, counter 4 (each fixed where found). ISS-013 mitigated (the plan check's rule, TASK-033, installed). Every other issue fixed or closed: the Issues file in Documents/, and docs/archive/STATUS_HISTORY.md
+diff --git a/handoff/REFAC-015-r1-report.md b/handoff/REFAC-015-r1-report.md
+new file mode 100644
+index 0000000..ff4ae22
+--- /dev/null
++++ b/handoff/REFAC-015-r1-report.md
+@@ -0,0 +1,332 @@
++# REFAC-015 round 1 report
++
++## Files changed
++
++- `bridge/cursor-bridge/roster-check.py`
++- `bridge/cursor-bridge/MANIFEST.json`
++- `handoff/REFAC-015-r1-report.md` (this file)
++
++## Summary
++
++Refactored `roster-check.py` in three parts without behaviour change: added nested `_rebuild_entry` as the sole caller of `_rebuild_line_open` (dropped unused `rb_model` parameter) and `_rebuild_needs_new_branch`, returning `(rb_line, rebuild, end_marker, new_branch_git_fail)` where `new_branch_git_fail` is `True` when the new-branch question was asked and `_rebuild_needs_new_branch` returned `None`; added module-level `_unreadable` and merged the two `head_fail` exits in `built_families`; routed `built_by`'s run-log loop through `_parse_run_line`. Regenerated `MANIFEST.json` via `make-manifest.py`.
++
++## Behaviour
++
++Each helper delegates to the same logic as before (same REBUILD/FAIL paths, same unreadable causes, same line filtering); call sites still print FAIL and return 1, assign `rebuild` and `profile_rebuild_end`, and keep site C's ordering unchanged, so printed lines, exit codes, `built_families` dicts, and `built_by` answers stay the same.
++
++## Git at start
++
++Working tree: clean (no output from `git status --short`).
++
++```
++git rev-parse HEAD
++```
++
++```
++203352f19f42ce3fa491acc8fa2db68442c5fc2d
++```
++
++## Requirement 1 (before edit)
++
++```
++git diff --stat 8b03c32 -- bridge/cursor-bridge/roster-check.py
++```
++
++```
++(empty)
++```
++
++```
++git grep -n -F -e "_rebuild_line_open(" -e "_rebuild_needs_new_branch(" -- bridge/cursor-bridge/roster-check.py
++```
++
++```
++bridge/cursor-bridge/roster-check.py:572:def _rebuild_needs_new_branch(counted, branch, cwd):
++bridge/cursor-bridge/roster-check.py:1184:    def _rebuild_line_open(r_id, r_fam, rb_model, builder_id):
++bridge/cursor-bridge/roster-check.py:1348:                    rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
++bridge/cursor-bridge/roster-check.py:1351:                        nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
++bridge/cursor-bridge/roster-check.py:1370:                        rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
++bridge/cursor-bridge/roster-check.py:1372:                        nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
++bridge/cursor-bridge/roster-check.py:1408:                        rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
++bridge/cursor-bridge/roster-check.py:1410:                        nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
++```
++
++```
++git grep -n -F -e "cannot read the families that built this branch" -- bridge/cursor-bridge/roster-check.py
++```
++
++```
++bridge/cursor-bridge/roster-check.py:1175:        print("FAIL  cannot read the families that built this branch (%s)" % cause)
++bridge/cursor-bridge/roster-check.py:1353:                            print("FAIL  cannot read the families that built this branch (git)")
++bridge/cursor-bridge/roster-check.py:1374:                            print("FAIL  cannot read the families that built this branch (git)")
++bridge/cursor-bridge/roster-check.py:1412:                            print("FAIL  cannot read the families that built this branch (git)")
++```
++
++```
++git grep -n -F -e "new branch" -e rebuild_with -- bridge/cursor-bridge/roster-check.py
++```
++
++```
++bridge/cursor-bridge/roster-check.py:1349:                    rebuild = {"built_by": rb_model, "rebuild_with": b_id}
++bridge/cursor-bridge/roster-check.py:1356:                            profile_rebuild_end = "new branch"
++bridge/cursor-bridge/roster-check.py:1371:                        rebuild = {"built_by": rb_model, "rebuild_with": b_id}
++bridge/cursor-bridge/roster-check.py:1377:                            profile_rebuild_end = "new branch"
++bridge/cursor-bridge/roster-check.py:1409:                        rebuild = {"built_by": rb_model, "rebuild_with": b_id}
++bridge/cursor-bridge/roster-check.py:1415:                            profile_rebuild_end = "new branch"
++bridge/cursor-bridge/roster-check.py:1472:        elif end == "new branch":
++bridge/cursor-bridge/roster-check.py:1473:            print(base + "; run the same rebuild under a new branch name (new branch)")
++```
++
++```
++git grep -n -w -e unreadable -e unreadable_cause -e head_fail -- bridge/cursor-bridge/roster-check.py
++```
++
++```
++bridge/cursor-bridge/roster-check.py:469:    """Families that built the branch, or empty / unknown / unreadable.
++bridge/cursor-bridge/roster-check.py:472:    status, families, unknown_causes, unreadable_cause, parsing_rows, counted_rows, rebuild_end.
++bridge/cursor-bridge/roster-check.py:482:              "unreadable_cause": None, "parsing_rows": [], "counted_rows": [],
++bridge/cursor-bridge/roster-check.py:487:    branch_name, head_fail = _branch_from_head(cwd)
++bridge/cursor-bridge/roster-check.py:488:    if head_fail == "git":
++bridge/cursor-bridge/roster-check.py:489:        result["status"] = "unreadable"
++bridge/cursor-bridge/roster-check.py:490:        result["unreadable_cause"] = "git"
++bridge/cursor-bridge/roster-check.py:492:    if head_fail == "detached":
++bridge/cursor-bridge/roster-check.py:493:        result["status"] = "unreadable"
++bridge/cursor-bridge/roster-check.py:494:        result["unreadable_cause"] = "detached"
++bridge/cursor-bridge/roster-check.py:500:        result["status"] = "unreadable"
++bridge/cursor-bridge/roster-check.py:501:        result["unreadable_cause"] = rep_fail
++bridge/cursor-bridge/roster-check.py:507:            result["status"] = "unreadable"
++bridge/cursor-bridge/roster-check.py:508:            result["unreadable_cause"] = fail
++bridge/cursor-bridge/roster-check.py:511:            result["status"] = "unreadable"
++bridge/cursor-bridge/roster-check.py:512:            result["unreadable_cause"] = "main"
++bridge/cursor-bridge/roster-check.py:516:            result["status"] = "unreadable"
++bridge/cursor-bridge/roster-check.py:517:            result["unreadable_cause"] = "git"
++bridge/cursor-bridge/roster-check.py:523:        result["status"] = "unreadable"
++bridge/cursor-bridge/roster-check.py:524:        result["unreadable_cause"] = open_fail
++bridge/cursor-bridge/roster-check.py:531:        result["status"] = "unreadable"
++bridge/cursor-bridge/roster-check.py:532:        result["unreadable_cause"] = "git"
++bridge/cursor-bridge/roster-check.py:1173:    if set_status == "unreadable":
++bridge/cursor-bridge/roster-check.py:1174:        cause = bset["unreadable_cause"]
++```
++
++```
++git grep -n -F -e "json.loads(" -e "_parse_run_line(" -- bridge/cursor-bridge/roster-check.py
++```
++
++```
++bridge/cursor-bridge/roster-check.py:176:            e = json.loads(line)
++bridge/cursor-bridge/roster-check.py:410:def _parse_run_line(line_b):
++bridge/cursor-bridge/roster-check.py:420:        e = json.loads(text)
++bridge/cursor-bridge/roster-check.py:445:        parsed = _parse_run_line(line_b)
++bridge/cursor-bridge/roster-check.py:666:        parsed = _parse_run_line(line_b)
++```
++
++```
++git grep -n -w -e _unreadable -e _rebuild_entry -- bridge
++```
++
++```
++(exit 1, no output)
++```
++
++```
++git grep -n -w -e _rebuild_line_open -e _rebuild_needs_new_branch -e _parse_run_line -e _unreadable -e _rebuild_entry -- tests
++```
++
++```
++(exit 1, no output)
++```
++
++## Pytest before edit
++
++Commit: `203352f19f42ce3fa491acc8fa2db68442c5fc2d`, working tree clean.
++
++```
++python -m pytest -p no:cacheprovider -q -rs tests/test_improve_roster_alt.py tests/test_improve_roster_launch.py tests/test_roster_check.py tests/test_roster_check_a4.py tests/test_hotfix25a_roster_launcher.py tests/test_program_roster_sign_in.py
++```
++
++```
++281 passed, 3 skipped in 172.14s (0:02:52)
++```
++
++## Post-edit verification
++
++```
++python tools/make-manifest.py
++```
++
++```
++make-manifest: version 2026.11.24a, 148 files hashed, VERSION + MANIFEST.json written
++```
++
++```
++python tools/dump-cli.py --check
++```
++
++```
++(empty output, exit 0)
++```
++
++```
++python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet
++```
++
++```
++bridge-check: version 2026.11.24a (2026-11-26 03:26) at <Workspace>/bridge
++bridge-check: 148 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.24a <Workspace>/bridge/cursor-bridge
++```
++
++```
++git diff --numstat -- bridge/cursor-bridge/VERSION
++```
++
++```
++(empty)
++```
++
++```
++git diff --numstat -- bridge/cursor-bridge/roster-check.py
++```
++
++```
++45	58	bridge/cursor-bridge/roster-check.py
++```
++
++## Requirement 1 / acceptance (after edit)
++
++```
++git grep -n -F -e "_rebuild_line_open(" -e "_rebuild_needs_new_branch(" -- bridge/cursor-bridge/roster-check.py
++```
++
++```
++bridge/cursor-bridge/roster-check.py:553:def _rebuild_needs_new_branch(counted, branch, cwd):
++bridge/cursor-bridge/roster-check.py:1165:    def _rebuild_line_open(r_id, r_fam, builder_id):
++bridge/cursor-bridge/roster-check.py:1178:        rb_line, rb_model = _rebuild_line_open(r_id, r_fam, builder_id)
++bridge/cursor-bridge/roster-check.py:1183:            nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
++```
++
++```
++git grep -n -F -e "cannot read the families that built this branch" -- bridge/cursor-bridge/roster-check.py
++```
++
++```
++bridge/cursor-bridge/roster-check.py:1156:        print("FAIL  cannot read the families that built this branch (%s)" % cause)
++bridge/cursor-bridge/roster-check.py:1344:                        print("FAIL  cannot read the families that built this branch (git)")
++bridge/cursor-bridge/roster-check.py:1363:                            print("FAIL  cannot read the families that built this branch (git)")
++bridge/cursor-bridge/roster-check.py:1399:                            print("FAIL  cannot read the families that built this branch (git)")
++```
++
++```
++git grep -n -F -e "new branch" -e rebuild_with -- bridge/cursor-bridge/roster-check.py
++```
++
++```
++bridge/cursor-bridge/roster-check.py:1179:        rebuild = {"built_by": rb_model, "rebuild_with": builder_id}
++bridge/cursor-bridge/roster-check.py:1187:                end_marker = "new branch"
++bridge/cursor-bridge/roster-check.py:1459:        elif end == "new branch":
++bridge/cursor-bridge/roster-check.py:1460:            print(base + "; run the same rebuild under a new branch name (new branch)")
++```
++
++```
++git grep -n -w -e unreadable -e unreadable_cause -e head_fail -- bridge/cursor-bridge/roster-check.py
++```
++
++```
++bridge/cursor-bridge/roster-check.py:462:    result["status"] = "unreadable"
++bridge/cursor-bridge/roster-check.py:463:    result["unreadable_cause"] = cause
++bridge/cursor-bridge/roster-check.py:468:    """Families that built the branch, or empty / unknown / unreadable.
++bridge/cursor-bridge/roster-check.py:471:    status, families, unknown_causes, unreadable_cause, parsing_rows, counted_rows, rebuild_end.
++bridge/cursor-bridge/roster-check.py:481:              "unreadable_cause": None, "parsing_rows": [], "counted_rows": [],
++bridge/cursor-bridge/roster-check.py:486:    branch_name, head_fail = _branch_from_head(cwd)
++bridge/cursor-bridge/roster-check.py:487:    if head_fail:
++bridge/cursor-bridge/roster-check.py:488:        return _unreadable(result, head_fail)
++bridge/cursor-bridge/roster-check.py:1154:    if set_status == "unreadable":
++bridge/cursor-bridge/roster-check.py:1155:        cause = bset["unreadable_cause"]
++```
++
++```
++git grep -n -F -e "json.loads(" -e "_parse_run_line(" -- bridge/cursor-bridge/roster-check.py
++```
++
++```
++bridge/cursor-bridge/roster-check.py:169:        e = _parse_run_line(line_b)
++bridge/cursor-bridge/roster-check.py:403:def _parse_run_line(line_b):
++bridge/cursor-bridge/roster-check.py:413:        e = json.loads(text)
++bridge/cursor-bridge/roster-check.py:438:        parsed = _parse_run_line(line_b)
++bridge/cursor-bridge/roster-check.py:647:        parsed = _parse_run_line(line_b)
++```
++
++```
++git grep -n -w -e _unreadable -- bridge/cursor-bridge/roster-check.py
++```
++
++```
++bridge/cursor-bridge/roster-check.py:461:def _unreadable(result, cause):
++bridge/cursor-bridge/roster-check.py:488:        return _unreadable(result, head_fail)
++bridge/cursor-bridge/roster-check.py:493:        return _unreadable(result, rep_fail)
++bridge/cursor-bridge/roster-check.py:498:            return _unreadable(result, fail)
++bridge/cursor-bridge/roster-check.py:500:            return _unreadable(result, "main")
++bridge/cursor-bridge/roster-check.py:503:            return _unreadable(result, "git")
++bridge/cursor-bridge/roster-check.py:508:        return _unreadable(result, open_fail)
++bridge/cursor-bridge/roster-check.py:514:        return _unreadable(result, "git")
++```
++
++```
++git grep -n -w -e _rebuild_entry -- bridge/cursor-bridge/roster-check.py
++```
++
++```
++bridge/cursor-bridge/roster-check.py:1177:    def _rebuild_entry(r_id, r_fam, builder_id, ask_new_branch):
++bridge/cursor-bridge/roster-check.py:1342:                    rb_line, rebuild, end_marker, new_branch_git_fail = _rebuild_entry(r_id, r_fam, b_id, family_only_unknown)
++bridge/cursor-bridge/roster-check.py:1361:                        rb_line, rebuild, end_marker, new_branch_git_fail = _rebuild_entry(r_id, r_fam, b_id, True)
++bridge/cursor-bridge/roster-check.py:1397:                        rb_line, rebuild, end_marker, new_branch_git_fail = _rebuild_entry(r_id, r_fam, b_id, True)
++```
++
++## Pytest after edit
++
++Commit: `203352f19f42ce3fa491acc8fa2db68442c5fc2d`, working tree had uncommitted changes (`M bridge/cursor-bridge/MANIFEST.json`, `M bridge/cursor-bridge/roster-check.py`, plus this report after write).
++
++```
++python -m pytest -p no:cacheprovider -q -rs tests/test_improve_roster_alt.py tests/test_improve_roster_launch.py tests/test_roster_check.py tests/test_roster_check_a4.py tests/test_hotfix25a_roster_launcher.py tests/test_program_roster_sign_in.py
++```
++
++```
++281 passed, 3 skipped in 173.99s (0:02:53)
++```
++
++## Git at end
++
++```
++git status --short
++```
++
++```
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/roster-check.py
++```
++
++```
++git diff --stat
++```
++
++```
++ bridge/cursor-bridge/MANIFEST.json   |   4 +-
++ bridge/cursor-bridge/roster-check.py | 103 +++++++++++++++--------------------
++ 2 files changed, 47 insertions(+), 60 deletions(-)
++```
++
++```
++git rev-parse HEAD
++```
++
++```
++203352f19f42ce3fa491acc8fa2db68442c5fc2d
++```
++
++## Not changed (noted only)
++
++`built_by` previously decoded with default UTF-8; `_parse_run_line` uses strict UTF-8 — brief states both skip the same lines and tests stayed green.
++
++## Assumed, not verified
++
++Assumed, not verified: none
+\ No newline at end of file
+diff --git a/handoff/REFAC-015.md b/handoff/REFAC-015.md
+new file mode 100644
+index 0000000..27b8810
+--- /dev/null
++++ b/handoff/REFAC-015.md
+@@ -0,0 +1,255 @@
++---
++record: brief
++header: 1
++id: "REFAC-015"
++round: 1
++satisfies: [R-107, R-095, R-040]
++scope: ["bridge/cursor-bridge/roster-check.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/REFAC-015-r1-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# REFAC-015: roster-check's rebuild entry, its unreadable exits and built_by's line reader, each one copy
++
++## Objective
++Refactoring — remove duplication / simplify **without any change in behaviour**.
++
++This brief carries three candidates of stage I1's refactoring pass, all in `bridge/cursor-bridge/roster-check.py`, in three named parts. The manifest is regenerated after them. Behaviour stays exactly the same: every line roster-check.py prints (each REBUILD, FAIL, DEVIATION, RESOLVED, probe and skip line, in the same order), every exit code, every file it writes (`docs/ROSTER.resolved.json` with the same keys and values, the roster state), the dict `built_families` returns (the same keys, in the same insertion order, with the same values), and the answer of `built_by` for every run log. Line numbers below are as the file stands at `8b03c32` (TASK-087c, the base of branch `refactor/I1`); Requirement 1 checks that the file is still that one.
++
++**Part 1: the rebuild entry in `main()`.**
++
++The nested helper today, lines 1184-1194 (inside `main()`, after `bset`, `built_model`, `roster_b_fams`, `set_status` and `cwd` are set at lines 1159-1171):
++
++```python
++    def _rebuild_line_open(r_id, r_fam, rb_model, builder_id):
++        rows_for_rb = bset["counted_rows"] if set_status != "unknown" else bset["parsing_rows"]
++        rb = _rebuild_built_by_model(rows_for_rb, r_fam, roster, profiles, built_model)
++        if rb and _roster_model_family(roster, profiles, rb) == r_fam:
++            return ("    REBUILD  review_b %s is of the %s family, which built the change in flight (%s): this profile's builder %s rebuilds it before Review B (step 3b); the reviewer of a change is never of the family that built it (release A4)" % (
++                r_id, r_fam, rb, builder_id)), rb
++```
++
++(two more `return` branches follow, each returning a REBUILD line and `rb`). Its third parameter `rb_model` is read nowhere in its body: the fallback model passed to `_rebuild_built_by_model` is the closure's `built_model`.
++
++The three sites, each in the profile loop of `main()`:
++
++- Site A, lines 1347-1357 (the built set is unknown); the new-branch question is asked only where `family_only_unknown` (lines 1340-1342) is true:
++
++```python
++                if r_fam in roster_b_fams or r_fam in parse_b_fams or parsing_unknown_family:
++                    rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
++                    rebuild = {"built_by": rb_model, "rebuild_with": b_id}
++                    if family_only_unknown:
++                        nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
++                        if nb is None:
++                            print("FAIL  cannot read the families that built this branch (git)")
++                            return 1
++                        if nb:
++                            profile_rebuild_end = "new branch"
++                    print(rb_line)
++```
++
++- Site B, lines 1369-1378 (a known set that holds review_b's family and no usable alternate); the question is always asked:
++
++```python
++                    else:
++                        rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
++                        rebuild = {"built_by": rb_model, "rebuild_with": b_id}
++                        nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
++                        if nb is None:
++                            print("FAIL  cannot read the families that built this branch (git)")
++                            return 1
++                        if nb:
++                            profile_rebuild_end = "new branch"
++                        print(rb_line)
++```
++
++- Site C, lines 1407-1420 (the alternate did not answer its probe); the question is always asked, and two extra assignments sit between the question and the print:
++
++```python
++                    if not ok_alt:
++                        rb_line, rb_model = _rebuild_line_open(r_id, r_fam, built_model, b_id)
++                        rebuild = {"built_by": rb_model, "rebuild_with": b_id}
++                        nb = _rebuild_needs_new_branch(bset["counted_rows"], bset["branch"], cwd)
++                        if nb is None:
++                            print("FAIL  cannot read the families that built this branch (git)")
++                            return 1
++                        if nb:
++                            profile_rebuild_end = "new branch"
++                        deviation = None
++                        use_r_id, use_r_fam = r_id, r_fam
++                        print(rb_line)
++                        if not ok_rb:
++                            print("    skip: a model did not answer"); continue
++```
++
++`profile_rebuild_end` starts each profile as `global_rebuild_end` (line 1337, which is `bset["rebuild_end"]`: `None`, `"checkpoint"` or `"--repair-record"`) and is replaced only when the answer is yes; `main()` reads it at lines 1431-1433 and 1464-1475. `_rebuild_needs_new_branch(counted, branch, cwd)` (line 572) returns `False`, `True`, or `None` where git does not answer, and prints nothing.
++
++The change: `_rebuild_line_open` loses its `rb_model` parameter and becomes `def _rebuild_line_open(r_id, r_fam, builder_id):`, its body unchanged. One more nested helper, named `_rebuild_entry`, is defined directly after it inside `main()`; it takes the reviewer's id and family, the builder's id, and whether to ask the new-branch question, and returns three things: the REBUILD line (from `_rebuild_line_open`), the rebuild dict `{"built_by": <the model _rebuild_line_open returned>, "rebuild_with": <the builder's id>}`, and the end marker: `"new branch"` where the question was asked and answered `True`, nothing (`None`) where it was not asked or answered `False`. Where `_rebuild_needs_new_branch` returns `None`, the helper tells its caller so in a way the caller can test (the representation is yours; state it in the report). The helper prints nothing and returns no exit code. Each of the three sites calls it once (site A with the question behind `family_only_unknown`, sites B and C always asking) and keeps, itself: the `print("FAIL  cannot read the families that built this branch (git)")` and `return 1` where git did not answer, setting `rebuild`, setting `profile_rebuild_end = "new branch"` only where the marker says so (otherwise leaving it as it was), its `print(rb_line)` after that, and site C's `deviation = None` and `use_r_id, use_r_fam = r_id, r_fam` before its print and its `if not ok_rb:` skip after it. Where site A's `family_only_unknown` is false, `_rebuild_needs_new_branch` is not called at all (it runs git; a git failure there must still not end the resolve).
++
++**Part 2: the unreadable exits of `built_families`.**
++
++`built_families(run_log, branch=None, cwd=None, roster=None, profiles=None)` (line 468) repeats one three-line exit eight times, at lines 489-491, 493-495, 500-502, 507-509, 511-513, 516-518, 523-525 and 531-533, each of this form:
++
++```python
++        result["status"] = "unreadable"
++        result["unreadable_cause"] = "git"
++        return result
++```
++
++(the causes, in order: `"git"`, `"detached"`, `rep_fail`, `fail`, `"main"`, `"git"`, `open_fail`, `"git"`). The first two are the two branches on `head_fail`, lines 487-495:
++
++```python
++    branch_name, head_fail = _branch_from_head(cwd)
++    if head_fail == "git":
++        result["status"] = "unreadable"
++        result["unreadable_cause"] = "git"
++        return result
++    if head_fail == "detached":
++        result["status"] = "unreadable"
++        result["unreadable_cause"] = "detached"
++        return result
++```
++
++`_branch_from_head(cwd)` (lines 304-313) returns its second value as exactly one of `"git"`, `"detached"` or `None` (its four `return` statements: `None, "git"`; `None, "detached"`; `ref[len("refs/heads/"):], None`; `None, "detached"`).
++
++The change: a module-level private function `_unreadable(result, cause)`, placed directly before `built_families`, sets `result["status"] = "unreadable"` and `result["unreadable_cause"] = cause` and returns `result`. Each of the eight exits becomes a `return _unreadable(result, <the same cause>)` with its condition unchanged, except that the two `head_fail` branches merge into one, `if head_fail:` returning `_unreadable(result, head_fail)`. Nothing else in `built_families` changes; its docstring stays. The keys of `result` are only assigned, never added, so the returned dict keeps its keys and their order. `bridge/cursor-bridge/bridge-run.py`'s `_built_set_at_launch` (line 1319) calls `roster.built_families(log_path, branch=branch, cwd=ws, roster=roster_data or {}, profiles=profiles or [])`, and its callers read `status`, `families`, `unknown_causes` and `run_log_base` from the result: those fields and their values must stay the same, and bridge-run.py is not edited.
++
++**Part 3: `built_by`'s line reader.**
++
++`built_by(run_log, branch=None)` (line 156) re-parses each run-log line itself, lines 168-182:
++
++```python
++    for line_b in raw:
++        if not line_b.strip():
++            continue
++        try:
++            line = line_b.decode("utf-8")
++        except UnicodeDecodeError:
++            continue
++        try:
++            e = json.loads(line)
++        except (ValueError, RecursionError):
++            continue
++        if isinstance(e, dict) and e.get("kind") == "builder" and e.get("model"):
++            if e.get("slot") == "not free":
++                continue
++            entries.append(e)
++```
++
++while `_parse_run_line(line_b)` (lines 410-425, the same file) already does that reading: it returns `None` for a blank line (bytes or text that strip to nothing), `False` for a line that does not decode as strict UTF-8, does not parse as JSON (`ValueError`, `RecursionError`) or is not a JSON object, and the dict otherwise. The change: `built_by`'s loop calls `_parse_run_line(line_b)` and skips a falsy result (`None` or `False`), then keeps the filter as it is (`kind == "builder"`, a truthy `model`, a `slot` of `"not free"` skipped). The `try`/`except OSError: return None` around the read, `branch = branch or current_branch()` after it (so git is asked only after the log was read), the reversed walk and the return value stay exactly as they are; the docstring stays. The two readers skip the same lines: each blank or undecodable or unparseable line and each non-object is skipped by both (`built_by` today skips a non-object through its `isinstance(e, dict)` test, and a line whose text strips to nothing through `json.loads` raising `ValueError`).
++
++**And the manifest:** `bridge/cursor-bridge/MANIFEST.json` regenerated once, after your last source edit, by `python tools/make-manifest.py`. The version stays `2026.11.24a` (the newest `## ` entry of `bridge/cursor-bridge/CHANGELOG.md`, which make-manifest picks, and today's content of `bridge/cursor-bridge/VERSION`).
++
++Satisfies: no new requirement. This keeps as they are R-107 (an exhausted pool never parks or pauses work, and a reviewer is never of a family that built the change: `roster-check.py` reads the families that built a branch from the launcher's run record, prints REBUILD where what was built leaves no reviewer, and ends with the cause and no REBUILD where the set cannot be read at all; TASK-086a, TASK-086b), R-095 (a signed-out Cursor tool is told from a failing model: roster-check.py's probe prints the SIGN-IN line and ends with exit 5; TASK-075) and R-040 (one heavy job at a time: a launch refused the slot is no builder run, which `built_by`'s `slot == "not free"` skip keeps; tests/test_hotfix25a_roster_launcher.py).
++
++## Scope
++Files and directories you may create or modify:
++- bridge/cursor-bridge/roster-check.py
++- bridge/cursor-bridge/MANIFEST.json
++- docs/BUILDER_NOTES.md
++- handoff/REFAC-015-r1-report.md
++
++Do not modify anything else. `docs/BUILDER_NOTES.md` is append only.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration, pre-commit configuration, anything under `tools/` (you run `tools/make-manifest.py` and `tools/dump-cli.py`; you do not edit them)
++- docs/ and handoff/, except the files the Scope section names; `docs/diagrams/` included (this change needs no diagram change, see Diagrams); `docs/CLI_REFERENCE.md` and `docs/cli-reference.json` included (this change touches no `build_parser` and no module docstring)
++- every file under `tests/`, `tests/fixtures/` included: no test file or fixture may be edited, renamed or created (the supervisor's purity check fails the branch on any test edit). If the working tree shows a test file modified before your run, leave it exactly as it is
++- `bridge/cursor-bridge/VERSION`: its content must still read `2026.11.24a` after make-manifest rewrites it; make-manifest writes it with an LF line ending; report what `git diff --numstat -- bridge/cursor-bridge/VERSION` prints, do not try to restore the file
++- everything under `run/`: the supervisor's and the launcher's, gitignored; you write nothing there
++- `docs/CHANGES.md` and `bridge/cursor-bridge/CHANGELOG.md`: a refactoring has no change entry
++- in roster-check.py: `_profile_in_use` and the two inline probe blocks (lines 1224-1250, 1240-1247 and 1287-1295 at `8b03c32`: the nested `_profile_in_use` with its builder probe, and the `review_b_alt` probe in the `--review-alt` branch) are not touched, not even to reuse `_probe_roles`; a later fix changes them (R-107's open item, planned at stage I2's start). `_probe_roles`, `_alt_pool_ok`, `_r_excluded`, `_rebuild_needs_new_branch`, `_rebuild_built_by_model`, `_parse_run_line`, `_parse_run_log_raw`, `_branch_from_head`, `repair_record`, the rest of `built_families` and of `main()`, and every other function stay as they are
++- `bridge/cursor-bridge/bridge-run.py` and every other file under `bridge/`
++
++## Context
++**What the code is today** (`8b03c32`). roster-check.py has CRLF line endings on every line; keep them, and add no trailing whitespace. It defines no `__all__`. No test names `_rebuild_line_open`, `_rebuild_needs_new_branch`, `_parse_run_line`, `_unreadable` or `_rebuild_entry` (Requirement 1 checks it); tests call `built_by` directly (`tests/test_hotfix25a_roster_launcher.py` lines 47, 49, 221, 223; `tests/test_improve_roster_alt.py` lines 987-989) and reach `built_families` and `main()` through the program and through bridge-run.py's load of it by file. `tests/test_improve_roster_launch.py` (around line 393) writes stand-in copies of the roster program in its own temporary folders; that does not involve the Workspace file.
++
++**The covering tests**, which must stay green and are not edited: `tests/test_improve_roster_alt.py` (TASK-086a, R-107: the resolve, REBUILD and DEVIATION lines, the rebuild dict `["built_by", "rebuild_with"]`, the new-branch, checkpoint and repair-record ends, `built_by`'s answer), `tests/test_improve_roster_launch.py` (TASK-086b, R-107: the launcher's refusals reading `built_families`, the unreadable set included), `tests/test_roster_check.py`, `tests/test_roster_check_a4.py` (release A4: the REBUILD line and `{"built_by": ..., "rebuild_with": ...}`), `tests/test_hotfix25a_roster_launcher.py` (R-040: `built_by` and the `slot` skip) and `tests/test_program_roster_sign_in.py` (TASK-075, R-095: the probe's sign-in line and exit 5). They make no network call and run git only in pytest's temporary repositories. Some cases may be skipped on Windows; the skip count must be the same before and after.
++
++**The expected count.** No supervisor count is given for this set: your before-edit run of the pytest command below is the baseline, and the after-edit run must match it (the same count passed, none failed, the same count skipped).
++
++**The manifest.** `MANIFEST.json` holds a normalized sha256 (CRLF folded to LF, BOM dropped) of every file under `bridge/`. After your edit it is stale for roster-check.py; `python tools/make-manifest.py` rewrites `VERSION` (to `2026.11.24a` and a line feed) and the manifest, whose `generated` stamp changes, and prints `make-manifest: version 2026.11.24a, <n> files hashed, VERSION + MANIFEST.json written`. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` then compares the tree with it and is expected to print `RESULT: SOURCES MATCH bridge 2026.11.24a`. `python tools/dump-cli.py --check` is expected to print nothing and exit 0 (it prints the path of each reference file that differs and exits 1); if it prints a path, stop and report it, since this change must not alter the command reference.
++
++**Security context.** roster-check.py reads the launcher's run log (`run/launcher/runs.jsonl`, a file the agents' user can write, so every line is untrusted input), the checkout through git, and the roster; it writes the resolved roster that bridge-run.py's review refusals read. The trust boundaries are the run log, the checkout's git state and the roster file. `.cursor/rules/secure-coding.mdc` is in force for you, and the project's ASVS level is 2 (`docs/INVENTORY.md`, Decisions). This change moves no boundary: Part 3 accepts and skips exactly the same run-log lines (strict UTF-8, JSON objects only, `RecursionError` caught), Part 2 ends in the same unreadable status with the same cause on every git or record failure (so the launcher still refuses every review on an unreadable set), and Part 1 still ends the resolve with FAIL and exit 1 where git does not answer the new-branch question.
++
++**Development data** (`docs/INVENTORY.md`, Decisions): "the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet". For you: the tests run the Workspace sources against pytest's temporary folders and the repositories they create there. Never run roster-check.py or bridge-run.py yourself, against this repository or any other: roster-check.py rewrites `docs/ROSTER.resolved.json` and the roster state, and its probe starts a model. Never run `cursor-agent` or `bridge-install.py`.
++
++## Diagrams
++`docs/diagrams/D-002-components.md`: the element `roster_check` (`bridge/cursor-bridge/roster-check.py`), whose edges already exist:
++
++```mermaid
++    roster_check --> bridge_env
++    bridge_run -.-> roster_check
++```
++
++The change adds no import, no load and no edge, so the diagram does not change. `docs/diagrams/D-004-context-dfd.md` draws `p_roster_check`'s flows (the run record and the report files read, `--repair-record`'s rewrite, `docs/ROSTER.resolved.json` written; R-107); this change adds or removes none of them. **If the task cannot be done within them, stop and report the conflict (an objection) instead of deviating.**
++
++## Requirements
++1. **Checks first, before any edit; paste each command and its output in the report.** From the Workspace root, run:
++   - `git diff --stat 8b03c32 -- bridge/cursor-bridge/roster-check.py`. Expected: nothing (the file is as at `8b03c32`).
++   - `git grep -n -F -e "_rebuild_line_open(" -e "_rebuild_needs_new_branch(" -- bridge/cursor-bridge/roster-check.py`. Expected: eight lines, 572 (the def of `_rebuild_needs_new_branch`), 1184 (the def of `_rebuild_line_open`), 1348, 1351, 1370, 1372, 1408 and 1410.
++   - `git grep -n -F -e "cannot read the families that built this branch" -- bridge/cursor-bridge/roster-check.py`. Expected: four lines, 1175, 1353, 1374 and 1412.
++   - `git grep -n -F -e "new branch" -e rebuild_with -- bridge/cursor-bridge/roster-check.py`. Expected: eight lines, 1349, 1356, 1371, 1377, 1409, 1415, 1472 and 1473.
++   - `git grep -n -w -e unreadable -e unreadable_cause -e head_fail -- bridge/cursor-bridge/roster-check.py`. Expected: 24 lines, 469, 472, 482, 487, 488, 489, 490, 492, 493, 494, 500, 501, 507, 508, 511, 512, 516, 517, 523, 524, 531, 532, 1173 and 1174.
++   - `git grep -n -F -e "json.loads(" -e "_parse_run_line(" -- bridge/cursor-bridge/roster-check.py`. Expected: five lines, 176 (in `built_by`), 410 (the def), 420, 445 and 666.
++   - `git grep -n -w -e _unreadable -e _rebuild_entry -- bridge`. Expected: nothing.
++   - `git grep -n -w -e _rebuild_line_open -e _rebuild_needs_new_branch -e _parse_run_line -e _unreadable -e _rebuild_entry -- tests`. Expected: nothing.
++   If a check does not hold (another hit, a missing hit, or another line number), stop, change nothing, and report it.
++2. Part 1: `_rebuild_line_open` reads `def _rebuild_line_open(r_id, r_fam, builder_id):` with its body unchanged; `_rebuild_entry` is the one caller of `_rebuild_line_open` and of `_rebuild_needs_new_branch`; each of the three sites calls `_rebuild_entry` once and keeps its own FAIL print and `return 1`, its `rebuild` and `profile_rebuild_end` assignments as described in the Objective, its `print(rb_line)`, and (site C) its `deviation = None`, `use_r_id, use_r_fam = r_id, r_fam` and `ok_rb` skip, in the same order relative to the print as today. Site A asks the question only where `family_only_unknown` is true.
++3. Part 2: `_unreadable(result, cause)` is a module-level function directly before `built_families`; the eight exits are seven `return _unreadable(...)` lines with the same causes in the same order, the two `head_fail` branches merged into one; nothing else in `built_families` changes.
++4. Part 3: `built_by`'s loop uses `_parse_run_line` and skips a falsy result; the filter, the `OSError` return, the `current_branch()` call after the read, the reversed walk and the return value are unchanged.
++5. No other line changes in roster-check.py. It keeps its CRLF line endings and gains no trailing whitespace. No comment, docstring or alias is added (the two new helpers carry none); nothing is imported anew.
++6. After your last source edit, run `python tools/make-manifest.py` once, then the remaining verification commands in the Constraints.
++
++## Acceptance criteria
++- [ ] Behaviour is identical: the same lines printed in the same order (REBUILD, FAIL, DEVIATION, RESOLVED, probe, skip and NOTE lines), the same exit codes (0, 1, 5), the same `docs/ROSTER.resolved.json` and roster state written, the same dict from `built_families` (keys, order, values, `status` and `unreadable_cause` included) for every git and record outcome, and the same answer from `built_by` for every run log.
++- [ ] The full test suite passes with the **same** test set (the supervisor's run and CI's, not yours); in your own run the pytest command below passes before and after the edit with the same count passed, none failed, the same count skipped, both summary lines quoted in the report. No test file edited.
++- [ ] One copy each, checked after the edit with the same commands as Requirement 1: the `_rebuild_line_open(` / `_rebuild_needs_new_branch(` grep prints four lines (the two defs and one call of each, both inside `_rebuild_entry`); the `cannot read the families that built this branch` grep still prints four lines (1175's and the three sites'); the `new branch` / `rebuild_with` grep prints four lines (one `rebuild_with` and one `"new branch"` in `_rebuild_entry`, and the two lines of the end's print, today's 1472 and 1473); the `unreadable` / `unreadable_cause` / `head_fail` grep prints ten lines (the docstring's two, the dict's initial `unreadable_cause`, the three `head_fail` lines: the unpacking, `if head_fail:` and its `return _unreadable(result, head_fail)`, the two assignments in `_unreadable`, and `main()`'s two); the `json.loads(` / `_parse_run_line(` grep prints five lines (the def, its `json.loads`, and the calls in `_parse_run_log_raw`, `repair_record` and `built_by`); `git grep -n -w -e _unreadable -- bridge/cursor-bridge/roster-check.py` prints eight lines (the def and seven calls); `git grep -n -w -e _rebuild_entry -- bridge/cursor-bridge/roster-check.py` prints four lines (the def and three calls). If your edit gives another count for a sound reason, quote it and explain it in the report.
++- [ ] No public signature changed: `built_by`, `built_families`, `main` and every other module-level name keep their signatures; the only signature change is the nested `_rebuild_line_open`'s dropped `rb_model`. roster-check.py imports nothing new.
++- [ ] `python tools/dump-cli.py --check` exits 0 with no output.
++- [ ] `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` prints `RESULT: SOURCES MATCH bridge 2026.11.24a`.
++- [ ] `git diff --numstat -- bridge/cursor-bridge/VERSION` prints nothing (if it prints a line, it is quoted in the report and the file's content is shown to read `2026.11.24a`).
++- [ ] `git diff --stat` shows only `bridge/cursor-bridge/roster-check.py`, `bridge/cursor-bridge/MANIFEST.json`, and if written `docs/BUILDER_NOTES.md` (the report is a new file); `docs/CHANGES.md`, `bridge/cursor-bridge/CHANGELOG.md`, `bridge/cursor-bridge/bridge-run.py` and every file under `tests/` unchanged; no mutation script in the diff.
++
++## Constraints
++- Do not add dependencies.
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it; everything you produce goes inside it. Run the Workspace copies of the tools, as the commands below do, never a copy under a home folder.
++- If the brief, the rules, or the tooling got in your way (an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason), append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks.
++- This change talks to no external service and adds no test; do not invent a mock of anything, and do not add or change a fixture.
++- Any console process your code launches on Windows is created windowless (`creationflags=subprocess.CREATE_NO_WINDOW` in Python, `0` on other platforms; `windowsHide: true` in Node). Capturing output does not prevent the window. A window is allowed only when it serves the user (they watch it or type into it); then write the reason at the call site as `windowless: visible-ok <reason>`. A spawn that needs a process group for a `CTRL_BREAK` stop is hidden only with a test of the stop path. This change adds no launch and leaves `_git_run` and `probe` as they are.
++- Never start a server, a watcher or a daemon that outlives a test: a test that needs the product running starts it through the test framework's own fixture and stops it there. A server left running keeps your run from ending (plan 10.3, release A2).
++- Do not refactor code outside the scope, even if it looks wrong.
++- Never run the product, a migration, a seed or a test against the owner's live data. A development build uses the development data the design names (the inventory's `Development data` decision, stated in Context) and refuses the installed product's data. Here that means the Workspace sources and pytest's temporary folders only.
++- No value in this task is marked as the owner's.
++- Follow existing conventions in the files you touch.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`; you read with `git status`, `git diff`, `git grep`, `git rev-parse` and `git log` only.
++- Numbers from text, a file, a reply or an environment variable are parsed with the language's own parser, never by slicing or splitting a string. This change parses no number.
++- An increment that starts a process meets the process checklist (windowless, stopped in a `finally` or a fixture's teardown with its whole tree, nothing outlives the test or the command, a browser on Windows launched attached, pipes closed or drained). This change starts none.
++- Every verification command is written here in full. Run exactly these, each from the Workspace root (the folder you were started in), each in the foreground, never in the background; run pytest directly as written, never through a launcher:
++  - At the start: `git status --short` and `git rev-parse HEAD`, pasted into the report.
++  - Before the edit, and again after the last edit: `python -m pytest -p no:cacheprovider -q -rs tests/test_improve_roster_alt.py tests/test_improve_roster_launch.py tests/test_roster_check.py tests/test_roster_check_a4.py tests/test_hotfix25a_roster_launcher.py tests/test_program_roster_sign_in.py`
++  - After the last source edit, in this order: `python tools/make-manifest.py`; `python tools/dump-cli.py --check`; `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`; `git diff --numstat -- bridge/cursor-bridge/VERSION`; `git diff --numstat -- bridge/cursor-bridge/roster-check.py`; the Requirement 1 `git grep` commands on `bridge/cursor-bridge/roster-check.py` again, and the two of the third acceptance criterion.
++  - At the end: `git status --short`, `git diff --stat` and `git rev-parse HEAD`, pasted into the report.
++  - Do not run the whole `tests/` tree or any other test file; the supervisor runs the full suite and the purity check after your run. If a test fails before your edit, stop and report it; do not fix it.
++- Mutation checking is the supervisor's in this task. Run no mutation, write no mutation script, and let none land in the diff.
++- Prefer reuse over new code and write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a security, observability, or accessibility requirement stated above.
++- **Refactoring constraints.** Do not edit any test file. Do not add an entry to `docs/CHANGES.md`. Do not "improve" behaviour, messages, edge cases, or defaults you notice along the way (for example the wording of the REBUILD lines, the FAIL line's fixed `(git)` cause at the three sites, `_parse_run_line`'s handling of a line, or `_profile_in_use`'s probe); report them in your summary instead. Do not introduce an abstraction beyond the two helpers named here: no further helper, no parameter beyond what `_rebuild_entry` needs, no alias, no comment, nothing new outside roster-check.py except the regenerated manifest.
++- **No computer path in the report.** Where quoted output holds the repository's absolute folder, write `<Workspace>` in its place; paste no other absolute path of this machine.
++
++## Done
++Your report is the file `handoff/REFAC-015-r1-report.md`, which you write as you go (what you did, what you changed, what you ran and what it printed, what you could not do) so that nothing of it is lost when your run ends early. When you finish, it holds:
++- a list of every file you changed;
++- a one-paragraph summary of what you did, naming how `_rebuild_entry` tells its caller that git did not answer;
++- the Requirement 1 commands with their output as the evidence;
++- the before and after outputs of the pytest command, with both summary lines;
++- the outputs of make-manifest, dump-cli `--check`, bridge-check, the two `git diff --numstat` commands and the after-edit `git grep` commands, each line that shows the result quoted (an empty output written as such);
++- `git status --short`, `git diff --stat` and `git rev-parse HEAD` at the start and at the end, and whether the working tree held uncommitted changes then;
++- one sentence stating why the behaviour is identical;
++- anything you noticed but did not change (per the refactoring constraints);
++- a final section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm (an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose). One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Every command you ran is quoted in the report with the lines it printed, verbatim (with `<Workspace>` in place of the repository's folder), in a fenced block; a count, or a claim that a check passed, quotes the output line that shows it. A command you did not run is written `not run`, never described as run. Run this brief's pytest command once more after your last edit, and write the report's results after that run, naming the commit its counts belong to (`git rev-parse HEAD`) and whether the working tree then held uncommitted changes (`git status --short`).
++
++Your last message is the summary and the report file's path, and nothing follows it: the supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/handoff/REFAC-016-r1-report.md b/handoff/REFAC-016-r1-report.md
+new file mode 100644
+index 0000000..535be9f
+--- /dev/null
++++ b/handoff/REFAC-016-r1-report.md
+@@ -0,0 +1,234 @@
++# REFAC-016 round 1 report
++
++## Files changed
++
++- `bridge/cursor-bridge/mutation-run.py`
++- `bridge/cursor-bridge/MANIFEST.json`
++- `handoff/REFAC-016-r1-report.md`
++
++## Summary
++
++Part 1 introduced `run_paths()` so checkpoint and ordinary `main()` paths share one seven-step probe-and-map sequence and return `(ir_active, mapped_active, path_kw)`. Part 2 replaced the inlined checkpoint pytest driver with `run_mutant_tests(..., [item], ...)`, discarding only the still-alive return value. Part 3 merged `pytest_env`'s two root loops into one pass over `list(import_roots_rel) + list(mapped_roots_rel)` without the `"."` branch. Part 4 added module-level `DEFAULT_DOTTED_PREFIXES` and routed all five former literal sites through it. Part 5 collapsed the generated resolution plugin's `_in_workspace` and `_in_copy` into `_under(ap, a, b)` with the same call argument order. Regenerated `MANIFEST.json` via `tools/make-manifest.py`. Behaviour is unchanged except the ephemeral generated plugin source text; JSON output and all runtime paths, env vars, and exit codes stay the same.
++
++## Start state
++
++```text
++$ git status --short
++(empty)
++
++$ git rev-parse HEAD
++bc3bcd78e44220847efdecea1b33cb3a20d5708d
++```
++
++Working tree at start: clean (no uncommitted changes).
++
++## Requirement 1 (before any edit)
++
++```text
++$ git grep -n -e "run_interpreter_path_probe(" -e "map_probe_entries(" -e "dotted_ps" -- bridge/cursor-bridge/mutation-run.py
++bridge/cursor-bridge/mutation-run.py:306:def map_probe_entries(probe_paths, workspace, copy_root):
++bridge/cursor-bridge/mutation-run.py:341:def run_interpreter_path_probe(plugin_dir, tree_root, env, timeout_sec):
++bridge/cursor-bridge/mutation-run.py:1848:            probe_paths = run_interpreter_path_probe(plugin_dir, copy_root, env, timeout_sec)
++bridge/cursor-bridge/mutation-run.py:1849:            mapped_all = map_probe_entries(probe_paths, workspace, copy_root)
++bridge/cursor-bridge/mutation-run.py:1852:            dotted_ps = module_dotted_prefixes(ir_active, mapped_active)
++bridge/cursor-bridge/mutation-run.py:1854:                import_roots_rel=ir_active, mapped_roots_rel=mapped_active, dotted_prefixes=dotted_ps)
++bridge/cursor-bridge/mutation-run.py:1947:        probe_paths = run_interpreter_path_probe(plugin_dir, copy_root, env, timeout_sec)
++bridge/cursor-bridge/mutation-run.py:1948:        mapped_all = map_probe_entries(probe_paths, workspace, copy_root)
++bridge/cursor-bridge/mutation-run.py:1951:        dotted_ps = module_dotted_prefixes(ir_active, mapped_active)
++bridge/cursor-bridge/mutation-run.py:1953:            import_roots_rel=ir_active, mapped_roots_rel=mapped_active, dotted_prefixes=dotted_ps)
++```
++
++The two seven-line sites (checkpoint 1848–1854 at 12-space indent, ordinary 1947–1953 at 8-space indent) are identical apart from indentation: same calls in the same order (`run_interpreter_path_probe`, `map_probe_entries`, `active_mapped_roots`, `active_import_roots`, `module_dotted_prefixes`, `path_kw` dict with the same three keys).
++
++```text
++$ git grep -n -w -e run_mutant_tests -e run_process -e pytest_env -e read_pytest_results -e run_process_still_alive_after_timeout -- tests
++tests/test_mutation_run.py:1259:    """R-041, TASK-031 S7, handoff/TASK-031-r7.md item 3: a grandchild holding run_process's real pipes is bounded.
++tests/test_mutation_run_supervisor.py:511:rc, out, err, timed = mod.run_process([sys.executable, sys.argv[2], sys.argv[3], sys.argv[4]], None, sys.argv[5], 2)
++tests/test_mutation_run_supervisor.py:519:    parent gone; on POSIX a session of its own) cannot keep run_process waiting: it returns timed out within the
++tests/test_mutation_run_supervisor.py:530:        pytest.fail("run_process waited on the pipes past the bound")
++```
++
++None of these lines assign or monkeypatch `run_mutant_tests`, `run_process`, `pytest_env`, `read_pytest_results`, or `run_process_still_alive_after_timeout` on the loaded program; they are docstrings, a direct call to `mod.run_process`, or assertion text. Known monkeypatches elsewhere (not among the hits above): `git` (`tests/test_mutation_run.py:275`), `kill_tree` (`tests/test_mutation_run.py:1410`, `:1487`), `git_try` (`tests/test_bug032.py:254`), `bridge_env.is_link` (`tests/test_mutation_run_supervisor.py:1244`).
++
++```text
++$ git grep -n -w -e pytest_env -- bridge/cursor-bridge/mutation-run.py
++bridge/cursor-bridge/mutation-run.py:342:    probe_env = pytest_env(plugin_dir, tree_root, env)
++bridge/cursor-bridge/mutation-run.py:1429:def pytest_env(plugin_dir, tree_root, env, results_path=None, import_roots_rel=(), mapped_roots_rel=()):
++bridge/cursor-bridge/mutation-run.py:1581:    run_env = pytest_env(
++bridge/cursor-bridge/mutation-run.py:1714:    run_env = pytest_env(
++bridge/cursor-bridge/mutation-run.py:1903:                run_env = pytest_env(
++```
++
++```text
++$ git grep -n -F -e src/ -- bridge/cursor-bridge/mutation-run.py
++bridge/cursor-bridge/mutation-run.py:271:    prefixes = ["", "src/"]
++bridge/cursor-bridge/mutation-run.py:882:    for prefix in dotted_prefixes or ("", "src/"):
++bridge/cursor-bridge/mutation-run.py:1465:    for prefix in dotted_prefixes or ("", "src/"):
++bridge/cursor-bridge/mutation-run.py:1552:    prefixes = dotted_prefixes or ("", "src/")
++bridge/cursor-bridge/mutation-run.py:1573:    dp = dotted_prefixes or ("", "src/")
++```
++
++```text
++$ git grep -n -w -e _in_workspace -e _in_copy -- bridge tests
++bridge/cursor-bridge/mutation-run.py:1357:def _in_workspace(ap, nw, nwr):
++bridge/cursor-bridge/mutation-run.py:1360:def _in_copy(ap, nc, ncr):
++bridge/cursor-bridge/mutation-run.py:1391:        if _in_copy(ap, nc, ncr):
++bridge/cursor-bridge/mutation-run.py:1397:        if _in_workspace(ap, nw, nwr):
++bridge/cursor-bridge/mutation-run.py:1405:        if not _in_workspace(af, nw, nwr):
++bridge/cursor-bridge/mutation-run.py:1407:        if _in_copy(af, nc, ncr):
++tests/test_improve_mutation_editable.py:399:            "def _in_copy(p):\n"
++tests/test_improve_mutation_editable.py:402:            "_sys.path[:] = [p for p in _sys.path if not (p and _in_copy(p))]\n"
++```
++
++```text
++$ git grep -n -w -e run_paths -e DEFAULT_DOTTED_PREFIXES -e _under -- bridge
++(no output, exit 1)
++```
++
++```text
++$ python -c "import os; t = os.path.join(os.getcwd(), 'bridge'); print(os.path.abspath(os.path.join(t, '.')) == os.path.abspath(t), os.path.isdir(os.path.join(t, '.')) == os.path.isdir(t), os.path.normcase(os.path.abspath(os.path.join(t, '.'))) == os.path.normcase(os.path.abspath(t)))"
++True True True
++```
++
++## Pytest (before edit, commit bc3bcd78e44220847efdecea1b33cb3a20d5708d, clean tree)
++
++```text
++$ python -m pytest -p no:cacheprovider -q -rs tests/test_improve_mutation_editable.py tests/test_mutation_run.py tests/test_mutation_run_supervisor.py tests/test_program_mutation_baseline.py tests/test_bug032.py
++223 passed, 2 skipped in 1017.85s (0:16:57)
++```
++
++## Pytest (after last edit, commit bc3bcd78e44220847efdecea1b33cb3a20d5708d, uncommitted mutation-run + MANIFEST)
++
++```text
++$ python -m pytest -p no:cacheprovider -q -rs tests/test_improve_mutation_editable.py tests/test_mutation_run.py tests/test_mutation_run_supervisor.py tests/test_program_mutation_baseline.py tests/test_bug032.py
++223 passed, 2 skipped in 970.57s (0:16:10)
++```
++
++Same counts: 223 passed, 2 skipped, none failed.
++
++## Post-edit verification
++
++```text
++$ python tools/make-manifest.py
++make-manifest: version 2026.11.24a, 148 files hashed, VERSION + MANIFEST.json written
++```
++
++```text
++$ python tools/dump-cli.py --check
++(empty output, exit 0)
++```
++
++```text
++$ python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet
++bridge-check: version 2026.11.24a (2026-11-26 03:52) at <Workspace>\bridge
++bridge-check: 148 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.24a <Workspace>\bridge\cursor-bridge
++```
++
++```text
++$ git diff --numstat -- bridge/cursor-bridge/VERSION
++(empty)
++```
++
++```text
++$ git diff --numstat -- bridge/cursor-bridge/mutation-run.py
++28	50	bridge/cursor-bridge/mutation-run.py
++```
++
++### Acceptance criterion git grep (after edit)
++
++```text
++$ git grep -n -w -e run_paths -- bridge
++bridge/cursor-bridge/mutation-run.py:367:def run_paths(plugin_dir, copy_root, workspace, import_roots, env, timeout_sec):
++bridge/cursor-bridge/mutation-run.py:1846:            ir_active, mapped_active, path_kw = run_paths(plugin_dir, copy_root, workspace, import_roots, env, timeout_sec)
++bridge/cursor-bridge/mutation-run.py:1931:        ir_active, mapped_active, path_kw = run_paths(plugin_dir, copy_root, workspace, import_roots, env, timeout_sec)
++```
++
++```text
++$ git grep -n -e "run_interpreter_path_probe(" -- bridge/cursor-bridge/mutation-run.py
++bridge/cursor-bridge/mutation-run.py:342:def run_interpreter_path_probe(plugin_dir, tree_root, env, timeout_sec):
++bridge/cursor-bridge/mutation-run.py:368:    probe_paths = run_interpreter_path_probe(plugin_dir, copy_root, env, timeout_sec)
++```
++
++```text
++$ git grep -n -w -e pytest_env -- bridge/cursor-bridge/mutation-run.py
++bridge/cursor-bridge/mutation-run.py:343:    probe_env = pytest_env(plugin_dir, tree_root, env)
++bridge/cursor-bridge/mutation-run.py:1438:def pytest_env(plugin_dir, tree_root, env, results_path=None, import_roots_rel=(), mapped_roots_rel=()):
++bridge/cursor-bridge/mutation-run.py:1579:    run_env = pytest_env(
++bridge/cursor-bridge/mutation-run.py:1712:    run_env = pytest_env(
++```
++
++```text
++$ git grep -n -w -e OUTCOMES_PLUGIN_MOD -- bridge/cursor-bridge/mutation-run.py
++bridge/cursor-bridge/mutation-run.py:61:OUTCOMES_PLUGIN_MOD = "_mutation_outcomes"
++bridge/cursor-bridge/mutation-run.py:1716:    argv = interpreter_argv() + ["-m", "pytest", "-p", OUTCOMES_PLUGIN_MOD, "-p", "no:cacheprovider"] + cfg + tests
++```
++
++```text
++$ git grep -n -F -e "os.path.normcase(ap)" -- bridge/cursor-bridge/mutation-run.py
++bridge/cursor-bridge/mutation-run.py:1445:            nk = os.path.normcase(ap)
++```
++
++```text
++$ git grep -n -F -e src/ -- bridge/cursor-bridge/mutation-run.py
++bridge/cursor-bridge/mutation-run.py:62:DEFAULT_DOTTED_PREFIXES = ("", "src/")
++```
++
++```text
++$ git grep -n -w -e DEFAULT_DOTTED_PREFIXES -- bridge
++bridge/cursor-bridge/mutation-run.py:62:DEFAULT_DOTTED_PREFIXES = ("", "src/")
++bridge/cursor-bridge/mutation-run.py:272:    prefixes = list(DEFAULT_DOTTED_PREFIXES)
++bridge/cursor-bridge/mutation-run.py:894:    for prefix in dotted_prefixes or DEFAULT_DOTTED_PREFIXES:
++bridge/cursor-bridge/mutation-run.py:1463:    for prefix in dotted_prefixes or DEFAULT_DOTTED_PREFIXES:
++bridge/cursor-bridge/mutation-run.py:1550:    prefixes = dotted_prefixes or DEFAULT_DOTTED_PREFIXES
++bridge/cursor-bridge/mutation-run.py:1571:    dp = dotted_prefixes or DEFAULT_DOTTED_PREFIXES
++```
++
++```text
++$ git grep -n -w -e _in_workspace -e _in_copy -- bridge
++(no output, exit 1)
++```
++
++```text
++$ git grep -n -w -e _under -- bridge
++bridge/cursor-bridge/mutation-run.py:1369:def _under(ap, a, b):
++bridge/cursor-bridge/mutation-run.py:1400:        if _under(ap, nc, ncr):
++bridge/cursor-bridge/mutation-run.py:1406:        if _under(ap, nw, nwr):
++bridge/cursor-bridge/mutation-run.py:1414:        if not _under(af, nw, nwr):
++bridge/cursor-bridge/mutation-run.py:1416:        if _under(af, nc, ncr):
++```
++
++## End state
++
++```text
++$ git status --short
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/mutation-run.py
++?? handoff/REFAC-016-r1-report.md
++```
++
++```text
++$ git diff --stat
++ bridge/cursor-bridge/MANIFEST.json   |  4 +-
++ bridge/cursor-bridge/mutation-run.py | 78 +++++++++++++-----------------------
++ 2 files changed, 30 insertions(+), 52 deletions(-)
++```
++
++```text
++$ git rev-parse HEAD
++bc3bcd78e44220847efdecea1b33cb3a20d5708d
++```
++
++Working tree at end: uncommitted changes to `mutation-run.py` and `MANIFEST.json`; new report file.
++
++## Behaviour identity
++
++Every refactor is a straight extraction or alias of existing logic: `run_paths` and the unified `pytest_env` loop perform the same operations in the same order with the same deduplication; checkpoint items use `run_mutant_tests` which already encoded that sequence; `DEFAULT_DOTTED_PREFIXES` is the same tuple values; `_under` is logically identical to `_in_workspace` and `_in_copy` with renamed parameters. Child `PYTHONPATH` construction, pytest argv, resolution JSON, stdout/stderr, and exit codes are therefore unchanged.
++
++## Noticed, not changed
++
++The checkpoint loop still ignores `run_process_still_alive_after_timeout()` from `run_mutant_tests` (as before). `active_mapped_roots` still skips `"."`. `run_resolution_check` still uses path comparisons with `startswith(croot_abs)` as in the base tree.
++
++## Assumed, not verified
++
++Assumed, not verified: none.
+\ No newline at end of file
+diff --git a/handoff/REFAC-016.md b/handoff/REFAC-016.md
+new file mode 100644
+index 0000000..ce32631
+--- /dev/null
++++ b/handoff/REFAC-016.md
+@@ -0,0 +1,235 @@
++---
++record: brief
++header: 1
++id: REFAC-016
++round: 1
++satisfies: [R-041, R-090, R-106]
++scope: ["bridge/cursor-bridge/mutation-run.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/REFAC-016-r1-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# REFAC-016: mutation-run.py's run paths, checkpoint test run, path loop, default prefixes and generated path test, each one copy
++
++## Objective
++Refactoring - remove duplication / simplify **without any change in behaviour**.
++
++This brief carries five candidates of stage I1's refactoring pass, all in `bridge/cursor-bridge/mutation-run.py` (the editable-install code of TASK-085, R-106), in five named parts. The manifest is regenerated after them. Behaviour stays exactly the same: every line printed to stdout and stderr, every exit code, every file written in the scratch folder and the cache (one exception, named in Part 5: the text of the generated resolution plugin, whose behaviour and output file stay the same), every environment given to a child process, and the order of the entries of every `PYTHONPATH` built (and so of `sys.path` in each child). Line numbers below are as the file stands at `8b03c32` (TASK-087c, the base of branch `refactor/I1`). REFAC-015 (`bridge/cursor-bridge/roster-check.py`) may be committed on this branch before your run: it touches no source file of this brief; if it regenerated `bridge/cursor-bridge/MANIFEST.json`, that change is already committed and your regeneration after your edit covers both. Function names are the anchors; a line number in mutation-run.py that differs from the one given here is a reason to stop only where Requirement 1 says so.
++
++**Part 1: the run paths, set up once.** `main()` sets up the run's paths twice with the same seven lines against `copy_root`, once in checkpoint mode (lines 1848-1854, indented 12 spaces) and once in ordinary mode (lines 1947-1953, indented 8 spaces):
++
++```python
++probe_paths = run_interpreter_path_probe(plugin_dir, copy_root, env, timeout_sec)
++mapped_all = map_probe_entries(probe_paths, workspace, copy_root)
++mapped_active = active_mapped_roots(copy_root, mapped_all)
++ir_active = active_import_roots(copy_root, import_roots)
++dotted_ps = module_dotted_prefixes(ir_active, mapped_active)
++path_kw = dict(
++    import_roots_rel=ir_active, mapped_roots_rel=mapped_active, dotted_prefixes=dotted_ps)
++```
++
++`probe_paths`, `mapped_all` and `dotted_ps` are used nowhere else in `main()`; `ir_active`, `mapped_active` and `path_kw` are used after both sites (checkpoint: `run_resolution_check(..., **rc_kwargs, **path_kw)` three times and the test loop's `pytest_env` call, lines 1903-1905; ordinary: line 1958, `compute_key(copy_root, m, tracked_set, import_roots, mapped_active)` line 1960, `run_baselines` line 1967-1969 and `run_mutant_tests` lines 2015-2017). The change: one top-level function `run_paths(plugin_dir, copy_root, workspace, import_roots, env, timeout_sec)` whose body is those seven lines in the same order (the same calls with the same arguments, the probe first) and which returns the tuple `(ir_active, mapped_active, path_kw)`, `path_kw` the same dict with the same three keys in the same order. Both sites become one line, `ir_active, mapped_active, path_kw = run_paths(plugin_dir, copy_root, workspace, import_roots, env, timeout_sec)`, at the site's indentation. Each site keeps its position: in checkpoint mode after `archive_checkpoint`, in ordinary mode after `copy_tracked(workspace, copy_root, tracked_list, untracked)`.
++
++**Part 2: the checkpoint test run is run_mutant_tests.** The checkpoint loop in `main()`, lines 1900-1911, re-implements `run_mutant_tests` (line 1710):
++
++```python
++                chk_results = os.path.join(plugin_dir, "pytest-outcomes-chk-%d.json" % chk_idx)
++                if os.path.isfile(chk_results):
++                    os.remove(chk_results)
++                run_env = pytest_env(
++                    plugin_dir, copy_root, env, chk_results,
++                    import_roots_rel=ir_active, mapped_roots_rel=mapped_active)
++                cfg = pytest_config_argv(plugin_dir, copy_root)
++                rc, out, err, timed = run_process(
++                    interpreter_argv() + ["-m", "pytest", "-p", OUTCOMES_PLUGIN_MOD, "-p", "no:cacheprovider"]
++                    + cfg + [item],
++                    run_env, copy_root, timeout_sec)
++                data = read_pytest_results(chk_results)
++```
++
++```python
++def run_mutant_tests(plugin_dir, copy_root, tests, env, timeout_sec, results_path,
++                     import_roots_rel=(), mapped_roots_rel=()):
++    if os.path.isfile(results_path):
++        os.remove(results_path)
++    run_env = pytest_env(
++        plugin_dir, copy_root, env, results_path,
++        import_roots_rel=import_roots_rel, mapped_roots_rel=mapped_roots_rel)
++    cfg = pytest_config_argv(plugin_dir, copy_root)
++    argv = interpreter_argv() + ["-m", "pytest", "-p", OUTCOMES_PLUGIN_MOD, "-p", "no:cacheprovider"] + cfg + tests
++    rc, out, err, timed = run_process(argv, run_env, copy_root, timeout_sec)
++    data = read_pytest_results(results_path)
++    return rc, out, err, timed, run_process_still_alive_after_timeout(), data
++```
++
++The same steps in the same order with `tests = [item]`; the only extra is the fifth value, `run_process_still_alive_after_timeout()` (line 731), a plain getter with no side effect: `return _last_run_process_still_alive`. After line 1911 the loop reads only `timed` and `data` (lines 1912-1943); `rc`, `out` and `err` are not read again before `return 4 if any_pass else 0` (line 1944). The change: the `chk_results = ...` line stays; the lines from `if os.path.isfile(chk_results):` through `data = read_pytest_results(chk_results)` become one call, `run_mutant_tests(plugin_dir, copy_root, [item], env, timeout_sec, chk_results, import_roots_rel=ir_active, mapped_roots_rel=mapped_active)`, unpacked into six names, the still-alive value ignored (the checkpoint loop does not read it today and must not start to). No test replaces `run_mutant_tests`, `run_process`, `pytest_env` or `read_pytest_results` (Requirement 1 checks it): the tests' monkeypatches of mutation-run are `git` (tests/test_mutation_run.py:275), `kill_tree` (tests/test_mutation_run.py:1410, :1487), `git_try` (tests/test_bug032.py:254) and `bridge_env.is_link` (tests/test_mutation_run_supervisor.py:1244).
++
++**Part 3: one loop in pytest_env.** `pytest_env` (line 1429) runs the same loop twice, lines 1432-1450:
++
++```python
++    for rel in import_roots_rel:
++        p = os.path.join(tree_root, rel.replace("/", os.sep))
++        if os.path.isdir(p):
++            ap = os.path.abspath(p)
++            nk = os.path.normcase(ap)
++            if nk not in seen:
++                parts.append(ap)
++                seen.add(nk)
++    for rel in mapped_roots_rel:
++        if rel == ".":
++            p = tree_root
++        else:
++            p = os.path.join(tree_root, rel.replace("/", os.sep))
++        if os.path.isdir(p):
++            ap = os.path.abspath(p)
++            nk = os.path.normcase(ap)
++            if nk not in seen:
++                parts.append(ap)
++                seen.add(nk)
++```
++
++The change: one loop over `list(import_roots_rel) + list(mapped_roots_rel)` with the first loop's body, so the entries keep their order (import roots first, then mapped roots) and share the one `seen` set as today. The mapped loop's `rel == "."` branch is dropped, on this ground, which you verify before you edit (Requirement 1): for `rel == "."`, `os.path.join(tree_root, ".")` is a directory exactly when `tree_root` is, and `os.path.abspath` normalizes the `.` component away (`posixpath.abspath` through `normpath`, `ntpath.abspath` through the full-path call), so `ap` and `nk` are the same as from `tree_root`. If your check prints anything other than `True True True`, stop, change nothing, and report it. Everything else in `pytest_env` (the `parts = [plugin_dir]` start, the tree root appended last when not seen, the three environment keys) is unchanged. The callers pass lists or the default `()` (`run_interpreter_path_probe` line 342, `run_resolution_check` line 1581, `run_mutant_tests` line 1714); none passes an iterator.
++
++**Part 4: one constant for the default prefixes.** The literal default prefixes appear five times:
++
++- line 271, `module_dotted_prefixes`: `    prefixes = ["", "src/"]` (a list, appended to below);
++- line 882, `dotted_module_paths`: `    for prefix in dotted_prefixes or ("", "src/"):`;
++- line 1465, `module_file_at_commit`: `    for prefix in dotted_prefixes or ("", "src/"):`;
++- line 1552, `checkpoint_collect_refused`: `    prefixes = dotted_prefixes or ("", "src/")`;
++- line 1573, `run_resolution_check`: `    dp = dotted_prefixes or ("", "src/")` (passed on to `write_resolution_plugin`, which writes `json.dumps(list(dotted_prefixes))`, to `checkpoint_collect_refused` and to `dotted_module_paths`).
++
++The change: one module-level constant `DEFAULT_DOTTED_PREFIXES = ("", "src/")`, placed among the module's constants near the top of the file (lines 50-61), not inside a function. Line 271 becomes `prefixes = list(DEFAULT_DOTTED_PREFIXES)` (a fresh list on every call, since the function appends to it; the constant itself is never mutated); the other four sites read `DEFAULT_DOTTED_PREFIXES` in place of the tuple literal, so each keeps its type (tuple there, list at line 271).
++
++**Part 5: one path test in the generated plugin.** `write_resolution_plugin` (line 1294) writes a pytest plugin from the code string that starts at line 1300; that string defines two functions with identical bodies, lines 1357-1361:
++
++```python
++def _in_workspace(ap, nw, nwr):
++    return ap == nw or ap.startswith(nw + os.sep) or ap == nwr or ap.startswith(nwr + os.sep)
++
++def _in_copy(ap, nc, ncr):
++    return ap == nc or ap.startswith(nc + os.sep) or ap == ncr or ap.startswith(ncr + os.sep)
++```
++
++called four times in the same string's `pytest_sessionfinish`: line 1391 `        if _in_copy(ap, nc, ncr):`, line 1397 `        if _in_workspace(ap, nw, nwr):`, line 1405 `        if not _in_workspace(af, nw, nwr):`, line 1407 `        if _in_copy(af, nc, ncr):`. The change: in the generated text, the two definitions become one, `_under(ap, a, b)`, whose body is the same expression with `a` and `b` (`ap == a or ap.startswith(a + os.sep) or ap == b or ap.startswith(b + os.sep)`), in the place of the two; the four calls become `_under(ap, nc, ncr)`, `_under(ap, nw, nwr)`, `not _under(af, nw, nwr)` and `_under(af, nc, ncr)`, each keeping its argument order. The code string is a `%`-formatted, non-raw, triple-single-quoted literal: the new text adds no `%`, no backslash and no `'''`. The generated file `_mutation_resolution_check.py` in the scratch folder is the one file whose bytes change; it is written and removed by each run, no test reads its text (`git grep` finds `_in_workspace` nowhere else in `bridge/` or `tests/`; `tests/test_improve_mutation_editable.py:399` defines an unrelated `_in_copy` inside a fixture's own text, which you do not touch), and the JSON it writes, `_resolution_out.json`, has the same content.
++
++**And the manifest:** `bridge/cursor-bridge/MANIFEST.json` regenerated once, after your last source edit, by `python tools/make-manifest.py`. The version stays `2026.11.24a` (the newest `## ` entry of `bridge/cursor-bridge/CHANGELOG.md`, which make-manifest picks, and today's content of `bridge/cursor-bridge/VERSION`).
++
++Satisfies: no new requirement. This keeps as they are R-041 (mutation reruns skip only what is unchanged: every mutation run is a run of `mutation-run.py` on a mutant list the supervisor writes, with its cache key, its per-mutant bound and its `--checkpoint` run of the new tests; TASK-031), R-090 (a mutation run matches its ids and proves its baseline: each distinct tests list runs once on the unmutated copy before the mutant loop; TASK-070) and R-106 (the mutation engine runs on a project installed in editable form: it reads the interpreter's import path in the run's environment, maps every entry inside the Workspace to the copy and puts those folders first on the run's `PYTHONPATH`, and its resolution check refuses a module loaded from the Workspace; TASK-085).
++
++## Scope
++Files and directories you may create or modify:
++- bridge/cursor-bridge/mutation-run.py
++- bridge/cursor-bridge/MANIFEST.json
++- docs/BUILDER_NOTES.md
++- handoff/REFAC-016-r1-report.md
++
++Do not modify anything else. `docs/BUILDER_NOTES.md` is append only.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration, pre-commit configuration, anything under `tools/` (you run `tools/make-manifest.py` and `tools/dump-cli.py`; you do not edit them)
++- docs/ and handoff/, except the files the Scope section names; `docs/diagrams/` included (this change needs no diagram change, see Diagrams); `docs/CLI_REFERENCE.md` and `docs/cli-reference.json` included (this change touches neither `build_parser` nor the module docstring)
++- every file under `tests/`, `tests/fixtures/` included: no test file or fixture may be edited, renamed or created (the supervisor's purity check, `refactor-check.py main --max-lines 400`, fails the branch on any test edit). If the working tree shows a test file modified before your run, leave it exactly as it is
++- `bridge/cursor-bridge/VERSION`: its content must still read `2026.11.24a` after make-manifest rewrites it; make-manifest writes it with an LF line ending; report what `git diff --numstat -- bridge/cursor-bridge/VERSION` prints, do not try to restore the file
++- everything under `run/`: the supervisor's and the launcher's, gitignored; none of this brief's commands writes a file there, and you write none
++- `docs/CHANGES.md` and `bridge/cursor-bridge/CHANGELOG.md`: a refactoring has no change entry
++- `bridge/cursor-bridge/roster-check.py` (REFAC-015's) and every other file under `bridge/`
++- in mutation-run.py, every line but those the five parts name: the two seven-line sites in `main()` and the added `run_paths`; the checkpoint loop's lines 1901-1911; `pytest_env`'s two loops; the five prefix sites and the added constant; the generated text's two definitions and four calls. `OUTCOMES_PLUGIN_CODE`, `run_baselines`, `run_resolution_check`'s other lines, the module docstring and `build_parser` stay exactly as they are
++
++## Context
++**What the code is today** (`8b03c32`). `bridge/cursor-bridge/mutation-run.py` has CRLF line endings on every line; keep them, and add no trailing whitespace. The generated plugin text is written with `newline="\n"` (line 1424), which you do not change. The module defines no `__all__`; no other program under `bridge/` imports mutation-run (it is a standalone program, run as `python mutation-run.py <mutants file> ...`); the tests load it in process by file path (`load_program("mutation-run")`, the `program` fixture) or run it as a child process.
++
++**How the tests reach this code.** These covering tests must stay green, unedited:
++- `tests/test_improve_mutation_editable.py` (TASK-085, R-106): editable installs imitated by `.pth` path entries and a meta-path finder in a scratch virtual environment; mutants under `sdk/src/pkg/`, import roots, the resolution check's refusals, and `--checkpoint` runs (Parts 1, 3, 4, 5).
++- `tests/test_mutation_run.py` (TASK-031, R-041): the cache, the copy, untracked files, the per-mutant bound and the still-alive path (`kill_tree` replaced so a pytest outlives the bound), `--checkpoint` runs (Parts 1, 2, 3, 4).
++- `tests/test_mutation_run_supervisor.py` (TASK-031, R-041): the supervisor's cases, `--checkpoint` runs and `run_process`'s pipe bound driven in a child (Parts 1, 2).
++- `tests/test_program_mutation_baseline.py` (TASK-070, R-090): the baseline lists through `run_baselines` and `run_mutant_tests`, and `--checkpoint` (Parts 1, 2).
++- `tests/test_bug032.py` (BUG-032, R-041): `--checkpoint` runs whose copied conftest fails to load, the per-file resolution checks, `not run` lines for blocked tests and the judged clear files (Parts 1, 2); it also holds launcher and guard cases that do not reach mutation-run.
++
++There is no other `tests/test_mutation*.py`. Some tests take tens of seconds (the bound's 30-second waits); the whole command may take several minutes. Some cases may be skipped on Windows; the skip count must be the same before and after.
++
++**The expected count.** No supervisor baseline count is given for this command. Your before-edit run is the baseline, and the after-edit run must match it (the same count passed, none failed, the same count skipped).
++
++**The manifest.** `MANIFEST.json` holds a normalized sha256 (CRLF folded to LF, BOM dropped) of every file under `bridge/`. After your edit it is stale for mutation-run.py; `python tools/make-manifest.py` rewrites `VERSION` (to `2026.11.24a` and a line feed) and the manifest, whose `generated` stamp changes, and prints `make-manifest: version 2026.11.24a, <n> files hashed, VERSION + MANIFEST.json written`. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` then compares the tree with it and is expected to print `RESULT: SOURCES MATCH bridge 2026.11.24a`. `python tools/dump-cli.py --check` is expected to print nothing and exit 0 (it prints the path of each reference file that differs and exits 1; `tests/test_dump_cli.py` lists mutation-run.py among its argparse programs); if it prints a path, stop and report it, since this change must not alter the command reference.
++
++**Security context.** mutation-run.py confines a test run to a scratch copy: the import path it builds puts the copy's folders first so that no module of the Workspace is loaded, and the generated resolution plugin refuses a module resolving outside the copy or a Workspace path ahead of the copy (R-106). The trust boundaries are the mutants file (supervisor-written, under `run/supervisor/`), the project's own code and conftest files run inside the copy, and the interpreter's import path read by the probe. `.cursor/rules/secure-coding.mdc` is in force for you, and the project's ASVS level is 2 (`docs/INVENTORY.md`, Decisions). This change moves no boundary: every `PYTHONPATH` holds the same entries in the same order, the same paths count as inside the Workspace and inside the copy, and each child runs with the same environment, arguments and bound.
++
++**Development data** (`docs/INVENTORY.md`, Decisions): "Development data: the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet (§15 condition 1, A1a condition 1)". For you: the tests run the Workspace sources against pytest's temporary folders and the repositories and environments they create there. Never run mutation-run.py yourself, against this repository or any other, and never run `bridge-install.py`.
++
++## Diagrams
++`docs/diagrams/D-002-components.md`: the element `mutation_run` (`bridge/cursor-bridge/mutation-run.py`), whose one edge is:
++
++```mermaid
++    mutation_run --> bridge_env
++```
++
++The diagram's note says the `import` lines inside the generated plugins' source strings (`OUTCOMES_PLUGIN_CODE`, `write_resolution_plugin`) are text, not imports; Part 5 adds no import to that text. The change adds no import and no edge, so the diagram does not change. `docs/diagrams/D-004-context-dfd.md` (`p_test_suite`, "Suite or mutation run") draws no flow this change adds or removes. **If the task cannot be done within them, stop and report the conflict (an objection) instead of deviating.**
++
++## Requirements
++1. **Checks first, before any edit; paste each command and its output in the report.** From the Workspace root, run:
++   - `git grep -n -e "run_interpreter_path_probe(" -e "map_probe_entries(" -e "dotted_ps" -- bridge/cursor-bridge/mutation-run.py`. Expected: the defs of `run_interpreter_path_probe` (341) and `map_probe_entries` (306), and lines 1848, 1849, 1852, 1854, 1947, 1948, 1951, 1953; compare the two seven-line sites (1848-1854 and 1947-1953) and state in the report that they are identical apart from indentation.
++   - `git grep -n -w -e run_mutant_tests -e run_process -e pytest_env -e read_pytest_results -e run_process_still_alive_after_timeout -- tests`. Expected: no line that assigns or monkeypatches one of these names on the loaded program (a line that only calls `mod.run_process(...)`, as `tests/test_mutation_run_supervisor.py:511` does, is a call, not a replacement); list each hit in the report.
++   - `git grep -n -w -e pytest_env -- bridge/cursor-bridge/mutation-run.py`. Expected: five lines, 342, 1429, 1581, 1714, 1903.
++   - `git grep -n -F -e src/ -- bridge/cursor-bridge/mutation-run.py`. Expected: five lines, 271, 882, 1465, 1552, 1573.
++   - `git grep -n -w -e _in_workspace -e _in_copy -- bridge tests`. Expected: lines 1357, 1360, 1391, 1397, 1405, 1407 of mutation-run.py, and `tests/test_improve_mutation_editable.py:399:` and `:402:` (the fixture's own text).
++   - `git grep -n -w -e run_paths -e DEFAULT_DOTTED_PREFIXES -e _under -- bridge`. Expected: nothing.
++   - `python -c "import os; t = os.path.join(os.getcwd(), 'bridge'); print(os.path.abspath(os.path.join(t, '.')) == os.path.abspath(t), os.path.isdir(os.path.join(t, '.')) == os.path.isdir(t), os.path.normcase(os.path.abspath(os.path.join(t, '.'))) == os.path.normcase(os.path.abspath(t)))"`. Expected: `True True True` (Part 3's ground).
++   If a check does not hold (another hit, a missing hit, sites that differ, a replacement of one of Part 2's names in a test, a line number other than these, or Part 3's check printing anything but `True True True`), stop, change nothing, and report it.
++2. Part 1: `run_paths(plugin_dir, copy_root, workspace, import_roots, env, timeout_sec)` is a top-level function holding the seven lines in their order and returning `(ir_active, mapped_active, path_kw)`; both sites in `main()` are one call each, at their places; nothing else in `main()` changes for this part.
++3. Part 2: the checkpoint loop calls `run_mutant_tests(plugin_dir, copy_root, [item], env, timeout_sec, chk_results, import_roots_rel=ir_active, mapped_roots_rel=mapped_active)` and ignores its still-alive value; `chk_results` is built as today; the loop's lines from `if timed or data is None:` on are unchanged.
++4. Part 3: `pytest_env` holds one loop over `list(import_roots_rel) + list(mapped_roots_rel)`, without the `"."` branch; its signature and everything else in it are unchanged.
++5. Part 4: `DEFAULT_DOTTED_PREFIXES = ("", "src/")` is a module-level constant; line 271 reads `list(DEFAULT_DOTTED_PREFIXES)`; the four other sites read the constant; no tuple or list literal `("", "src/")` / `["", "src/"]` remains.
++6. Part 5: the generated text defines `_under(ap, a, b)` in place of `_in_workspace` and `_in_copy`, and its four calls read `_under` with their arguments in today's order; nothing else in the code string changes.
++7. No other line changes in mutation-run.py. It keeps CRLF line endings and gains no trailing whitespace. No comment, docstring, alias or import is added; no public signature changes except the added `run_paths` and `DEFAULT_DOTTED_PREFIXES`.
++8. After your last source edit, run `python tools/make-manifest.py` once, then the remaining verification commands in the Constraints.
++
++## Acceptance criteria
++- [ ] Behaviour is identical: the same lines printed, the same exit codes, the same files written (the generated plugin's text aside, whose output `_resolution_out.json` is the same), the same environment and `PYTHONPATH` entries in the same order for every child, in ordinary and in `--checkpoint` mode.
++- [ ] The full test suite passes with the **same** test set (the supervisor's run and CI's, not yours); in your own run the pytest command below passes before and after the edit with the same count passed, none failed, the same count skipped, both summary lines quoted in the report. No test file edited.
++- [ ] One copy each: `git grep -n -w -e run_paths -- bridge` prints three lines (the def and two calls, all in mutation-run.py); `git grep -n -e "run_interpreter_path_probe(" -- bridge/cursor-bridge/mutation-run.py` prints two lines (the def and the call in `run_paths`); `git grep -n -w -e pytest_env -- bridge/cursor-bridge/mutation-run.py` prints four lines (342, the def, `run_resolution_check`'s, `run_mutant_tests`'), where it printed five; `git grep -n -w -e OUTCOMES_PLUGIN_MOD -- bridge/cursor-bridge/mutation-run.py` prints two lines (the constant and `run_mutant_tests`'), where it printed three; `git grep -n -F -e "os.path.normcase(ap)" -- bridge/cursor-bridge/mutation-run.py` prints one line, where it printed two; `git grep -n -F -e src/ -- bridge/cursor-bridge/mutation-run.py` prints one line, the constant; `git grep -n -w -e DEFAULT_DOTTED_PREFIXES -- bridge` prints six lines, all in mutation-run.py; `git grep -n -w -e _in_workspace -e _in_copy -- bridge` prints nothing; `git grep -n -w -e _under -- bridge` prints five lines, all in mutation-run.py (the generated def and four calls).
++- [ ] `python tools/dump-cli.py --check` exits 0 with no output.
++- [ ] `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` prints `RESULT: SOURCES MATCH bridge 2026.11.24a`.
++- [ ] `git diff --numstat -- bridge/cursor-bridge/VERSION` prints nothing (if it prints a line, it is quoted in the report and the file's content is shown to read `2026.11.24a`).
++- [ ] `git diff --stat` shows only `bridge/cursor-bridge/mutation-run.py`, `bridge/cursor-bridge/MANIFEST.json`, and if written `docs/BUILDER_NOTES.md` (the report is a new file); `docs/CHANGES.md`, `bridge/cursor-bridge/CHANGELOG.md` and every file under `tests/` unchanged; no mutation script in the diff.
++
++## Constraints
++- Do not add dependencies.
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it; everything you produce goes inside it. Run the Workspace copies of the tools, as the commands below do, never a copy under a home folder.
++- If the brief, the rules, or the tooling got in your way (an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason), append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks.
++- This increment talks to no external service; the tests make no network call.
++- Any console process your code launches on Windows is created windowless (`creationflags=subprocess.CREATE_NO_WINDOW` in Python, `0` on other platforms; `windowsHide: true` in Node). Capturing output does not prevent the window. A window is allowed only when it serves the user (they watch it or type into it); then write the reason at the call site as `windowless: visible-ok <reason>`. A spawn that needs a process group for a `CTRL_BREAK` stop is hidden only with a test of the stop path. This change adds no launch: the checkpoint run's child is started by the same `run_process` (with `creationflags=NO_WINDOW`) as today, and `run_process` and `kill_tree` stay as they are.
++- Never start a server, a watcher or a daemon that outlives a test: a test that needs the product running starts it through the test framework's own fixture and stops it there. A server left running keeps your run from ending (plan 10.3, release A2).
++- Do not refactor code outside the scope, even if it looks wrong.
++- Never run the product, a migration, a seed or a test against the owner's live data. A development build uses the development data the design names (the inventory's `Development data` decision, stated in Context) and refuses the installed product's data. Here that means the Workspace sources and pytest's temporary folders only.
++- No value in this task is marked as the owner's.
++- Follow existing conventions in the files you touch.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`; you read with `git status`, `git diff`, `git grep`, `git rev-parse` and `git log` only.
++- Numbers from text, a file, a reply or an environment variable are parsed with the language's own parser, never by slicing or splitting a string. This change parses no number.
++- An increment that starts a process meets the process checklist (windowless, stopped in a `finally` or a fixture's teardown with its whole tree, nothing outlives the test or the command, a browser on Windows launched attached, pipes closed or drained). This change starts no new process; the existing children keep today's bound, kill and pipe handling.
++- Every verification command is written here in full. Run exactly these, each from the Workspace root (the folder you were started in), each in the foreground, never in the background; run pytest directly as written, never through a launcher:
++  - At the start: `git status --short` and `git rev-parse HEAD`, pasted into the report.
++  - The seven commands of Requirement 1, before any edit.
++  - Before the edit, and again after the last edit: `python -m pytest -p no:cacheprovider -q -rs tests/test_improve_mutation_editable.py tests/test_mutation_run.py tests/test_mutation_run_supervisor.py tests/test_program_mutation_baseline.py tests/test_bug032.py`
++  - After the last source edit, in this order: `python tools/make-manifest.py`; `python tools/dump-cli.py --check`; `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`; `git diff --numstat -- bridge/cursor-bridge/VERSION`; `git diff --numstat -- bridge/cursor-bridge/mutation-run.py`; the nine `git grep` commands of the third acceptance criterion.
++  - At the end: `git status --short`, `git diff --stat` and `git rev-parse HEAD`, pasted into the report.
++  - Do not run the whole `tests/` tree or any other test file; the supervisor runs the full suite and the purity check after your run. If a test fails before your edit, stop and report it; do not fix it.
++- Mutation checking is the supervisor's in this task. Run no mutation, write no mutation script, and let none land in the diff.
++- Prefer reuse over new code and write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a security, observability, or accessibility requirement stated above.
++- **Refactoring constraints.** Do not edit any test file. Do not add an entry to `docs/CHANGES.md`. Do not "improve" behaviour, messages, edge cases, or defaults you notice along the way (for example the checkpoint loop not reading the still-alive value, `active_mapped_roots` skipping `"."`, or the two path tests in `run_resolution_check` that compare with `startswith(croot_abs)`); report them in your summary instead. Do not introduce an abstraction beyond the two added names and the generated `_under`: no further helper, parameter, alias or comment.
++- **No computer path in the report.** Where quoted output holds the repository's absolute folder, write `<Workspace>` in its place; paste no other absolute path of this machine.
++
++## Done
++Your report is the file `handoff/REFAC-016-r1-report.md`, which you write as you go (what you did, what you changed, what you ran and what it printed, what you could not do) so that nothing of it is lost when your run ends early. When you finish, it holds:
++- a list of every file you changed;
++- a one-paragraph summary of what you did, part by part;
++- the Requirement 1 commands with their output as the evidence, your comparison of the two seven-line sites, and the list of test hits for Part 2's names;
++- the before and after outputs of the pytest command, with both summary lines;
++- the outputs of make-manifest, dump-cli `--check`, bridge-check, the two `git diff --numstat` commands and the third acceptance criterion's nine `git grep` commands, each line that shows the result quoted (an empty output written as such);
++- `git status --short`, `git diff --stat` and `git rev-parse HEAD` at the start and at the end, and whether the working tree held uncommitted changes then;
++- one sentence stating why the behaviour is identical;
++- anything you noticed but did not change (per the refactoring constraints);
++- a final section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm (an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose). One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Every command you ran is quoted in the report with the lines it printed, verbatim (with `<Workspace>` in place of the repository's folder), in a fenced block; a count, or a claim that a check passed, quotes the output line that shows it. A command you did not run is written `not run`, never described as run. Run this brief's pytest command once more after your last edit, and write the report's results after that run, naming the commit its counts belong to (`git rev-parse HEAD`) and whether the working tree then held uncommitted changes (`git status --short`).
++
++Your last message is the summary and the report file's path, and nothing follows it: the supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/handoff/REFAC-017-r1-report.md b/handoff/REFAC-017-r1-report.md
+new file mode 100644
+index 0000000..8ef8a35
+--- /dev/null
++++ b/handoff/REFAC-017-r1-report.md
+@@ -0,0 +1,296 @@
++# REFAC-017 round 1 report
++
++## Files changed
++
++- `bridge/cursor-bridge/bridge-run.py`
++- `bridge/cursor-bridge/MANIFEST.json`
++- `handoff/REFAC-017-r1-report.md` (this file)
++
++## Summary
++
++Refactored `bridge/cursor-bridge/bridge-run.py` so `_git_launch_state` obtains HEAD via `_git_rev_parse(ws, "HEAD")` with the same 40/64-hex validation and unchanged status block, and so `roster_builder_model`, `_read_roster_json`, and `_load_deviation` each read `docs/*.json` through new private `_read_docs_json(folder, name)`; regenerated `bridge/cursor-bridge/MANIFEST.json` with `python tools/make-manifest.py`. Requirement 1 held for `bridge-run.py`; three test files already differed from `8b03c32` before this run (left untouched per Out of scope). Pytest before and after: 622 passed, 4 skipped.
++
++## Start state
++
++```
++git status --short
++```
++
++(empty)
++
++```
++git rev-parse HEAD
++```
++
++```
++25cba54f060b6217f4100d04ddb3f6fe659f22d8
++```
++
++```
++git log --oneline -3
++```
++
++```
++25cba54 REFAC-017: the header's satisfies list in the prose line's order
++ae0e3ac REFAC-016: mutation-run.py - run paths, the checkpoint run, pytest_env's loop and the plugin's path test, each once
++bc3bcd7 REFAC-015: roster-check.py - the rebuild entry, the unreadable exit and built_by's line parse, each once
++```
++
++Working tree at start: no uncommitted changes shown by `git status --short`.
++
++## Requirement 1 (before edit)
++
++```
++git diff --stat 8b03c32 -- bridge/cursor-bridge/bridge-run.py tests
++```
++
++```
++ tests/roster_rows.py                | 56 +++++++++++++++++++++++++++++++++++++
++ tests/test_improve_roster_alt.py    | 51 ++-------------------------------
++ tests/test_improve_roster_launch.py | 52 ++--------------------------------
++ 3 files changed, 61 insertions(+), 98 deletions(-)
++```
++
++`bridge/cursor-bridge/bridge-run.py` is unchanged from `8b03c32`; three test files differ (pre-existing on this branch). No edit was made to those files.
++
++```
++git grep -n -w -e _git_rev_parse -e _git_launch_state -e roster_builder_model -e _read_roster_json -e _load_deviation -e _read_docs_json -- bridge tests
++```
++
++```
++bridge/cursor-bridge/bridge-run.py:1201:def roster_builder_model(folder):
++bridge/cursor-bridge/bridge-run.py:1212:def _read_roster_json(ws):
++bridge/cursor-bridge/bridge-run.py:1241:def _git_launch_state(ws):
++bridge/cursor-bridge/bridge-run.py:1304:def _load_deviation(folder):
++bridge/cursor-bridge/bridge-run.py:1329:    roster_data, profiles = _read_roster_json(ws)
++bridge/cursor-bridge/bridge-run.py:1353:    deviation = _load_deviation(folder)
++bridge/cursor-bridge/bridge-run.py:1432:    builder = roster_builder_model(folder)
++bridge/cursor-bridge/bridge-run.py:1439:            if _load_deviation(folder) is None:
++bridge/cursor-bridge/bridge-run.py:2678:        resolved_builder = roster_builder_model(ws)
++bridge/cursor-bridge/bridge-run.py:3135:def _git_rev_parse(folder, *args):
++bridge/cursor-bridge/bridge-run.py:3156:    raw = _git_rev_parse(folder, *args)
++bridge/cursor-bridge/bridge-run.py:3609:        start_commit, clean = _git_launch_state(ws_build)
++```
++
++(Twelve lines; no `_read_docs_json`; none in `tests/`.)
++
++```
++git grep -n -F -e "json.load(" -- bridge/cursor-bridge/bridge-run.py
++```
++
++```
++bridge/cursor-bridge/bridge-run.py:1204:            data = json.load(f)
++bridge/cursor-bridge/bridge-run.py:1215:            data = json.load(f)
++bridge/cursor-bridge/bridge-run.py:1307:            data = json.load(f)
++```
++
++```
++git grep -n -F -e "except (OSError, ValueError, RecursionError):" -- bridge/cursor-bridge/bridge-run.py
++```
++
++```
++bridge/cursor-bridge/bridge-run.py:1207:    except (OSError, ValueError, RecursionError):
++bridge/cursor-bridge/bridge-run.py:1216:    except (OSError, ValueError, RecursionError):
++bridge/cursor-bridge/bridge-run.py:1308:    except (OSError, ValueError, RecursionError):
++```
++
++```
++git grep -n -F -e rev-parse -- bridge/cursor-bridge/bridge-run.py
++```
++
++```
++bridge/cursor-bridge/bridge-run.py:1183:            ["git", "-C", folder or ".", "rev-parse", "--git-common-dir"],
++bridge/cursor-bridge/bridge-run.py:1247:            ["git", "-C", base, "rev-parse", "HEAD"],
++bridge/cursor-bridge/bridge-run.py:2584:            ["git", "-C", folder or ".", "rev-parse", "--abbrev-ref", "HEAD"],
++bridge/cursor-bridge/bridge-run.py:2700:        p = subprocess.run(["git", "-C", folder, "rev-parse", "HEAD"], capture_output=True, text=True, timeout=30, creationflags=NO_WINDOW)
++bridge/cursor-bridge/bridge-run.py:3138:            ["git", "-C", folder or ".", "rev-parse"] + list(args),
++bridge/cursor-bridge/bridge-run.py:3155:    """Absolute path of a git rev-parse answer...
++```
++
++```
++git grep -n -e "^GIT_TIMEOUT" -- bridge/cursor-bridge/bridge_env.py
++```
++
++```
++bridge/cursor-bridge/bridge_env.py:416:GIT_TIMEOUT = 30
++```
++
++### Git call comparison (`_git_launch_state` rev-parse block vs `_git_rev_parse`)
++
++For `_git_launch_state` at `8b03c32`, `base = ws or "."` and the subprocess used `["git", "-C", base, "rev-parse", "HEAD"]`. For `_git_rev_parse(ws, "HEAD")`, the command is `["git", "-C", folder or ".", "rev-parse"] + list(args)` → `["git", "-C", ws or ".", "rev-parse", "HEAD"]`. Same `-C` folder rule, same subcommand and `HEAD`, same `capture_output=True`, `text=True`, `encoding="utf-8"`, `errors="replace"`, `creationflags=NO_WINDOW`, `timeout=bridge_env.GIT_TIMEOUT` (30), neither passes `env=` or `cwd=`. Non-zero exit, empty stripped stdout, `OSError`, and `TimeoutExpired` in `_git_rev_parse` yield `None`, which maps to the same `(None, False)` paths as before; non-empty stdout is the same stripped string, then the same 40/64-hex test applies.
++
++### JSON reader comparison
++
++All three copies used `open(os.path.join(<folder>, "docs", <name>), encoding="utf-8", errors="replace")`, `json.load(f)`, and `except (OSError, ValueError, RecursionError):` with the same handling semantics described in the Objective. `_read_docs_json` preserves that path join (folder unchanged), encoding, `errors`, and except tuple, and returns the object only when it is a `dict`, else `None`.
++
++## Pytest (before edit, at HEAD `25cba54`)
++
++```
++python -m pytest -p no:cacheprovider -q -rs tests/test_improve_roster_launch.py tests/test_hotfix25a_roster_launcher.py tests/test_task032_supervisor_launcher.py tests/test_bridge_run.py tests/test_bridge_run_design_ceiling.py tests/test_bridge_run_review_ceiling.py tests/test_bridge_run_driver.py tests/test_bridge_run_slot.py tests/test_hotfix24a_heavy_slots.py tests/test_header_currency.py
++```
++
++```
++........................... (dots omitted) ...
++=========================== short test summary info ===========================
++SKIPPED [1] tests\test_bridge_run_slot.py:411: POSIX special files
++SKIPPED [1] tests\test_bridge_run_slot.py:930: POSIX links and permission bits
++SKIPPED [1] tests\test_bridge_run_slot.py:1125: POSIX permission bits
++SKIPPED [1] tests\test_hotfix24a_heavy_slots.py:1102: POSIX file modes
++622 passed, 4 skipped in 413.73s (0:06:53)
++```
++
++Working tree before this pytest: no uncommitted changes (`git status --short` empty at start).
++
++## Post-edit verification
++
++```
++python tools/make-manifest.py
++```
++
++```
++make-manifest: version 2026.11.24a, 148 files hashed, VERSION + MANIFEST.json written
++```
++
++```
++python tools/dump-cli.py --check
++```
++
++(empty output, exit 0)
++
++```
++python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet
++```
++
++```
++bridge-check: version 2026.11.24a (2026-11-26 04:42) at <Workspace>\bridge
++bridge-check: 148 OK, 0 STALE, 0 MISSING, 0 EXTRA
++RESULT: SOURCES MATCH bridge 2026.11.24a <Workspace>\bridge\cursor-bridge
++```
++
++```
++git diff --numstat -- bridge/cursor-bridge/VERSION
++```
++
++(empty)
++
++```
++git diff --numstat -- bridge/cursor-bridge/bridge-run.py
++```
++
++```
++18	33	bridge/cursor-bridge/bridge-run.py
++```
++
++### Acceptance `git grep` (after edit)
++
++```
++git grep -n -F -e "json.load(" -- bridge/cursor-bridge/bridge-run.py
++```
++
++```
++bridge/cursor-bridge/bridge-run.py:1204:            data = json.load(f)
++```
++
++```
++git grep -n -F -e "except (OSError, ValueError, RecursionError):" -- bridge/cursor-bridge/bridge-run.py
++```
++
++```
++bridge/cursor-bridge/bridge-run.py:1205:    except (OSError, ValueError, RecursionError):
++```
++
++```
++git grep -n -w -e _read_docs_json -- bridge
++```
++
++```
++bridge/cursor-bridge/bridge-run.py:1201:def _read_docs_json(folder, name):
++bridge/cursor-bridge/bridge-run.py:1211:    data = _read_docs_json(folder, "ROSTER.resolved.json")
++bridge/cursor-bridge/bridge-run.py:1218:    data = _read_docs_json(ws, "ROSTER.json")
++bridge/cursor-bridge/bridge-run.py:1294:    data = _read_docs_json(folder, "ROSTER.resolved.json")
++```
++
++```
++git grep -n -w -e _git_rev_parse -- bridge
++```
++
++```
++bridge/cursor-bridge/bridge-run.py:1246:    cand = _git_rev_parse(ws, "HEAD")
++bridge/cursor-bridge/bridge-run.py:3120:def _git_rev_parse(folder, *args):
++bridge/cursor-bridge/bridge-run.py:3141:    raw = _git_rev_parse(folder, *args)
++```
++
++```
++git grep -n -F -e rev-parse -- bridge/cursor-bridge/bridge-run.py
++```
++
++```
++bridge/cursor-bridge/bridge-run.py:1183:            ["git", "-C", folder or ".", "rev-parse", "--git-common-dir"],
++bridge/cursor-bridge/bridge-run.py:2569:            ["git", "-C", folder or ".", "rev-parse", "--abbrev-ref", "HEAD"],
++bridge/cursor-bridge/bridge-run.py:2685:        p = subprocess.run(["git", "-C", folder, "rev-parse", "HEAD"], ...
++bridge/cursor-bridge/bridge-run.py:3123:            ["git", "-C", folder or ".", "rev-parse"] + list(args),
++bridge/cursor-bridge/bridge-run.py:3140:    """Absolute path of a git rev-parse answer...
++```
++
++Five lines; none inside `_git_launch_state`.
++
++## Pytest (after edit, at HEAD `25cba54`, uncommitted changes present)
++
++```
++python -m pytest -p no:cacheprovider -q -rs tests/test_improve_roster_launch.py tests/test_hotfix25a_roster_launcher.py tests/test_task032_supervisor_launcher.py tests/test_bridge_run.py tests/test_bridge_run_design_ceiling.py tests/test_bridge_run_review_ceiling.py tests/test_bridge_run_driver.py tests/test_bridge_run_slot.py tests/test_hotfix24a_heavy_slots.py tests/test_header_currency.py
++```
++
++```
++=========================== short test summary info ===========================
++SKIPPED [1] tests\test_bridge_run_slot.py:411: POSIX special files
++SKIPPED [1] tests\test_bridge_run_slot.py:930: POSIX links and permission bits
++SKIPPED [1] tests\test_bridge_run_slot.py:1125: POSIX permission bits
++SKIPPED [1] tests\test_hotfix24a_heavy_slots.py:1102: POSIX file modes
++622 passed, 4 skipped in 413.54s (0:06:53)
++```
++
++Same passed and skipped counts as before edit.
++
++## End state
++
++```
++git status --short
++```
++
++```
++ M bridge/cursor-bridge/MANIFEST.json
++ M bridge/cursor-bridge/bridge-run.py
++?? handoff/REFAC-017-r1-report.md
++```
++
++```
++git diff --stat
++```
++
++```
++ bridge/cursor-bridge/MANIFEST.json |  4 +--
++ bridge/cursor-bridge/bridge-run.py | 51 ++++++++++++++------------------------
++ 2 files changed, 20 insertions(+), 35 deletions(-)
++```
++
++```
++git rev-parse HEAD
++```
++
++```
++25cba54f060b6217f4100d04ddb3f6fe659f22d8
++```
++
++Working tree at end: uncommitted modifications to `bridge-run.py` and `MANIFEST.json`, untracked report.
++
++## Behaviour
++
++The launcher still runs the same git invocation for HEAD (via `_git_rev_parse`), applies the same hex gate and status porcelain logic, and still reads the same roster JSON paths with the same encoding, exception set, and per-caller field checks, so every exit, refusal, printed line, and run-record field on the exercised paths stays the same.
++
++## Noticed, not changed
++
++`local_head`, `branch_of`, and `git_common_dir` still carry their own git subprocess patterns; `git diff --stat 8b03c32 -- tests` shows pre-existing test extractions to `tests/roster_rows.py` on this branch.
++
++## Assumed, not verified
++
++Assumed, not verified: none.
+\ No newline at end of file
+diff --git a/handoff/REFAC-017.md b/handoff/REFAC-017.md
+new file mode 100644
+index 0000000..bd88ec2
+--- /dev/null
++++ b/handoff/REFAC-017.md
+@@ -0,0 +1,236 @@
++---
++record: brief
++header: 1
++id: "REFAC-017"
++round: 1
++satisfies: [R-107, R-039]
++scope: ["bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/MANIFEST.json", "docs/BUILDER_NOTES.md", "handoff/REFAC-017-r1-report.md"]
++merge_unit: null
++blocking_class: null
++---
++# REFAC-017: the launcher's HEAD reading through _git_rev_parse, and one reader of docs/*.json
++
++## Objective
++Refactoring - remove duplication / simplify **without any change in behaviour**.
++
++This brief carries two candidates of stage I1's refactoring pass, both in `bridge/cursor-bridge/bridge-run.py` (the launcher), in two named parts. Part 1 makes `_git_launch_state` read the commit through the existing `_git_rev_parse` instead of its own copy of the same git call. Part 2 gives three readers of a JSON file under `docs/` one private reading function. The manifest is regenerated after it. Behaviour stays exactly the same: every line the launcher prints, every refusal and its text, every exit code, every field of every run-record row (`start_commit` and `clean` on a builder row included), and every git command the launcher starts (its arguments and its options). This is the launcher: every refusal that reads these values fails closed today and must still do so, and a value that is `None` or `False` today on a failure must stay `None` or `False` on the same failure. Line numbers below are as `bridge/cursor-bridge/bridge-run.py` stands at `8b03c32` (TASK-087c, the base of branch `refactor/I1`). REFAC-015 (`bridge/cursor-bridge/roster-check.py`) and REFAC-016 (`bridge/cursor-bridge/mutation-run.py`) may be committed on this branch before your run: they touch no file of this brief except `bridge/cursor-bridge/MANIFEST.json` (which you regenerate anyway), so `bridge-run.py` must be byte-identical to its `8b03c32` content when you start (Requirement 1 checks it). `bridge-run.py` loads `roster-check.py` at run time (`roster_program()`, line 2618), so REFAC-015 may run under your tests; it is itself a no-behaviour-change refactoring.
++
++**Part 1: `_git_launch_state` reads HEAD through `_git_rev_parse`.**
++
++The copy, `_git_launch_state(ws)`, lines 1241-1262 (the rev-parse HEAD block and its None test):
++
++```python
++def _git_launch_state(ws):
++    """The commit and clean-tree reading for a builder row, before the child starts."""
++    base = ws or "."
++    start_commit = None
++    try:
++        p = subprocess.run(
++            ["git", "-C", base, "rev-parse", "HEAD"],
++            capture_output=True,
++            text=True,
++            encoding="utf-8",
++            errors="replace",
++            creationflags=NO_WINDOW,
++            timeout=bridge_env.GIT_TIMEOUT,
++        )
++        if p.returncode == 0:
++            cand = p.stdout.strip()
++            if len(cand) in (40, 64) and all(ch in "0123456789abcdef" for ch in cand.lower()):
++                start_commit = cand
++    except (OSError, subprocess.TimeoutExpired):
++        return None, False
++    if start_commit is None:
++        return None, False
++```
++
++Lines 1263-1301 then run `["git", "-C", base, "status", "--porcelain", "-z", "--untracked-files=normal", "--ignore-submodules=none"]` with the same options and parse its answer (the status block).
++
++The single implementation, `_git_rev_parse(folder, *args)`, lines 3135-3151:
++
++```python
++def _git_rev_parse(folder, *args):
++    try:
++        p = subprocess.run(
++            ["git", "-C", folder or ".", "rev-parse"] + list(args),
++            capture_output=True,
++            text=True,
++            encoding="utf-8",
++            errors="replace",
++            creationflags=NO_WINDOW,
++            timeout=bridge_env.GIT_TIMEOUT,
++        )
++        if p.returncode != 0:
++            return None
++        out = p.stdout.strip()
++        return out if out else None
++    except (OSError, subprocess.TimeoutExpired):
++        return None
++```
++
++The packager compared the two at `8b03c32` and they agree exactly: the same argument list for `_git_rev_parse(ws, "HEAD")` (`["git", "-C", ws or ".", "rev-parse", "HEAD"]`, the folder in the `-C` form, no `cwd=`), the same `capture_output=True, text=True, encoding="utf-8", errors="replace", creationflags=NO_WINDOW, timeout=bridge_env.GIT_TIMEOUT` (`GIT_TIMEOUT = 30`, `bridge_env.py` line 416), and neither passes `env=`, so both inherit the process's environment. Each case `_git_rev_parse` turns into `None` (a non-zero exit, an empty answer after `strip()`, `OSError`, `subprocess.TimeoutExpired`) already ends in `(None, False)` in `_git_launch_state` today (an empty answer fails the length test). A non-empty answer is the same stripped string in both.
++
++The change: in `_git_launch_state`, the `try`/`except` block holding the rev-parse call becomes a call `cand = _git_rev_parse(ws, "HEAD")`; the 40/64-hex test stays exactly as it is, written over `cand`; a `None` answer gives `(None, False)` without running the status command and without a `TypeError` (today `len()` is never called on `None`). The docstring, `base = ws or "."` (still used by the status block), the `if start_commit is None: return None, False` test and the whole status block (lines 1263-1301) stay exactly as they are. `_git_rev_parse` itself does not change.
++
++**Part 2: one reader of `docs/<name>.json`.**
++
++The three copies, each opening `os.path.join(<folder>, "docs", <name>)` with `encoding="utf-8", errors="replace"`, calling `json.load(f)`, catching `(OSError, ValueError, RecursionError)` and requiring a dict (read at `8b03c32`; the packager checked the encoding, the `errors` argument and the except tuple are character for character the same in all three):
++
++```python
++def roster_builder_model(folder):
++    try:
++        with open(os.path.join(folder, "docs", "ROSTER.resolved.json"), encoding="utf-8", errors="replace") as f:
++            data = json.load(f)
++        if isinstance(data, dict) and isinstance(data.get("builder"), str):
++            return data["builder"]
++    except (OSError, ValueError, RecursionError):
++        pass
++    return None
++
++
++def _read_roster_json(ws):
++    try:
++        with open(os.path.join(ws, "docs", "ROSTER.json"), encoding="utf-8", errors="replace") as f:
++            data = json.load(f)
++    except (OSError, ValueError, RecursionError):
++        return None, None
++    if not isinstance(data, dict):
++        return None, None
++    profiles = data.get("profiles")
++    ...
++    return data, profiles
++```
++
++(`roster_builder_model` lines 1201-1209, `_read_roster_json` lines 1212-1228; its profiles checks, lines 1220-1227, stay as they are), and:
++
++```python
++def _load_deviation(folder):
++    try:
++        with open(os.path.join(folder, "docs", "ROSTER.resolved.json"), encoding="utf-8", errors="replace") as f:
++            data = json.load(f)
++    except (OSError, ValueError, RecursionError):
++        return None
++    if not isinstance(data, dict):
++        return None
++    deviation = data.get("deviation")
++    return deviation if isinstance(deviation, dict) else None
++```
++
++(lines 1304-1314).
++
++The change: one private top-level function `_read_docs_json(folder, name)` that returns the loaded object where it is a dict, and `None` where the file cannot be opened or read (`OSError`), does not parse (`ValueError`), is nested too deep (`RecursionError`) or is not a dict. It joins the path as the copies do, `os.path.join(folder, "docs", name)`, with `folder` passed through unchanged (no `or "."`, no normalisation), opens with `encoding="utf-8", errors="replace"`, and catches exactly `(OSError, ValueError, RecursionError)`, nothing wider: an exception none of the copies catches today (for example the `TypeError` of `os.path.join` given `None`) still propagates. Place it directly above `roster_builder_model`. The three functions keep their names, their signatures, their own field checks and their return values on every path: `roster_builder_model` the `builder` string or `None`; `_read_roster_json` `(data, profiles)` or `(None, None)`; `_load_deviation` the `deviation` dict or `None`. Their callers (lines 1329, 1353, 1432, 1439, 2678) do not change.
++
++**And the manifest:** `bridge/cursor-bridge/MANIFEST.json` regenerated once, after your last source edit, by `python tools/make-manifest.py`. The version stays `2026.11.24a` (the newest `## ` entry of `bridge/cursor-bridge/CHANGELOG.md`, which make-manifest picks, and today's content of `bridge/cursor-bridge/VERSION`).
++
++Satisfies: no new requirement. This keeps as they are R-107 (an exhausted pool never parks or pauses work, and a reviewer is never of a family that built the change: the launcher writes `start_commit` and `clean` on every builder row, read before the child starts, and its two review refusals read the built set from `docs/ROSTER.json` and the run record and the recorded deviation from `docs/ROSTER.resolved.json`; TASK-086a, TASK-086b) and R-039 (windowless launches are enforced by the bridge: every git command the launcher starts keeps `creationflags=NO_WINDOW`).
++
++## Scope
++Files and directories you may create or modify:
++- bridge/cursor-bridge/bridge-run.py
++- bridge/cursor-bridge/MANIFEST.json
++- docs/BUILDER_NOTES.md
++- handoff/REFAC-017-r1-report.md
++
++Do not modify anything else. `docs/BUILDER_NOTES.md` is append only. `MANIFEST.json` is written only by `python tools/make-manifest.py`, never by hand.
++
++## Out of scope
++- .env and anything under secrets/
++- CI configuration, pre-commit configuration, anything under `tools/` (you run `tools/make-manifest.py` and `tools/dump-cli.py`; you do not edit them)
++- docs/ and handoff/, except the files the Scope section names; `docs/diagrams/`, `docs/CLI_REFERENCE.md` and `docs/cli-reference.json` included (this change touches no `build_parser`, no usage text and no module docstring)
++- every file under `tests/`, `tests/fixtures/` included: no test file or fixture may be edited, renamed or created (the supervisor's purity check, `refactor-check.py main --max-lines 400`, fails the branch on any test edit). If the working tree shows a test file modified before your run, leave it exactly as it is and report it
++- `bridge/cursor-bridge/VERSION`: its content must still read `2026.11.24a` after make-manifest rewrites it; make-manifest writes it with an LF line ending; report what `git diff --numstat -- bridge/cursor-bridge/VERSION` prints, do not try to restore the file
++- everything under `run/`: the supervisor's, gitignored; this brief asks you to write no file there (every output goes into the report)
++- `docs/CHANGES.md` and `bridge/cursor-bridge/CHANGELOG.md`: a refactoring has no change entry
++- `bridge/cursor-bridge/roster-check.py` and `bridge/cursor-bridge/mutation-run.py` (REFAC-015's and REFAC-016's), and every other file under `bridge/`
++- in bridge-run.py, every line but Part 1's block in `_git_launch_state` and Part 2's three bodies and the added `_read_docs_json`. In particular these stay exactly as they are, though they look alike: the other git readers `git_common_dir` (line 1180, `rev-parse --git-common-dir`), `branch_of` (line 2580, `rev-parse --abbrev-ref HEAD`) and `local_head` (line 2698, a one-line `rev-parse HEAD` with other options); `_git_rev_parse` and `_git_rev_parse_path`; `_run_parameters_values` (line 1069, which reads `docs/RUN_PARAMETERS.md` as text); the status block of `_git_launch_state`; and every caller of the touched functions
++
++## Context
++**What the code is today** (`8b03c32`). `bridge-run.py` has CRLF line endings on every line (3840 lines); keep them, and add no trailing whitespace. It imports `json`, `os` and `subprocess` at the top (lines 109, 111, 116) and `bridge_env` (line 122); `NO_WINDOW` is module-level (line 124). Python resolves `_git_rev_parse` (defined at line 3135, after `_git_launch_state`) at call time, so nothing needs to move. No name touched here is used outside `bridge-run.py`: no program under `bridge/` and no file under `tests/` names `_git_rev_parse`, `_git_launch_state`, `roster_builder_model`, `_read_roster_json`, `_load_deviation` or `_read_docs_json` (Requirement 1 checks it), so no test patches them; the tests reach them through real launches.
++
++**Where the values go, and why each failure must keep its answer.** `_git_launch_state(ws_build)` (line 3609) fills a builder row's `start_commit` and `clean`; R-107's built-set rule drops an earlier builder run only where a later one started on a clean tree at its start commit, so a failure must never give a commit or `clean: true`. `_read_roster_json(ws)` feeds `_built_set_at_launch` (line 1329). `_load_deviation(folder)` decides `_deviation_allows_builder_review` (line 1353, `None` refuses) and the refusal text in `review_launch_refusal` (line 1439, `None` picks the text naming Review B's reviewer model). `roster_builder_model` is read by `review_launch_refusal` (line 1432) and `review_family_refusal` (line 2678, `None` gives the refusal `cannot`).
++
++**How the tests reach this code.** `tests/test_improve_roster_launch.py` (TASK-086b, R-107) launches builders against scratch repositories and checks `start_commit` and `clean` on the row: on a clean tree, with an untracked file, in a worktree, in a folder in no repository (`test_r8_a_builder_row_in_a_folder_in_no_repository_has_no_commit_and_is_not_clean`) and where git fails or does not start (`test_r8_r10_a_builder_row_where_git_does_not_answer`, both `None`/`False`); and it drives the two review refusals with and without a recorded deviation. `tests/test_hotfix25a_roster_launcher.py` and `tests/test_task032_supervisor_launcher.py` drive the launcher's roster and review refusals and check the row's keys (`start_commit`, `clean` among them). `tests/test_bridge_run.py`, `tests/test_bridge_run_design_ceiling.py`, `tests/test_bridge_run_review_ceiling.py`, `tests/test_bridge_run_driver.py`, `tests/test_bridge_run_slot.py` and `tests/test_hotfix24a_heavy_slots.py` cover the rest of the launcher (R-040's and R-137's slots, R-042's ceiling). `tests/test_header_currency.py` reads `bridge-run.py`'s syntax tree and is in the command as the guard of its names. All of these must stay green unedited. Some cases may be skipped on Windows (for example the no-repository case where the temporary folder lies inside a repository); the skip count must be the same before and after.
++
++**The expected count.** No supervisor baseline is given for this command. Your before-edit run is the baseline, and the after-edit run must match it (the same count passed, none failed, the same count skipped). If a test fails before your edit, stop and report it.
++
++**The manifest.** `MANIFEST.json` holds a normalized sha256 (CRLF folded to LF, BOM dropped) of every file under `bridge/`. After your edit it is stale for `bridge-run.py`; `python tools/make-manifest.py` rewrites `VERSION` (to `2026.11.24a` and a line feed) and the manifest, whose `generated` stamp changes, and prints `make-manifest: version 2026.11.24a, <n> files hashed, VERSION + MANIFEST.json written`. `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` then compares the tree with it and is expected to print `RESULT: SOURCES MATCH bridge 2026.11.24a`. `python tools/dump-cli.py --check` is expected to print nothing and exit 0 (it prints the path of each reference file that differs and exits 1); if it prints a path, stop and report it, since this change must not alter the command reference.
++
++**Security context.** The trust boundaries are the project's `docs/ROSTER.json` and `docs/ROSTER.resolved.json` (files an agent can write, so their content is untrusted: any shape, any size, any nesting) and git's answer about the Workspace. Each reading fails closed today: a file that is missing, unreadable, malformed, too deeply nested or not a JSON object gives `None` (or `(None, None)`), and a git that fails, times out, does not start or answers anything but a 40- or 64-hex object name gives `(None, False)`. The change moves no boundary: the same files are opened the same way, the same exceptions are caught (none wider), the same shapes are refused, and the git command is the same. `.cursor/rules/secure-coding.mdc` is in force for you, and the project's ASVS level is 2 (`docs/INVENTORY.md`, Decisions).
++
++**Development data** (`docs/INVENTORY.md`, Decisions): "the dev build is the Workspace sources under `bridge/`; a session in the repo always runs the *installed* bridge (`~/.claude`), never the one being edited, and installs reach running projects only through the owner's install run sheet". For you: the tests run the Workspace sources against pytest's temporary folders and the repositories they create there. Never run `bridge-run.py`, `roster-check.py` or `bridge-install.py` yourself, against this repository or any other, and never run `gh`.
++
++## Diagrams
++`docs/diagrams/D-002-components.md`: the element `bridge_run` (`bridge/cursor-bridge/bridge-run.py`), whose edges already exist:
++
++```mermaid
++    bridge_run --> bridge_env
++    bridge_run -.-> roster_check
++```
++
++The change adds no import and no edge, so the diagram does not change. **If the task cannot be done within them, stop and report the conflict (an objection) instead of deviating.**
++
++## Requirements
++1. **Checks first, before any edit; paste each command and its output in the report.** From the Workspace root, run:
++   - `git diff --stat 8b03c32 -- bridge/cursor-bridge/bridge-run.py tests`. Expected: nothing (the file and the tests are as at `8b03c32`).
++   - `git grep -n -w -e _git_rev_parse -e _git_launch_state -e roster_builder_model -e _read_roster_json -e _load_deviation -e _read_docs_json -- bridge tests`. Expected: twelve lines, all in `bridge/cursor-bridge/bridge-run.py`, at lines 1201, 1212, 1241, 1304, 1329, 1353, 1432, 1439, 2678, 3135, 3156 and 3609; none in `tests/`, no `_read_docs_json`.
++   - `git grep -n -F -e "json.load(" -- bridge/cursor-bridge/bridge-run.py`. Expected: three lines, 1204, 1215 and 1307.
++   - `git grep -n -F -e "except (OSError, ValueError, RecursionError):" -- bridge/cursor-bridge/bridge-run.py`. Expected: three lines, 1207, 1216 and 1308.
++   - `git grep -n -F -e rev-parse -- bridge/cursor-bridge/bridge-run.py`. Expected: six lines, 1183, 1247, 2584, 2700, 3138 and 3155 (the last a docstring).
++   - `git grep -n -e "^GIT_TIMEOUT" -- bridge/cursor-bridge/bridge_env.py`. Expected: one line, `416:GIT_TIMEOUT = 30`.
++   Then compare, in the file itself, the `subprocess.run` call of `_git_launch_state` (lines 1246-1254) with that of `_git_rev_parse` (lines 3137-3145) argument by argument, and the `open(...)` lines and except tuples of the three readers (1203/1207, 1214/1216, 1306/1308), and state in the report that each pair agrees as quoted in the Objective. If a check does not hold (another hit, a missing hit, an option or argument that differs, or a line number other than these), stop, change nothing, and report it.
++2. Part 1: `_git_launch_state` obtains the commit by `cand = _git_rev_parse(ws, "HEAD")`; the hex test is the same expression over `cand`; a `None` answer returns `(None, False)` before the status command; the docstring, `base = ws or "."`, the `start_commit is None` test and the status block are unchanged; `_git_rev_parse` is unchanged.
++3. Part 2: `_read_docs_json(folder, name)` is a private top-level function directly above `roster_builder_model`, holding the only `json.load(` and the only `except (OSError, ValueError, RecursionError):` of the file, with the path, encoding, `errors` argument and except tuple quoted in the Objective; `roster_builder_model`, `_read_roster_json` and `_load_deviation` each call it once and keep their names, signatures, field checks and return values on every path.
++4. No other line changes in `bridge-run.py`. It keeps its CRLF line endings and gains no trailing whitespace. Nothing is imported anew. No comment is added; `_read_docs_json` may have a one-line docstring in the style of the file's others, or none.
++5. After your last source edit, run `python tools/make-manifest.py` once, then the remaining verification commands in the Constraints.
++
++## Acceptance criteria
++- [ ] Behaviour is identical: the same lines printed, the same refusals with the same texts, the same exit codes, the same run-record rows (`start_commit` a 40- or 64-hex name only where git answered one, otherwise `None` with `clean` `False`), and the same git commands with the same options and environment.
++- [ ] The full test suite passes with the **same** test set (the supervisor's run and CI's, not yours); in your own run the pytest command below passes before and after the edit with the same count passed, none failed, the same count skipped, both summary lines quoted in the report. No test file edited.
++- [ ] Every listed caller now uses the single implementation: `git grep -n -F -e "json.load(" -- bridge/cursor-bridge/bridge-run.py` prints one line, in `_read_docs_json`; `git grep -n -F -e "except (OSError, ValueError, RecursionError):" -- bridge/cursor-bridge/bridge-run.py` prints one line, in `_read_docs_json`; `git grep -n -w -e _read_docs_json -- bridge` prints four lines, all in `bridge-run.py` (the def and one call in each of the three readers); `git grep -n -w -e _git_rev_parse -- bridge` prints three lines (the def, the call in `_git_rev_parse_path`, the call in `_git_launch_state`); `git grep -n -F -e rev-parse -- bridge/cursor-bridge/bridge-run.py` prints five lines, none inside `_git_launch_state`.
++- [ ] No public signature changed outside the one added private name; `bridge-run.py` imports nothing new.
++- [ ] `python tools/dump-cli.py --check` exits 0 with no output.
++- [ ] `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet` prints `RESULT: SOURCES MATCH bridge 2026.11.24a`.
++- [ ] `git diff --numstat -- bridge/cursor-bridge/VERSION` prints nothing (if it prints a line, it is quoted in the report and the file's content is shown to read `2026.11.24a`).
++- [ ] `git diff --stat` shows only `bridge/cursor-bridge/bridge-run.py`, `bridge/cursor-bridge/MANIFEST.json`, and if written `docs/BUILDER_NOTES.md` (the report is a new file); `docs/CHANGES.md`, `bridge/cursor-bridge/CHANGELOG.md` and every file under `tests/` unchanged; no mutation script in the diff.
++
++## Constraints
++- Do not add dependencies.
++- Do not read or write any file outside this workspace (the folder you were started in). Everything you need is inside it; everything you produce goes inside it. Run the Workspace copies of the tools, as the commands below do, never a copy under a home folder.
++- If the brief, the rules, or the tooling got in your way (an instruction that contradicted another, a check that fired wrongly, a step that cost time for no reason), append one dated line describing it to `docs/BUILDER_NOTES.md`. Do not try to fix the tooling. Do the same for anything you learned about a defect or a pitfall (a cause you found, a platform quirk that cost you a round): one dated line, so the supervisor can carry it forward.
++- In any Markdown you write, never break a line inside a paragraph or a list item; one paragraph is one line. Line breaks only between blocks.
++- This increment talks to no external service, and its tests use no recorded replies; add no fixture and no mock of git.
++- Any console process your code launches on Windows is created windowless (`creationflags=subprocess.CREATE_NO_WINDOW` in Python, `0` on other platforms; `windowsHide: true` in Node). Capturing output does not prevent the window. A window is allowed only when it serves the user (they watch it or type into it); then write the reason at the call site as `windowless: visible-ok <reason>`. A spawn that needs a process group for a `CTRL_BREAK` stop is hidden only with a test of the stop path. This change adds no launch: the rev-parse call keeps `creationflags=NO_WINDOW` through `_git_rev_parse`, and the status call keeps its own.
++- Never start a server, a watcher or a daemon that outlives a test: a test that needs the product running starts it through the test framework's own fixture and stops it there. A server left running keeps your run from ending (plan 10.3, release A2).
++- Do not refactor code outside the scope, even if it looks wrong.
++- Never run the product, a migration, a seed or a test against the owner's live data. A development build uses the development data the design names (the inventory's `Development data` decision, stated in Context) and refuses the installed product's data. Here that means the Workspace sources and pytest's temporary folders only.
++- No value in this task is marked as the owner's.
++- Follow existing conventions in the files you touch.
++- These git commands are not yours to run: `commit`, `push`, `switch`, `checkout`, `merge`, `rebase`, `reset`, `stash`, `branch -d`, `worktree`; you read with `git status`, `git diff`, `git grep`, `git rev-parse` and `git log` only.
++- Numbers from text, a file, a reply or an environment variable are parsed with the language's own parser, never by slicing or splitting a string. This change parses no number.
++- An increment that starts a process meets the process checklist (windowless, stopped in a `finally` or a fixture's teardown with its whole tree, nothing outlives the test or the command, a browser on Windows launched attached, pipes closed or drained). This change starts none beyond the existing git call.
++- Every verification command is written here in full. Run exactly these, each from the Workspace root (the folder you were started in), each in the foreground, never in the background; run pytest directly as written, never through a launcher:
++  - At the start: `git status --short`, `git rev-parse HEAD` and `git log --oneline -3`, pasted into the report.
++  - Before the edit, and again after the last edit: `python -m pytest -p no:cacheprovider -q -rs tests/test_improve_roster_launch.py tests/test_hotfix25a_roster_launcher.py tests/test_task032_supervisor_launcher.py tests/test_bridge_run.py tests/test_bridge_run_design_ceiling.py tests/test_bridge_run_review_ceiling.py tests/test_bridge_run_driver.py tests/test_bridge_run_slot.py tests/test_hotfix24a_heavy_slots.py tests/test_header_currency.py`
++  - After the last source edit, in this order: `python tools/make-manifest.py`; `python tools/dump-cli.py --check`; `python bridge/cursor-bridge/bridge-check.py --root bridge --sources --quiet`; `git diff --numstat -- bridge/cursor-bridge/VERSION`; `git diff --numstat -- bridge/cursor-bridge/bridge-run.py`; the five `git grep` commands of the third acceptance criterion.
++  - At the end: `git status --short`, `git diff --stat` and `git rev-parse HEAD`, pasted into the report.
++  - Do not run the whole `tests/` tree or any other test file; the supervisor runs the full suite and the purity check after your run. If a test fails before your edit, stop and report it; do not fix it.
++- Mutation checking is the supervisor's in this task. Run no mutation, write no mutation script, and let none land in the diff.
++- Prefer reuse over new code and write the minimum that meets the acceptance criteria (the frozen `minimal-code.mdc` is in force). This never overrides a security, observability, or accessibility requirement stated above.
++- **Refactoring constraints.** Do not edit any test file. Do not add an entry to `docs/CHANGES.md`. Do not "improve" behaviour, messages, edge cases, or defaults you notice along the way (for example the other git readers named in Out of scope, `local_head`'s own options, `roster_builder_model`'s answer where the file is missing, or a reader that would accept a wider set of exceptions); report them in your summary instead. Do not introduce an abstraction beyond what the listed duplicates need: one private function for Part 2, no new function for Part 1, no parameter beyond `folder` and `name`, no alias, no comment.
++- **No computer path in the report.** Where quoted output holds the repository's absolute folder, write `<Workspace>` in its place; paste no other absolute path of this machine.
++
++## Done
++Your report is the file `handoff/REFAC-017-r1-report.md`, which you write as you go (what you did, what you changed, what you ran and what it printed, what you could not do) so that nothing of it is lost when your run ends early. When you finish, it holds:
++- a list of every file you changed;
++- a one-paragraph summary of what you did;
++- the Requirement 1 commands with their output as the evidence, and your argument-by-argument comparison of the two git calls and of the three readers' `open` lines and except tuples;
++- the before and after outputs of the pytest command, with both summary lines;
++- the outputs of make-manifest, dump-cli `--check`, bridge-check, the two `git diff --numstat` commands and the third acceptance criterion's five `git grep` commands, each line that shows the result quoted (an empty output written as such);
++- `git status --short`, `git diff --stat` and `git rev-parse HEAD` at the start and at the end, and whether the working tree held uncommitted changes then;
++- one sentence stating why the behaviour is identical;
++- anything you noticed but did not change (per the refactoring constraints);
++- a final section headed exactly `Assumed, not verified`: every fact this change relies on that neither this brief nor the existing code settled, and that you did not confirm (an ambiguous requirement you resolved one way, a platform or library behaviour you expected, a value you chose). One item per line: what you assumed · why · what would confirm it. If there are none, write `Assumed, not verified: none`. Be specific: "edge cases" or "error handling" is not an item.
++
++Every command you ran is quoted in the report with the lines it printed, verbatim (with `<Workspace>` in place of the repository's folder), in a fenced block; a count, or a claim that a check passed, quotes the output line that shows it. A command you did not run is written `not run`, never described as run. Run this brief's pytest command once more after your last edit, and write the report's results after that run, naming the commit its counts belong to (`git rev-parse HEAD`) and whether the working tree then held uncommitted changes (`git status --short`).
++
++Your last message is the summary and the report file's path, and nothing follows it: the supervisor reads only the last message, and a message printed earlier and then followed by more work is lost.
+diff --git a/tests/roster_rows.py b/tests/roster_rows.py
+new file mode 100644
+index 0000000..d4138a0
+--- /dev/null
++++ b/tests/roster_rows.py
+@@ -0,0 +1,56 @@
++"""Shared by tests/test_improve_roster_alt.py (TASK-086a) and tests/test_improve_roster_launch.py (TASK-086b): the
++roster's model ids and profiles, a launcher run-record row as the launcher writes it, and two readers of the
++programs' output. One copy, the two files' former identical helpers (stage I1's refactoring pass, tests lane)."""
++import itertools
++import json
++import os
++
++GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.autocrlf=false",
++       "-c", "commit.gpgsign=false"]
++BRANCH = "task-1"
++
++REVIEW_A = "claude-opus-5-5"        # anthropic, Review A's family
++GROK_B = "grok-4.7-high"            # xai, native pool
++GROK_R = "grok-4.7-medium"          # xai, native pool
++COMPOSER = "composer-2.5"           # cursor, native pool
++GPT = "gpt-5.6-sol-high"            # openai, other pool
++
++FULL = {"name": "full", "builder": GROK_B, "review_b": GPT}
++NATIVE = {"name": "native", "builder": COMPOSER, "review_b": GROK_R}
++
++_ids = itertools.count(1)
++
++
++def row(model, branch=BRANCH, start=None, clean=None, brief="TASK-001", rnd=1, slot=None):
++    """A builder row as the launcher writes it; `start_commit` and `clean` only where given."""
++    e = {"id": "r%d" % next(_ids), "kind": "builder", "head": "cursor-agent", "model": model, "branch": branch,
++         "limit": 7200, "seconds": 100, "exit": 0, "healthy": True}
++    if brief:
++        e.update(brief=brief, round=rnd, brief_name=brief if rnd == 1 else "%s-r%d" % (brief, rnd))
++    if start is not None:
++        e["start_commit"] = start
++    if clean is not None:
++        e["clean"] = clean
++    if slot:
++        e.update(slot=slot, exit=123, seconds=0, healthy=None, waited=7320)
++    return json.dumps(e)
++
++
++def review_row(model=GPT, branch=BRANCH):
++    return json.dumps({"id": "v%d" % next(_ids), "kind": "review", "head": "cursor-agent", "model": model,
++                       "branch": branch, "limit": 3600, "seconds": 10, "exit": 0, "healthy": True})
++
++
++def rebuild_text(out):
++    return "\n".join(line for line in out.splitlines() if "REBUILD" in line)
++
++
++def lies_in_no_repository(path):
++    p = os.path.abspath(str(path))
++    while True:
++        if os.path.exists(os.path.join(p, ".git")):
++            return False
++        parent = os.path.dirname(p)
++        if parent == p:
++            return True
++        p = parent
+diff --git a/tests/test_improve_roster_alt.py b/tests/test_improve_roster_alt.py
+index 774c0f3..d4b41c0 100644
+--- a/tests/test_improve_roster_alt.py
++++ b/tests/test_improve_roster_alt.py
+@@ -24,7 +24,6 @@ record's file name, `git`, or `main`; the REBUILD line names `--repair-record` f
+ 
+ enforces: docs/BUILD_PLAN.md, TASK-086a, Done when; docs/REQUIREMENTS.md R-107; docs/DESIGN.md C39 and its table
+ """
+-import itertools
+ import json
+ import os
+ import re
+@@ -35,30 +34,19 @@ import sys
+ import pytest
+ 
+ import conftest as test_conftest
++from roster_rows import (BRANCH, COMPOSER, FULL, GIT, GPT, GROK_B, GROK_R, NATIVE, REVIEW_A,  # noqa: F401
++                         lies_in_no_repository, rebuild_text, review_row, row)
+ 
+ HERE = os.path.dirname(os.path.abspath(__file__))
+ PROG = os.path.join(HERE, os.pardir, "bridge", "cursor-bridge", "roster-check.py")
+-GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.autocrlf=false",
+-       "-c", "commit.gpgsign=false"]
+ 
+ NOW = "2026-11-24T09:00"
+ MARK = "2026-11-24T08:30 UTC: 2 consecutive failures -- x"
+-BRANCH = "task-1"
+ REPORT1 = "handoff/TASK-001-r1-report.md"
+ REPORT2 = "handoff/TASK-001-r2-report.md"
+ 
+-REVIEW_A = "claude-opus-5-5"        # anthropic, Review A's family
+-GROK_B = "grok-4.7-high"            # xai, native pool
+-GROK_R = "grok-4.7-medium"          # xai, native pool
+-COMPOSER = "composer-2.5"           # cursor, native pool
+-GPT = "gpt-5.6-sol-high"            # openai, other pool
+ CLAUDE_ALT = "claude-sonnet-5"      # anthropic: Review A's family, never independent
+ 
+-FULL = {"name": "full", "builder": GROK_B, "review_b": GPT}
+-NATIVE = {"name": "native", "builder": COMPOSER, "review_b": GROK_R}
+-
+-_ids = itertools.count(1)
+-
+ 
+ # --- helpers -------------------------------------------------------------------------------------
+ 
+@@ -126,26 +114,6 @@ def write_roster(ws, profiles, other_pool="available", unavailable=(), in_repo=T
+         write(ws, ".git/bridge/roster-state.json", json.dumps(state, indent=2) + "\n")
+ 
+ 
+-def row(model, branch=BRANCH, start=None, clean=None, brief="TASK-001", rnd=1, slot=None):
+-    """A builder row as the launcher writes it; `start_commit` and `clean` only where given."""
+-    e = {"id": "r%d" % next(_ids), "kind": "builder", "head": "cursor-agent", "model": model, "branch": branch,
+-         "limit": 7200, "seconds": 100, "exit": 0, "healthy": True}
+-    if brief:
+-        e.update(brief=brief, round=rnd, brief_name=brief if rnd == 1 else "%s-r%d" % (brief, rnd))
+-    if start is not None:
+-        e["start_commit"] = start
+-    if clean is not None:
+-        e["clean"] = clean
+-    if slot:
+-        e.update(slot=slot, exit=123, seconds=0, healthy=None, waited=7320)
+-    return json.dumps(e)
+-
+-
+-def review_row(model=GPT, branch=BRANCH):
+-    return json.dumps({"id": "v%d" % next(_ids), "kind": "review", "head": "cursor-agent", "model": model,
+-                       "branch": branch, "limit": 3600, "seconds": 10, "exit": 0, "healthy": True})
+-
+-
+ def record_path(ws):
+     return ws / "run" / "launcher" / "runs.jsonl"
+ 
+@@ -184,10 +152,6 @@ def plant_resolved(ws):
+     return resolved_path(ws).read_bytes()
+ 
+ 
+-def rebuild_text(out):
+-    return "\n".join(line for line in out.splitlines() if "REBUILD" in line)
+-
+-
+ def deviation_printed(out):
+     return any(line.strip().startswith("DEVIATION") for line in out.splitlines())
+ 
+@@ -238,17 +202,6 @@ def assert_cannot_read(ws, rc, out, before, needle):
+     assert resolved_path(ws).read_bytes() == before, "the resolved file is left unchanged"
+ 
+ 
+-def lies_in_no_repository(path):
+-    p = os.path.abspath(str(path))
+-    while True:
+-        if os.path.exists(os.path.join(p, ".git")):
+-            return False
+-        parent = os.path.dirname(p)
+-        if parent == p:
+-            return True
+-        p = parent
+-
+-
+ # --- the built set's histories ---------------------------------------------------------------------
+ 
+ def test_task086a_one_family_is_the_built_set(tmp_path):
+diff --git a/tests/test_improve_roster_launch.py b/tests/test_improve_roster_launch.py
+index e672763..d738652 100644
+--- a/tests/test_improve_roster_launch.py
++++ b/tests/test_improve_roster_launch.py
+@@ -34,7 +34,6 @@ set that cannot be read names `detached`, `runs.jsonl`, `git` or `main`; the loa
+ enforces: docs/BUILD_PLAN.md, TASK-086b, Done when; docs/REQUIREMENTS.md R-107; docs/DESIGN.md C39 and its table;
+ D-003; D-004
+ """
+-import itertools
+ import json
+ import os
+ import re
+@@ -45,31 +44,23 @@ import time
+ 
+ import pytest
+ 
++from roster_rows import (BRANCH, COMPOSER, FULL, GIT, GPT, GROK_B, GROK_R, NATIVE, REVIEW_A,  # noqa: F401
++                         lies_in_no_repository, rebuild_text, review_row, row)
++
+ HERE = os.path.dirname(os.path.abspath(__file__))
+ CB = os.path.abspath(os.path.join(HERE, os.pardir, "bridge", "cursor-bridge"))
+ PROG = os.path.join(CB, "bridge-run.py")
+ ROSTER_PROG = os.path.join(CB, "roster-check.py")
+ NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+ TIMEOUT = 120
+-GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.autocrlf=false",
+-       "-c", "commit.gpgsign=false"]
+ 
+ REFUSED = "bridge-run: refused - "
+ STARTED_RX = re.compile(r"^bridge-run: started \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
+ COMMIT_RX = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
+-BRANCH = "task-1"
+ NOW = "2026-11-25T09:00"
+ 
+-REVIEW_A = "claude-opus-5-5"        # anthropic
+-GROK_B = "grok-4.7-high"            # xai
+-GROK_R = "grok-4.7-medium"          # xai
+-COMPOSER = "composer-2.5"           # cursor
+-GPT = "gpt-5.6-sol-high"            # openai
+ MYSTERY = "mystery-builder-2"       # a model whose family no rule names
+ 
+-FULL = {"name": "full", "builder": GROK_B, "review_b": GPT}
+-NATIVE = {"name": "native", "builder": COMPOSER, "review_b": GROK_R}
+-
+ REVIEW_PROMPT = "Review run/review/REVIEW-TASK-001.diff"
+ REPORT2 = "handoff/TASK-002-r1-report.md"
+ OLD_KEYS = {"id", "kind", "head", "model", "branch", "limit", "seconds", "exit", "healthy", "boundary", "waited", "slot",
+@@ -92,8 +83,6 @@ while time.time() < deadline and not os.path.exists(sys.argv[3]):
+     time.sleep(0.1)
+ '''
+ 
+-_ids = itertools.count(1)
+-
+ 
+ # --- helpers -------------------------------------------------------------------------------------
+ 
+@@ -171,37 +160,6 @@ def commit(ws, msg, files=None):
+     return head(ws)
+ 
+ 
+-def lies_in_no_repository(path):
+-    p = os.path.abspath(str(path))
+-    while True:
+-        if os.path.exists(os.path.join(p, ".git")):
+-            return False
+-        parent = os.path.dirname(p)
+-        if parent == p:
+-            return True
+-        p = parent
+-
+-
+-def row(model, branch=BRANCH, brief="TASK-001", rnd=1, start=None, clean=None, slot=None):
+-    """A builder row as the launcher writes it; `start_commit` and `clean` only where given."""
+-    e = {"id": "r%d" % next(_ids), "kind": "builder", "head": "cursor-agent", "model": model, "branch": branch,
+-         "limit": 7200, "seconds": 100, "exit": 0, "healthy": True}
+-    if brief:
+-        e.update(brief=brief, round=rnd, brief_name=brief if rnd == 1 else "%s-r%d" % (brief, rnd))
+-    if start is not None:
+-        e["start_commit"] = start
+-    if clean is not None:
+-        e["clean"] = clean
+-    if slot:
+-        e.update(slot=slot, exit=123, seconds=0, healthy=None, waited=7320)
+-    return json.dumps(e)
+-
+-
+-def review_row(model=GPT, branch=BRANCH):
+-    return json.dumps({"id": "v%d" % next(_ids), "kind": "review", "head": "cursor-agent", "model": model,
+-                       "branch": branch, "limit": 3600, "seconds": 10, "exit": 0, "healthy": True})
+-
+-
+ def record(ws):
+     return ws / "run" / "launcher" / "runs.jsonl"
+ 
+@@ -408,10 +366,6 @@ def resolve(ws):
+     return p.returncode, (p.stdout + p.stderr).decode("utf-8", "replace")
+ 
+ 
+-def rebuild_text(out):
+-    return "\n".join(line for line in out.splitlines() if "REBUILD" in line)
+-
+-
+ # --- R1: the family refusal reads the built set ------------------------------------------------------
+ 
+ def test_r1_a_branch_built_by_one_family_refuses_its_reviewer(tmp_path):
