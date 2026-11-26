@@ -164,7 +164,9 @@ def brief_findings(path, item):
         if rec.fallback.get("none_carries_ids"):
             found.append(bridge_env.brief_none_carries_message(body_src))
         elif "satisfies" in rec.disagrees:
-            found.append(bridge_env.brief_satisfies_disagree_message(rec.header, rec.fallback))
+            found.append(
+                "header " + bridge_env.brief_satisfies_disagree_message(rec.header, rec.fallback)
+            )
     return found
 
 

@@ -572,7 +572,7 @@ def plan_body(text):
 
 
 _BRIEF_SAT_BULLET_RX = re.compile(r"^\s*[-*]\s+(.*)$")
-_SAT_NONE_FIRST_RX = re.compile(r"^[\*_`]*none(?=$|[\s,;.(\[]|[\*`_])", re.I)
+_SAT_NONE_FIRST_RX = re.compile(r"^[\*_`]*none\b", re.I)
 
 
 def brief_satisfies_line(body):
@@ -3778,7 +3778,11 @@ def brief_satisfies_disagree_lists(header, fallback):
 
 def brief_satisfies_disagree_message(header, fallback):
     ha, fa = brief_satisfies_disagree_lists(header, fallback)
-    return "header disagrees satisfies header %s prose %s" % (ha, fa)
+    return (
+        "disagrees satisfies header %s prose %s; "
+        "the header and the prose name the same rows"
+        % (ha, fa)
+    )
 
 
 def _brief_none_carries_refusal(body):
@@ -3786,12 +3790,10 @@ def _brief_none_carries_refusal(body):
 
 
 def _brief_satisfies_disagree_refusal(header, fallback):
-    ha, fa = brief_satisfies_disagree_lists(header, fallback)
-    return (
-        "header: disagrees satisfies header %s prose %s; "
-        "the header and the prose name the same rows"
-        % (ha, fa)
-    )
+    return "header: " + brief_satisfies_disagree_message(header, fallback)
+
+
+_BRIEF_HEADER_REFUSAL_ORDER = ("id", "round", "satisfies", "scope", "merge_unit", "blocking_class")
 
 
 def brief_header_refusal(text, shown_path, keys=None):
@@ -3807,15 +3809,20 @@ def brief_header_refusal(text, shown_path, keys=None):
         return None
     check_satisfies = keys is None or "satisfies" in keys
     body = rec.body if rec.body is not None else ""
-    disagrees = list(rec.disagrees)
-    if keys is not None:
-        disagrees = [k for k in disagrees if k in keys]
-    for key in disagrees:
+    disagrees = set(rec.disagrees)
+    if keys is None:
+        order = _BRIEF_HEADER_REFUSAL_ORDER
+    else:
+        order = [k for k in _BRIEF_HEADER_REFUSAL_ORDER if k in keys]
+    for key in order:
         if key == "satisfies" and check_satisfies:
             if rec.fallback and rec.fallback.get("none_carries_ids"):
                 return _brief_none_carries_refusal(body)
-            return _brief_satisfies_disagree_refusal(rec.header, rec.fallback)
-        return "header: disagrees %s" % key
+            if key in disagrees:
+                return _brief_satisfies_disagree_refusal(rec.header, rec.fallback)
+            continue
+        if key in disagrees:
+            return "header: disagrees %s" % key
     return None
 
 
