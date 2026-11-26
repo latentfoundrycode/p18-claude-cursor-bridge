@@ -163,6 +163,75 @@ def test_task087d_a_review_b_that_did_not_answer_skips_the_profile_for_the_reque
     assert probed.count(GROK_B) == 1 and probed.count(GPT) == 1, "the skipped profile's models once each: %r" % probed
 
 
+def _alt_probe_lines(out):
+    return [line.strip() for line in out.splitlines() if line.strip().startswith("probe review_b_alt")]
+
+
+def test_task087d_r2_after_a_grok_build_the_alternate_is_probed_once_on_request(program, tmp_path, monkeypatch,
+                                                                              capsys):
+    """Round 2 (Review A, round 1, blocking 1): where the profile in use already resolves its alternate (Review B's
+    family built the change), the request reads the alternate's one answer and probes it no second time in the role
+    `review_b_alt` (red on round 1, which printed the role's probe line twice)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [FULL, NATIVE_ALT], other_pool="exhausted")
+    write_record(ws, row(GROK_R, start=c1, clean=True))
+    commit(ws, "the builder's work")
+    mod = program("roster-check")
+    probed = []
+    monkeypatch.setattr(mod, "probe", _fake_probe(probed, failing=set()))
+    rc, out = _main_in_process(mod, ws, monkeypatch, capsys, "--review-alt", "safety-refusal")
+    assert rc == 0 and _deviation_lines(out) == [ON_REQUEST], out
+    assert len(_alt_probe_lines(out)) == 1, out
+
+
+def test_task087d_r2_a_marked_review_b_the_alternate_is_probed_once_on_request(program, tmp_path, monkeypatch,
+                                                                              capsys):
+    """Round 2: the same where the profile's Review B is marked unavailable, the alternate resolved for that cause
+    first; one probe line in the role `review_b_alt` (red on round 1)."""
+    ws = scratch_repo(tmp_path)
+    commit(ws, "checkpoint")
+    write_roster(ws, [FULL, NATIVE_ALT], other_pool="exhausted", unavailable=[GROK_R])
+    mod = program("roster-check")
+    probed = []
+    monkeypatch.setattr(mod, "probe", _fake_probe(probed, failing=set()))
+    rc, out = _main_in_process(mod, ws, monkeypatch, capsys, "--review-alt", "safety-refusal")
+    assert rc == 0 and _deviation_lines(out) == [ON_REQUEST], out
+    assert len(_alt_probe_lines(out)) == 1, out
+
+
+def test_task087d_r2_an_alternate_that_did_not_answer_is_refused_on_its_one_answer(program, tmp_path, monkeypatch,
+                                                                                  capsys):
+    """Round 2: where the resolve probed the alternate, found it not answering and kept the profile with a REBUILD,
+    the request is refused by the alternate's existing `did not answer its probe` line on that one answer, with no
+    second probe that could grant what the resolve refused; the resolved file unchanged (red on round 1, whose
+    second probe here answered and granted the alternate)."""
+    ws = scratch_repo(tmp_path)
+    c1 = commit(ws, "checkpoint")
+    write_roster(ws, [dict(NATIVE, review_b_alt=GPT)])
+    write_record(ws, row(GROK_R, start=c1, clean=True))
+    commit(ws, "the builder's work")
+    before = plant_resolved(ws)
+    mod = program("roster-check")
+    probed = []
+    answers = {"n": 0}
+
+    def first_fails(model_id, *args, **kwargs):
+        probed.append(model_id)
+        if model_id == GPT:
+            answers["n"] += 1
+            if answers["n"] == 1:
+                return False, "exit 1; stdout=''; stderr='refused'"
+        return True, "answered"
+
+    monkeypatch.setattr(mod, "probe", first_fails)
+    rc, out = _main_in_process(mod, ws, monkeypatch, capsys, "--review-alt", "safety-refusal")
+    assert rc == 1 and not deviation_printed(out), out
+    assert "did not answer its probe" in fail_text(out) and GPT in fail_text(out), out
+    assert probed.count(GPT) == 1, probed
+    assert resolved_path(ws).read_bytes() == before
+
+
 def test_task087d_a_sign_in_ends_the_request_with_exit_5(program, tmp_path, monkeypatch, capsys):
     """The Cursor tool signed out: the request ends with SIGN-IN, exit 5, as the resolve does, the resolved file
     unchanged (as on the checkpoint)."""

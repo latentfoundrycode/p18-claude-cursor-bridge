@@ -1,6 +1,6 @@
 {
   "version": "2026.11.24a",
-  "generated": "2026-11-26 04:42",
+  "generated": "2026-11-26 08:24",
   "files": {
     "agents/cursor-configurator.md": "9c0eb6ca7137e955de61cc16e74f5a91450d269f683ebf29cdda23ab40606f89",
     "agents/design-auditor.md": "c69924173f18e10bbb83afb6cca9e0caea237f5b76d4d6745a0e7b1d4b06fc3d",
@@ -96,7 +96,7 @@
     "cursor-bridge/records-migrate.py": "2d3e07ab28b244c74efdcb49a6ccf0830b6d52559b1243f975e752ff363cdad2",
     "cursor-bridge/refactor-check.py": "4950674a1de1bccf2ac95a4bcec6ab5cc767f1c0a171c01cf164891d1c7d7c36",
     "cursor-bridge/review-guard.py": "f40efd0817933ce0aef8261ce400e065c9b61c27ec445d0532afb5c44039b19f",
-    "cursor-bridge/roster-check.py": "27a7015d96a5b4b81f43398e43bfb34c74f9f1d5f0b5e8f9746206790824d743",
+    "cursor-bridge/roster-check.py": "a2e1ff74849d5559f6dee9332f6c69e2bb7c9c4bb28fb367ffc4170684f37517",
     "cursor-bridge/run-hidden.py": "bcae418e3cca9d7f1be7bf421ce44b879b343613301df4590d9cc45d00f5be5c",
     "cursor-bridge/scope-check.py": "0c9377dbd74236d256a4cbee74b082d0c4a2cd03ab20b2ad6e15a5a40d32b9d5",
     "cursor-bridge/secure-coding.snapshot.md": "3f41667754917ffef6fb47308645356be6a5fd2fc362cc9c3dedf92a9457324e",
