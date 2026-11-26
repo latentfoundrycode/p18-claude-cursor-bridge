@@ -1216,6 +1216,19 @@ def main():
         return r_id in unavailable or (other_pool == "exhausted" and r_pool == "other")
 
     global_rebuild_end = rebuild_end
+    alt_probe_answers = {}
+
+    def _alt_probe_result(a_id):
+        if a_id in alt_probe_answers:
+            return alt_probe_answers[a_id], False
+        ok, detail = probe(a_id)
+        if ok is PROBE_SIGN_IN:
+            print("    probe %-8s %s: tool sign-in required" % ("review_b_alt", a_id))
+            print(SIGN_IN_LINE)
+            return None, True
+        print("    probe %-8s %s: %s" % ("review_b_alt", a_id, detail))
+        alt_probe_answers[a_id] = bool(ok)
+        return bool(ok), False
 
     def _evaluate_profile(prof, verbose):
         name = prof.get("name", "?")
@@ -1314,7 +1327,7 @@ def main():
                 if sign_in_rb:
                     return "sign-in"
             if deviation and a_id and _alt_pool_ok(a_id, a_pool):
-                ok_alt, sign_in_alt = _probe_roles([("review_b_alt", a_id)])
+                ok_alt, sign_in_alt = _alt_probe_result(a_id)
                 if sign_in_alt:
                     return "sign-in"
                 alt_probe_ok = ok_alt
@@ -1396,18 +1409,10 @@ def main():
         b_id, b_fam_o, _ = norm_entry(in_use.get("builder"))
         b_fam = family_of(b_id, b_fam_o)
         if do_probe:
-            cached_alt = in_use_ev.get("alt_probe_ok")
-            if cached_alt is None:
-                ok, detail = probe(a_id)
-                if ok is PROBE_SIGN_IN:
-                    print("    probe %-8s %s: tool sign-in required" % ("review_b_alt", a_id))
-                    print(SIGN_IN_LINE)
-                    return 5
-                print("    probe %-8s %s: %s" % ("review_b_alt", a_id, detail))
-                if not ok:
-                    print("FAIL  --review-alt refused: review_b_alt %s did not answer its probe" % a_id)
-                    return 1
-            elif not cached_alt:
+            ok_alt, sign_in_alt = _alt_probe_result(a_id)
+            if sign_in_alt:
+                return 5
+            if not ok_alt:
                 print("FAIL  --review-alt refused: review_b_alt %s did not answer its probe" % a_id)
                 return 1
         fams = {"builder": b_fam, "review_a": ra_fam, "review_b": a_fam}
