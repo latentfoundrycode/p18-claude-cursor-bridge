@@ -74,7 +74,7 @@ def read(path):
 
 
 def ids_in(value):
-    return ID_RX.findall(value or "")
+    return bridge_env.plan_ids_in_text(value)
 
 
 def scope_paths(value):
@@ -129,7 +129,7 @@ SIZE_NOTE_ABOVE = 12                                       # release S: above a 
 def unreadable(value):
     """What is left of a Depends on / Parent value once the IDs and the fillers are removed."""
     rest = re.sub(r"\([^()]*\)", "", value or "")                          # a dated note in parentheses is not an ID
-    rest = ID_RX.sub("", rest)
+    rest = bridge_env._PLAN_ID_WORD_RX.sub("", rest)
     rest = re.sub(r"\bnone\b|(?<!\S)-(?!\S)", "", rest, flags=re.I)        # the fillers, never the hyphen inside TASK-02
     return re.sub(r"[,;\s]+", " ", rest).strip()
 

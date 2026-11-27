@@ -475,8 +475,10 @@ GRAMMAR_MERGES = [
 def test_task089_r2_the_grammar_style_maps_a_branch_of_each_prefix_as_task(line, want):
     """The launcher's reading (the grammar's pattern): a branch named for an id of any of the five prefixes maps as a
     `task-` branch did on the checkpoint, the prefix upper-cased, the digits and letter kept (a longer name giving the
-    id it begins with), else the prefix upper-cased and the rest as written; `task-` answers exactly as on the
-    checkpoint, and a name of another prefix (`hotfix-004`) as before."""
+    id it begins with), else the prefix upper-cased and the rest as written; a `task-` name whose rest begins with a
+    digit answers as on the checkpoint, and a name of another prefix (`hotfix-004`) as before. A rest that begins with
+    a letter (`task-cleanup`) keeps its case, where the checkpoint upper-cased it: the supervisor's ruling at round 2,
+    not one of the five (the launcher's lapse ignores case), recorded in docs/HARDENING.md (TASK-089)."""
     got = bridge_env.squash_merged_ids_from_lines([line], bridge_env.grammar_id_rx(), plan_style=False)
     assert got == want, (line, got)
 

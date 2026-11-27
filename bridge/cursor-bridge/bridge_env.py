@@ -437,6 +437,14 @@ FIELD_RX = re.compile(
 STAGE_RX = re.compile(r"^##\s+(\S.*?)\s*$")
 DEMO_RX = re.compile(r"^(?:[-*]\s+)?\**Demonstration\**\s*:\s*(\S.*)$", re.I)
 _PLAN_TASK_RX = re.compile(PLAN_ID_PATTERN)
+_PLAN_ID_WORD_RX = re.compile(r"(?<![A-Za-z0-9])%s" % PLAN_ID_PATTERN)
+
+
+def plan_ids_in_text(text):
+    """Plan ids in text only where the id is not preceded by a letter or digit."""
+    return _PLAN_ID_WORD_RX.findall(text or "")
+
+
 _PLAN_R_RX = re.compile(r"\bR-\d{3,}\b")
 _PLAN_D_RX = re.compile(r"\bD-\d{3,}\b")
 _BRIEF_PATH_RX = re.compile(r"^[\w.@~\[\]()*?/-]+$")
@@ -1176,9 +1184,24 @@ def _cand_from_plan_branch(branch, id_rx):
     return cand if id_rx.fullmatch(cand) else None
 
 
+def _cand_from_prefix_rest(branch, id_rx):
+    """Prefix upper-cased, hyphen, then the rest of the branch as written (grammar-style step)."""
+    for prefix in PLAN_ID_PREFIXES:
+        head = prefix.lower() + "-"
+        if len(branch) < len(head) or branch[: len(head)].lower() != head:
+            continue
+        cand = prefix + "-" + branch[len(head) :]
+        if id_rx.fullmatch(cand):
+            return cand
+    return None
+
+
 def _branch_name_to_id(branch, id_rx):
     """Map a merge branch name to an ID when it matches id_rx (case-insensitive, letter kept)."""
     cand = _cand_from_plan_branch(branch, id_rx)
+    if cand:
+        return cand
+    cand = _cand_from_prefix_rest(branch, id_rx)
     if cand:
         return cand
     for cand in (branch, branch.upper()):
@@ -3681,14 +3704,14 @@ def _plan_normalize_field(key, val):
     if key == "parent":
         if val is None or _none_filler(val):
             return key, None
-        ids = _PLAN_TASK_RX.findall(val or "")
+        ids = plan_ids_in_text(val or "")
         return key, ids[0] if ids else val
     if key == "depends_on":
         if val is None or _none_filler(val):
             return key, []
         if isinstance(val, list):
             return key, val
-        return key, _PLAN_TASK_RX.findall(val or "")
+        return key, plan_ids_in_text(val or "")
     if key == "diagrams":
         if val is None or _none_filler(val):
             return key, []
