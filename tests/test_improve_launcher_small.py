@@ -10,8 +10,12 @@ T74; docs/BUILD_PLAN.md, TASK-090's Done when.
   it set one; a builder's and a reviewer's environment are unchanged; no kind sets `PYTHONUTF8`.
 - A `--kind test` launch of `python <program>` under `<launch folder>/run/supervisor/`, or of the installed mutation
   engine, is refused with exit 125 by a line that names `--kind driver`; another program's refusal names no kind.
-- The usage text and the docstring say a stripped run sees none of the owner's files under APPDATA, LOCALAPPDATA or
-  the home folder, and that a driver that needs the owner's key file is launched unstripped under a recorded decision.
+- The usage text and the docstring say what a stripped run gets of its own (a home folder, APPDATA and LOCALAPPDATA)
+  and what still leads to the owner's folders (the tools' caches, cursor-agent's login, the home folder's `.cursor`
+  link, the owner's git config by an include), that it keeps the owner's rights, and that a driver that needs the
+  owner's key file (refused for the driver kind) is launched unstripped under a recorded decision; neither claims
+  isolation from every owner file.
+- A refused test launch that carries `--key-file`, or a launch of another kind, names no kind.
 - No environment name moves the run record or the pid folder.
 
 The builder reads and runs these tests and edits nothing in this file.
@@ -19,6 +23,7 @@ The builder reads and runs these tests and edits nothing in this file.
 import ast
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -374,6 +379,24 @@ def test_r112_the_help_claims_no_more_than_the_strip_gives(lab, program):
     for name, text in (("usage", p.stderr), ("docstring", doc)):
         missing, over = claims(text)
         assert missing == [] and over == [], (name, missing, over)
+
+
+IN_BOTH = ("owner's rights", "login")
+IN_THE_DOCSTRING = (re.compile(r"\.cursor(?![-\w])"), re.compile(r"\.gitconfig"))   # `.cursor`, never `.cursor-bridge`
+
+
+def test_r112_the_help_names_what_the_home_folder_still_reaches(lab, program):
+    """T74, round 3. Both texts say the run keeps the owner's rights and that cursor-agent's login still leads to the
+    owner's folders; the docstring also names the home folder's `.cursor` link to the owner's `~/.cursor`
+    (bridge_env.agent_home) and the owner's global git config read through an include (bridge_env.write_gitconfig).
+    Red on round 2."""
+    ws, _ = lab
+    p = subprocess.run([sys.executable, PROG], capture_output=True, text=True, cwd=str(ws), env=env_of(lab), timeout=120)
+    doc = program("bridge-run").__doc__ or ""
+    low = {name: " ".join(text.lower().split()) for name, text in (("usage", p.stderr), ("docstring", doc))}
+    missing = [(name, w) for name in low for w in IN_BOTH if w not in low[name]]
+    missing += [("docstring", rx.pattern) for rx in IN_THE_DOCSTRING if not rx.search(low["docstring"])]
+    assert missing == [], missing
 
 
 # ---------------------------------------------------------------- C36: no environment name moves the record

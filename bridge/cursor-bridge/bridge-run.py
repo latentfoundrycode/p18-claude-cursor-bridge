@@ -99,11 +99,15 @@ rule of 2026-10-05: no secret through the environment the owner sets).
   bounds for tests; without `BRIDGE_RUN_ALLOW_ANY=1` a set value is ignored and one note line
   says so.
 - `cursor-agent` is started the way Windows needs it (the .cmd launcher) and with the
-  owner's identity withheld, the same recipe as cursor-agent.shim (KP-032). `--strip`
-  withholds it for any other accepted command too: a stripped run sees none of the owner's
-  files under APPDATA, LOCALAPPDATA or the home folder, because it gets a home folder and
-  app folders of its own. A driver that needs the owner's key file (a key file is refused for
-  the driver kind) is launched unstripped, under a recorded decision.
+  owner's identity withheld, the same recipe as cursor-agent.shim (KP-032). Every
+  cursor-agent run is stripped; `--strip` withholds the owner's identity for any other
+  accepted command too. A stripped run gets a home folder, APPDATA and LOCALAPPDATA of its
+  own, so the owner's files there are not found through those variables; it still runs with
+  the owner's rights. The tools' caches the bridge passes through (uv, pip, the Python user
+  base, npm, Yarn, Playwright, Go, Hugging Face, Torch and Puppeteer) and cursor-agent's
+  login under APPDATA (by a link, or the owner's APPDATA itself where the link cannot be
+  made) still lead to the owner's folders. A key file is refused for the driver kind, so a
+  driver that needs the owner's key file is launched unstripped, under a recorded decision.
 
 ASCII-only on purpose (cp1252 consoles).
 """
@@ -162,8 +166,8 @@ DESIGN_TRIM_BEFORE_SEP = bridge_env.DESIGN_TRIM_BEFORE_SEP
 def usage():
     sys.stderr.write("usage: bridge-run.py --limit <seconds|auto> [--kind builder|driver|review|watch|test] [--strip] [--key-file <path>] -- <command> [args...]\n"
                      "       bridge-run.py --healthy <run id>\n"
-                     "  --strip: a stripped run sees none of the owner's files under APPDATA, LOCALAPPDATA or the home folder (it gets its own).\n"
-                     "  A driver that needs the owner's key file runs unstripped, under a recorded decision; use --kind driver for programs under run/supervisor/ or the installed mutation engine.\n")
+                     "  --strip: every cursor-agent run is stripped; otherwise a stripped run gets its own home folder, APPDATA and LOCALAPPDATA so the owner's files there are not found through those variables; tools' cache paths passed through still reach the owner's folders.\n"
+                     "  A key file is refused for the driver kind; a driver that needs the owner's key file runs unstripped, under a recorded decision; use --kind driver for programs under run/supervisor/ or the installed mutation engine.\n")
     return 2
 
 
@@ -3398,7 +3402,7 @@ def main():
             sys.stderr.write(line)
         else:
             sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name, without an option that runs another program, and an npx tool only when the project has it (got %r); a benchmark or an unknown runner runs directly in the background, marked # wake\n" % cmd[0])
-        if kind == "test" and resolve_driver_program(cmd, folder) is not None:
+        if kind == "test" and "--key-file" not in flags and resolve_driver_program(cmd, folder) is not None:
             sys.stderr.write("bridge-run: refused - use --kind driver for this command\n")
         return 125
     if head_of(cmd) in PACKAGE_FOLDER_LONG and named_suite(cmd, folder):

@@ -255,11 +255,15 @@ rule of 2026-10-05: no secret through the environment the owner sets).
   bounds for tests; without `BRIDGE_RUN_ALLOW_ANY=1` a set value is ignored and one note line
   says so.
 - `cursor-agent` is started the way Windows needs it (the .cmd launcher) and with the
-  owner's identity withheld, the same recipe as cursor-agent.shim (KP-032). `--strip`
-  withholds it for any other accepted command too: a stripped run sees none of the owner's
-  files under APPDATA, LOCALAPPDATA or the home folder, because it gets a home folder and
-  app folders of its own. A driver that needs the owner's key file (a key file is refused for
-  the driver kind) is launched unstripped, under a recorded decision.
+  owner's identity withheld, the same recipe as cursor-agent.shim (KP-032). Every
+  cursor-agent run is stripped; `--strip` withholds the owner's identity for any other
+  accepted command too. A stripped run gets a home folder, APPDATA and LOCALAPPDATA of its
+  own, so the owner's files there are not found through those variables; it still runs with
+  the owner's rights. The tools' caches the bridge passes through (uv, pip, the Python user
+  base, npm, Yarn, Playwright, Go, Hugging Face, Torch and Puppeteer) and cursor-agent's
+  login under APPDATA (by a link, or the owner's APPDATA itself where the link cannot be
+  made) still lead to the owner's folders. A key file is refused for the driver kind, so a
+  driver that needs the owner's key file is launched unstripped, under a recorded decision.
 
 ASCII-only on purpose (cp1252 consoles).
 ```
