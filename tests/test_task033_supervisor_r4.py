@@ -154,7 +154,7 @@ def test_task033r4_the_letter_rule_asks_the_tracked_list(tmp_path):
 @pytest.mark.parametrize("subject,plan_expected,grammar_expected", [
     ("docs: x (TASK-100, R-027) (#5)", {"TASK-100"}, {"TASK-100", "R-027"}),
     ("docs: x (R-027)", set(), {"R-027"}),
-    ("docs: x ( R-027 , BUG-018 )", set(), {"R-027", "BUG-018"}),
+    ("docs: x ( R-027 , BUG-018 )", {"BUG-018"}, {"R-027", "BUG-018"}),   # BUG-018 a plan id since R-111 (TASK-089)
 ])
 def test_task033r4_r_nnn_is_a_bare_item_merging_only_under_the_grammar(tmp_path, program, monkeypatch, subject,
                                                                        plan_expected, grammar_expected):
