@@ -5,13 +5,14 @@
 
 Run from the Workspace root. Deterministic; reads only. ASCII output.
 
-An increment is a heading `### TASK-nnn — <title>` (or `### TASK-nnn: <title>`) inside a
+An increment is a heading `### TASK-nnn`, `### BUG-nnn`, `### DEP-nnn`, `### CONFIG-nnn` or `### FIX-nnn`
+— <title> (or `### TASK-nnn: <title>` and the same for the other prefixes) inside a
 stage heading (`## ...`), followed by field lines (`Key: value`, optionally as `- Key: value`):
 
   Kind:        increment | group                  (default increment; a group is a parent
                                                    task with child increments, never delegated)
-  Parent:      TASK-nnn | none                    (the group this increment helps fulfil)
-  Depends on:  TASK-nnn, TASK-mmm | none          (must be merged first; a group = all its children)
+  Parent:      TASK-nnn, BUG-nnn, ... | none      (the group this increment helps fulfil)
+  Depends on:  TASK-nnn, BUG-nnn, ... | none      (must be merged first; a group = all its children)
   Parallel:    yes | no                           (may be built alongside other ready increments)
   Satisfies:   R-nnn, ...                         (checked by completion-check.py)
   Diagrams:    D-nnn, ...  | none                 (the normative diagrams its brief carries)
@@ -270,7 +271,8 @@ def main():
             for key in ("parent", "depends on"):
                 rest = unreadable(items[tid]["fields"].get(key))
                 if rest:
-                    fails.append("DEPENDS: %s has an unreadable %s value '%s' (IDs are TASK-nnn, three digits or more)" % (tid, key.title(), rest[:40]))
+                    id_forms = ", ".join("%s-nnn" % p for p in bridge_env.PLAN_ID_PREFIXES)
+                    fails.append("DEPENDS: %s has an unreadable %s value '%s' (IDs are %s, three digits or more)" % (tid, key.title(), rest[:40], id_forms))
         for p in ids_in(items[tid]["fields"].get("parent")):
             if p not in items:
                 fails.append("PARENT: %s names parent %s, which does not exist" % (tid, p))
@@ -381,7 +383,10 @@ def main():
     inc = [t for t in order if kinds[t] == "increment"]
     done = {t for t in inc if t in merged_ready}
     if a.briefs and os.path.isdir(a.briefs):
-        for bp in sorted(glob.glob(os.path.join(a.briefs, "TASK-*.md"))):
+        brief_paths = []
+        for prefix in bridge_env.PLAN_ID_PREFIXES:
+            brief_paths.extend(glob.glob(os.path.join(a.briefs, "%s-*.md" % prefix)))
+        for bp in sorted(brief_paths):
             if bp.endswith("-report.md"):                    # the builder's report beside its brief (2026.10.11d)
                 continue
             m = ID_RX.search(os.path.basename(bp))

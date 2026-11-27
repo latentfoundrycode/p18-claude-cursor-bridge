@@ -692,7 +692,7 @@ PARITY_SUBJECTS = [
 
 
 def test_task032_launcher_squash_reader_parity_with_plan_check(tmp_path, program, monkeypatch):
-    """R-042. bridge_env.squash_merged_ids(folder, r"TASK-\\d{3,}[a-z]?") returns exactly the merged set plan-check.py
+    """R-042. bridge_env.squash_merged_ids(folder, PLAN_ID_PATTERN) returns exactly the merged set plan-check.py
     reads with --base main on the same fixture repository; beside it, the launcher lapses a TASK-004b claim on the
     Merge form `Merge pull request #4 from x/task-004b` (tried before the subject form). Since TASK-048 (R-059; the
     design's retired reading (11)) plan-check.py keeps no merged_ids of its own and reads
@@ -711,7 +711,7 @@ def test_task032_launcher_squash_reader_parity_with_plan_check(tmp_path, program
     be = program("bridge_env")
     expected = be.squash_merged_ids(os.getcwd(), be.PLAN_ID_PATTERN, ref="main")
     assert expected and "TASK-004b" in expected       # precondition: the fixture reads under plan-check
-    got = program("bridge_env").squash_merged_ids(str(lab.root), r"TASK-\d{3,}[a-z]?")
+    got = program("bridge_env").squash_merged_ids(str(lab.root), be.PLAN_ID_PATTERN)   # the plan pattern since R-111
     assert set(got) == set(expected), (sorted(got), sorted(expected))
 
 

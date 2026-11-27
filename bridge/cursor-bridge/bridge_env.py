@@ -426,7 +426,8 @@ BLOCKING_CLASSES = frozenset((
 ))
 
 GRAMMAR_ID_PATTERN = r"[A-Z][A-Za-z0-9-]*"
-PLAN_ID_PATTERN = r"TASK-\d{3,}[a-z]?"
+PLAN_ID_PREFIXES = ("TASK", "BUG", "DEP", "CONFIG", "FIX")
+PLAN_ID_PATTERN = r"(?:%s)-\d{3,}[a-z]?" % "|".join(PLAN_ID_PREFIXES)
 
 HEAD_RX = re.compile(r"^###\s+(%s)\s*(?:[-:\u2014\u2013]+)?\s*(.*)$" % PLAN_ID_PATTERN)
 FIELD_RX = re.compile(
@@ -1159,12 +1160,27 @@ def _ids_subset_merged(declared, merged):
     return True
 
 
+_PLAN_BRANCH_RX = re.compile(
+    r"(?i)(%s)-(\d{3,}[a-z]?)" % "|".join(re.escape(p.lower()) for p in PLAN_ID_PREFIXES)
+)
+_PLAN_MERGE_BRANCH = r"(?:%s)" % "|".join(
+    re.escape(p.lower()) + r"-\d{3,}[a-z]?" for p in PLAN_ID_PREFIXES
+)
+
+
+def _cand_from_plan_branch(branch, id_rx):
+    m = _PLAN_BRANCH_RX.match(branch)
+    if not m:
+        return None
+    cand = m.group(1).upper() + "-" + m.group(2)
+    return cand if id_rx.fullmatch(cand) else None
+
+
 def _branch_name_to_id(branch, id_rx):
     """Map a merge branch name to an ID when it matches id_rx (case-insensitive, letter kept)."""
-    if re.match(r"^task-\d", branch, re.I):
-        cand = "TASK-" + branch[5:]
-        if id_rx.fullmatch(cand):
-            return cand
+    cand = _cand_from_plan_branch(branch, id_rx)
+    if cand:
+        return cand
     for cand in (branch, branch.upper()):
         if id_rx.fullmatch(cand):
             return cand
@@ -1206,7 +1222,7 @@ def _subject_leading_ids(line, id_rx):
 
 
 _PLAN_MERGE_RX = re.compile(
-    r"^\s*Merge (?:pull request #\d+ from \S+?/|branch ')(task-\d{3,}[a-z]?)\b", re.I
+    r"^\s*Merge (?:pull request #\d+ from \S+?/|branch ')(%s)\b" % _PLAN_MERGE_BRANCH, re.I
 )
 _GRAMMAR_MERGE_RX = re.compile(r"^\s*Merge (?:pull request #\d+ from \S+?/|branch ')([a-z0-9-]+)\b", re.I)
 def _trail_paren_inner(line):
@@ -1266,24 +1282,14 @@ def _parenthesis_merged_ids(inner, id_rx, plan_style):
 
 
 def _grammar_merge_id(branch, id_rx):
-    mapped = None
-    if re.match(r"^task-\d", branch, re.I):
-        bm = re.match(r"(task-\d{3,}[a-z]?)", branch, re.I)
-        if bm:
-            cand = "TASK-" + bm.group(1)[5:]
-            if id_rx.fullmatch(cand):
-                mapped = cand
-    if mapped is None:
-        mapped = _branch_name_to_id(branch, id_rx)
-    return mapped
+    return _branch_name_to_id(branch, id_rx)
 
 
 def _plan_merge_id(line, id_rx):
     m = _PLAN_MERGE_RX.match(line)
     if not m:
         return None
-    cand = "TASK-" + m.group(1)[5:]
-    return cand if id_rx.fullmatch(cand) else None
+    return _cand_from_plan_branch(m.group(1), id_rx)
 
 
 def squash_merged_ids_from_lines(lines, id_rx, plan_style=None):

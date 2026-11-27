@@ -398,3 +398,109 @@ def test_task089_a_merged_bug_subject_still_needs_its_changes_line(tmp_path):
     repo, since = changes_repo(tmp_path, ["BUG-004: a bug (#4)"])
     rc, out = hp.run(RECORDS_CHECK, repo, "--since", since, "--ref", "main")
     assert rc == 1 and "BUG-004" in out, out
+
+
+# ================================================================ round 2
+
+# ---------------------------------------------------------------- an id inside a longer word is no plan id
+
+WORD_PLAN = """# Plan
+
+## Stage 1 %(d)s words
+Demonstration: the plan reads.
+
+### TASK-001 %(d)s base
+Scope: src/a.py
+
+### TASK-002 %(d)s after a hotfix
+Depends on: HOTFIX-004
+Scope: src/b.py
+
+### TASK-003 %(d)s under a debug group
+Parent: DEBUG-001
+Scope: src/c.py
+
+### TASK-004 %(d)s after a subtask
+Depends on: SUBTASK-001
+Scope: src/d.py
+""" % {"d": DASH}
+
+
+def test_task089_r2_an_id_inside_a_longer_word_is_read_whole_by_plan_check(tmp_path):
+    """`HOTFIX-004`, `DEBUG-001` and `SUBTASK-001` name no plan id: each value is unreadable as written, and no line
+    names FIX-004, BUG-001 or TASK-001 as a dependency or a parent (round 1 read the id out of the longer word)."""
+    repo = walk_repo(tmp_path, ["TASK-001: base (#1)"], plan=WORD_PLAN)
+    rc, out = hp.plan_check(repo)
+    lines = out.splitlines()
+    assert rc == 1, out
+    assert not [l for l in lines if "depends on FIX-004" in l or "names parent BUG-001" in l
+                or "depends on TASK-001" in l and "TASK-004" in l], out
+    for tid, key, value in (("TASK-002", "Depends On", "HOTFIX-004"), ("TASK-003", "Parent", "DEBUG-001"),
+                            ("TASK-004", "Depends On", "SUBTASK-001")):
+        want = "DEPENDS: %s has an unreadable %s value '%s'" % (tid, key, value)
+        assert [l for l in lines if l.startswith(want)], (want, out)
+
+
+@pytest.mark.parametrize("key,value,want", [
+    ("depends_on", "HOTFIX-004", []),
+    ("depends_on", "TASK-001, HOTFIX-004", ["TASK-001"]),
+    ("depends_on", "SUBTASK-001", []),
+    ("depends_on", "BUG-001 (the fix), FIX-002", ["BUG-001", "FIX-002"]),
+    ("parent", "DEBUG-001", "DEBUG-001"),
+    ("parent", "BUG-001", "BUG-001"),
+], ids=["hotfix", "task-and-hotfix", "subtask", "two-ids", "debug-parent", "bug-parent"])
+def test_task089_r2_the_headers_field_reading_keeps_a_longer_word_whole(key, value, want):
+    """The header's parent and depends_on reading (records-migrate's header and plan-check's agreement) reads an id
+    only where it stands as a word of its own; a parent value naming no id is kept as written, as on the checkpoint."""
+    assert bridge_env._plan_normalize_field(key, value) == (key, want)
+
+
+# ---------------------------------------------------------------- the branch names of every prefix, both styles
+
+GRAMMAR_MERGES = [
+    ("Merge pull request #1 from someone/bug-001", {"BUG-001"}),
+    ("Merge branch 'Bug-001a'", {"BUG-001a"}),
+    ("Merge branch 'bug-001-x'", {"BUG-001"}),
+    ("Merge branch 'config-003'", {"CONFIG-003"}),
+    ("Merge branch 'dep-002'", {"DEP-002"}),
+    ("Merge branch 'task-031-x'", {"TASK-031"}),
+    ("Merge branch 'task-03x'", {"TASK-03x"}),
+    ("Merge branch 'task-12-fix'", {"TASK-12-fix"}),
+    ("Merge branch 'bug-12-fix'", {"BUG-12-fix"}),
+    ("Merge branch 'hotfix-004'", {"HOTFIX-004"}),
+]
+
+
+@pytest.mark.parametrize("line,want", GRAMMAR_MERGES, ids=[l.split()[-1].strip("'") for l, _ in GRAMMAR_MERGES])
+def test_task089_r2_the_grammar_style_maps_a_branch_of_each_prefix_as_task(line, want):
+    """The launcher's reading (the grammar's pattern): a branch named for an id of any of the five prefixes maps as a
+    `task-` branch did on the checkpoint, the prefix upper-cased, the digits and letter kept (a longer name giving the
+    id it begins with), else the prefix upper-cased and the rest as written; `task-` answers exactly as on the
+    checkpoint, and a name of another prefix (`hotfix-004`) as before."""
+    got = bridge_env.squash_merged_ids_from_lines([line], bridge_env.grammar_id_rx(), plan_style=False)
+    assert got == want, (line, got)
+
+
+PLAN_MERGES = [
+    ("Merge branch 'Bug-001'", {"BUG-001"}),
+    ("Merge pull request #3 from someone/bug-001-x", {"BUG-001"}),
+    ("Merge pull request #3 from someone/feat/fix-004", {"FIX-004"}),
+    ("Merge branch 'bug-001ab'", set()),
+    ("Merge branch 'hotfix-004'", set()),
+    ("Merge branch 'debug-001'", set()),
+]
+
+
+@pytest.mark.parametrize("line,want", PLAN_MERGES, ids=[l.split()[-1].strip("'") for l, _ in PLAN_MERGES])
+def test_task089_r2_the_plan_style_maps_a_branch_of_each_prefix(line, want):
+    got = bridge_env.squash_merged_ids_from_lines([line], bridge_env.PLAN_ID_PATTERN)
+    assert got == want, (line, got)
+
+
+def test_task089_r2_a_leading_id_wins_over_the_closing_parenthesis():
+    """The supervisor's ruling on Review A's note: one rule for every prefix, as for `TASK-119: x (TASK-120)` on the
+    checkpoint: a subject whose start names ids merges those, and its closing parenthesis is not read."""
+    got = bridge_env.squash_merged_ids_from_lines(["BUG-018: x (TASK-031, TASK-100) (#61)"], bridge_env.PLAN_ID_PATTERN)
+    assert got == {"BUG-018"}, got
+    got = bridge_env.squash_merged_ids_from_lines(["TASK-119: x (TASK-120) (#62)"], bridge_env.PLAN_ID_PATTERN)
+    assert got == {"TASK-119"}, got
