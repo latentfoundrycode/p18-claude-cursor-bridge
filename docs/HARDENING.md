@@ -2750,6 +2750,33 @@ Each is fixed by the next increment that edits its record.
   - The builders' `Assumed, not verified` lists read `none` in rounds 2 and 3, while each round's reviewers found an unlisted reading (the `none` forms, the refusal's placement).
 - **Records.** R-110 stays planned until TASK-096, its text increment. Its Evidence names this test file.
 
+### TASK-089 - plan headings take the TASK, BUG, DEP, CONFIG and FIX prefixes (R-111; stage I2, 2026-11-27)
+- **The acceptance file**, tests/test_improve_plan_prefixes.py, the supervisor's. It held 67 tests at round 1 and 91 after round 2: the tuple and the pattern; the walker, plan-check (with its merged forms and a BUG increment's brief), the completion check, records-migrate's header and the launcher's merge-unit rule, each reading a heading of every prefix; REFAC, DEV, TEST and R headings as no increments; records-check keeping its own list; a source scan of the four programs. Round 2's tests cover an id inside a longer word and the branch-name mapping in both styles.
+- **Changed expectations**, the supervisor's, which Review A judged right under C30:
+  - tests/test_task033_supervisor.py: the plan pattern it passes is now bridge_env's. `squash_merged_ids` picks the plan style by pattern equality, so the old TASK-only literal now selects the grammar style without saying so. The ISS-013 subject and `BUG-018: x (#61)` now merge BUG-018 under the plan pattern, and never TASK-031.
+  - tests/test_plan_check.py: the ISS-013 set; the main-history regression is compared on TASK ids.
+  - tests/test_task032_supervisor_launcher.py: the parity test passes `PLAN_ID_PATTERN`.
+- **Round 1** (composer-2.5, the native profile): `PLAN_ID_PREFIXES` and the composed `PLAN_ID_PATTERN`; the merged-id readers' branch mapping read from the tuple; plan-check's brief files of every prefix and its DEPENDS message.
+  - Review A rejected it on one supervisor test edit (`test_task033_n4_a_leading_bug_id_merges_under_the_grammar`), corrected.
+  - The audit passed it, with an advisory taken into round 2: a plan id picked out of a longer word, so `Depends on: HOTFIX-004` read `FIX-004` and `Parent: DEBUG-001` read `BUG-001`.
+  - Review A also found that a `task-` branch with fewer than three digits no longer kept its case in the grammar style (`task-03x` gave `TASK-03X`), which was taken into round 2.
+- **The supervisor's ruling (round 1, Review A's note):** a subject whose start names ids merges those, and its closing parenthesis is not read, for every prefix. This is the same rule as for `TASK-119: x (TASK-120)` on main. `BUG-018: x (TASK-031, TASK-100) (#61)` now merges BUG-018 only, where main read TASK-031 and TASK-100 from the parenthesis. No commit on this repository's main reads differently on TASK ids (the history regression). The ruling is pinned by `test_task089_r2_a_leading_id_wins_over_the_closing_parenthesis`.
+- **Round 2:** `plan_ids_in_text` and `_PLAN_ID_WORD_RX` (no letter or digit before an id) serve the header's parent and depends_on reading and plan-check's `ids_in` and `unreadable`. `_cand_from_prefix_rest` maps a grammar-style branch to its prefix upper-cased, followed by the rest as written.
+  - The audit passed it.
+  - Review A named one blocking item: the rest-as-written step drops main's condition that a digit follows the prefix, so `task-cleanup` gives `TASK-cleanup` where main gave `TASK-CLEANUP`. The cause is round 2's brief, whose R2 spelled the step without the digit.
+  - The supervisor ruled it outside the five, recorded here. The launcher's lapse compares through `_id_eq`, which ignores case. The only exact-case consumer, pace-report, differs only for a non-numeric grammar brief name merged by a merge commit. The acceptance test's docstring now says what the code does.
+  - Review A accepted the ruling and gave APPROVE by message.
+  - Own-file run: 20 test files, 1578 passed, 1 skipped.
+- **Leads, recorded, not fixed (none of the five):**
+  - Restore main's digit condition in `_cand_from_prefix_rest`, pinned by a case `("Merge branch 'task-cleanup'", {"TASK-CLEANUP"})` (Review A, round 2).
+  - `_PLAN_ID_WORD_RX`'s left boundary is ASCII only, so `éBUG-001`, `SUB-TASK-001` and `X_TASK-001` still read the inner id. It has no right boundary, so `TASK-001extra` reads `TASK-001e`, as on main. plan-check fails each of these closed, since `unreadable` leaves a residue, but the header's field reading drops the residue silently. A fix is `(?<![^\W_])` or `(?<![A-Za-z0-9_-])`, plus `(?![A-Za-z0-9])` (the audit and Review A, round 2).
+  - `_PLAN_BRANCH_RX` and `_PLAN_MERGE_RX` use `re.I` without `re.ASCII`, so a homoglyph branch name (`f\u0131x-003`) maps to `FIX-003`. Main did the same for `task` (the audit, round 1; add `re.ASCII`).
+  - This repository's history holds out-of-plan BUG-nnn and FIX-nnn squash subjects. A future plan heading that reuses one of those numbers would count as merged at once. A plan-check note for a heading already merged but not marked historic would show it (the audit, round 1).
+  - records-check.py's own pattern, with `findall`, still reads `HOTFIX-004` as `FIX-004` (Review A, round 2; outside the scope, on main already).
+  - The grammar mapping now gives the id a longer branch name begins with for every prefix (`bug-001-x` gives `BUG-001`, `task-001b2` gives `TASK-001b`), as main's `task-` path did. This is the design's "the same way".
+  - Reports: round 1's `Assumed, not verified` read `none`, and round 2's first item was factually wrong (`TASK-001extra`). Round 2 did not quote its after-runs whole.
+- **Records.** R-111 reads built; its Evidence names the acceptance file.
+
 ## Hotfix 2026.11.24a - the heavy slots (HOTFIX-004)
 
 ### Deviations and leads drawn under the gate (2026-11-25)
