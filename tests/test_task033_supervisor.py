@@ -43,7 +43,7 @@ PLAN_CHECK = os.path.join(CB, "plan-check.py")
 BRIDGE_ENV = os.path.join(CB, "bridge_env.py")
 TIMEOUT = 300
 
-PLAN_PATTERN = r"TASK-\d{3,}[a-z]?"
+PLAN_PATTERN = r"(?:TASK|BUG|DEP|CONFIG|FIX)-\d{3,}[a-z]?"   # bridge_env.PLAN_ID_PATTERN since R-111 (TASK-089)
 GRAMMAR_PATTERN = r"[A-Z][A-Za-z0-9-]*"
 ISS013 = "BUG-018: stage B3's review round 2's fixes (pointers, TASK-031's Scope, survival lists, records) (#61)"
 ISS013_FORM = "docs: fixes (pointers, TASK-031's Scope, survival lists, records) (#61)"
@@ -481,11 +481,13 @@ def test_task033_parenthesis_items_may_have_spaces_around_them(tmp_path, program
 
 
 def test_task033_iss013_subject_merges_nothing_under_the_plan_pattern(tmp_path, program, monkeypatch):
-    """R-044. 9f6ace6's exact subject merges nothing under the plan pattern, in plan-check.py and bridge_env.
-    enforces: handoff/TASK-033.md Context, "The ISS-013 subject"; docs/BUILD_PLAN.md TASK-033 (a)."""
+    """R-044. 9f6ace6's exact subject merges no TASK id under the plan pattern, in plan-check.py and bridge_env: not
+    TASK-031; since R-111 (TASK-089) its leading BUG-018 is a plan id, counted for a plan only where the plan holds
+    its heading.
+    enforces: handoff/TASK-033.md Context, "The ISS-013 subject"; docs/BUILD_PLAN.md TASK-033 (a); R-111."""
     pc, plan, _ = readings(tmp_path, program, monkeypatch, ISS013)
-    assert pc == set()
-    assert plan == set()
+    assert pc == {"BUG-018"}
+    assert plan == {"BUG-018"}
 
 
 def test_task033_iss013_subject_merges_bug018_not_task031_under_the_grammar(tmp_path, program, monkeypatch):
@@ -530,11 +532,12 @@ def test_task033_n4_two_leading_ids_merge_both(tmp_path, program, monkeypatch):
 
 
 def test_task033_n4_a_leading_bug_id_merges_under_the_grammar(tmp_path, program, monkeypatch):
-    """R-044. N4: `BUG-018: x (#61)` merges BUG-018 under the grammar's pattern.
-    enforces: handoff/TASK-033.md Context (N4)."""
+    """R-044. N4: `BUG-018: x (#61)` merges BUG-018 under the grammar's pattern, and since R-111 (TASK-089) under
+    the plan pattern too (a plan id, counted for a plan only where the plan holds its heading).
+    enforces: handoff/TASK-033.md Context (N4); R-111."""
     _, plan, grammar = readings(tmp_path, program, monkeypatch, "BUG-018: x (#61)")
     assert grammar == {"BUG-018"}
-    assert plan == set()
+    assert plan == {"BUG-018"}
 
 
 def test_task033_trailer_form_unchanged(tmp_path, program, monkeypatch):

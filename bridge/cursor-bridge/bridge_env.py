@@ -426,7 +426,8 @@ BLOCKING_CLASSES = frozenset((
 ))
 
 GRAMMAR_ID_PATTERN = r"[A-Z][A-Za-z0-9-]*"
-PLAN_ID_PATTERN = r"TASK-\d{3,}[a-z]?"
+PLAN_ID_PREFIXES = ("TASK", "BUG", "DEP", "CONFIG", "FIX")
+PLAN_ID_PATTERN = r"(?:%s)-\d{3,}[a-z]?" % "|".join(PLAN_ID_PREFIXES)
 
 HEAD_RX = re.compile(r"^###\s+(%s)\s*(?:[-:\u2014\u2013]+)?\s*(.*)$" % PLAN_ID_PATTERN)
 FIELD_RX = re.compile(
@@ -436,6 +437,14 @@ FIELD_RX = re.compile(
 STAGE_RX = re.compile(r"^##\s+(\S.*?)\s*$")
 DEMO_RX = re.compile(r"^(?:[-*]\s+)?\**Demonstration\**\s*:\s*(\S.*)$", re.I)
 _PLAN_TASK_RX = re.compile(PLAN_ID_PATTERN)
+_PLAN_ID_WORD_RX = re.compile(r"(?<![A-Za-z0-9])%s" % PLAN_ID_PATTERN)
+
+
+def plan_ids_in_text(text):
+    """Plan ids in text only where the id is not preceded by a letter or digit."""
+    return _PLAN_ID_WORD_RX.findall(text or "")
+
+
 _PLAN_R_RX = re.compile(r"\bR-\d{3,}\b")
 _PLAN_D_RX = re.compile(r"\bD-\d{3,}\b")
 _BRIEF_PATH_RX = re.compile(r"^[\w.@~\[\]()*?/-]+$")
@@ -1159,12 +1168,42 @@ def _ids_subset_merged(declared, merged):
     return True
 
 
-def _branch_name_to_id(branch, id_rx):
-    """Map a merge branch name to an ID when it matches id_rx (case-insensitive, letter kept)."""
-    if re.match(r"^task-\d", branch, re.I):
-        cand = "TASK-" + branch[5:]
+_PLAN_BRANCH_RX = re.compile(
+    r"(?i)(%s)-(\d{3,}[a-z]?)" % "|".join(re.escape(p.lower()) for p in PLAN_ID_PREFIXES)
+)
+_PLAN_MERGE_BRANCH = r"(?:%s)" % "|".join(
+    re.escape(p.lower()) + r"-\d{3,}[a-z]?" for p in PLAN_ID_PREFIXES
+)
+
+
+def _cand_from_plan_branch(branch, id_rx):
+    m = _PLAN_BRANCH_RX.match(branch)
+    if not m:
+        return None
+    cand = m.group(1).upper() + "-" + m.group(2)
+    return cand if id_rx.fullmatch(cand) else None
+
+
+def _cand_from_prefix_rest(branch, id_rx):
+    """Prefix upper-cased, hyphen, then the rest of the branch as written (grammar-style step)."""
+    for prefix in PLAN_ID_PREFIXES:
+        head = prefix.lower() + "-"
+        if len(branch) < len(head) or branch[: len(head)].lower() != head:
+            continue
+        cand = prefix + "-" + branch[len(head) :]
         if id_rx.fullmatch(cand):
             return cand
+    return None
+
+
+def _branch_name_to_id(branch, id_rx):
+    """Map a merge branch name to an ID when it matches id_rx (case-insensitive, letter kept)."""
+    cand = _cand_from_plan_branch(branch, id_rx)
+    if cand:
+        return cand
+    cand = _cand_from_prefix_rest(branch, id_rx)
+    if cand:
+        return cand
     for cand in (branch, branch.upper()):
         if id_rx.fullmatch(cand):
             return cand
@@ -1206,7 +1245,7 @@ def _subject_leading_ids(line, id_rx):
 
 
 _PLAN_MERGE_RX = re.compile(
-    r"^\s*Merge (?:pull request #\d+ from \S+?/|branch ')(task-\d{3,}[a-z]?)\b", re.I
+    r"^\s*Merge (?:pull request #\d+ from \S+?/|branch ')(%s)\b" % _PLAN_MERGE_BRANCH, re.I
 )
 _GRAMMAR_MERGE_RX = re.compile(r"^\s*Merge (?:pull request #\d+ from \S+?/|branch ')([a-z0-9-]+)\b", re.I)
 def _trail_paren_inner(line):
@@ -1266,24 +1305,14 @@ def _parenthesis_merged_ids(inner, id_rx, plan_style):
 
 
 def _grammar_merge_id(branch, id_rx):
-    mapped = None
-    if re.match(r"^task-\d", branch, re.I):
-        bm = re.match(r"(task-\d{3,}[a-z]?)", branch, re.I)
-        if bm:
-            cand = "TASK-" + bm.group(1)[5:]
-            if id_rx.fullmatch(cand):
-                mapped = cand
-    if mapped is None:
-        mapped = _branch_name_to_id(branch, id_rx)
-    return mapped
+    return _branch_name_to_id(branch, id_rx)
 
 
 def _plan_merge_id(line, id_rx):
     m = _PLAN_MERGE_RX.match(line)
     if not m:
         return None
-    cand = "TASK-" + m.group(1)[5:]
-    return cand if id_rx.fullmatch(cand) else None
+    return _cand_from_plan_branch(m.group(1), id_rx)
 
 
 def squash_merged_ids_from_lines(lines, id_rx, plan_style=None):
@@ -3675,14 +3704,14 @@ def _plan_normalize_field(key, val):
     if key == "parent":
         if val is None or _none_filler(val):
             return key, None
-        ids = _PLAN_TASK_RX.findall(val or "")
+        ids = plan_ids_in_text(val or "")
         return key, ids[0] if ids else val
     if key == "depends_on":
         if val is None or _none_filler(val):
             return key, []
         if isinstance(val, list):
             return key, val
-        return key, _PLAN_TASK_RX.findall(val or "")
+        return key, plan_ids_in_text(val or "")
     if key == "diagrams":
         if val is None or _none_filler(val):
             return key, []

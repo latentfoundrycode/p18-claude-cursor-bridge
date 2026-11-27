@@ -201,7 +201,8 @@ def _plan_check_merged(base):
 
 
 def test_r044_iss013_subject_merges_nothing_beside_bare_parenthesis(tmp_path, monkeypatch):
-    """R-044. 9f6ace6's subject merges nothing; (TASK-100, R-027) merges TASK-100."""
+    """R-044. 9f6ace6's subject merges no TASK id (not TASK-031); (TASK-100, R-027) merges TASK-100. Since R-111
+    (TASK-089) the subject's leading BUG-018 is a plan id, counted for a plan only where the plan holds its heading."""
     repo = tmp_path / "r"
     repo.mkdir()
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(repo), env=ENV, check=True, timeout=120)
@@ -217,7 +218,7 @@ def test_r044_iss013_subject_merges_nothing_beside_bare_parenthesis(tmp_path, mo
     git(repo, "commit", "-q", "--allow-empty", "-m", "feat(x): ok (TASK-100, R-027) (#1)")
     git(repo, "commit", "-q", "--allow-empty", "-m", iss.stdout.strip())
     monkeypatch.chdir(str(repo))
-    assert _plan_check_merged("main") == {"TASK-100"}
+    assert _plan_check_merged("main") == {"TASK-100", "BUG-018"}
 
 
 @pytest.mark.parametrize(
@@ -238,7 +239,8 @@ def test_r044_non_bare_parenthesis_merges_nothing(tmp_path, subject, monkeypatch
 
 
 def test_r044_main_regression_minus_task031(monkeypatch):
-    """R-044. Reader on Workspace main equals former rule minus {TASK-031} at 9f6ace6 only."""
+    """R-044. Reader on Workspace main equals former rule minus {TASK-031} at 9f6ace6 only, compared on TASK ids (the
+    former rule's only prefix); since R-111 (TASK-089) the reader also names BUG, DEP, CONFIG and FIX ids."""
     shallow = subprocess.run(
         ["git", "-C", WORKSPACE, "rev-parse", "--is-shallow-repository"],
         capture_output=True,
@@ -262,7 +264,7 @@ def test_r044_main_regression_minus_task031(monkeypatch):
     new = _new_merged_ids_per_commit(WORKSPACE)
     seen_9f6 = False
     for sha, fset in former.items():
-        nset = new.get(sha, set())
+        nset = {i for i in new.get(sha, set()) if i.startswith("TASK-")}
         if sha.startswith("9f6ace6") or sha == "9f6ace6":
             seen_9f6 = True
             assert fset - nset == {"TASK-031"}, (sha, fset, nset)
