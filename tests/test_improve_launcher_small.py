@@ -55,10 +55,10 @@ def env_of(lab, allow_any=False, **extra):
     return env
 
 
-def launch(lab, words, kind=None, limit="120", strip=False, allow_any=False, extra=None, timeout=300):
+def launch(lab, words, kind=None, limit="120", strip=False, allow_any=False, extra=None, timeout=300, flags=()):
     ws, _ = lab
     argv = [sys.executable, PROG, "--limit", limit] + (["--strip"] if strip else [])
-    argv += (["--kind", kind] if kind else []) + ["--"] + list(words)
+    argv += (["--kind", kind] if kind else []) + list(flags) + ["--"] + list(words)
     return subprocess.run(argv, capture_output=True, text=True, cwd=str(ws), env=env_of(lab, allow_any, **(extra or {})),
                           timeout=timeout, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
@@ -192,14 +192,30 @@ def test_r112_a_driver_s_child_keeps_the_caller_s_value(lab, strip):
     assert "ENC='cp1252' UTF8=False" in out, out
 
 
-def probe_suite(lab, strip, caller, expected):
+def probe_suite(lab, strip, caller, expected, flags=()):
     ws, _ = lab
     (ws / "tests" / "test_enc.py").write_text(
         "import os\n\n\ndef test_enc():\n    assert os.environ.get('PYTHONIOENCODING') == %r, os.environ.get('PYTHONIOENCODING')\n"
         "    assert 'PYTHONUTF8' not in os.environ\n" % expected, encoding="utf-8")
     extra = {"PYTHONIOENCODING": caller} if caller is not None else {}
     return launch(lab, ["python", "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/test_enc.py"], kind="test",
-                  strip=strip, extra=extra)
+                  strip=strip, extra=extra, flags=flags)
+
+
+def key_file(lab, text):
+    """A key file beside the launch folder, outside it, as the loop keeps one."""
+    ws, _ = lab
+    path = ws.parent / "keys.env"
+    path.write_text(text, encoding="utf-8")
+    return str(path)
+
+
+@pytest.mark.parametrize("strip", [False, True])
+def test_r112_a_key_file_s_value_counts_as_the_caller_s(lab, strip):
+    """C37, round 2. A key file that sets PYTHONIOENCODING for a test run is the caller's value: the default does not
+    replace it."""
+    p = probe_suite(lab, strip, None, "latin-1", flags=["--key-file", key_file(lab, "PYTHONIOENCODING=latin-1\n")])
+    assert p.returncode == 0 and "1 passed" in p.stdout, (p.stdout, p.stderr)
 
 
 @pytest.mark.parametrize("strip", [False, True])
@@ -282,6 +298,27 @@ def test_r112_another_program_s_refusal_names_no_kind(lab):
     assert "--kind driver" not in line, line
 
 
+def test_r112_a_test_launch_with_a_key_file_names_no_driver_kind(lab):
+    """C54, round 2. The driver kind refuses a key file, so a refused test launch that carries one is not pointed at
+    it. Red on round 1."""
+    ws, _ = lab
+    (ws / "run" / "supervisor" / "x.py").write_text("print('x')\n", encoding="utf-8")
+    p = launch(lab, ["python", "run/supervisor/x.py"], kind="test", flags=["--key-file", key_file(lab, "A=1\n")])
+    line = refused_line(p)
+    assert "--kind driver" not in line, line
+
+
+@pytest.mark.parametrize("kind", [None, "builder", "review", "watch"])
+def test_r112_a_supervisor_program_under_another_kind_gets_no_hint(lab, kind):
+    """C54, round 2. The hint is the test kind's alone: the same program without `--kind`, or under another kind
+    that refuses it, is refused as before, naming no kind."""
+    ws, _ = lab
+    (ws / "run" / "supervisor" / "x.py").write_text("print('x')\n", encoding="utf-8")
+    p = launch(lab, ["python", "run/supervisor/x.py"], kind=kind)
+    line = refused_line(p)
+    assert "--kind driver" not in line, (kind, line)
+
+
 def test_r112_the_driver_kind_still_runs_the_supervisor_program(lab):
     """The control: the same program under `--kind driver` runs."""
     ws, _ = lab
@@ -315,6 +352,28 @@ def test_r112_the_docstring_names_them_too(program):
     """T74. The module's docstring, which the command reference is generated from."""
     doc = program("bridge-run").__doc__ or ""
     assert told(doc) == [], told(doc)
+
+
+TRUE_OF_THE_STRIP = ("cache", "a key file is refused", "cursor-agent")
+OVERCLAIM = ("none of the owner's files", "sees none of the owner")
+
+
+def claims(text):
+    low = " ".join(text.lower().split())
+    return [w for w in TRUE_OF_THE_STRIP if w not in low], [w for w in OVERCLAIM if w in low]
+
+
+def test_r112_the_help_claims_no_more_than_the_strip_gives(lab, program):
+    """T74, round 2. `stripped_env` re-points the home folder, APPDATA and LOCALAPPDATA, but passes the tools' caches
+    and cursor-agent's login link through to the owner's folders (bridge_env.APP_CACHES, APP_LINKS): the usage text
+    and the docstring say so, say that a key file is refused for the driver kind, and claim no isolation from every
+    owner file. Red on round 1."""
+    ws, _ = lab
+    p = subprocess.run([sys.executable, PROG], capture_output=True, text=True, cwd=str(ws), env=env_of(lab), timeout=120)
+    doc = program("bridge-run").__doc__ or ""
+    for name, text in (("usage", p.stderr), ("docstring", doc)):
+        missing, over = claims(text)
+        assert missing == [] and over == [], (name, missing, over)
 
 
 # ---------------------------------------------------------------- C36: no environment name moves the record

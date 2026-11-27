@@ -100,7 +100,10 @@ rule of 2026-10-05: no secret through the environment the owner sets).
   says so.
 - `cursor-agent` is started the way Windows needs it (the .cmd launcher) and with the
   owner's identity withheld, the same recipe as cursor-agent.shim (KP-032). `--strip`
-  withholds it for any other accepted command too.
+  withholds it for any other accepted command too: a stripped run sees none of the owner's
+  files under APPDATA, LOCALAPPDATA or the home folder, because it gets a home folder and
+  app folders of its own. A driver that needs the owner's key file (a key file is refused for
+  the driver kind) is launched unstripped, under a recorded decision.
 
 ASCII-only on purpose (cp1252 consoles).
 """
@@ -158,7 +161,9 @@ DESIGN_TRIM_BEFORE_SEP = bridge_env.DESIGN_TRIM_BEFORE_SEP
 
 def usage():
     sys.stderr.write("usage: bridge-run.py --limit <seconds|auto> [--kind builder|driver|review|watch|test] [--strip] [--key-file <path>] -- <command> [args...]\n"
-                     "       bridge-run.py --healthy <run id>\n")
+                     "       bridge-run.py --healthy <run id>\n"
+                     "  --strip: a stripped run sees none of the owner's files under APPDATA, LOCALAPPDATA or the home folder (it gets its own).\n"
+                     "  A driver that needs the owner's key file runs unstripped, under a recorded decision; use --kind driver for programs under run/supervisor/ or the installed mutation engine.\n")
     return 2
 
 
@@ -3393,6 +3398,8 @@ def main():
             sys.stderr.write(line)
         else:
             sys.stderr.write("bridge-run: refused - the launcher runs only cursor-agent, gh pr checks and the test suites it knows by name, without an option that runs another program, and an npx tool only when the project has it (got %r); a benchmark or an unknown runner runs directly in the background, marked # wake\n" % cmd[0])
+        if kind == "test" and resolve_driver_program(cmd, folder) is not None:
+            sys.stderr.write("bridge-run: refused - use --kind driver for this command\n")
         return 125
     if head_of(cmd) in PACKAGE_FOLDER_LONG and named_suite(cmd, folder):
         rewritten, refuse = _package_folder_rewrite(cmd, folder)
@@ -3587,6 +3594,8 @@ def main():
             return _abort_before_child(125)
         env.update(keys)
         sys.stderr.write("bridge-run: key file read (%d name(s): %s)\n" % (len(keys), ", ".join(sorted(keys)) or "none"))
+    if kind in ("driver", "test") and "PYTHONIOENCODING" not in env:
+        env["PYTHONIOENCODING"] = "utf-8"
     log_branch = brief_meta.get("branch") if brief_meta else branch_of(workspace_of(cmd, folder))
     entry = {"id": run_id, "kind": kind, "head": head, "model": model_of(cmd), "branch": log_branch, "limit": int(limit), "seconds": None, "exit": None, "healthy": None}
     if kind == "builder":
@@ -3793,6 +3802,7 @@ def main():
         sys.stderr.flush()
         entry.update(seconds=int(time.time() - started), exit=124)
         write_log(folder, entry)            # before the job ends this process too
+        remove_pid_file(pid_file or reserved_pid_file)  # before killer(); on Windows the job ends this process
         try:
             killer()                        # on Windows this ends this process too, with exit code 124
         except OSError as e:
