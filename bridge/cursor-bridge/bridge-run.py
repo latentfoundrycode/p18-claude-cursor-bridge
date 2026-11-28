@@ -102,12 +102,16 @@ rule of 2026-10-05: no secret through the environment the owner sets).
   owner's identity withheld, the same recipe as cursor-agent.shim (KP-032). Every
   cursor-agent run is stripped; `--strip` withholds the owner's identity for any other
   accepted command too. A stripped run gets a home folder, APPDATA and LOCALAPPDATA of its
-  own, so the owner's files there are not found through those variables; it still runs with
-  the owner's rights. The tools' caches the bridge passes through (uv, pip, the Python user
-  base, npm, Yarn, Playwright, Go, Hugging Face, Torch and Puppeteer) and cursor-agent's
-  login under APPDATA (by a link, or the owner's APPDATA itself where the link cannot be
-  made) still lead to the owner's folders. A key file is refused for the driver kind, so a
-  driver that needs the owner's key file is launched unstripped, under a recorded decision.
+  own, so the owner's other files there are not found through those variables; it still runs
+  with the owner's rights. The run's home folder holds a `.cursor` link to the owner's
+  `~/.cursor` (the Cursor CLI's account and state). Git reads the owner's `~/.gitconfig`
+  through an include in the bridge's global config, with the credential helper list reset, so
+  the owner's git identity applies and no credential helper hands out the owner's login. The
+  tools' caches the bridge passes through (uv, pip, the Python user base, npm, Yarn, Playwright,
+  Go, Hugging Face, Torch and Puppeteer) and cursor-agent's login under APPDATA (by a link, or
+  the owner's APPDATA itself where the link cannot be made) still lead to the owner's folders.
+  A key file is refused for the driver kind, so a driver that needs the owner's key file is
+  launched unstripped, under a recorded decision.
 
 ASCII-only on purpose (cp1252 consoles).
 """
@@ -166,7 +170,7 @@ DESIGN_TRIM_BEFORE_SEP = bridge_env.DESIGN_TRIM_BEFORE_SEP
 def usage():
     sys.stderr.write("usage: bridge-run.py --limit <seconds|auto> [--kind builder|driver|review|watch|test] [--strip] [--key-file <path>] -- <command> [args...]\n"
                      "       bridge-run.py --healthy <run id>\n"
-                     "  --strip: every cursor-agent run is stripped; otherwise a stripped run gets its own home folder, APPDATA and LOCALAPPDATA so the owner's files there are not found through those variables; tools' cache paths passed through still reach the owner's folders.\n"
+                     "  --strip: every cursor-agent run is stripped, and so is a --strip run; a stripped run gets its own home folder, APPDATA and LOCALAPPDATA and still runs with the owner's rights; the owner's other files there are not found through those variables; tools' cache paths passed through and cursor-agent's login (by a link, or the owner's APPDATA where the link cannot be made) still reach the owner's folders.\n"
                      "  A key file is refused for the driver kind; a driver that needs the owner's key file runs unstripped, under a recorded decision; use --kind driver for programs under run/supervisor/ or the installed mutation engine.\n")
     return 2
 
