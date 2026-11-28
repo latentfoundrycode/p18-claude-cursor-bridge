@@ -152,6 +152,8 @@ SLOT_CLOCK_SKEW = 300
 SLOT_LIMIT_MAX = 604800
 PID_MAX = 4294967295 if sys.platform == "win32" else 4194304
 RUN_ID_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z(?:-\d+)?$", re.ASCII)
+HOLDER_PROJECT_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$", re.ASCII)
+HOLDER_BRANCH_RE = re.compile(r"^[A-Za-z0-9._/-]{1,100}$", re.ASCII)
 SLOT_START_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", re.ASCII)
 SLOT_START_MIN = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
 WATCH_ONLY_REFUSE = ("bridge-run: refused - a watch run is only a gh pr checks command\n")
@@ -1950,6 +1952,36 @@ def _plain_record_text(value):
     return True
 
 
+def _holder_project_ok(value):
+    return isinstance(value, str) and HOLDER_PROJECT_RE.fullmatch(value) is not None
+
+
+def _holder_branch_ok(value):
+    return isinstance(value, str) and HOLDER_BRANCH_RE.fullmatch(value) is not None
+
+
+def _launch_folder_project_name(folder):
+    norm = os.path.normpath(folder)
+    base = os.path.basename(norm)
+    if base == "Workspace":
+        parent = os.path.dirname(norm)
+        if not parent:
+            return None
+        name = os.path.basename(parent)
+    else:
+        name = base
+    return name if _holder_project_ok(name) else None
+
+
+def _holder_line_suffix(record):
+    tail = ", limit %ds" % int(record["limit"])
+    if "project" in record:
+        tail += ", project %s" % record["project"]
+    if "branch" in record:
+        tail += ", branch %s" % record["branch"]
+    return tail
+
+
 def process_alive(pid):
     if sys.platform == "win32":
         import ctypes
@@ -2099,7 +2131,16 @@ def read_holder_record(holder_path):
             return None
         if not process_alive(pid) or actual is None or abs(actual - created_f) > 0.01:
             return None
-        return {"kind": kind, "run_id": run_id, "pid": pid, "created": created_f, "start": start, "limit": limit}
+        if "project" in data and not _holder_project_ok(data.get("project")):
+            return None
+        if "branch" in data and not _holder_branch_ok(data.get("branch")):
+            return None
+        out = {"kind": kind, "run_id": run_id, "pid": pid, "created": created_f, "start": start, "limit": limit}
+        if "project" in data:
+            out["project"] = data["project"]
+        if "branch" in data:
+            out["branch"] = data["branch"]
+        return out
     finally:
         try:
             os.close(fd)
@@ -2198,8 +2239,8 @@ def _waiting_line(record, grace):
     end = holder_end_time(record, grace)
     if end is None:
         return "bridge-run: waiting for the slot held by unknown\n"
-    return ("bridge-run: waiting for the slot held by %s %s since %s, ends by %s\n"
-            % (record["kind"], record["run_id"], record["start"], end))
+    return ("bridge-run: waiting for the slot held by %s %s since %s, ends by %s%s\n"
+            % (record["kind"], record["run_id"], record["start"], end, _holder_line_suffix(record)))
 
 
 def _slot_not_free_line(record, grace):
@@ -2208,8 +2249,8 @@ def _slot_not_free_line(record, grace):
     end = holder_end_time(record, grace)
     if end is None:
         return "bridge-run: slot not free - held by unknown\n"
-    return ("bridge-run: slot not free - held by %s %s since %s, ends by %s\n"
-            % (record["kind"], record["run_id"], record["start"], end))
+    return ("bridge-run: slot not free - held by %s %s since %s, ends by %s%s\n"
+            % (record["kind"], record["run_id"], record["start"], end, _holder_line_suffix(record)))
 
 
 def _waiting_line_multi(num_slots, records, grace):
@@ -2222,7 +2263,8 @@ def _waiting_line_multi(num_slots, records, grace):
             if end is None:
                 parts.append("unknown")
             else:
-                parts.append("%s %s since %s, ends by %s" % (rec["kind"], rec["run_id"], rec["start"], end))
+                parts.append("%s %s since %s, ends by %s%s"
+                               % (rec["kind"], rec["run_id"], rec["start"], end, _holder_line_suffix(rec)))
     return ("bridge-run: waiting for a slot (%d of %d held): %s\n"
             % (num_slots, num_slots, "; ".join(parts)))
 
@@ -2287,7 +2329,7 @@ def _close_heavy_fds(fds):
                 pass
 
 
-def _publish_slot_taken(kind, run_id, limit, holder_path, taken_suffix=""):
+def _publish_slot_taken(kind, run_id, limit, holder_path, taken_suffix="", folder=None, log_branch=None):
     taken = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
     pub_limit = max(1, int(limit))
     created = process_creation_epoch(os.getpid())
@@ -2297,6 +2339,12 @@ def _publish_slot_taken(kind, run_id, limit, holder_path, taken_suffix=""):
     else:
         record = {"kind": kind, "run_id": run_id, "pid": os.getpid(), "created": created, "start": taken,
                   "limit": pub_limit}
+        if folder is not None:
+            proj = _launch_folder_project_name(folder)
+            if proj is not None:
+                record["project"] = proj
+        if log_branch is not None and _holder_branch_ok(log_branch):
+            record["branch"] = log_branch
         publish_holder_record(holder_path, record)
     sys.stderr.write("bridge-run: slot taken %s%s\n" % (taken, taken_suffix))
     sys.stderr.flush()
@@ -2387,7 +2435,7 @@ def acquire_heavy_slot(kind, run_id, limit, scale):
     return _acquire_heavy_slot_one(kind, run_id, limit, scale)
 
 
-def acquire_heavy_for_launch(kind, run_id, limit, scale, argv, folder, num_slots):
+def acquire_heavy_for_launch(kind, run_id, limit, scale, argv, folder, num_slots, log_branch=None):
     """Folder lock, then a slot; return (slot_fd, folder_fd, waited, slot_k) | None | 'refused'."""
     identity = checkout_identity_hash(folder, argv)
     folder_lock, folder_holder = folder_lock_paths(identity)
@@ -2499,7 +2547,8 @@ def acquire_heavy_for_launch(kind, run_id, limit, scale, argv, folder, num_slots
                         except OSError:
                             pass
                 taken_suffix = suffix % (taken_slot, num_slots) if num_slots > 1 else ""
-                _, record = _publish_slot_taken(kind, run_id, limit, slot_holder_paths[taken_slot - 1], taken_suffix)
+                _, record = _publish_slot_taken(kind, run_id, limit, slot_holder_paths[taken_slot - 1], taken_suffix,
+                                                folder=folder, log_branch=log_branch)
                 if record is not None:
                     publish_holder_record(folder_holder, record)
                 return slot_fd, folder_fd, waited, taken_slot
@@ -3652,7 +3701,8 @@ def main():
 
     if kind in HEAVY_KINDS:
         slot_attempt = time.monotonic()
-        slot_result = acquire_heavy_for_launch(kind, run_id, limit, slot_scale, cmd_before_resolve, folder, num_slots)
+        slot_result = acquire_heavy_for_launch(kind, run_id, limit, slot_scale, cmd_before_resolve, folder, num_slots,
+                                               log_branch)
         if slot_result == "refused":
             return _abort_before_child(125)
         if slot_result is None:

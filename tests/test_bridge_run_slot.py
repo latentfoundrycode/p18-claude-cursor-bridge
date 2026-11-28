@@ -728,7 +728,7 @@ def test_r040_two_heavy_runs_serialize_commands(tmp_path):
     rid = err1.splitlines()[0].split("started ", 1)[1]
     taken = next(ln.split("slot taken ", 1)[1] for ln in err1.splitlines() if ln.startswith("bridge-run: slot taken "))
     wait_ln = next(ln for ln in err2.splitlines() if ln.startswith("bridge-run: waiting for the slot held by"))
-    m = re.fullmatch(r"bridge-run: waiting for the slot held by test %s since %s, ends by (\S+Z)" % (re.escape(rid), re.escape(taken)), wait_ln)
+    m = re.fullmatch(r"bridge-run: waiting for the slot held by test %s since %s, ends by (\S+Z), limit 30s, project a" % (re.escape(rid), re.escape(taken)), wait_ln)  # TASK-091 (R-113): the limit and the project; no branch outside a checkout
     assert m, wait_ln
     # ends by: since + the holder's limit (30 s) + the scaled grace's whole seconds (120 x 0.05 = 6)
     assert (datetime.strptime(m.group(1), STAMP) - datetime.strptime(taken, STAMP)).total_seconds() == 36
@@ -844,7 +844,7 @@ def test_r040_wait_timeout_exit_123_and_log(tmp_path):
     assert out.returncode == 123
     lines = out.stderr.splitlines()
     assert lines[-1] == "bridge-run: exit 123"
-    m = re.fullmatch(r"bridge-run: slot not free - held by test 2026-04-01T00:00:00Z since (\S+Z), ends by (\S+Z)", lines[-2])
+    m = re.fullmatch(r"bridge-run: slot not free - held by test 2026-04-01T00:00:00Z since (\S+Z), ends by (\S+Z), limit 3s", lines[-2])  # TASK-091 (R-113): the limit; a record without project and branch
     assert m, lines[-2]
     since, ends = (datetime.strptime(x, STAMP) for x in m.groups())
     assert (ends - since).total_seconds() == 3  # limit 3 plus the scaled grace's whole seconds (0)
@@ -907,9 +907,10 @@ def test_r040_grace_end_lines_at_scale_one():
     grace = br.SLOT_GRACE
     assert grace == 120
     expect = "2026-01-01T00:02:10Z"  # 00:00:00 + 10 s + 120 s
-    assert br._waiting_line(rec, grace).rstrip("\n").endswith("since 2026-01-01T00:00:00Z, ends by " + expect)
+    assert br._waiting_line(rec, grace).rstrip("\n").endswith("since 2026-01-01T00:00:00Z, ends by " + expect + ", limit 10s")
     assert br._slot_not_free_line(rec, grace).rstrip("\n") == (
-        "bridge-run: slot not free - held by test 2026-01-01T00:00:00Z since 2026-01-01T00:00:00Z, ends by " + expect)
+        "bridge-run: slot not free - held by test 2026-01-01T00:00:00Z since 2026-01-01T00:00:00Z, ends by " + expect
+        + ", limit 10s")  # TASK-091 (R-113)
 
 
 def test_r040_lock_folder_refused(tmp_path):

@@ -44,6 +44,8 @@ GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "
        "-c", "commit.gpgsign=false"]
 STAMP_RE = r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"
 TAKEN_RE = r"bridge-run: slot taken " + STAMP_RE
+# TASK-091 (R-113): a holder's clause goes on with its limit, then its project and branch where its record holds them.
+TAIL_RE = r", limit \d+s(?:, project [A-Za-z0-9._-]{1,64})?(?:, branch [A-Za-z0-9._/-]{1,100})?"
 NOTE_PREFIX = "bridge-run: note - heavy-slots.json ignored ("
 NOTE_SUFFIX = "); one heavy slot"
 
@@ -304,7 +306,7 @@ def test_hotfix24a_no_setting_file_keeps_one_slot(tmp_path, env):
     assert first.proc.returncode == 0 and second.proc.returncode == 0, (err1, err2)
     assert float((b / "s").read_text()) >= float((a / "e").read_text())
     assert re.fullmatch(r"bridge-run: waiting for the slot held by test %s since %s, ends by %s"
-                        % (re.escape(first.run_id()), STAMP_RE, STAMP_RE), wait_line), wait_line
+                        % (re.escape(first.run_id()), STAMP_RE, STAMP_RE) + TAIL_RE, wait_line), wait_line
     for err in (err1, err2):
         assert taken_lines(err) and all(re.fullmatch(TAKEN_RE, ln) for ln in taken_lines(err)), err
         assert not any("heavy-slots" in ln for ln in err), err
@@ -330,7 +332,7 @@ def test_hotfix24a_two_slots_second_at_once_third_waits_on_both(tmp_path, env):
         rid1, rid2 = l1.run_id(), l2.run_id()
         l3 = Launch(c, env, "--limit", "30", "--", *holding_cmd(c))
         line = l3.until_prefix("bridge-run: waiting")
-        clause = r"test %s since " + STAMP_RE + r", ends by " + STAMP_RE
+        clause = r"test %s since " + STAMP_RE + r", ends by " + STAMP_RE + TAIL_RE
         assert re.fullmatch(r"bridge-run: waiting for a slot \(2 of 2 held\): " + clause % re.escape(rid1)
                             + "; " + clause % re.escape(rid2), line), line
         assert not (c / "s").exists()
@@ -350,7 +352,7 @@ def test_hotfix24a_two_slots_second_at_once_third_waits_on_both(tmp_path, env):
 
 def today_waiting_re(run_id):
     """Today's waiting line naming one live holder (the one-slot form the folder lock's waiter keeps)."""
-    return r"bridge-run: waiting for the slot held by test %s since %s, ends by %s" % (re.escape(run_id), STAMP_RE, STAMP_RE)
+    return r"bridge-run: waiting for the slot held by test %s since %s, ends by %s" % (re.escape(run_id), STAMP_RE, STAMP_RE) + TAIL_RE
 
 
 @pytest.mark.parametrize("where", ["same-folder", "subfolder"])
@@ -443,7 +445,7 @@ def test_hotfix24a_same_checkout_holder_record_from_its_slot_taken_time(tmp_path
         rid_h = hl.run_id()
         line = wl.until(lambda ln: ln.startswith("bridge-run: waiting") and rid_h in ln, "naming H %s" % rid_h)
         m = re.fullmatch(r"bridge-run: waiting for the slot held by test %s since (\S+Z), ends by (\S+Z)"
-                         % re.escape(rid_h), line)
+                         % re.escape(rid_h) + TAIL_RE, line)
         assert m, line
         assert m.group(1) == t_h, (m.group(1), t_h)
         since, ends = (datetime.strptime(x, "%Y-%m-%dT%H:%M:%SZ") for x in m.groups())
@@ -486,7 +488,7 @@ def test_hotfix24a_same_checkout_not_free_names_the_folder_holder(tmp_path, env)
     assert out.returncode == 123, out.stderr
     assert lines[-1] == "bridge-run: exit 123"
     assert re.fullmatch(r"bridge-run: slot not free - held by test %s since %s, ends by %s"
-                        % (re.escape(mine.run_id()), STAMP_RE, STAMP_RE), lines[-2]), lines[-2]
+                        % (re.escape(mine.run_id()), STAMP_RE, STAMP_RE) + TAIL_RE, lines[-2]), lines[-2]
     assert elapsed < 25, elapsed  # the folder holder's end capped at (14,400 + 120) x 0.001 = 14.5 s
     assert not (root / "ran.txt").exists()
 
@@ -770,7 +772,7 @@ def test_hotfix24a_not_free_names_the_earliest_end(tmp_path, env):
     assert out.returncode == 123, out.stderr
     assert lines[-1] == "bridge-run: exit 123"
     assert re.fullmatch(r"bridge-run: slot not free - held by test 2026-09-01T02:00:00Z since %s, ends by %s"
-                        % (STAMP_RE, STAMP_RE), lines[-2]), lines[-2]
+                        % (STAMP_RE, STAMP_RE) + TAIL_RE, lines[-2]), lines[-2]
     assert elapsed < 9, elapsed  # the earliest end, not the provisional bound (14,520 x 0.001 = 14.5 s)
     assert not marker.exists()
 

@@ -1186,7 +1186,7 @@ stages:
         depends_on: [TASK-090]
         parallel: false
         diagrams: []
-        scope: ["bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_improve_slot_line.py", "tests/test_bridge_run_slot.py", "tests/test_loop_text_windowless.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-091-r<N>-report.md"]
+        scope: ["bridge/cursor-bridge/bridge-run.py", "bridge/cursor-bridge/MANIFEST.json", "tests/test_improve_slot_line.py", "tests/test_bridge_run_slot.py", "tests/test_hotfix24a_heavy_slots.py", "tests/test_loop_text_windowless.py", "docs/cli-reference.json", "docs/CLI_REFERENCE.md", "docs/BUILDER_NOTES.md", "handoff/TASK-091-r<N>-report.md"]
         satisfies: [R-113]
         deferred: null
         historic: false
@@ -2633,8 +2633,8 @@ Parent: none
 Depends on: TASK-090
 Parallel: no
 Diagrams: none
-Scope: bridge/cursor-bridge/bridge-run.py; bridge/cursor-bridge/MANIFEST.json; tests/test_improve_slot_line.py; tests/test_bridge_run_slot.py; tests/test_loop_text_windowless.py; docs/cli-reference.json; docs/CLI_REFERENCE.md; docs/BUILDER_NOTES.md; handoff/TASK-091-r<N>-report.md
-Scope notes: tests/test_improve_slot_line.py: the supervisor's, committed before the checkpoint; tests/test_bridge_run_slot.py and tests/test_loop_text_windowless.py: the lines they hold by a whole match, changed by the supervisor before the checkpoint to the new line and to nothing else; the records the increment writes in its records-only commit, outside Scope by the RECORDS rule: docs/HARDENING.md, docs/PROJECT_STATUS.md
+Scope: bridge/cursor-bridge/bridge-run.py; bridge/cursor-bridge/MANIFEST.json; tests/test_improve_slot_line.py; tests/test_bridge_run_slot.py; tests/test_hotfix24a_heavy_slots.py; tests/test_loop_text_windowless.py; docs/cli-reference.json; docs/CLI_REFERENCE.md; docs/BUILDER_NOTES.md; handoff/TASK-091-r<N>-report.md
+Scope notes: tests/test_improve_slot_line.py: the supervisor's, committed before the checkpoint; tests/test_bridge_run_slot.py, tests/test_hotfix24a_heavy_slots.py (added at TASK-091's checkpoint, 2026-11-28: it holds the line by a whole match too) and tests/test_loop_text_windowless.py: the lines they hold by a whole match, changed by the supervisor before the checkpoint to the new line and to nothing else; the records the increment writes in its records-only commit, outside Scope by the RECORDS rule: docs/HARDENING.md, docs/PROJECT_STATUS.md
 Satisfies: R-113
 Done when: the holder record carries the holder's project folder's name, never its path, and its branch, beside the limit it holds already, each read back under the record's strict validation with a length bound and a character list; a waiter's line, at once and at each repeat, reads as on the checkpoint and goes on to name the limit in seconds, the project and the branch (red on the checkpoint); the line printed at the bound names them too; a record without the two fields, as 2026.11.23a writes it, is read and its line printed without them; a record whose new fields break the validation is treated as the checkpoint treats a malformed record; no queue, no priority and no new option; the loop's text shows the line only where the tests' changed lines require it, named in the report for TASK-096; the command reference regenerated and `tools/dump-cli.py --check` green; MANIFEST regenerated; R-113 reads built in the records commit.
 
