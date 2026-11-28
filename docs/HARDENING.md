@@ -2777,6 +2777,25 @@ Each is fixed by the next increment that edits its record.
   - Reports: round 1's `Assumed, not verified` read `none`, and round 2's first item was factually wrong (`TASK-001extra`). Round 2 did not quote its after-runs whole.
 - **Records.** R-111 reads built; its Evidence names the acceptance file.
 
+### TASK-090 - the launcher's small repairs (R-112; stage I2, 2026-11-28)
+- **The acceptance file**, tests/test_improve_launcher_small.py, the supervisor's: 27 tests at round 1, 35 after round 2, 36 after round 3. They cover the pid file at a limit (behavioural for the test, driver and builder kinds, plus a source check of every limit branch's order); the encoding default for the driver and test kinds (a caller's and a key file's value kept, builder and review unchanged, no `PYTHONUTF8`); the refusal's `--kind driver` hint (not with `--key-file`, not under another kind); the help text; the record and pid folder not moved by any environment name. The guard test of R-079 (tests/test_program_review_rows.py) was widened to every test file that names the launcher and to the checkout's pid folder.
+- **Round 1** (composer-2.5, the native profile): the pid file removed before `killer()` in the limit branch that is not a watch; `PYTHONIOENCODING=utf-8` for the driver and test kinds where unset, after the key file's names; the hint; the help text.
+  - The audit passed it.
+  - Review A rejected it. The help text said a stripped run "sees none of the owner's files under APPDATA, LOCALAPPDATA or the home folder", which `stripped_env` does not do: the tools' caches (`CACHES`, `APP_CACHES`) and cursor-agent's login link (`APP_LINKS`) lead to the owner's folders, and APPDATA stays the owner's where that link cannot be made. The wording was the brief's (a brief error), corrected in round 2.
+- **Round 2:** the help text says what the strip gives and what still leads to the owner's folders; the hint is skipped where the launch carries `--key-file`, which the driver kind refuses.
+  - The audit passed it, with an advisory taken into round 3: the home folder's `.cursor` link to the owner's `~/.cursor` and the owner's `~/.gitconfig` read by an include were still unnamed (round 2's brief left both out).
+  - Review A rejected it on records (the report's M5 described as the opposite mutation, two parametrized tests cited by bare names), with the usage text's gaps.
+- **Round 3**, the ceiling's last: the docstring names the `.cursor` link and the git include; the usage text names the owner's rights and the login link. Review A APPROVE, the audit PASS. Own-file run (nine files, the guard test included): 369 passed, 3 skipped. Mutation: nine mutants (M1 to M9), each caught by the acceptance file.
+- **Leads, recorded, not fixed (none of the five):**
+  - `--strip` is not a sandbox: the child runs with the owner's rights and can open any owner file by its absolute path. The help text now says so; a reader must not hand a stripped run an untrusted program (the audit, round 1).
+  - The owner's whole `~/.gitconfig` applies to a stripped run, not only the identity: a `core.sshCommand` naming the owner's SSH key, an `insteadOf` rule or an `includeIf` there applies too, so an SSH remote could still use the owner's login though no credential helper does. Better wording: "the owner's git settings apply, an SSH command there included" (the audit, round 3).
+  - `PYTHONUSERBASE` is grouped with the caches in `bridge_env.APP_CACHES`, but it is the owner's installed user packages, which Python imports: a stripped run can write there and plant code that runs in the owner's later Python sessions. A design point for the strip, outside this increment (the audit, round 2).
+  - With the pid file removed before `killer()`, a `killer()` that raises leaves up to 30 seconds (the wait before `proc.kill()`) in which `bridge-stop.py` cannot find the run; the watch branch already worked this way (the audit and Review A, round 1).
+  - An empty `PYTHONIOENCODING` from the caller is kept as set (Python treats it as unset), and a key-file name differing only in case would sit beside the default (Review A, round 1).
+  - The briefs' `Round cause:` lines named their causes in prose; the launcher logged each as unstated because no line opened with one of its category words (defect, security, fix-induced, no external path, records, builder incomplete, brief error, base update). The next round brief starts its line with the category.
+  - Reports: round 1 cited three test ids that do not exist and described M5 as another mutation; round 2 repeated the M5 error and cited parametrized tests by bare names; round 3 elided a failure trace with `...` and quoted step 5's status before the report file existed (Review A).
+- **Records.** R-112 stays planned until TASK-096 (the plan), which writes it.
+
 ## Hotfix 2026.11.24a - the heavy slots (HOTFIX-004)
 
 ### Deviations and leads drawn under the gate (2026-11-25)
