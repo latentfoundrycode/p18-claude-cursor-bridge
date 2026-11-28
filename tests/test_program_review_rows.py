@@ -8,7 +8,8 @@ enforces: docs/REQUIREMENTS.md R-079; docs/BUILD_PLAN.md, TASK-061's Done when.
 - `review-guard.py verify` prints, after its verdict and never changing it or the exit code, one note naming the
   launcher rows written during the review's own run by id and kind, the review's own row apart, and no note where
   there is none.
-- After the bridge's own launcher tests have run, the checkout's `run/launcher/runs.jsonl` holds no row of theirs.
+- After the bridge's test files that name the launcher have run, the checkout's `run/launcher/runs.jsonl` holds no
+  row of theirs and its `run/launcher/pids/` is as it was (widened by R-112, TASK-090).
 
 At the checkpoint every case is red but the controls. The builder adds its cases to the launcher test files and
 tests/test_review_guard.py and edits nothing in this file.
@@ -27,8 +28,35 @@ from test_review_guard import git, guard, repo  # noqa: F401  (repo is a fixture
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORKSPACE = os.path.abspath(os.path.join(HERE, os.pardir))
 CHECKOUT_LOG = os.path.join(WORKSPACE, "run", "launcher", "runs.jsonl")
-LAUNCHER_TESTS = ["tests/test_bridge_run.py", "tests/test_bridge_run_slot.py", "tests/test_bridge_run_driver.py",
-                  "tests/test_release_s_launcher.py"]
+CHECKOUT_PIDS = os.path.join(WORKSPACE, "run", "launcher", "pids")
+NAMES_THE_LAUNCHER = re.compile(r"bridge[-_]run")
+
+
+def launcher_tests():
+    """Every test file that names the launcher (R-112, C36), this file apart (it would run itself)."""
+    found = []
+    for name in sorted(os.listdir(HERE)):
+        if not (name.startswith("test_") and name.endswith(".py")) or name == os.path.basename(__file__):
+            continue
+        with open(os.path.join(HERE, name), encoding="utf-8", errors="replace") as f:
+            if NAMES_THE_LAUNCHER.search(f.read()):
+                found.append("tests/" + name)
+    return found
+
+
+def pid_folder_state():
+    """The checkout's pid folder: each file's name and bytes, or None where the folder is absent."""
+    if not os.path.isdir(CHECKOUT_PIDS):
+        return None
+    state = {}
+    for name in sorted(os.listdir(CHECKOUT_PIDS)):
+        path = os.path.join(CHECKOUT_PIDS, name)
+        try:
+            with open(path, "rb") as f:
+                state[name] = f.read()
+        except OSError:
+            state[name] = None
+    return state
 
 
 def write_rows(folder, rows):
@@ -286,14 +314,21 @@ def test_r079_verify_finds_a_suffixed_review_row(repo):
 @pytest.mark.skipif(not os.path.isdir(os.path.join(WORKSPACE, "run")),
                     reason="the launcher writes its log only where the checkout has a run/ folder (absent in CI)")
 def test_r079_the_launcher_tests_write_no_row_into_the_checkout(tmp_path):
-    """The bridge's own launcher tests each start the launcher in a temporary Workspace of their own, by their own
-    arrangement: run in a subprocess, they leave the checkout's run log as it was."""
+    """The bridge's test files that name the launcher each start it in a temporary Workspace of their own, by their
+    own arrangement: run in a subprocess, they leave the checkout's run log and its pid folder as they were (R-079;
+    widened by R-112, C36, from the four launcher test files to every test file that names the launcher and to the
+    pid folder)."""
+    files = launcher_tests()
+    assert "tests/test_bridge_run.py" in files and len(files) > 4, files
     before = open(CHECKOUT_LOG, "rb").read() if os.path.isfile(CHECKOUT_LOG) else None
+    pids_before = pid_folder_state()
     env = {k: v for k, v in os.environ.items() if k.upper() not in ("BRIDGE_RUN_ALLOW_ANY", "BRIDGE_RUN_SLOT_SCALE")}
-    p = subprocess.run([sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q"] + LAUNCHER_TESTS,
-                       capture_output=True, text=True, cwd=WORKSPACE, env=env, timeout=3000)
+    p = subprocess.run([sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q"] + files,
+                       capture_output=True, text=True, cwd=WORKSPACE, env=env, timeout=10800)
     assert " passed" in p.stdout, p.stdout[-3000:] + p.stderr[-2000:]
     after = open(CHECKOUT_LOG, "rb").read() if os.path.isfile(CHECKOUT_LOG) else None
     if before != after:
         new = (after or b"")[len(before or b""):].decode("utf-8", "replace")
         pytest.fail("the launcher tests wrote rows into the checkout's run log:\n" + new[:3000])
+    pids_after = pid_folder_state()
+    assert pids_after == pids_before, ("the launcher tests changed the checkout's pid folder", pids_before, pids_after)
