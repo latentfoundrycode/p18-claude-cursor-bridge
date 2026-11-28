@@ -2796,6 +2796,19 @@ Each is fixed by the next increment that edits its record.
   - Reports: round 1 cited three test ids that do not exist and described M5 as another mutation; round 2 repeated the M5 error and cited parametrized tests by bare names; round 3 elided a failure trace with `...` and quoted step 5's status before the report file existed (Review A).
 - **Records.** R-112 stays planned until TASK-096 (the plan), which writes it.
 
+### TASK-091 - the heavy slot's line names the holder's limit, project and branch (R-113; stage I2, 2026-11-28)
+- **The acceptance file**, tests/test_improve_slot_line.py, the supervisor's: 21 tests, 19 red on the checkpoint and two controls (a folder name outside the list is not written; no new option). They cover the record's `project` (the launch folder's parent where the launch folder is named `Workspace`, its own name otherwise; never a path) and `branch` (the run's log branch); the waiter's line at once and at each repeat, the line at the bound and the several-slot line, each going on with `, limit <n>s`, then `, project <name>` and `, branch <branch>` where the record holds them; a record without the fields, as 2026.11.23a writes it, read; a present field outside its list or bound making the record no live record (`held by unknown`).
+- **Changed expectations**, the supervisor's, the new tail and nothing else: tests/test_bridge_run_slot.py (three whole matches) and tests/test_hotfix24a_heavy_slots.py (a `TAIL_RE` on six whole matches). The plan's Scope gained tests/test_hotfix24a_heavy_slots.py at the checkpoint (a deviation told to the owner). tests/test_loop_text_windowless.py is unchanged: the loop's text holds the line's form up to `ends by <end>`, still a true prefix; the loop's text is TASK-096's.
+- **Round 1** (composer-2.5, the native profile): `HOLDER_PROJECT_RE` and `HOLDER_BRANCH_RE` (`fullmatch`, `re.ASCII`; 1 to 64 of `A-Z a-z 0-9 . _ -`, 1 to 100 of those and `/`), shared by the writer and the reader; `_launch_folder_project_name`; `_holder_line_suffix` on the three line forms; `log_branch` passed to the slot's publication. Review A APPROVE, the audit PASS. Own-file run (eleven files, the guard test included): 410 passed, 4 skipped.
+- **Assumed, not verified (the builder's), dispositioned:** a launch folder named `workspace` in another case names itself (accepted: the layout's name is `Workspace`; display only); a `Workspace` at a drive root gives no `project` (accepted); a detached checkout records `branch HEAD`, as its run row does (accepted; the report's wording of this item was inexact, Review A).
+- **Leads, recorded, not fixed (none of the five):**
+  - A heavy run launched in the owner's home folder, or in a `Workspace` folder directly under it, names the owner's user name as its `project`, printed on the waiting lines a supervisor may quote. The loop launches heavy runs from a project's Workspace, the lines land in gitignored run files, and the path scan before every push names the owner's names; a fix leaves `project` out where the folder it names is the real home (`bridge_env.real_home`) (the audit).
+  - `Workspace` is matched in its exact case; on Windows a launch folder typed `workspace` names itself (the audit and Review A; display only).
+  - `_acquire_heavy_slot_one`, reached only through `acquire_heavy_slot`, which only tests call, publishes no `project` or `branch` (Review A; consistent with an older record).
+  - No test asserts the folder lock's holder record directly; it is the same dict as the slot's, published after it (Review A).
+  - The report quoted no output for steps 1 and 3, no failing ids for step 2, shortened step 10's line, and described M3 as another mutation (Review A).
+- **Records.** R-113 reads built; its Evidence names the acceptance file.
+
 ## Hotfix 2026.11.24a - the heavy slots (HOTFIX-004)
 
 ### Deviations and leads drawn under the gate (2026-11-25)
